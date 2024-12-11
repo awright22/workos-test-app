@@ -21,7 +21,7 @@ workos_client = workos.WorkOSClient(
 
 # Enter Organization ID here
 
-CUSTOMER_ORGANIZATION_ID = "org_01JESB8PS536G663P3S58FJ6S9"  # Use org_test_idp for testing
+CUSTOMER_ORGANIZATION_ID = ""  # Use org_test_idp for testing
 
 
 def to_pretty_json(value):
