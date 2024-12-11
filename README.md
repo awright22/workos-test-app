@@ -79,33 +79,6 @@ An example Flask application demonstrating how to use the [WorkOS Python SDK](ht
 
 9. In `workos-test-app/app.py` change the `CUSTOMER_ORGANIZATION_ID` string value to the organization you will be testing the login for. This can be found in your WorkOS Dashboard.
 
-10. The final setup step is to start the server.
-
-```bash
-(env) $ flask run
-```
-
-If you are using macOS Monterey, port 5000 is not available and you'll need to start the app on a different port with this slightly different command.
-
-```bash
-(env) $ flask run -p 5001
-```
-
-You'll know the server is running when you see no errors in the CLI, and output similar to the following is displayed:
-
-```bash
-* Tip: There are .env or .flaskenv files present. Do "pip install python-dotenv" to use them.
-* Environment: production
-WARNING: This is a development server. Do not use it in a production deployment.
-Use a production WSGI server instead.
-* Debug mode: off
-* Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
-```
-
-Navigate to `localhost:5000`, or `localhost:5001` depending on which port you launched the server, in your web browser. You should see a "Login" button. If you click this link, you'll be redirected to an HTTP `404` page because we haven't set up SSO yet!
-
-You can stop the local Flask server for now by entering `CTRL + c` on the command line.
-
 ## SSO Setup with WorkOS
 
 Follow the [SSO authentication flow instructions](https://workos.com/docs/sso/guide/introduction) to set up an SSO connection.
@@ -142,15 +115,12 @@ If you get stuck, please reach out to us at support@workos.com so we can help.
 11. Naviagte to the `workos-test-app` directory. Source the virtual environment we created earlier, if it isn't still activated from the steps above. Start the Flask server locally.
 
 ```bash
-$ cd ~/Desktop/workos-test-app/
 $ source env/bin/activate
 (env) $ flask run
 ```
 
 Once running, navigate to `localhost:5000`, or `localhost:5001` depending on which port you launched the server, to test out the SSO workflow.
 
+12. Once you see the login screen, click "Enterprise SAML" to start the login flow. You should be redirect to Okta, and then the app after logging in successfully.
+
 Hooray!
-
-## Need help?
-
-If you get stuck and aren't able to resolve the issue by reading our API reference or tutorials, you can reach out to us at support@workos.com and we'll lend a hand.
