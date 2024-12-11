@@ -1,0 +1,35 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='login.css')}}">
+</head>
+
+<body class="container_success">
+    <div class='flex'>
+        
+        <div class="logged_in_div_right">
+            <div class="flex_column">
+                <div class="flex width-941px space-between">
+                    <div>
+                        <p>Your name is</p>
+                    </div>
+                    <div>
+                        <a href="/logout"><button class="button button-outline">Log Out</button></a>
+                    </div>                
+                </div>
+                <div>
+                    <pre id="noborder" class="prettyprint noborder">
+                        {{first_name}} {{last_name}}
+                    </pre>
+                </div>
+                <div>
+                    <a href="/users"><button class="button button-outline">View Directory Users -></button></a>
+                </div>    
+            </div>
+
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+</body>
+
+</html>
