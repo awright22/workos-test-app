@@ -3,6 +3,7 @@ import os
 from flask import Flask, session, redirect, render_template, request, url_for, make_response
 import workos
 from flask_lucide import Lucide
+from functools import wraps
 
 
 
