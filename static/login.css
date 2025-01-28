@@ -207,7 +207,25 @@ h2 {
 .button-outline {
   background-color: #f9f9fb;
   color: #6363f1;
-  padding: 8px 16px;
+  padding: 12px 24px;
+  display: inline-block;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.button-outline:hover {
+  background-color: #6363f1;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.user-name {
+  font-size: 18px;
+  color: #3A3A3A;
+  margin: 16px 0;
+  font-weight: 500;
 }
 
 .button-sm {
