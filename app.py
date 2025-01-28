@@ -142,5 +142,19 @@ def logout():
     return response
 
 
+@app.route("/game")
+@with_auth
+def game_page():
+    session = workos_client.user_management.load_sealed_session(
+        sealed_session=request.cookies.get("wos_session"),
+        cookie_password=cookie_password,
+    )
+    auth_response = session.authenticate()
+    if auth_response.authenticated:
+        user = auth_response.user
+        return render_template("game.html", first_name=user.first_name, last_name=user.last_name)
+    else:
+        return redirect("/login")
+
 if __name__ == "__main__":
     app.run(debug=True, port=3000)
