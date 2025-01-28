@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, session, redirect, render_template, request, url_for
+from flask import Flask, session, redirect, render_template, request, url_for, make_response
 import workos
 from flask_lucide import Lucide
 
@@ -23,6 +23,7 @@ workos_client = workos.WorkOSClient(
 
 CUSTOMER_ORGANIZATION_ID = ""  # Use org_test_idp for testing
 
+cookie_password = os.getenv("WORKOS_COOKIE_PASSWORD")
 
 def to_pretty_json(value):
     return json.dumps(value, sort_keys=True, indent=4)
@@ -30,73 +31,116 @@ def to_pretty_json(value):
 
 app.jinja_env.filters["tojson_pretty"] = to_pretty_json
 
+def with_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        session = workos_client.user_management.load_sealed_session(
+            sealed_session=request.cookies.get("wos_session"),
+            cookie_password=cookie_password,
+        )
+        auth_response = session.authenticate()
+        if auth_response.authenticated:
+            return f(*args, **kwargs)
+
+        if (
+            auth_response.authenticated == False
+            and auth_response.reason == "no_session_cookie_provided"
+        ):
+            return make_response(redirect("/login"))
+
+        # If no session, attempt a refresh
+        try:
+            print("Refreshing session")
+            result = session.refresh()
+            if result.authenticated == False:
+                return make_response(redirect("/login"))
+
+            response = make_response(redirect(request.url))
+            response.set_cookie(
+                "wos_session",
+                result.sealed_session,
+                secure=True,
+                httponly=True,
+                samesite="lax",
+            )
+            return response
+        except Exception as e:
+            print("Error refreshing session", e)
+            response = make_response(redirect("/login"))
+            response.delete_cookie("wos_session")
+            return response
+
+    return decorated_function
 
 @app.route("/")
-def login():
-    directory_id = os.getenv("DIRECTORY_ID")
+def login_successful():
+    # directory_id = os.getenv("DIRECTORY_ID")
 
-    try:
-        users = workos_client.directory_sync.list_users(directory_id=directory_id, limit=100)
-        return render_template(
-            "login_successful.html",
-            first_name=session["first_name"],
-            last_name=session["last_name"],
-            raw_profile=session["raw_profile"],
-            directory_id = request.args.get("id"),
-            users=users.data,
-        )
-    except KeyError:
-        return render_template("login.html")
-
-@app.route("/users")
-def directory_users():
-    directory_id = os.getenv("DIRECTORY_ID")
-    users = workos_client.directory_sync.list_users(directory_id=directory_id, limit=100)
-    return render_template("users.html", users=users)
-
-@app.route("/auth", methods=["POST"])
-def auth():
-
-    login_type = request.form.get("login_method")
-    if login_type not in (
-        "saml",
-        "GoogleOAuth",
-        "MicrosoftOAuth",
-    ):
-        return redirect("/")
-
-    redirect_uri = url_for("auth_callback", _external=True)
-
-    authorization_url = (
-        workos_client.sso.get_authorization_url(
-            redirect_uri=redirect_uri, organization_id=CUSTOMER_ORGANIZATION_ID
-        )
-        if login_type == "saml"
-        else workos_client.sso.get_authorization_url(
-            redirect_uri=redirect_uri, provider=login_type
-        )
+    session = workos_client.user_management.load_sealed_session(
+        sealed_session=request.cookies.get("wos_session"),
+        cookie_password=cookie_password,
     )
+    response = session.authenticate()
 
-    return redirect(authorization_url)
+    if response.authenticated:
+        user = response.user
+        return render_template("login_successful.html", first_name=user.first_name, last_name=user.last_name)
+    else:
+        return render_template("login.html")
 
 
 @app.route("/auth/callback")
 def auth_callback():
 
     code = request.args.get("code")
-    # Why do I always get an error that the target does not belong to the target organization?
-    if code is None:
-        return redirect("/")
-    profile = workos_client.sso.get_profile_and_token(code).profile
-    session["first_name"] = profile.first_name
-    session["last_name"] = profile.last_name
-    session["raw_profile"] = profile.dict()
-    session["session_id"] = profile.id
-    return redirect("/")
 
+    try:
+        auth_response = workos_client.user_management.authenticate_with_code(
+            code=code,
+            session={"seal_session": True, "cookie_password": cookie_password},
+        )
+
+        print("Successfully authenticated")
+
+        # store the session in a cookie
+        response = make_response(redirect("/"))
+        response.set_cookie(
+            "wos_session",
+            auth_response.sealed_session,
+            secure=True,
+            httponly=True,
+            samesite="lax",
+        )
+        return response
+
+    except Exception as e:
+        print("Error authenticating with code", e)
+        return redirect(url_for("/login"))
+
+@app.route("/login")
+def login():
+    redirect_uri = os.getenv("WORKOS_REDIRECT_URI")
+    print("Using redirect URI:", redirect_uri)
+    authorization_url = workos_client.user_management.get_authorization_url(
+        provider="authkit", redirect_uri=os.getenv("WORKOS_REDIRECT_URI")
+    )
+
+    return redirect(authorization_url)
 
 @app.route("/logout")
 def logout():
-    session.clear()
-    session["raw_profile"] = ""
-    return redirect("/")
+    session = workos_client.user_management.load_sealed_session(
+        sealed_session=request.cookies.get("wos_session"),
+        cookie_password=cookie_password,
+    )
+    url = session.get_logout_url()
+
+    # After log out has succeeded, the user will be redirected to your app homepage which is configured in the WorkOS dashboard
+    response = make_response(redirect(url))
+    response.delete_cookie("wos_session")
+
+    return response
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=3000)
