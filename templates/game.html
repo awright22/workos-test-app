@@ -25,8 +25,8 @@
 </head>
 <body class="height-100vh">
     <div class="flex flex_column height-80vh">
-        <div class="flex height-40vh">
-            <div class="card">
+        <div class="flex" style="margin: auto;">
+            <div class="card" style="width: 900px; margin: auto; padding: 20px;">
                 <h2 class="game-title">Mario {{ first_name }} {{ last_name }}</h2>
                 <div id="game-container"></div>
                 <a href="/" class="button button-outline back-link">Back to Dashboard</a>
@@ -129,10 +129,12 @@
             if (cursors.left.isDown) {
                 player.setVelocityX(-160);
                 player.anims.play('left', true);
-            } else if (cursors.right.isDown) {
+            }
+            if (cursors.right.isDown) {
                 player.setVelocityX(160);
                 player.anims.play('right', true);
-            } else {
+            }
+            if (!cursors.left.isDown && !cursors.right.isDown) {
                 player.setVelocityX(0);
                 player.anims.play('turn');
             }
