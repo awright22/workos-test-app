@@ -1,3 +1,8 @@
+:root {
+  --primary-color: #6363f1;
+  --primary-color-hover: #5151d3;
+}
+
 body {
   font-family: Inter, sans-serif;
   background-color: #F8F8F7;
@@ -181,8 +186,8 @@ h2 {
 }
 
 .button {
-  background-color: #6363f1;
-  border: 2px solid #6363f1;
+  background-color: var(--primary-color);
+  border: 2px solid var(--primary-color);
   border-radius: 6px;
   color: white;
   padding: 12px 24px;
@@ -198,15 +203,15 @@ h2 {
 }
 
 .button:hover {
-  background-color: #5151d3;
-  border-color: #5151d3;
+  background-color: var(--primary-color-hover);
+  border-color: var(--primary-color-hover);
   transform: translateY(-1px);
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .button-outline {
   background-color: #f9f9fb;
-  color: #6363f1;
+  color: var(--primary-color);
   padding: 12px 24px;
   display: inline-block;
   text-decoration: none;
@@ -226,6 +231,19 @@ h2 {
   color: #3A3A3A;
   margin: 16px 0;
   font-weight: 500;
+}
+
+.color-select-container {
+  margin: 16px 0;
+}
+
+.color-select {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  width: 100%;
+  font-size: 14px;
 }
 
 .button-sm {
@@ -251,7 +269,7 @@ h2 {
 }
 
 .login_button:hover {
-  border-color: #6363f1;
+  border-color: var(--primary-color);
   color: #292929;
 }
 

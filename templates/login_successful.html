@@ -5,6 +5,20 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter">
 </head>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const colorSelect = document.getElementById('colorSelect');
+        colorSelect.addEventListener('change', function() {
+            document.documentElement.style.setProperty('--primary-color', this.value);
+            // Calculate a darker shade for hover state (20% darker)
+            const darkerColor = this.value.replace(/^#/, '').match(/.{2}/g)
+                .map(hex => Math.max(0, parseInt(hex, 16) * 0.8).toString(16).padStart(2, '0'))
+                .join('');
+            document.documentElement.style.setProperty('--primary-color-hover', '#' + darkerColor);
+        });
+    });
+</script>
+
 <body class="height-100vh">
     <div class="flex flex_column height-80vh">
         <div class='flex height-40vh'>
@@ -12,6 +26,15 @@
                 <h2>Welcome!</h2>
                 <p class="subtitle">You are now signed in as:</p>
                 <p class="user-name">{{first_name}} {{last_name}}</p>
+                <div class="color-select-container">
+                    <label for="colorSelect" class="subtitle">Choose a primary color:</label>
+                    <select id="colorSelect" name="colorSelect" class="color-select">
+                        <option value="#6363f1">Default Blue</option>
+                        <option value="#ff0000">Red</option>
+                        <option value="#00ff00">Green</option>
+                        <option value="#0000ff">Blue</option>
+                    </select>
+                </div>
                 <a href="/game" class="button">Play Mini-Game</a>
                 <a href="/logout" class="button button-outline">Log Out</a>
             </div>
