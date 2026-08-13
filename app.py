@@ -157,5 +157,10 @@ def game_page():
     else:
         return redirect("/login")
 
+@app.route("/martian")
+def martian_page():
+    return render_template("martian.html")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=3000)
