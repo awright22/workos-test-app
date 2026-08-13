@@ -1,65 +1,69 @@
-# STRANDED — A Martian Survival Game
+# STRANDED II — A Martian Survival Game
 
-A browser-based 3D survival game inspired by *The Martian*. You are stranded on
-Mars with a leaking suit, a Hab, ten ration packs, and a botany degree everyone
-laughed at. Survive to Sol 12, then fly home.
+A browser-based, full-planet 3D survival game inspired by *The Martian*. You are
+stranded **somewhere random on a spherical, geographically real Mars** — Olympus
+Mons, Valles Marineris, Hellas, both ice caps, and all fourteen real landers are
+out there at their true coordinates. Survive, farm, salvage, phone home, and
+drive to Schiaparelli crater to fly out.
 
 ## Play it
 
 - **Via Flask**: run the app and open `/martian` — no login required.
 - **Standalone**: serve this directory statically (`python3 -m http.server`)
-  and open `index.html`. Everything is local; no CDN, no network needed.
+  and open `index.html`. No CDN, no network, everything is procedural.
 
-## How to survive
+## The planet
 
-The movie is the walkthrough:
+- A real sphere (1:282 scale) you can circumnavigate — 75 km around. Day and
+  night depend on where you stand; the poles get twilight, local time is real.
+- Terrain is an analytic model of actual Mars topography: the crustal dichotomy,
+  the Tharsis rise and its volcanoes, the Valles Marineris chasma chain
+  (Noctis, Ius, Melas, Coprates, Eos, Capri), Hellas/Argyre/Isidis/Utopia,
+  Gale with Mount Sharp, both polar caps, and more — all at real coordinates.
+- Every soft-landed Mars probe is placed where history left it, from Mars 3
+  (1971) to Zhurong (2021), each salvageable and each with a journal entry.
+- Pathfinder really is in Ares Vallis. The Ares 4 MAV really is at Schiaparelli.
+  Your crash site is random — the expedition lengths are whatever fate deals.
 
-1. **Cold open** — your suit is punctured. Sprint (`Shift`) to the Hab and seal it.
-2. **Take stock** — inspect the oxygenator and water reclaimer, run the numbers
-   at the comms desk.
-3. **Farm** — dig regolith outside, fill the beds in the Hab, plant seed
-   potatoes, keep them watered.
-4. **Make water** — burn hydrazine. The first attempt goes... the way it went
-   in the movie.
-5. **Keep the lights on** — solar panels collect dust (storms make it worse).
-   Wipe them or the battery dies, and life support idles with it.
-6. **Phone home** — from Sol 4 the charts point to Pathfinder, ~320 m NW. Take
-   the rover, dig it out, park it on the painted ring by the Hab, connect it.
-7. **Survive** — a dust storm is always forecast one sol ahead. Sol 7 has a
-   surprise for your Hab canvas. Duct tape is undefeated.
-8. **Launch** — on Sol 12 drive to the MAV, strip the excess weight (nose cone,
-   seats, dignity), and punch it.
+## The game
+
+- **Survival**: six bars (suit O2, hab O2, water, food, power, vitals), potato
+  farming, hydrazine water-making, solar panels vs. dust, roaming planetary
+  dust storms, a Hab breach event, day/night temperature swings.
+- **Exploration**: drivable rover with its own power and O2 tank; discovery
+  journal for landmarks and landers; achievements; a full orbital-survey map
+  (`M`) drawn from the same terrain model.
+- **Crafting** (`C`): scrap + circuits from salvage build O2 candles, portable
+  solar panels, greenhouse domes (farm anywhere), nav beacons, O2 caches, and
+  nine permanent upgrades (rover drivetrains, suit tanks, CO2 recycler, ice
+  drill, the RTG...). Some need blueprints from NASA survey quests.
+- **Quests** (`J`): after you connect Pathfinder, NASA radios survey tasks that
+  pull you across the planet — Viking, Spirit, Opportunity, InSight, Phoenix,
+  Mars 3 — each paying out supply pods and blueprints.
+- **Structure**: dawn auto-checkpoints, auto-save (continue any time), three
+  difficulties — BOTANIST (Sol 20 rescue, gentle), ENGINEER (Sol 45, intended),
+  SPACE PIRATE (Sol 60, death deletes the save).
 
 ## Controls
 
 | Key | Action |
 | --- | ------ |
-| `W A S D` | Move |
-| Mouse | Look (pointer lock, or hold-and-drag where pointer lock is unavailable) |
+| `W A S D` | Move / drive |
+| Mouse | Look (pointer lock, or hold-drag fallback) |
 | `Shift` | Sprint |
 | `Space` | Jump (Mars gravity) |
-| `E` (hold) | Interact — everything is one verb |
-| `F` | Exit the rover |
-| `Esc` | Pause |
-
-## Systems
-
-Six bars, one rule — none of them reaches zero:
-
-- **SUIT O2** drains on EVA (faster when sprinting), refills instantly in the
-  Hab or rover. It is your leash.
-- **HAB O2** is made by the oxygenator — while there's power.
-- **H2O** — drinking, farming, and the water reclaimer's recycling all pull on
-  it. Hydrazine is the pressure valve.
-- **FOOD** — rations plus potatoes; one meal is consumed at dawn each sol.
-- **PWR** — solar in daylight, scaled by panel dust; life support runs on it.
-- **VITALS** — what happens when you neglect the other five.
-
-The game auto-checkpoints at every dawn; dying rewinds to the morning.
+| `E` (hold) | Interact — one verb for everything |
+| `X` | Crack an O2 candle |
+| `F` | Exit rover |
+| `M` / `C` / `J` | Map · Colony & crafting · Journal |
+| `Esc` | Pause (auto-saves) |
 
 ## Tech
 
-- Single `game.js` (~2100 lines), no dependencies beyond the vendored
-  three.js r147 UMD build (`three.min.js`).
-- All assets are procedural: geometry, canvas textures, WebAudio synthesis
+- Single `game.js` (~3,800 lines) + vendored three.js r147. No other deps.
+- Spherical engine: quaternion body frames (no pole singularities),
+  camera-relative rendering (no float32 jitter at planet scale), a seam-free
+  displaced globe mesh plus a double-buffered high-detail terrain patch that
+  follows you, deterministic world-stable rock fields, analytic-height physics.
+- All assets procedural: geometry, canvas textures, WebAudio synthesis
   (including the disco).
