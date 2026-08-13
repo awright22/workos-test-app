@@ -794,7 +794,7 @@ function applyCamera() {
 const sunDir = new THREE.Vector3(1, 0, 0);
 function updateSunDir() {
   const a = S.tod * Math.PI * 2;
-  sunDir.set(Math.cos(a), 0, -Math.sin(a));
+  sunDir.set(Math.cos(a), 0, Math.sin(a));
 }
 
 // stars
@@ -1029,15 +1029,20 @@ function scatterRocks(up) {
   const anchorPos = up.clone().multiplyScalar(surfaceH(up.x, up.y, up.z, false));
   rocksMesh.position.copy(anchorPos);
   const cells = Math.floor(ROCK_RANGE / ROCK_CELL);
+  const seenCells = new Set();
   let placed = 0;
   for (let cy = -cells; cy <= cells && placed < 420; cy++) {
     for (let cx = -cells; cx <= cells && placed < 420; cx++) {
       // world-stable cell id from the quantized cell-center direction
       _pd.copy(up).addScaledVector(_pe, cx * ROCK_CELL / R).addScaledVector(_pn, cy * ROCK_CELL / R).normalize();
       const qx = Math.round(_pd.x * R / ROCK_CELL), qy = Math.round(_pd.y * R / ROCK_CELL), qz = Math.round(_pd.z * R / ROCK_CELL);
+      const cellKey = qx + '|' + qy + '|' + qz;
+      if (seenCells.has(cellKey)) continue;
+      seenCells.add(cellKey);
       const h1 = hash3(qx, qy, qz), h2 = hash3(qx + 91, qy + 7, qz), h3 = hash3(qx, qy + 313, qz + 17);
       if (h1 < 0.45) continue;                       // not every cell has a rock
-      // deterministic offset within the cell
+      // rebuild from the world-stable lattice center, then apply the deterministic offset
+      _pd.set(qx, qy, qz).multiplyScalar(ROCK_CELL / R).normalize();
       _pd.addScaledVector(_pe, (h2 - 0.5) * ROCK_CELL * 0.9 / R).addScaledVector(_pn, (h3 - 0.5) * ROCK_CELL * 0.9 / R).normalize();
       const latDeg = Math.abs(Math.asin(clamp(_pd.y, -1, 1)) / d2r);
       if (latDeg > 76) continue;
@@ -1235,6 +1240,12 @@ function pickSpawn(rng) {
     const pf = llToVec(19.13, 326.79), mav = llToVec(-2.71, 16.77);
     if (angDist(u.x, u.y, u.z, pf.x, pf.y, pf.z) * R < 2500) continue; // keep the story a road trip
     if (angDist(u.x, u.y, u.z, mav.x, mav.y, mav.z) * R < 2500) continue;
+    let stormed = false;
+    for (const c of (S.storm.cells || [])) {
+      const cv = llToVec(c.lat, c.lon);
+      if (angDist(u.x, u.y, u.z, cv.x, cv.y, cv.z) * R < c.r + 2500) { stormed = true; break; }
+    }
+    if (stormed) continue;                        // don't found a colony inside a dust cell
     return { lat, lon, v: u };
   }
   return { lat: 18, lon: 340, v: llToVec(18, 340) };                  // safe fallback
@@ -1439,7 +1450,7 @@ function addFarmPlot(parent, px, pz, collide) {
 // ============================================================
 function buildRover(group) {
   mkBox(2.4, 1.3, 4.2, 0xd8d0c0, 0, 1.35, 0, group);
-  mkBox(2.0, 0.9, 1.6, 0x9ab0c0, 0, 2.35, 0.7, group, { transparent: true, opacity: 0.85 });
+  mkBox(2.0, 0.9, 1.6, 0x9ab0c0, 0, 2.35, -0.7, group, { transparent: true, opacity: 0.85 });
   mkBox(2.42, 0.2, 4.22, 0xc06a30, 0, 0.85, 0, group);
   const wheels = [];
   for (let i = 0; i < 6; i++) {
@@ -1449,9 +1460,9 @@ function buildRover(group) {
     wheels.push(w);
   }
   const hl = new THREE.SpotLight(0xfff2d8, 0, 60, 0.5, 0.4);
-  hl.position.set(0, 1.6, 2.1);
+  hl.position.set(0, 1.6, -2.1);
   group.add(hl);
-  const hlT = new THREE.Object3D(); hlT.position.set(0, 0.6, 14);
+  const hlT = new THREE.Object3D(); hlT.position.set(0, 0.6, -14);
   group.add(hlT); hl.target = hlT;
   World.rover = { group, wheels, headlight: hl, speed: 0 };
   World.roverCollider = { v: group.position.clone().normalize(), r: 2.6 };
@@ -1557,11 +1568,11 @@ function buildDeployable(kind, atVec) {
   } else if (kind === 'beacon') {
     mkCyl(0.05, 0.07, 2.6, 0x9a9a9a, 0, 1.3, 0, g, 6);
     mkBox(0.22, 0.22, 0.22, 0x33ccff, 0, 2.7, 0, g, { emissive: 0x1188cc });
-  } else if (kind === 'o2cache') {
+  } else if (kind === 'cache') {
     mkCyl(0.4, 0.4, 1.3, 0x7fd4ff, 0, 0.65, 0, g, 10);
     mkBox(0.5, 0.2, 0.3, 0x5a6a72, 0, 1.4, 0, g);
   }
-  const b = { kind, group: g, v: g.position.clone().normalize(), charges: kind === 'o2cache' ? 3 : 0 };
+  const b = { kind, group: g, v: g.position.clone().normalize(), charges: kind === 'cache' ? 3 : 0 };
   World.builtMeshes.push(b);
   return b;
 }
@@ -1610,7 +1621,7 @@ window.addEventListener('keydown', (ev) => {
     if (screenOpen()) closeScreens();
     else if (!S.uiOpen) showPause();
   }
-  if (k === 'f' && S.mode === 'rover') exitRover();
+  if (k === 'f' && S.mode === 'rover' && !S.uiOpen && !screenOpen()) exitRover();
   if (!S.uiOpen && !S.flags.coldOpen) {
     if (k === 'm') toggleScreen('map');
     if (k === 'c') toggleScreen('colony');
@@ -1849,6 +1860,10 @@ function updateRover(dt) {
   if (hadHit) RV.speed *= 0.5;
   RV.q.normalize();
   syncRoverVisual(dt);
+  // keep the player frame glued to the rover so map/objectives/clock stay live
+  player.q.copy(RV.q);
+  player.alt = 0; player.vy = 0;
+  syncPlayerPos();
   // rover power: drains while driving (worse at night), trickle solar when parked in daylight
   const sunEl = _v1.set(0, 1, 0).applyQuaternion(RV.q).dot(sunDir);
   const night = sunEl < 0.05;
@@ -1934,7 +1949,7 @@ function nearHab() { return habGroup && groundDist(player.pos, habGroup.position
 
 // O2 candle hotkey
 window.addEventListener('keydown', (ev) => {
-  if (ev.key.toLowerCase() !== 'x' || !S.started || S.uiOpen || S.over) return;
+  if (ev.key.toLowerCase() !== 'x' || !S.started || S.uiOpen || screenOpen() || S.over) return;
   if ((S.inv.candle || 0) > 0 && S.suit < suitCap() - 5) {
     S.inv.candle--;
     S.suit = clamp(S.suit + 40, 0, suitCap());
@@ -2283,15 +2298,15 @@ addI({
 });
 addI({
   pos: () => World.rover.group.position, r: 1e9, hold: 0.4, mode: 'rover',
-  visible: () => Math.abs(roverF.speed) < 1.5,
+  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() >= 0.05,
   label: () => 'Step out',
-  sub: () => localSunEl() < 0.05 ? 'or hold to camp: sleep here until dawn' : '',
   use: () => exitRover(),
 });
 addI({
-  pos: () => World.rover.group.position, r: 1e9, hold: 2.2, mode: 'rover', priority: 1,
+  pos: () => World.rover.group.position, r: 1e9, hold: 2.2, mode: 'rover',
   visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() < 0.05,
   label: () => 'Camp in the rover until dawn',
+  sub: () => 'press F to step out instead',
   use: () => sleepToDawn(true),
 });
 // pathfinder pickup + uplink connect
@@ -2422,7 +2437,7 @@ addI({
   pos: () => {
     let best = null, bestD = 3.5;
     for (const b of World.builtMeshes) {
-      if (b.kind !== 'o2cache' || b.charges <= 0) continue;
+      if (b.kind !== 'cache' || b.charges <= 0) continue;
       const d = groundDist(player.pos, b.group.position);
       if (d < bestD) { bestD = d; best = b; }
     }
@@ -2725,7 +2740,8 @@ function advanceTime(dt) {
   if (S.storm.i > 0.4 && !S.inside && S.mode === 'walk') S.stats.stormOut += dt;
   // breach event: waits for a sol >= BREACH_SOL when the player is near home
   if (S.sol >= 7 && S.tod > 0.1 && !S.breach.done && !S.breach.active &&
-      groundDist(player.pos, habGroup.position) < 800 && !S.flags.coldOpen && S.mode !== 'cutscene') {
+      groundDist(S.mode === 'rover' ? World.rover.group.position : player.pos, habGroup.position) < 800 &&
+      !S.flags.coldOpen && S.mode !== 'cutscene') {
     S.breach.active = true;
     S.breach.timer = 0;
     S.shake = 1.4;
@@ -2942,6 +2958,8 @@ function questTargetPos(q) {
 }
 function offerQuests() {
   for (const q of QUEST_DEFS) if (!S.quests[q.id]) S.quests[q.id] = 'active';
+  // retro-complete survey tasks for landers already stripped before the uplink
+  for (const name of Object.keys(S.salvaged)) onQuestEvent('salvage', name);
   log('NASA uploaded survey tasks — old landers with parts worth saving. Check the journal [J]. They pay in supply pods.', 'nasa');
   // the care package: ice drill blueprint arrives with the first pod
   dropSupplyPod({ scrap: 3, rations: 3, candle: 1 }, 'Open NASA care package').blueprint = 'drill';
@@ -2955,7 +2973,7 @@ function onQuestEvent(type, name) {
       let cache = false, beacon = false;
       for (const b of World.builtMeshes) {
         const d = groundDist(b.group.position, habGroup.position);
-        if (d > 2000 && b.kind === 'o2cache') cache = true;
+        if (d > 2000 && b.kind === 'cache') cache = true;
         if (d > 2000 && b.kind === 'beacon') beacon = true;
       }
       hit = cache && beacon;
@@ -3152,7 +3170,7 @@ function updateCompass() {
 // ============================================================
 function fmtClock() {
   const ll = vecToLl(_v1.copy(player.pos).normalize());
-  let h = ((ll.lon - S.tod * 360) / 360 * 24.66 + 12) % 24.66;
+  let h = ((ll.lon + S.tod * 360) / 360 * 24.66 + 12) % 24.66;
   if (h < 0) h += 24.66;
   const mn = Math.floor((h % 1) * 60);
   return `LT ${String(Math.floor(h)).padStart(2, '0')}:${String(mn).padStart(2, '0')}`;
@@ -3275,7 +3293,7 @@ function renderMap() {
   for (const b of World.builtMeshes)
     dot(b.group.position, b.kind === 'beacon' ? '#4fd8ff' : '#c0b090', b.kind === 'beacon' ? 'beacon' : '');
   for (const p of World.pods) if (!p.taken) dot(p.group.position, '#ffd27f', 'cache');
-  if (S.flags.pfRevealed && !S.pf.connected) dot(World.pathfinder.position, '#ffef9e', 'PATHFINDER');
+  if (S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected) dot(World.pathfinder.position, '#ffef9e', 'PATHFINDER');
   dot(World.mav.position, S.flags.mavRevealed ? '#ff7f5f' : 'rgba(255,127,95,0.5)', 'ARES 4 MAV');
   dot(habGroup.position, '#7fff9e', 'HAB');
   dot(World.rover.group.position, '#ffb45e', 'rover');
@@ -3439,6 +3457,12 @@ function applyState(d) {
   S.breach = { ...d.breach }; S.pf = { ...d.pf };
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
+  // rebuild deployed structures FIRST so greenhouse plots exist before plot restore
+  for (let i = World.builtMeshes.length; i < (d.built || []).length; i++) {
+    const b = d.built[i];
+    const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon));
+    bb.charges = b.charges;
+  }
   d.plots.forEach((cp, i) => { if (World.plots[i]) Object.assign(World.plots[i], cp); });
   d.panels.forEach((v, i) => { if (World.panels[i]) World.panels[i].dust = v; });
   d.piles.forEach((v, i) => { if (World.soilPiles[i]) World.soilPiles[i].left = v; });
@@ -3455,12 +3479,6 @@ function applyState(d) {
   d.pods.forEach((v, i) => { if (World.pods[i]) World.pods[i].taken = v; });
   d.ice.forEach((v, i) => { if (World.iceSites[i]) World.iceSites[i].left = v; });
   if (World.rtgSite) World.rtgSite.taken = d.rtgTaken;
-  // rebuild deployed structures missing from the world (load path); never remove extras
-  for (let i = World.builtMeshes.length; i < d.built.length; i++) {
-    const b = d.built[i];
-    const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon));
-    bb.charges = b.charges;
-  }
   for (let i = 0; i < Math.min(World.builtMeshes.length, d.built.length); i++)
     World.builtMeshes[i].charges = d.built[i].charges;
   player.q.fromArray(d.playerQ);
@@ -3585,13 +3603,18 @@ function winGame() {
       `If a hiker gets lost, people organize a search party. This is why\n` +
       `they came back for me." — M. Watney, space pirate, greatest botanist\n` +
       `on two planets.`,
-    buttons: [{ label: 'PLAY AGAIN (new random site)', fn: () => { try { location.reload(); } catch (e) {} } }],
+    buttons: [{ label: 'PLAY AGAIN (new random site)', keep: true, fn: () => tryReload() }],
   });
 }
 
 // ============================================================
 // 32. DEATH & PAUSE
 // ============================================================
+function tryReload() {
+  try { location.reload(); } catch (e) {}
+  // if the host blocked reload, the overlay stays up (keep:true) — say why
+  setTimeout(() => toast('SYSTEM', 'Reload blocked by host page', 'Refresh the page manually to restart.'), 400);
+}
 function die(cause) {
   if (S.over) return;
   S.over = true;
@@ -3601,7 +3624,7 @@ function die(cause) {
   if (iron) wipeSave();
   const buttons = [];
   if (!iron && CHECKPOINT) buttons.push({ label: `WAKE AT DAWN (SOL ${CHECKPOINT.sol})`, fn: () => restoreCheckpoint() });
-  buttons.push({ label: 'RESTART FROM SOL 1', ghost: !iron, fn: () => { wipeSave(); try { location.reload(); } catch (e) {} } });
+  buttons.push({ label: 'RESTART FROM SOL 1', ghost: !iron, keep: true, fn: () => { wipeSave(); tryReload(); } });
   showOverlay({
     title: 'YOU DIED ON MARS',
     subtitle: `Sol ${S.sol} · ${(S.stats.driven / 1000).toFixed(1)} km driven · ${S.stats.potatoes} potatoes grown` + (iron ? ' · SPACE PIRATE: save deleted' : ''),
@@ -3622,7 +3645,7 @@ function showPause() {
       'the Hab refills the rover; the sun refills the Hab. Keep the chain alive.',
     buttons: [
       { label: 'RESUME', fn: () => tryLock() },
-      { label: 'RESTART RUN', ghost: true, fn: () => { wipeSave(); try { location.reload(); } catch (e) {} } },
+      { label: 'RESTART RUN', ghost: true, keep: true, fn: () => { wipeSave(); tryReload(); } },
     ],
   });
 }
@@ -3635,9 +3658,10 @@ function newGame(diffKey) {
   S.diff = diffKey;
   S.rescueSol = DIFFICULTIES[diffKey].rescueSol;
   S.drainMult = DIFFICULTIES[diffKey].drain;
+  initStorms();                                   // before pickSpawn: it rejects storm cells
   SPAWN = pickSpawn(Math.random);
   // start the global sun so it is ~08:00 LOCAL time at the crash site
-  S.tod = (((SPAWN.lon + 58.4) / 360) % 1 + 1) % 1;
+  S.tod = ((-(SPAWN.lon + 58.4) / 360) % 1 + 1) % 1;
   updateSunDir();
   buildWorldAtSpawn();
   // cold open: wake ~85m from the hab, suit leaking, facing home
@@ -3646,7 +3670,6 @@ function newGame(diffKey) {
   syncPlayerPos();
   frameYaw(player.q, bearingTo(player.pos, habGroup.position, player.q));
   player.alt = 0; syncPlayerPos();
-  initStorms();
   S.started = true;
   if (!dragMode) tryLock();
   Snd.wind(0.2);
@@ -3738,7 +3761,7 @@ function frame() {
     return;
   }
   if (S.over && S.mode !== 'cutscene') { applyCamera(); renderer.render(scene, camera); return; }
-  if (S.uiOpen && !S.sleeping) { applyCamera(); renderer.render(scene, camera); return; }
+  if ((S.uiOpen || screenOpen()) && !S.sleeping) { applyCamera(); renderer.render(scene, camera); return; }
   if (S.mode === 'cutscene') {
     if (World.launchAnim) World.launchAnim(dt);
     updateSunDir();
