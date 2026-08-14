@@ -162,5 +162,33 @@ def martian_page():
     return render_template("martian.html")
 
 
+@app.route("/martian-sw.js")
+def martian_sw():
+    resp = app.send_static_file("martian/sw.js")
+    resp.headers["Content-Type"] = "application/javascript"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@app.route("/martian.webmanifest")
+def martian_manifest():
+    import flask
+    return flask.jsonify({
+        "name": "Stranded on Mars",
+        "short_name": "Stranded",
+        "description": "A full-planet Martian survival game. Farm. Salvage. Phone home. Fly out.",
+        "start_url": "/martian",
+        "scope": "/",
+        "display": "fullscreen",
+        "orientation": "landscape",
+        "background_color": "#160a04",
+        "theme_color": "#160a04",
+        "icons": [
+            {"src": "/static/martian/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/martian/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=3000)

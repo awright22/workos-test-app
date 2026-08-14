@@ -91,6 +91,47 @@ const CSS = `
 #mg-panel button:hover, .mg-btn:hover { filter: brightness(1.15); }
 #mg-panel .kbd, .mg-kbd { display: inline-block; border: 1px solid rgba(242,216,184,.5);
   padding: 0 6px; border-radius: 3px; margin: 0 2px; font-size: 12px; }
+/* ---- touch controls (shown only on touch devices) ---- */
+#mg-touch { display: none; }
+#mg-touch * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.mg-tbtn { position: absolute; pointer-events: auto; border: 1px solid rgba(242,216,184,.55);
+  border-radius: 50%; background: rgba(20,10,5,.5); color: #f2d8b8; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; letter-spacing: 1px;
+  font-size: 13px; touch-action: none; }
+.mg-tbtn.on { background: rgba(255,180,94,.4); border-color: #ffb45e; }
+#mg-joy { position: absolute; left: 22px; bottom: 24px; width: 132px; height: 132px;
+  border-radius: 50%; border: 1px solid rgba(242,216,184,.35); background: rgba(20,10,5,.35);
+  pointer-events: auto; touch-action: none; }
+#mg-joyknob { position: absolute; left: 40px; top: 40px; width: 52px; height: 52px;
+  border-radius: 50%; background: rgba(242,216,184,.35); border: 1px solid rgba(242,216,184,.6); }
+#mg-tE { right: 26px; bottom: 84px; width: 92px; height: 92px; font-size: 16px; }
+#mg-tJump { right: 128px; bottom: 30px; width: 62px; height: 62px; }
+#mg-tSprint { right: 30px; bottom: 196px; width: 62px; height: 62px; }
+#mg-tExit { right: 128px; bottom: 196px; width: 62px; height: 62px; display: none; }
+#mg-trow { position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; pointer-events: auto; }
+#mg-trow .mg-tbtn { position: static; border-radius: 8px; width: 52px; height: 30px; font-size: 10px; }
+/* ---- small screens ---- */
+@media (max-width: 900px) {
+  #mg-vitals { width: 148px; left: 10px; top: 10px; }
+  .mg-bar { margin-bottom: 4px; font-size: 9px; }
+  #mg-clock { right: 10px; top: 8px; font-size: 10px; }
+  #mg-clock .sol { font-size: 15px; }
+  #mg-compass { width: 260px; top: 6px; height: 30px; }
+  #mg-region { top: 38px; font-size: 9px; letter-spacing: 2px; }
+  #mg-objectives { width: 168px; font-size: 9px; right: 10px; top: 64px; }
+  #mg-keys { display: none; }
+  #mg-log { width: 55%; font-size: 10px; bottom: 8px; left: 168px; }
+  .mg-line { padding: 3px 6px; }
+  #mg-prompt { bottom: 31%; font-size: 12px; }
+  #mg-toast { top: 64px; padding: 6px 14px; }
+  #mg-toast .t2 { font-size: 12px; }
+  #mg-panel { padding: 16px 18px; max-height: 92vh; }
+  #mg-panel h1 { font-size: 19px; }
+  .mg-cols { flex-direction: column; overflow-y: auto; }
+  .mg-col { flex: none; overflow: visible; }
+  .mg-screen { padding: 12px 14px; overflow-y: auto; }
+}
 #mg-panel .diffrow { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
 #mg-panel .diff { flex: 1 1 160px; border: 1px solid rgba(242,216,184,.35); padding: 12px;
   cursor: pointer; font-size: 11.5px; line-height: 1.5; }
@@ -179,6 +220,17 @@ UI.flash = el('div', 'mg-flash', 'mg-hud');
 UI.toast = el('div', 'mg-toast', 'mg-hud');
 UI.overlay = el('div', 'mg-overlay', null);
 UI.panel = el('div', 'mg-panel', null, UI.overlay);
+// touch layer
+UI.touch = el('div', 'mg-touch', null, root);
+UI.joy = el('div', 'mg-joy', null, UI.touch);
+UI.joyKnob = el('div', 'mg-joyknob', null, UI.joy);
+UI.tE = el('div', 'mg-tE', 'mg-tbtn', UI.touch, 'HOLD');
+UI.tJump = el('div', 'mg-tJump', 'mg-tbtn', UI.touch, 'JUMP');
+UI.tSprint = el('div', 'mg-tSprint', 'mg-tbtn', UI.touch, 'RUN');
+UI.tExit = el('div', 'mg-tExit', 'mg-tbtn', UI.touch, 'EXIT');
+UI.tRow = el('div', 'mg-trow', null, UI.touch,
+  '<div class="mg-tbtn" data-t="map">MAP</div><div class="mg-tbtn" data-t="colony">CRAFT</div>' +
+  '<div class="mg-tbtn" data-t="journal">LOG</div><div class="mg-tbtn" data-t="cam">CAM</div>');
 // fullscreen screens
 UI.mapScreen = el('div', 'mg-map', 'mg-screen', root,
   '<h1>MARS · ORBITAL SURVEY</h1><div class="close">[M] close</div><div id="mg-map-wrap"><canvas id="mg-mapcanvas"></canvas><div id="mg-maplegend"></div></div>');
@@ -1672,6 +1724,100 @@ window.addEventListener('mousemove', (ev) => {
 });
 
 // ============================================================
+// 12b. TOUCH CONTROLS (virtual joystick + look drag + buttons)
+// ============================================================
+const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const touchIn = { joyX: 0, joyY: 0, joyId: null, lookId: null, lookX: 0, lookY: 0, sprint: false, jumpT: 0 };
+if (isTouch) {
+  dragMode = true;                                 // never attempt pointer lock on touch
+  UI.touch.style.display = 'block';
+  try { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); } catch (e) {}
+  const joyRect = () => UI.joy.getBoundingClientRect();
+  const setKnob = (dx, dy) => {
+    UI.joyKnob.style.left = (40 + dx * 40) + 'px';
+    UI.joyKnob.style.top = (40 + dy * 40) + 'px';
+  };
+  UI.joy.addEventListener('touchstart', (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    touchIn.joyId = ev.changedTouches[0].identifier;
+  }, { passive: false });
+  const joyMove = (ev) => {
+    for (const t of ev.changedTouches) {
+      if (t.identifier !== touchIn.joyId) continue;
+      const r = joyRect();
+      let dx = (t.clientX - (r.left + r.width / 2)) / (r.width / 2);
+      let dy = (t.clientY - (r.top + r.height / 2)) / (r.height / 2);
+      const l = Math.hypot(dx, dy);
+      if (l > 1) { dx /= l; dy /= l; }
+      touchIn.joyX = dx; touchIn.joyY = dy;
+      setKnob(dx, dy);
+      ev.preventDefault();
+    }
+  };
+  window.addEventListener('touchmove', joyMove, { passive: false });
+  const joyEnd = (ev) => {
+    for (const t of ev.changedTouches) {
+      if (t.identifier === touchIn.joyId) {
+        touchIn.joyId = null; touchIn.joyX = 0; touchIn.joyY = 0;
+        setKnob(0, 0);
+      }
+      if (t.identifier === touchIn.lookId) touchIn.lookId = null;
+    }
+  };
+  window.addEventListener('touchend', joyEnd);
+  window.addEventListener('touchcancel', joyEnd);
+  // look: any touch on the canvas that isn't the joystick finger
+  renderer.domElement.addEventListener('touchstart', (ev) => {
+    if (!S.started || S.uiOpen || screenOpen()) return;
+    for (const t of ev.changedTouches) {
+      if (t.identifier === touchIn.joyId || touchIn.lookId !== null) continue;
+      touchIn.lookId = t.identifier;
+      touchIn.lookX = t.clientX; touchIn.lookY = t.clientY;
+    }
+  }, { passive: true });
+  window.addEventListener('touchmove', (ev) => {
+    for (const t of ev.changedTouches) {
+      if (t.identifier !== touchIn.lookId) continue;
+      yawInput -= (t.clientX - touchIn.lookX) * 0.005;
+      pitchInput -= (t.clientY - touchIn.lookY) * 0.0045;
+      touchIn.lookX = t.clientX; touchIn.lookY = t.clientY;
+    }
+  }, { passive: true });
+  // buttons
+  const press = (elm, down, up) => {
+    elm.addEventListener('touchstart', (ev) => { ev.preventDefault(); ev.stopPropagation(); down(); }, { passive: false });
+    if (up) elm.addEventListener('touchend', (ev) => { ev.preventDefault(); up(); }, { passive: false });
+  };
+  press(UI.tE, () => { eHeld = true; }, () => { eHeld = false; S.holdT = 0; });
+  press(UI.tJump, () => { touchIn.jumpT = perf(); });
+  press(UI.tSprint, () => {
+    touchIn.sprint = !touchIn.sprint;
+    UI.tSprint.classList.toggle('on', touchIn.sprint);
+  });
+  press(UI.tExit, () => { if (S.mode === 'rover') exitRover(); });
+  UI.tRow.querySelectorAll('[data-t]').forEach(btn => {
+    press(btn, () => {
+      if (!S.started || S.uiOpen) return;
+      const t = btn.dataset.t;
+      if (t === 'cam') { S.firstPerson = !S.firstPerson; }
+      else toggleScreen(t);
+    });
+  });
+}
+function touchJumpFresh() { return isTouch && perf() - touchIn.jumpT < 0.18; }
+function moveInputMag() {
+  let mx = 0, mz = 0;
+  if (keys['w'] || keys['arrowup']) mz -= 1;
+  if (keys['s'] || keys['arrowdown']) mz += 1;
+  if (keys['a'] || keys['arrowleft']) mx -= 1;
+  if (keys['d'] || keys['arrowright']) mx += 1;
+  mx += touchIn.joyX; mz += touchIn.joyY;
+  const l = Math.hypot(mx, mz);
+  return { mx, mz, mag: Math.min(1, l) };
+}
+function sprinting() { return keys['shift'] || touchIn.sprint; }
+
+// ============================================================
 // 13. PLAYER — body-frame quaternion on the sphere
 // ============================================================
 const player = {
@@ -1769,8 +1915,8 @@ function updateAstronaut(dt) {
   astro.position.copy(player.pos).addScaledVector(player.up, player.alt > 0 ? 0 : 0);
   astro.quaternion.copy(player.q);
   const T = animTarget;
-  const moving = keys['w'] || keys['a'] || keys['s'] || keys['d'] || keys['arrowup'] || keys['arrowdown'];
-  const run = keys['shift'];
+  const moving = moveInputMag().mag > 0.12;
+  const run = sprinting();
   const interacting = eHeld && activeI && S.holdT > 0.02;
   if (interacting) {
     // kneel and reach: the task pose
@@ -1814,25 +1960,21 @@ function updateWalk(dt) {
   frameYaw(player.q, yawInput);
   player.pitch = clamp(player.pitch + pitchInput, -1.45, 1.45);
   yawInput = 0; pitchInput = 0;
-  const run = keys['shift'] && S.suit > 1;
+  const run = sprinting() && S.suit > 1;
   const spd = run ? BAL.runSpeed : BAL.walkSpeed;
-  let mx = 0, mz = 0;
-  if (keys['w'] || keys['arrowup']) mz -= 1;
-  if (keys['s'] || keys['arrowdown']) mz += 1;
-  if (keys['a'] || keys['arrowleft']) mx -= 1;
-  if (keys['d'] || keys['arrowright']) mx += 1;
-  const moving = (mx || mz);
+  const mv = moveInputMag();
+  const moving = mv.mag > 0.12;
   if (moving) {
-    const l = Math.hypot(mx, mz);
-    const dist = spd * dt;
-    frameMove(player.q, mx / l, mz / l, dist, R + player.alt);
-    player.bob += dt * (run ? 11 : 7);
+    const l = Math.hypot(mv.mx, mv.mz);
+    const dist = spd * mv.mag * dt;
+    frameMove(player.q, mv.mx / l, mv.mz / l, dist, R + player.alt);
+    player.bob += dt * (run ? 11 : 7) * mv.mag;
     S.stats.walked += dist;
   }
   collideUnit(player.q, 0.42);
   player.q.normalize();
   // gravity & jump
-  if (player.onGround && keys[' ']) { player.vy = BAL.jumpV; player.onGround = false; }
+  if (player.onGround && (keys[' '] || touchJumpFresh())) { player.vy = BAL.jumpV; player.onGround = false; }
   player.vy -= BAL.gravity * dt;
   player.alt += player.vy * dt;
   if (player.alt <= 0) { player.alt = 0; player.vy = 0; player.onGround = true; }
@@ -1921,10 +2063,13 @@ function updateRover(dt) {
   let acc = 0;
   if (keys['w'] || keys['arrowup']) acc = 14;
   if (keys['s'] || keys['arrowdown']) acc = -9;
+  if (touchIn.joyY < -0.2) acc = 14 * -touchIn.joyY;
+  if (touchIn.joyY > 0.25) acc = -9 * touchIn.joyY;
   RV.speed += acc * dt;
   RV.speed *= Math.pow(0.4, dt);
   RV.speed = clamp(RV.speed, -8, top);
-  const steer = ((keys['a'] || keys['arrowleft']) ? 1 : 0) - ((keys['d'] || keys['arrowright']) ? 1 : 0);
+  let steer = ((keys['a'] || keys['arrowleft']) ? 1 : 0) - ((keys['d'] || keys['arrowright']) ? 1 : 0);
+  if (Math.abs(touchIn.joyX) > 0.15) steer = -touchIn.joyX;
   if (Math.abs(RV.speed) > 0.4)
     frameYaw(RV.q, steer * dt * 1.5 * clamp(Math.abs(RV.speed) / 8, 0.3, 1) * Math.sign(RV.speed));
   if (Math.abs(RV.speed) > 0.01) {
@@ -2695,8 +2840,8 @@ function applyRates(dt, sleeping) {
     } else if (S.inside && S.o2 > 3) {
       S.suit = clamp(S.suit + 26 * dt, 0, suitCap());
     } else {
-      const moving = keys['w'] || keys['a'] || keys['s'] || keys['d'] || keys['arrowup'] || keys['arrowdown'];
-      let rate = moving ? (keys['shift'] ? 0.95 : 0.62) : 0.34;
+      const moving = moveInputMag().mag > 0.12;
+      let rate = moving ? (sprinting() ? 0.95 : 0.62) : 0.34;
       if (S.inside) rate = 0.3;
       if (S.upgrades.recycler) rate *= 0.75;
       if (S.flags.coldOpen) rate *= 1.9;
@@ -3266,6 +3411,10 @@ function updateHud() {
     b.wrap.classList.toggle('warn', v / max < 0.22);
   }
   const t = localTempC(_v1.copy(player.pos).normalize(), localSunEl());
+  if (isTouch) {
+    UI.tExit.style.display = S.mode === 'rover' ? 'flex' : 'none';
+    UI.tJump.style.display = S.mode === 'rover' ? 'none' : 'flex';
+  }
   let clock = `<span class="sol">SOL ${S.sol}</span><br>${fmtClock()} · ${t}°C`;
   if (S.mode === 'rover') clock += `<br><span style="font-size:11px">ROVER PWR ${Math.round(S.roverPower)} · O2 ${Math.round(S.roverO2)}</span>`;
   if (S.storm.i > 0.15) clock += '<br><span style="color:#ff6f5f;font-size:11px">⚠ DUST STORM</span>';
