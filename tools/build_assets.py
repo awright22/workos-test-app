@@ -440,6 +440,68 @@ def rtg_unit():
     parts.append(warn)
     return parts
 
+
+# ---------------------------------------------------------------- astronaut
+# Articulated EVA suit. Parented parts; pivots are RELATIVE to the parent's
+# pivot. Geometry is built around each part's own pivot. Forward is -Y.
+SUIT = (0.88, 0.85, 0.78)
+SUIT2 = (0.80, 0.50, 0.22)          # orange accents
+JOINT = (0.42, 0.42, 0.45)
+VISOR = (0.85, 0.62, 0.25)
+
+class PPart(Part):
+    def __init__(self, name, color, pivot=(0, 0, 0), parent=None, opacity=None, emissive=None):
+        super().__init__(name, color, pivot, opacity, emissive)
+        self.parent = parent
+    def export(self):
+        out = super().export()
+        if self.parent:
+            out['par'] = self.parent
+        return out
+
+@asset('astronaut')
+def astronaut():
+    parts = []
+    # torso: root pivot at hip height 1.02
+    torso = PPart('torso', SUIT, pivot=(0, 0, 1.02))
+    torso.box(0.46, 0.30, 0.52, at=(0, 0, 0.30))                 # chest
+    torso.box(0.40, 0.26, 0.18, at=(0, 0, -0.02))                # pelvis block
+    torso.box(0.30, 0.10, 0.16, at=(0, -0.17, 0.38))             # chest control panel
+    parts.append(torso)
+    pack = PPart('pack', SUIT2, pivot=(0, 0.22, 0.30), parent='torso')
+    pack.box(0.40, 0.20, 0.55, at=(0, 0.02, 0.02))               # PLSS backpack
+    pack.cyl(0.05, 0.05, 0.28, at=(0.14, 0.0, 0.42))             # antenna nub
+    parts.append(pack)
+    helmet = PPart('helmet', SUIT, pivot=(0, 0, 0.62), parent='torso')
+    helmet.sphere(0.185, at=(0, 0, 0.02), seg=12, rings=8)
+    parts.append(helmet)
+    visor = PPart('visor', VISOR, pivot=(0, -0.10, 0.02), parent='helmet', emissive=(0.25, 0.15, 0.05))
+    visor.sphere(0.13, at=(0, -0.04, 0), seg=10, rings=6, scale_z=0.9)
+    parts.append(visor)
+    # arms: shoulder pivots on torso, elbows on upper arms
+    for side, sx in (('L', -1), ('R', 1)):
+        au = PPart('armU' + side, SUIT2, pivot=(sx * 0.30, 0, 0.46), parent='torso')
+        au.sphere(0.09, at=(0, 0, 0), seg=8, rings=6)
+        au.cyl(0.075, 0.085, 0.30, at=(sx * 0.02, 0, -0.17))
+        parts.append(au)
+        al = PPart('armL' + side, SUIT, pivot=(sx * 0.02, 0, -0.32), parent='armU' + side)
+        al.sphere(0.075, at=(0, 0, 0), seg=8, rings=6)           # elbow
+        al.cyl(0.065, 0.075, 0.26, at=(0, 0, -0.16))
+        al.sphere(0.085, at=(0, 0, -0.33), seg=8, rings=6)       # glove
+        parts.append(al)
+    # legs: hip pivots at model root level, knees on thighs
+    for side, sx in (('L', -1), ('R', 1)):
+        lu = PPart('legU' + side, SUIT, pivot=(sx * 0.13, 0, 0.96))
+        lu.sphere(0.10, at=(0, 0, 0), seg=8, rings=6)
+        lu.cyl(0.095, 0.105, 0.38, at=(0, 0, -0.22))
+        parts.append(lu)
+        ll = PPart('legL' + side, SUIT2, pivot=(0, 0, -0.44), parent='legU' + side)
+        ll.sphere(0.09, at=(0, 0, 0), seg=8, rings=6)            # knee
+        ll.cyl(0.08, 0.09, 0.34, at=(0, 0, -0.21))
+        ll.box(0.20, 0.34, 0.12, at=(0, -0.05, -0.46))           # boot
+        parts.append(ll)
+    return parts
+
 # ---------------------------------------------------------------- export
 def main():
     out = {}
