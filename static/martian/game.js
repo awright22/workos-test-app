@@ -109,7 +109,7 @@ const CSS = `
 #mg-tSprint { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; }
 #mg-tExit { right: calc(128px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; display: none; }
 #mg-trow { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; pointer-events: auto; }
+  display: flex; gap: 8px; pointer-events: auto; z-index: 16; }
 #mg-trow .mg-tbtn { position: static; border-radius: 8px; width: 52px; height: 30px; font-size: 10px; }
 /* ---- small screens ---- */
 @media (max-width: 900px) {
@@ -145,7 +145,10 @@ const CSS = `
   padding: calc(22px + env(safe-area-inset-top, 0px)) calc(28px + env(safe-area-inset-right, 0px))
            calc(22px + env(safe-area-inset-bottom, 0px)) calc(28px + env(safe-area-inset-left, 0px)); }
 .mg-screen h1 { font-size: 18px; letter-spacing: 4px; color: #ffb45e; margin-bottom: 10px; }
-.mg-screen .close { position: absolute; right: 22px; top: 16px; font-size: 12px; opacity: .7; }
+.mg-screen .close { position: absolute; right: calc(22px + env(safe-area-inset-right, 0px));
+  top: calc(14px + env(safe-area-inset-top, 0px)); font-size: 13px; letter-spacing: 1px;
+  border: 1px solid rgba(242,216,184,.55); padding: 9px 16px; border-radius: 7px;
+  background: rgba(20,10,5,.5); cursor: pointer; pointer-events: auto; touch-action: none; z-index: 17; }
 #mg-map-wrap { position: relative; width: 100%; height: calc(100% - 40px); display: flex;
   align-items: center; justify-content: center; }
 #mg-mapcanvas { max-width: 100%; max-height: 100%; border: 1px solid rgba(242,216,184,.3);
@@ -237,11 +240,11 @@ UI.tRow = el('div', 'mg-trow', null, UI.touch,
   '<div class="mg-tbtn" data-t="journal">LOG</div><div class="mg-tbtn" data-t="cam">CAM</div>');
 // fullscreen screens
 UI.mapScreen = el('div', 'mg-map', 'mg-screen', root,
-  '<h1>MARS · ORBITAL SURVEY</h1><div class="close">[M] close</div><div id="mg-map-wrap"><canvas id="mg-mapcanvas"></canvas><div id="mg-maplegend"></div></div>');
+  '<h1>MARS · ORBITAL SURVEY</h1><div class="close">✕ CLOSE</div><div id="mg-map-wrap"><canvas id="mg-mapcanvas"></canvas><div id="mg-maplegend"></div></div>');
 UI.colonyScreen = el('div', 'mg-colony2', 'mg-screen', root,
-  '<h1>COLONY · INVENTORY & FABRICATION</h1><div class="close">[C] close</div><div class="mg-cols"><div class="mg-col" id="mg-inv"></div><div class="mg-col" id="mg-craft"></div><div class="mg-col" id="mg-build"></div></div>');
+  '<h1>COLONY · INVENTORY & FABRICATION</h1><div class="close">✕ CLOSE</div><div class="mg-cols"><div class="mg-col" id="mg-inv"></div><div class="mg-col" id="mg-craft"></div><div class="mg-col" id="mg-build"></div></div>');
 UI.journalScreen = el('div', 'mg-journal', 'mg-screen', root,
-  '<h1>MISSION JOURNAL</h1><div class="close">[J] close</div><div class="mg-cols"><div class="mg-col" id="mg-quests"></div><div class="mg-col" id="mg-discoveries"></div><div class="mg-col" id="mg-achievements"></div></div>');
+  '<h1>MISSION JOURNAL</h1><div class="close">✕ CLOSE</div><div class="mg-cols"><div class="mg-col" id="mg-quests"></div><div class="mg-col" id="mg-discoveries"></div><div class="mg-col" id="mg-achievements"></div></div>');
 UI.mapCanvas = UI.mapScreen.querySelector('#mg-mapcanvas');
 
 function showOverlay(opts) {
@@ -3423,6 +3426,11 @@ function closeScreens() {
   UI.mapScreen.style.display = 'none';
   UI.colonyScreen.style.display = 'none';
   UI.journalScreen.style.display = 'none';
+}
+for (const s of [UI.mapScreen, UI.colonyScreen, UI.journalScreen]) {
+  const c = s.querySelector('.close');
+  c.addEventListener('click', (ev) => { ev.stopPropagation(); Snd.click(); closeScreens(); });
+  c.addEventListener('touchstart', (ev) => { ev.preventDefault(); ev.stopPropagation(); Snd.click(); closeScreens(); }, { passive: false });
 }
 function toggleScreen(which) {
   const elMap = { map: UI.mapScreen, colony: UI.colonyScreen, journal: UI.journalScreen };
