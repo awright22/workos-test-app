@@ -130,7 +130,9 @@ const CSS = `
   #mg-panel h1 { font-size: 19px; }
   .mg-cols { flex-direction: column; overflow-y: auto; }
   .mg-col { flex: none; overflow: visible; }
-  .mg-screen { padding: 12px 14px; overflow-y: auto; }
+  .mg-screen { overflow-y: auto;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px))
+             calc(12px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); }
 }
 #mg-panel .diffrow { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
 #mg-panel .diff { flex: 1 1 160px; border: 1px solid rgba(242,216,184,.35); padding: 12px;
@@ -139,7 +141,9 @@ const CSS = `
 #mg-panel .diff .dn { color: #ffb45e; font-size: 13px; letter-spacing: 2px; margin-bottom: 6px; }
 /* fullscreen screens: map / colony / journal */
 .mg-screen { position: absolute; inset: 0; display: none; background: rgba(6,3,1,.94);
-  z-index: 15; pointer-events: auto; padding: 22px 28px; overflow: hidden; }
+  z-index: 15; pointer-events: auto; overflow: hidden;
+  padding: calc(22px + env(safe-area-inset-top, 0px)) calc(28px + env(safe-area-inset-right, 0px))
+           calc(22px + env(safe-area-inset-bottom, 0px)) calc(28px + env(safe-area-inset-left, 0px)); }
 .mg-screen h1 { font-size: 18px; letter-spacing: 4px; color: #ffb45e; margin-bottom: 10px; }
 .mg-screen .close { position: absolute; right: 22px; top: 16px; font-size: 12px; opacity: .7; }
 #mg-map-wrap { position: relative; width: 100%; height: calc(100% - 40px); display: flex;
@@ -1341,7 +1345,8 @@ function buildHabColony(spawn) {
     new THREE.MeshLambertMaterial({ color: 0x9a9284 }));
   floor.rotation.x = -Math.PI / 2; floor.position.y = 0.06;
   habGroup.add(floor);
-  World.beacon = mkBox(0.3, 0.3, 0.3, 0x33ff66, 0, 5.4, 0, habGroup, { emissive: 0x33ff66 });
+  mkCyl(0.05, 0.07, 1.0, 0x8a8378, 0, 8.3, 0, habGroup, 6);   // beacon mast on the dome apex
+  World.beacon = mkBox(0.26, 0.26, 0.26, 0x33ff66, 0, 8.9, 0, habGroup, { emissive: 0x33ff66 });
   const l1 = new THREE.PointLight(0xffe6c8, 0.95, 22); l1.position.set(0, 3.0, 0); habGroup.add(l1);
   const l2 = new THREE.PointLight(0xffd9b0, 0.5, 14); l2.position.set(3, 2.4, -4); habGroup.add(l2);
   World.habLights = [l1, l2];
