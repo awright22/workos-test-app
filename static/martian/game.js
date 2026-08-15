@@ -21,31 +21,31 @@ const CSS = `
   -webkit-user-select: none; user-select: none; }
 #mg-root canvas.mg-three { position: absolute; inset: 0; display: block; }
 .mg-hud { position: absolute; pointer-events: none; }
-#mg-vitals { left: 16px; top: 16px; width: 210px; }
+#mg-vitals { left: calc(16px + env(safe-area-inset-left, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); width: 210px; }
 .mg-bar { margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; }
 .mg-bar .lb { display: flex; justify-content: space-between; margin-bottom: 2px; text-shadow: 0 1px 2px #000; }
 .mg-bar .tk { height: 7px; background: rgba(0,0,0,.55); border: 1px solid rgba(242,216,184,.35); }
 .mg-bar .fl { height: 100%; transition: width .3s; }
 .mg-bar.warn .fl { animation: mg-blink 1s infinite; }
 @keyframes mg-blink { 50% { opacity: .35; } }
-#mg-clock { right: 16px; top: 16px; text-align: right; font-size: 13px; letter-spacing: 1px;
+#mg-clock { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); text-align: right; font-size: 13px; letter-spacing: 1px;
   text-shadow: 0 1px 3px #000; line-height: 1.55; }
 #mg-clock .sol { font-size: 22px; color: #ffb45e; }
-#mg-compass { left: 50%; top: 12px; transform: translateX(-50%); width: 500px; height: 34px;
+#mg-compass { left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: 500px; height: 34px;
   overflow: hidden; border-bottom: 1px solid rgba(242,216,184,.25); }
 .mg-cmark { position: absolute; top: 2px; transform: translateX(-50%); text-align: center;
   font-size: 10px; letter-spacing: 1px; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 .mg-cmark .ic { font-size: 13px; }
-#mg-region { left: 50%; top: 50px; transform: translateX(-50%); font-size: 12px; letter-spacing: 4px;
+#mg-region { left: 50%; top: calc(50px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); font-size: 12px; letter-spacing: 4px;
   color: #ffcf9e; opacity: .8; text-shadow: 0 1px 3px #000; }
-#mg-objectives { right: 16px; top: 92px; width: 260px; font-size: 11.5px; text-align: right; }
+#mg-objectives { right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(92px + env(safe-area-inset-top, 0px)); width: 260px; font-size: 11.5px; text-align: right; }
 #mg-objectives .ttl { color: #ffb45e; letter-spacing: 2px; margin-bottom: 6px; text-shadow: 0 1px 2px #000; }
 .mg-obj { margin-bottom: 5px; text-shadow: 0 1px 2px #000; line-height: 1.35; }
 .mg-obj.done { color: #7fca7f; text-decoration: line-through; opacity: .7; }
 .mg-obj.quest { color: #9ec8ff; }
 #mg-keys { right: 16px; bottom: 12px; font-size: 10px; letter-spacing: 1px; opacity: .55;
   text-align: right; text-shadow: 0 1px 2px #000; line-height: 1.6; }
-#mg-log { left: 16px; bottom: 16px; width: 470px; font-size: 12px; line-height: 1.45; }
+#mg-log { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 470px; font-size: 12px; line-height: 1.45; }
 .mg-line { margin-top: 6px; background: rgba(10,5,2,.55); padding: 6px 9px;
   border-left: 2px solid #ffb45e; opacity: 1; transition: opacity 1.2s; }
 .mg-line.nasa { border-left-color: #6fb7ff; color: #cfe6ff; }
@@ -67,7 +67,7 @@ const CSS = `
 #mg-cold { inset: 0; background: radial-gradient(ellipse at center, transparent 48%, rgba(80,140,255,.5) 100%);
   opacity: 0; transition: opacity 1.2s; }
 #mg-flash { inset: 0; background: #fff; opacity: 0; }
-#mg-toast { left: 50%; top: 88px; transform: translateX(-50%); text-align: center; display: none;
+#mg-toast { left: 50%; top: calc(88px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); text-align: center; display: none;
   background: rgba(20,8,30,.85); border: 1px solid #d8b0ff; padding: 10px 26px; }
 #mg-toast .t1 { font-size: 10px; letter-spacing: 3px; color: #d8b0ff; }
 #mg-toast .t2 { font-size: 16px; letter-spacing: 2px; margin-top: 3px; }
@@ -99,32 +99,32 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; letter-spacing: 1px;
   font-size: 13px; touch-action: none; }
 .mg-tbtn.on { background: rgba(255,180,94,.4); border-color: #ffb45e; }
-#mg-joy { position: absolute; left: 22px; bottom: 24px; width: 132px; height: 132px;
+#mg-joy { position: absolute; left: calc(22px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); width: 132px; height: 132px;
   border-radius: 50%; border: 1px solid rgba(242,216,184,.35); background: rgba(20,10,5,.35);
   pointer-events: auto; touch-action: none; }
 #mg-joyknob { position: absolute; left: 40px; top: 40px; width: 52px; height: 52px;
   border-radius: 50%; background: rgba(242,216,184,.35); border: 1px solid rgba(242,216,184,.6); }
-#mg-tE { right: 26px; bottom: 84px; width: 92px; height: 92px; font-size: 16px; }
-#mg-tJump { right: 128px; bottom: 30px; width: 62px; height: 62px; }
-#mg-tSprint { right: 30px; bottom: 196px; width: 62px; height: 62px; }
-#mg-tExit { right: 128px; bottom: 196px; width: 62px; height: 62px; display: none; }
-#mg-trow { position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+#mg-tE { right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 92px; height: 92px; font-size: 16px; }
+#mg-tJump { right: calc(128px + env(safe-area-inset-right, 0px)); bottom: calc(30px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; }
+#mg-tSprint { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; }
+#mg-tExit { right: calc(128px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; display: none; }
+#mg-trow { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: flex; gap: 8px; pointer-events: auto; }
 #mg-trow .mg-tbtn { position: static; border-radius: 8px; width: 52px; height: 30px; font-size: 10px; }
 /* ---- small screens ---- */
 @media (max-width: 900px) {
-  #mg-vitals { width: 148px; left: 10px; top: 10px; }
+  #mg-vitals { width: 148px; left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px)); }
   .mg-bar { margin-bottom: 4px; font-size: 9px; }
-  #mg-clock { right: 10px; top: 8px; font-size: 10px; }
+  #mg-clock { right: calc(10px + env(safe-area-inset-right, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 10px; }
   #mg-clock .sol { font-size: 15px; }
-  #mg-compass { width: 260px; top: 6px; height: 30px; }
-  #mg-region { top: 38px; font-size: 9px; letter-spacing: 2px; }
-  #mg-objectives { width: 168px; font-size: 9px; right: 10px; top: 64px; }
+  #mg-compass { width: 260px; top: calc(6px + env(safe-area-inset-top, 0px)); height: 30px; }
+  #mg-region { top: calc(38px + env(safe-area-inset-top, 0px)); font-size: 9px; letter-spacing: 2px; }
+  #mg-objectives { width: 168px; font-size: 9px; right: calc(10px + env(safe-area-inset-right, 0px)); top: calc(64px + env(safe-area-inset-top, 0px)); }
   #mg-keys { display: none; }
-  #mg-log { width: 55%; font-size: 10px; bottom: 8px; left: 168px; }
+  #mg-log { width: 55%; font-size: 10px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: calc(168px + env(safe-area-inset-left, 0px)); }
   .mg-line { padding: 3px 6px; }
   #mg-prompt { bottom: 31%; font-size: 12px; }
-  #mg-toast { top: 64px; padding: 6px 14px; }
+  #mg-toast { top: calc(64px + env(safe-area-inset-top, 0px)); padding: 6px 14px; }
   #mg-toast .t2 { font-size: 12px; }
   #mg-panel { padding: 16px 18px; max-height: 92vh; }
   #mg-panel h1 { font-size: 19px; }
@@ -961,50 +961,33 @@ worldRoot.add(atmo);
 const GLOBE_BIAS = 14;      // sits below the local patch everywhere
 let globeMesh;
 function buildGlobe() {
-  const LON = 320, LAT = 160;                       // LAT rows of quads, LON cols, wrapped
-  const vertsPerRow = LON;
-  const rows = LAT - 1;                              // interior rows (excluding poles)
-  const count = rows * vertsPerRow + 2;              // + 2 pole verts
-  const pos = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
+  // Standard SphereGeometry (battle-tested on iOS WebKit), displaced radially.
+  const LON = 320, LAT = 160;
+  const g = new THREE.SphereGeometry(1, LON, LAT);
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
   const v = new THREE.Vector3();
-  let i3 = 0;
-  const setVert = (idx, x, y, z) => {
-    v.set(x, y, z).normalize();
+  for (let i = 0; i < pos.count; i++) {
+    v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
     const hKm = marsHeightKm(v.x, v.y, v.z);
     const r = R + hKm * HKM - GLOBE_BIAS;
-    pos[idx * 3] = v.x * r; pos[idx * 3 + 1] = v.y * r; pos[idx * 3 + 2] = v.z * r;
+    pos.setXYZ(i, v.x * r, v.y * r, v.z * r);
     const c = marsColor(v.x, v.y, v.z, hKm);
-    col[idx * 3] = c.r; col[idx * 3 + 1] = c.g; col[idx * 3 + 2] = c.b;
-  };
-  for (let r = 0; r < rows; r++) {
-    const phi = Math.PI * (r + 1) / LAT - Math.PI / 2;   // -~90..~90
-    for (let l = 0; l < LON; l++) {
-      const lam = 2 * Math.PI * l / LON;
-      setVert(r * LON + l, Math.cos(phi) * Math.cos(lam), Math.sin(phi), -Math.cos(phi) * Math.sin(lam));
-    }
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
-  const southIdx = rows * LON, northIdx = rows * LON + 1;
-  setVert(southIdx, 0, -1, 0);
-  setVert(northIdx, 0, 1, 0);
-  const idx = [];
-  for (let r = 0; r < rows - 1; r++) {
-    for (let l = 0; l < LON; l++) {
-      const a = r * LON + l, b = r * LON + (l + 1) % LON;
-      const c2 = (r + 1) * LON + l, d = (r + 1) * LON + (l + 1) % LON;
-      idx.push(a, b, c2, b, d, c2);                  // CCW from outside
-    }
-  }
-  for (let l = 0; l < LON; l++) {                     // pole fans
-    idx.push(southIdx, (l + 1) % LON, l);
-    const base = (rows - 1) * LON;
-    idx.push(northIdx, base + l, base + (l + 1) % LON);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setIndex(idx);
   g.computeVertexNormals();
+  // weld normals across the duplicated UV-seam column so no lighting crease shows
+  const norm = g.attributes.normal;
+  const W = LON + 1;
+  for (let row = 0; row <= LAT; row++) {
+    const a = row * W, b = row * W + LON;
+    const nx = (norm.getX(a) + norm.getX(b)) / 2;
+    const ny = (norm.getY(a) + norm.getY(b)) / 2;
+    const nz = (norm.getZ(a) + norm.getZ(b)) / 2;
+    norm.setXYZ(a, nx, ny, nz);
+    norm.setXYZ(b, nx, ny, nz);
+  }
   globeMesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   worldRoot.add(globeMesh);
 }
