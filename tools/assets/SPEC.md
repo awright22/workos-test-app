@@ -45,7 +45,15 @@ library should gain.
 - Detail comes from geometry: bevelled edges, panel seams, fasteners, handrails, cable runs,
   tanks, hinges, tread. Nothing in a finished model should read as a bare cube, cylinder or
   sphere. A surface wider than about half a metre needs something breaking it up.
-- Smooth shading with sharp edges by angle is automatic (`smooth_angle`, default 38°).
+- Smooth shading with sharp edges by angle is automatic (`smooth_angle`, default 38°). On large
+  flat hull faces use a one-segment chamfer and a lower smooth angle; two-segment bevels plus
+  angle smoothing make flat plates look pillowed.
+- Draw calls: every material on every part is drawn separately. Keep a model to about ten
+  materials or fewer (landers and props: eight), and do not split meshes into parts unless the
+  game needs to move them.
+- Ambient occlusion is baked by `export_model`; a vertex buried inside another piece is handled
+  (rays that start inside a piece carry on), so kit-bashing from intersecting pieces is fine.
+  Long plain walls need an edge loop near each end, because occlusion is sampled at vertices.
 - Scale reference: the astronaut is 1.86 m tall in the suit. Hardware is real-world size.
 
 ## Art direction
