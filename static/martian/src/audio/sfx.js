@@ -85,8 +85,8 @@ def('uiToast',  { bus: 'ui', gap: 0.5, prio: 1, hall: 0.2 }, (E, v, t, o, K) => 
 def('click',    { bus: 'ui', gap: 0.06, prio: 1, hall: 0.05, gain: 2.8, group: 'uiPress' }, (E, v, t, o, K) => SFX.uiClick.fn(E, v, t, o, K));
 
 // ---- small confirmations in the world -----------------------------------------------------------
-def('ok', { gap: 0.1, hall: 0.12 }, (E, v, t, o, K) => bells(E, v, t, K, [24, 28], 0.075, { g: 0.075, d: 0.5, index: 0.7 }));
-def('pickup', { gap: 0.08, hall: 0.1, gain: 1.5 }, (E, v, t, o, K) => {
+def('ok', { gap: 0.1, hall: 0.12, gain: 1.2 }, (E, v, t, o, K) => bells(E, v, t, K, [24, 28], 0.075, { g: 0.075, d: 0.5, index: 0.7 }));
+def('pickup', { gap: 0.08, hall: 0.1, gain: 1.8 }, (E, v, t, o, K) => {
   E.thud(v, t, { f: 420, f1: 230, glide: 0.04, d: 0.06, g: 0.1 });
   E.burst(v, t, { bp: 2600, q: 0.8, a: 0.004, d: 0.09, g: 0.05 });
   E.bell(v, t + 0.05, { f: n(K, 31), g: 0.055, d: 0.4, index: 0.6 });
@@ -164,12 +164,12 @@ def('nasaMsg', { bus: 'ui', gap: 3, hall: 0.1 }, (E, v, t, o, K) => {
   E.burst(v, t, { bp: 2600, q: 2, a: 0.01, d: 0.14, g: 0.028 });
   [24, 24, 31].forEach((s, i) => E.tone(v, t + 0.05 + i * 0.075, { type: 'tone', f: n(K, s), a: 0.004, h: 0.03, d: 0.07, g: 0.04 }));
 });
-def('nasaSend', { gap: 0.5, hall: 0.1, gain: 2.5 }, (E, v, t) => {
+def('nasaSend', { gap: 0.5, hall: 0.1, gain: 3 }, (E, v, t) => {
   for (let i = 0; i < 5; i++) keyTap(E, v, t + i * 0.07 + E.rr(0, 0.025), 0.03);
   E.tone(v, t + 0.42, { f: 900, f1: 2400, glide: 0.12, a: 0.005, d: 0.16, g: 0.04 });
   E.burst(v, t + 0.45, { bp: 3000, q: 1.5, a: 0.02, d: 0.3, g: 0.02 });
 });
-def('terminal', { gap: 0.5, hall: 0.12 }, (E, v, t, o, K) => {
+def('terminal', { gap: 0.5, hall: 0.12, gain: 1.25 }, (E, v, t, o, K) => {
   for (let i = 0; i < 9; i++) keyTap(E, v, t + i * 0.066 + E.rr(0, 0.03), 0.032);
   const pent = [24, 26, 28, 31, 33, 36];
   for (let i = 0; i < 6; i++) E.tone(v, t + 0.66 + i * 0.05, { type: 'tone', f: n(K, E.pick(pent)), a: 0.002, h: 0.02, d: 0.04, g: 0.028 });
@@ -203,7 +203,7 @@ def('plant', { bus: 'world', gap: 0.2, gain: 0.9 }, (E, v, t, o, K) => {
   E.thud(v, t + 0.5, { f: 104, d: 0.08, g: 0.09 }); E.burst(v, t + 0.5, { table: 'pink', bp: 600, q: 0.8, a: 0.005, d: 0.08, g: 0.28 });
   E.bell(v, t + 0.62, { f: n(K, 24), g: 0.03, d: 0.5, index: 0.5 });
 });
-def('water', { bus: 'world', gap: 0.2, gain: 1.5 }, (E, v, t) => {
+def('water', { bus: 'world', gap: 0.2, gain: 1.8 }, (E, v, t) => {
   for (let i = 0; i < 15; i++) bubble(E, v, t + 0.05 + i * 0.055 + E.rr(0, 0.03), E.rr(0.035, 0.075));
   E.burst(v, t, { bp: 3200, q: 0.9, a: 0.08, h: 0.5, d: 0.3, g: 0.045 });
   E.burst(v, t, { table: 'pink', bp: 900, q: 1.5, a: 0.1, h: 0.45, d: 0.3, g: 0.08 });
@@ -223,7 +223,7 @@ def('clearBed', { bus: 'world', gap: 0.2, gain: 1.1 }, (E, v, t) => {
 });
 
 // ---- work outside ------------------------------------------------------------------------------------
-def('wipe', { bus: 'world', gap: 0.2, gain: 2.2 }, (E, v, t, o, K) => {
+def('wipe', { bus: 'world', gap: 0.2, gain: 2.6 }, (E, v, t, o, K) => {
   for (let s = 0; s < 2; s++) {
     const ts = t + s * 0.42, up = s === 0;
     E.burst(v, ts, { bp: up ? 1500 : 3000, bp1: up ? 3000 : 1500, bglide: 0.3, q: 2.2, a: 0.05, h: 0.12, d: 0.2, g: 0.14 });
@@ -269,7 +269,7 @@ def('rtg', { bus: 'world', gap: 0.5, gain: 1.6 }, (E, v, t) => {
   SFX.dig.fn(E, v, t);
   for (let i = 0; i < 12; i++) E.burst(v, t + 0.5 + Math.pow(E.rand(), 0.7) * 1.4, { hp: 1200, a: 0.0003, d: 0.008, g: 0.2 });
 });
-def('podOpen', { bus: 'world', gap: 0.5 }, (E, v, t, o, K) => {
+def('podOpen', { bus: 'world', gap: 0.5, gain: 1.2 }, (E, v, t, o, K) => {
   for (const dt of [0, 0.16]) { E.thud(v, t + dt, { f: 200, f1: 120, d: 0.06, g: 0.22 }); E.clank(v, t + dt, { f: 900, d: 0.2, g: 0.07 }); }
   E.tone(v, t + 0.3, { type: 'saw', f: 240, f1: 330, glide: 0.35, a: 0.05, h: 0.2, d: 0.1, g: 0.022 });
   E.burst(v, t + 0.3, { bp: 1200, q: 6, a: 0.05, h: 0.2, d: 0.1, g: 0.1 });
@@ -308,7 +308,7 @@ def('land', { bus: 'world', gap: 0.2 }, (E, v, t, o) => {
 });
 
 // ---- eating, air, water-making ---------------------------------------------------------------------
-def('eat', { gap: 0.3, room: 0.15, gain: 2.2 }, (E, v, t) => {
+def('eat', { gap: 0.3, room: 0.15, gain: 2.8 }, (E, v, t) => {
   for (const dt of [0, 0.1]) E.burst(v, t + dt, { hp: 3500, a: 0.004, d: 0.09, g: 0.06 });
   for (let i = 0; i < 3; i++) {
     const tt = t + 0.3 + i * (0.27 + E.rr(0, 0.05));
@@ -317,7 +317,7 @@ def('eat', { gap: 0.3, room: 0.15, gain: 2.2 }, (E, v, t) => {
   }
   E.thud(v, t + 1.15, { f: 180, f1: 120, glide: 0.08, d: 0.1, g: 0.09 });
 });
-def('candle', { gap: 0.4, hall: 0.12 }, (E, v, t, o, K) => {
+def('candle', { gap: 0.4, hall: 0.12, gain: 1.3 }, (E, v, t, o, K) => {
   E.burst(v, t, { hp: 2000, a: 0.0005, d: 0.025, g: 0.3 });
   E.clank(v, t, { f: 1700, ratios: [1, 1.6, 2.7], d: 0.09, g: 0.06 });
   E.burst(v, t + 0.03, { table: 'grit', rate: 2.2, hp: 3000, lp: 9000, a: 0.05, h: 0.7, d: 0.9, g: 0.22 });
@@ -325,7 +325,7 @@ def('candle', { gap: 0.4, hall: 0.12 }, (E, v, t, o, K) => {
   E.burst(v, t + 0.1, { table: 'pink', bp: 600, bp1: 1100, bglide: 0.8, q: 1, a: 0.3, h: 0.5, d: 0.7, g: 0.12 });
   bells(E, v, t + 0.9, K, [19, 24], 0.1, { g: 0.05, d: 0.9, index: 0.7 });
 });
-def('o2Refill', { gap: 0.4, hall: 0.1, gain: 1.5 }, (E, v, t, o, K) => {
+def('o2Refill', { gap: 0.4, hall: 0.1, gain: 1.9 }, (E, v, t, o, K) => {
   E.burst(v, t, { hp: 2500, a: 0.0005, d: 0.014, g: 0.2 }); E.thud(v, t, { f: 180, d: 0.04, g: 0.12 });
   E.burst(v, t + 0.03, { bp: 900, bp1: 2200, bglide: 0.8, q: 1.2, a: 0.1, h: 0.6, d: 0.16, g: 0.1 });
   E.tone(v, t + 0.03, { f: 300, f1: 620, glide: 0.8, a: 0.1, h: 0.6, d: 0.1, g: 0.02 });
@@ -499,12 +499,12 @@ def('work_dig', { bus: 'world', gap: 0.25, prio: 1, gain: 1.7 }, (E, v, t) => {
   E.burst(v, t, { table: 'pink', bp: 750, q: 0.7, a: 0.015, d: 0.3, g: 0.55 });
   E.thud(v, t, { f: E.rr(85, 105), d: 0.1, g: 0.08 });
 });
-def('work_wipe', { bus: 'world', gap: 0.25, prio: 1, gain: 1.5 }, (E, v, t) => {
+def('work_wipe', { bus: 'world', gap: 0.25, prio: 1, gain: 1.9 }, (E, v, t) => {
   const up = E.rand() < 0.5, a = up ? 1500 : 2900, b = up ? 2900 : 1500;
   E.burst(v, t, { bp: a, bp1: b, bglide: 0.26, q: 2.2, a: 0.05, h: 0.1, d: 0.16, g: 0.1 });
   E.tone(v, t, { type: 'triangle', f: up ? 980 : 1380, f1: up ? 1420 : 1020, glide: 0.26, a: 0.04, h: 0.1, d: 0.1, g: 0.018 });
 });
-def('work_tool', { bus: 'world', gap: 0.25, prio: 1, gain: 4 }, (E, v, t) => {
+def('work_tool', { bus: 'world', gap: 0.25, prio: 1, gain: 5 }, (E, v, t) => {
   const k = 2 + Math.floor(E.rand() * 3);
   for (let i = 0; i < k; i++) {
     E.burst(v, t + i * 0.05, { hp: 1500, bp: E.rr(2200, 2800), q: 3, a: 0.0005, d: 0.02, g: 0.15 });
@@ -512,7 +512,7 @@ def('work_tool', { bus: 'world', gap: 0.25, prio: 1, gain: 4 }, (E, v, t) => {
   }
   if (E.rand() < 0.4) E.clank(v, t + k * 0.05, { f: E.rr(450, 800), d: 0.25, g: 0.06 });
 });
-def('work_soft', { bus: 'world', gap: 0.25, prio: 1, gain: 1.5 }, (E, v, t) => {
+def('work_soft', { bus: 'world', gap: 0.25, prio: 1, gain: 1.9 }, (E, v, t) => {
   E.burst(v, t, { table: 'pink', hp: 900, bp: E.rr(1800, 3000), q: 0.7, a: 0.03, d: 0.2, g: 0.16 });
   E.thud(v, t + 0.08, { f: E.rr(105, 130), d: 0.07, g: 0.06 });
   E.burst(v, t + 0.08, { table: 'pink', bp: 600, q: 0.8, a: 0.005, d: 0.12, g: 0.3 });

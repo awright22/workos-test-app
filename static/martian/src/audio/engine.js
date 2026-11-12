@@ -28,7 +28,8 @@ class Ctl {
   constructor(ctx, param, v) { this.ctx = ctx; this.p = param; this.v = v; param.value = v; }
   /** Glide to `v` with time constant `tc` seconds (about 63% of the way after `tc`). */
   to(v, tc = 0.1, t) {
-    if (Math.abs(v - this.v) <= 1e-4 * (1 + Math.abs(v))) return;
+    // steps under half a percent are inaudible behind the glide; skipping them keeps automation light
+    if (v === this.v || (v !== 0 && Math.abs(v - this.v) <= 0.004 * Math.max(Math.abs(v), Math.abs(this.v)))) return;
     this.v = v;
     this.p.setTargetAtTime(v, t === undefined ? this.ctx.currentTime : t, tc);
   }

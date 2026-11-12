@@ -13,10 +13,11 @@
 //          movement.js footsteps, jumps, work          vehicle.js  the rover
 //          launch.js   the ascent                      music.js    the score      disco.js  the playlist
 //          sfx.js      every one-shot recipe           driver.js   reads the game state each frame
+//          settings.js saved volumes                   controls.js volume sliders for a menu
 //
 // Nothing in this file or the ones it imports touches the game; driver.js is the only bridge.
 // That keeps the whole system renderable in an OfflineAudioContext (tools/tests/audio.mjs).
-import { clamp } from './dsp.js';
+import { clamp, mtof } from './dsp.js';
 import { Engine } from './engine.js';
 import { SFX } from './sfx.js';
 import { Ambience } from './ambience.js';
@@ -113,6 +114,21 @@ class AudioSystem {
     return v;
   }
 
+  /** A short sample on one bus, so a volume slider can be judged by ear. */
+  audition(bus) {
+    const E = this.E;
+    if (!this.running() || !E.allow('audition', 0.12)) return;
+    if (bus === 'music') {
+      const v = E.voice('audition', { bus: 'music', hall: 0.4, prio: 1 });
+      E.bell(v, E.now + 0.005, { f: mtof(this.music.key() + 19), g: 0.09, d: 1.4 });
+      E.seal(v);
+    } else if (bus === 'ambience') {
+      const v = E.voice('audition', { bus: 'ambience', prio: 1 });
+      E.burst(v, E.now + 0.005, { table: 'pink', bp: 420, q: 0.8, a: 0.15, h: 0.1, d: 0.7, g: 0.3 });
+      E.seal(v);
+    } else this.play('uiConfirm');
+  }
+
   /** The first version's beep(freq, seconds, shape, level), kept for old callers. */
   beep(freq, dur, type, vol) {
     const E = this.E;
@@ -124,11 +140,20 @@ class AudioSystem {
   }
 }
 
+/** Audio must never take the game down with it: any error inside is counted, reported once and swallowed. */
+function guard(snd, fn) {
+  try { return fn(); } catch (e) {
+    snd.errors++;
+    if (!snd._warned && typeof console !== 'undefined') { snd._warned = true; console.warn('Audio error (sound carries on where it can):', e); }
+    return null;
+  }
+}
+
 function makeSnd() {
   return {
     sys: null, ctx: null,
     vol: { master: 1, music: 0.8, sfx: 1, ambience: 1 },     // the score ships a little under full, so the slider has room to go up
-    errors: 0, _watching: false, _hidden: false, _driven: false, _disco: false, _alarm: false,
+    errors: 0, _warned: false, _watching: false, _hidden: false, _driven: false, _disco: false, _alarm: false,
 
     /**
      * Create the audio system. With no argument it opens a live AudioContext (browsers only
@@ -190,19 +215,21 @@ function makeSnd() {
     },
 
     /** Per-frame state from the game (see DEFAULT_PARAMS). */
-    update(params) { this._driven = true; if (this.sys) this.sys.update(params); },
+    update(params) { this._driven = true; if (this.sys) guard(this, () => this.sys.update(params)); },
     /** Play a named one-shot. opts: gain, pan (-1..1), delay (seconds), plus what the recipe reads. */
-    play(name, opts) { return this.sys ? this.sys.play(name, opts) : null; },
+    play(name, opts) { return this.sys ? guard(this, () => this.sys.play(name, opts)) : null; },
+    /** A short sample on a bus ('master' | 'music' | 'sfx' | 'ambience') for a volume slider. */
+    audition(bus) { if (this.sys) guard(this, () => this.sys.audition(bus)); },
     has(name) { return !!SFX[name]; },
     /** bus: 'master' | 'music' | 'sfx' | 'ambience'; v: 0..1. Takes effect at once and is remembered across init(). */
     setVolume(bus, v) {
       if (!(bus in this.vol)) return;
       this.vol[bus] = clamp(+v || 0, 0, 1);
-      if (this.sys) this.sys.E.setVolume(bus, this.vol[bus]);
+      if (this.sys) guard(this, () => this.sys.E.setVolume(bus, this.vol[bus]));
     },
     getVolume(bus) { return this.vol[bus]; },
     /** Force a score state ('day', 'night', 'hab', 'drive', 'danger', 'triumph', 'title', 'space', 'silence'), or null. */
-    music(state) { if (this.sys) this.sys.music.force(state); },
+    music(state) { if (this.sys) guard(this, () => this.sys.music.force(state)); },
     /** Counters for the soak test: live nodes, voices, nodes ever made, updates run. */
     stats() {
       if (!this.sys) return { live: 0, made: 0, voices: 0, core: 0, updates: 0, state: 'off', errors: this.errors };
@@ -212,10 +239,10 @@ function makeSnd() {
     // ---- the first version's interface -----------------------------------------------------
     /** Wind is driven from update() now; this only matters to a caller that never calls update(). */
     wind(level) {
-      if (this.sys && !this._driven) this.sys.update({ scene: 'play', storm: clamp((level - 0.16) / 0.65, 0, 1) });
+      if (this.sys && !this._driven) guard(this, () => this.sys.update({ scene: 'play', storm: clamp((level - 0.16) / 0.65, 0, 1) }));
     },
     rumble(level) { if (this.sys) this.sys.p.rumble = clamp(+level || 0, 0, 1); },
-    beep(freq, dur, type, vol) { if (this.sys) this.sys.beep(freq, dur, type, vol); },
+    beep(freq, dur, type, vol) { if (this.sys) guard(this, () => this.sys.beep(freq, dur, type, vol)); },
     click() { this.play('click'); },
     ok() { this.play('ok'); },
     pickup() { this.play('pickup'); },

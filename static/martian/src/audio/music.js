@@ -34,7 +34,7 @@ const ST = {
   title:   { pool: ['vi', 'IV', 'I', 'V'], seq: true, chord: [11, 14], bright: 0.5, pad: 1.0, bass: 0.8, bells: 1.0, motif: 0.5, phrase: [3, 5], rest: [4, 8], beat: 1.5 },
   day:     { pool: ['I', 'IV', 'vi', 'iii', 'IVl', 'ii'], chord: [18, 34], bright: 0.55, pad: 0.85, bass: 0.45, bells: 0.9, motif: 0.14, phrase: [2, 5], rest: [7, 18], beat: 1.8, play: [70, 150], quiet: [45, 110] },
   night:   { pool: ['vi', 'IV', 'ii', 'iii'], chord: [24, 44], bright: 0.3, pad: 0.7, bass: 0.3, bells: 0.6, motif: 0.1, phrase: [1, 3], rest: [14, 30], beat: 2.4, low: true, play: [50, 100], quiet: [80, 190] },
-  hab:     { pool: ['IV', 'I', 'ii', 'vi'], chord: [20, 36], bright: 0.42, pad: 0.7, bass: 0.35, bells: 0.7, motif: 0.1, phrase: [2, 4], rest: [9, 22], beat: 2.0, play: [60, 120], quiet: [60, 140] },
+  hab:     { pool: ['IV', 'I', 'ii', 'vi'], chord: [20, 36], bright: 0.42, pad: 0.9, bass: 0.35, bells: 0.7, motif: 0.1, phrase: [2, 4], rest: [9, 22], beat: 2.0, play: [60, 120], quiet: [60, 140] },
   drive:   { pool: ['I', 'bVII', 'IV', 'V', 'vi'], chord: [13, 22], bright: 0.6, pad: 0.8, bass: 0.7, bells: 0.6, motif: 0.12, phrase: [2, 4], rest: [8, 16], beat: 1.58, pulse: 1, play: [90, 200], quiet: [35, 80] },
   danger:  { pool: ['phr', 'vib6'], chord: [10, 18], bright: 0.2, pad: 1.0, bass: 1.0, bells: 0.5, motif: 0, phrase: [1, 2], rest: [7, 13], beat: 2.6, dark: true },
   triumph: { pool: ['IV', 'V', 'vi', 'IV', 'I', 'V', 'I'], seq: true, chord: [6.5, 8], bright: 0.8, pad: 1.1, bass: 0.9, bells: 1.2, motif: 0.6, phrase: [3, 5], rest: [2, 4], beat: 1.1 },
@@ -78,7 +78,7 @@ export class Music {
     this.noteNext = -1; this.phraseLeft = 0; this.step = 4; this.motifAt = -1; this.beat = 1.8; this.octave = 0;
     this.pulseNext = -1; this.pulseStep = 0; this.pulseAmt = 0; this.mask = [1, 0, 0.6, 0, 0.9, 0.2, 0.5, 0];
     this.tollNext = -1;
-    this.triumphUntil = -1; this.driveTime = 0; this.danger = 0;
+    this.triumphUntil = -1; this.driveTime = 0; this.danger = 0; this.loud = 0;
     this.override = null; this.phase = E.rr(0, 6.28);
   }
   /** MIDI note of the current tonic (sfx.js tunes its stingers to it). */
@@ -105,6 +105,7 @@ export class Music {
     const d = Math.max(p.breach ? 1 : 0, smooth(0.26, 0.08, p.o2), smooth(0.34, 0.1, p.health),
       p.place === 'hab' ? 0 : smooth(0.4, 0.8, p.storm), p.leak ? 0.7 : 0);
     this.danger = d;
+    this.loud = Math.max(p.breach ? 0.8 : 0, p.place === 'hab' ? 0 : smooth(0.3, 0.9, p.storm));
     if (d > 0.3) return 'danger';
     if (p.place === 'hab') return 'hab';
     if (this.driveTime > 6) return 'drive';
@@ -154,7 +155,7 @@ export class Music {
     // ---- pad and bass ----
     if (level > 0.004 && st.pad > 0) {
       const fresh = !this.pad.on, c = this.pad.use();
-      const urge = st.dark ? 0.65 + 0.35 * this.danger : 1;
+      const urge = st.dark ? 1 + 2 * this.danger * this.loud : 1;   // danger has to carry over a storm or a klaxon
       c.out.to(0.2 * st.pad * level * urge, 0.6);
       const bright = st.bright * (1 + 0.16 * Math.sin(now * 0.047 + this.phase));
       c.cut.to(480 + 1900 * bright, 1.8);
@@ -187,7 +188,7 @@ export class Music {
     // ---- danger: a low toll ----
     if (st.dark && now >= this.tollNext) {
       const v = E.voice('mToll', { bus: 'music', hall: 0.6, prio: 1 });
-      E.bell(v, now + 0.02, { f: mtof(this.K + this.chord.root - 12), ratio: 1.41, index: 1.3, bite: 0.5, d: 7, g: 0.055 * level });
+      E.bell(v, now + 0.02, { f: mtof(this.K + this.chord.root - 12), ratio: 1.41, index: 1.3, bite: 0.5, d: 7, g: 0.055 * level * (1 + 1.5 * this.danger * this.loud) });
       if (E.rand() < 0.5) E.bell(v, now + E.rr(1.5, 3), { f: mtof(this.K + this.chord.root + 12 + E.pick([0, 1, 7])), index: 0.5, d: 5, g: 0.016 * level });
       E.seal(v);
       this.tollNext = now + E.rr(7, 13) / (0.6 + this.danger * 0.6);

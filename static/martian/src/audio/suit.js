@@ -1,6 +1,6 @@
 // Inside the helmet: breathing that follows effort and failing air, the suit's fan, a heartbeat
 // when things are critical, the low-oxygen caution tone, and the hiss of a leaking suit.
-import { clamp, lerp, smooth } from './dsp.js';
+import { lerp, smooth } from './dsp.js';
 import { Layer } from './engine.js';
 
 function buildSuit(E, L) {

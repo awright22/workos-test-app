@@ -1,11 +1,12 @@
 // The bridge between the game and the audio system. Once a frame it reads the game state and
 // hands Snd.update() a plain description of it; it also catches the moments nobody calls a
 // sound for (a new sol, falling asleep, opening a screen), gives every button a click, unlocks
-// audio on the first touch, and keeps the volume settings.
+// audio on the first touch, and loads the saved volume settings.
 //
 // The rest of src/audio knows nothing about the game, so this is the only file to change when
 // the game's state moves about.
 import { Snd } from './sound.js';
+import { setAudioVolume, getAudioVolumes, loadAudioVolumes } from './settings.js';
 import { clamp, smooth } from './dsp.js';
 import { S, suitCap } from '../game/state.js';
 import { player } from '../game/player.js';
@@ -25,16 +26,17 @@ let rough = 0, prevH = 0, prevVs = 0, habDist = 1e6, habDistAt = -1, frame = 0, 
 /** What kind of work a held action sounds like, from the words of its prompt. */
 const HOLD_KINDS = [
   [/wipe/i, 'wipe'],
-  [/dig|regolith|rtg/i, 'dig'],
-  [/salvage|strip|pathfinder|connect|place the|seal|mine|open|pull the antenna/i, 'tool'],
-  [/plant|water|harvest|clear|eat|burn/i, 'soft'],
+  [/\bdig\b|regolith|\brtg\b/i, 'dig'],
+  [/salvage|strip|connect|place the|\bseal|\bmine\b|\bopen\b|pull the antenna/i, 'tool'],
+  [/^plant|^water|harvest|clear out|\beat\b|\bburn\b/i, 'soft'],
 ];
 let kindOf = null, kindFor = null;
 function holdKind(it) {
-  if (it === kindFor) return kindOf;
-  kindFor = it; kindOf = null;
+  // one interactable can offer different actions (a farm plot: fill, plant, water, harvest), so go by its words
   let label = '';
   try { label = it.label ? String(it.label()) : ''; } catch (e) { /* a label that needs state we do not have */ }
+  if (label === kindFor) return kindOf;
+  kindFor = label; kindOf = null;
   for (const [re, kind] of HOLD_KINDS) if (re.test(label)) { kindOf = kind; break; }
   return kindOf;
 }
@@ -114,21 +116,6 @@ export function updateAudio(dt) {
   }
 }
 
-// ---- volume settings -------------------------------------------------------------------------------
-const VOL_KEY = 'stranded2-audio';
-/** Set a volume ('master' | 'music' | 'sfx' | 'ambience', 0..1) and remember it for next time. */
-export function setAudioVolume(bus, v) {
-  Snd.setVolume(bus, v);
-  try { localStorage.setItem(VOL_KEY, JSON.stringify(Snd.vol)); } catch (e) { /* private mode */ }
-}
-export function getAudioVolumes() { return { ...Snd.vol }; }
-function loadVolumes() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(VOL_KEY) || 'null');
-    if (saved) for (const k in Snd.vol) if (typeof saved[k] === 'number') Snd.setVolume(k, saved[k]);
-  } catch (e) { /* nothing saved, or not readable */ }
-}
-
 // ---- hooks on the page ----------------------------------------------------------------------------
 const PRESSABLE = 'button, .mg-tbtn, .close, [data-t], [data-deploy], [data-r], [data-u], [role="button"]';
 const SILENT_IDS = { 'mg-tE': 1, 'mg-tJump': 1 };          // game controls, not interface
@@ -142,7 +129,7 @@ function pressSound(el) {
 }
 
 function install() {
-  loadVolumes();
+  loadAudioVolumes();
   // Browsers only start audio from a user gesture, and iOS suspends it again after an
   // interruption, so every gesture makes sure the context exists and is running.
   const unlock = () => { Snd.init(); Snd.resume(); };

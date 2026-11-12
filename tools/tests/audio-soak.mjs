@@ -29,9 +29,10 @@ const began = await g.eval((G) => {
       Snd.ctx.renderCapacity.start({ updateInterval: 2 });
     } catch (e) { /* not supported */ }
   }
-  // drawing with software WebGL would starve the main thread, so stop the frame loop: the
-  // simulation and the audio are stepped by the timer below instead
+  // Drawing with software WebGL would starve the main thread, so stop the frame loop and hide
+  // the page (or every HUD change repaints it): the timer below steps the simulation and the audio.
   window.requestAnimationFrame = () => 0;
+  document.body.style.display = 'none';
   const key = (k, on) => { G.input.keys[k] = on; };
   const press = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
   // the script: [from second, what to do once]

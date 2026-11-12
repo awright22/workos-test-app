@@ -16,10 +16,10 @@ const GUITAR = [[2, 6, 7, 10, 14], [2, 3, 6, 10, 13, 14], [1, 2, 6, 9, 10, 14], 
 const HAT = [0.9, 0.35, 0.6, 0.4];
 const LEAD = [69, 72, 74, 76, 79, 81, 84];
 const TONE = {
-  hab:   { level: 0.4, hp: 180, lp: 5200, wet: 0.25 },
-  out:   { level: 0.13, hp: 300, lp: 1100, wet: 0 },
-  rover: { level: 0.3, hp: 200, lp: 2600, wet: 0.1 },
-  full:  { level: 0.5, hp: 40, lp: 15000, wet: 0.06 },
+  hab:   { level: 0.6, hp: 180, lp: 5200, wet: 0.25 },
+  out:   { level: 0.2, hp: 300, lp: 1100, wet: 0 },
+  rover: { level: 0.45, hp: 200, lp: 2600, wet: 0.1 },
+  full:  { level: 0.7, hp: 40, lp: 15000, wet: 0.06 },
 };
 
 function buildDisco(E, L) {
