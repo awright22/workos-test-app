@@ -1,0 +1,24 @@
+/* ../static/martian/src/ui/game.css */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+#mg-root {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+#mg-root canvas.mg-three {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/*# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsic3JjL3VpL2dhbWUuY3NzIl0sCiAgInNvdXJjZXNDb250ZW50IjogWyJodG1sLCBib2R5IHsgbWFyZ2luOiAwOyBwYWRkaW5nOiAwOyB3aWR0aDogMTAwJTsgaGVpZ2h0OiAxMDAlOyBvdmVyZmxvdzogaGlkZGVuOyBiYWNrZ3JvdW5kOiAjMDAwOyB9XG4jbWctcm9vdCB7IHBvc2l0aW9uOiBmaXhlZDsgaW5zZXQ6IDA7IGJhY2tncm91bmQ6ICMwMDA7IG92ZXJmbG93OiBoaWRkZW47IH1cbiNtZy1yb290IGNhbnZhcy5tZy10aHJlZSB7IHBvc2l0aW9uOiBhYnNvbHV0ZTsgaW5zZXQ6IDA7IHdpZHRoOiAxMDAlOyBoZWlnaHQ6IDEwMCU7IGRpc3BsYXk6IGJsb2NrOyB9XG4iXSwKICAibWFwcGluZ3MiOiAiO0FBQUE7QUFBTTtBQUFPLFVBQVE7QUFBRyxXQUFTO0FBQUcsU0FBTztBQUFNLFVBQVE7QUFBTSxZQUFVO0FBQVEsY0FBWTtBQUFNO0FBQ25HLENBQUM7QUFBVSxZQUFVO0FBQU8sU0FBTztBQUFHLGNBQVk7QUFBTSxZQUFVO0FBQVE7QUFDMUUsQ0FEQyxRQUNRLE1BQU0sQ0FBQztBQUFXLFlBQVU7QUFBVSxTQUFPO0FBQUcsU0FBTztBQUFNLFVBQVE7QUFBTSxXQUFTO0FBQU87IiwKICAibmFtZXMiOiBbXQp9Cg== */

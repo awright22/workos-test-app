@@ -1,0 +1,186 @@
+/*
+ * The Martian sky: a dome around the camera, shaded per pixel.
+ *
+ * It is a look model, not a physical simulation, built from what the surface cameras show:
+ *   - by day a dusty butterscotch sky, palest and brightest toward the horizon and the sun
+ *   - at sunrise and sunset the sky darkens to grey-brown and the glow around the sun turns
+ *     blue (fine dust scatters blue light forward)
+ *   - a long, dim twilight, then stars
+ *   - from high above, black space with a thin tan haze along the limb of the planet
+ * skyColor() in JavaScript mirrors the shader, so lights and fog can match the sky exactly.
+ */
+import * as THREE from 'three';
+import { R } from '../planet/constants.js';
+import { clamp, smoothstep, lerp } from '../core/math.js';
+
+const ATMO_H = 420;      // visual scale height of the dust haze in world metres
+
+const GLSL_SKY = /* glsl */`
+  uniform vec3 uSun;        // unit, world
+  uniform vec3 uUp;         // unit, world: straight up at the camera
+  uniform float uAlt;       // camera altitude above the mean surface (m)
+  uniform float uDust;      // 0 clear .. 1 thick dust storm
+  uniform float uTime;
+  const float PI = 3.14159265;
+
+  float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+
+  // colour of the sky in direction v (unit, world). Linear, scene-referred.
+  vec3 skyColor(vec3 v, out float space) {
+    float mu = dot(v, uUp);
+    float sunE = dot(uSun, uUp);
+    float cosT = dot(v, uSun);
+    float day = smoothstep(-0.16, 0.10, sunE);
+    float low = 1.0 - smoothstep(0.0, 0.45, sunE);           // 1 at the horizon, 0 high sun
+    // base dome: zenith to horizon
+    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 2.6);
+    vec3 zen = mix(vec3(0.30, 0.215, 0.150), vec3(0.150, 0.130, 0.125), low);
+    vec3 hor = mix(vec3(0.86, 0.60, 0.39), vec3(0.40, 0.30, 0.25), low);
+    vec3 col = mix(zen, hor, h) * (0.10 + 1.25 * day);
+    // dust aureole around the sun: warm white by day, blue when the sun is low
+    float g = 0.80;
+    float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosT, 1.5) * 0.25;
+    float wide = pow(max(cosT, 0.0), 6.0);
+    vec3 aur = mix(vec3(1.0, 0.86, 0.66), vec3(0.34, 0.52, 0.92), smoothstep(0.30, 0.02, sunE));
+    float sunUp = smoothstep(-0.10, 0.04, sunE);
+    col += aur * (hg * 0.30 + wide * 0.16) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    // twilight glow hugging the horizon on the sun's side after sunset
+    float tw = smoothstep(-0.34, -0.02, sunE) * (1.0 - sunUp);
+    col += vec3(0.20, 0.25, 0.42) * tw * pow(max(cosT * 0.5 + 0.5, 0.0), 3.0) * (0.25 + h) * 0.55;
+    // night floor so the ground is never pure black
+    col += vec3(0.0035, 0.0040, 0.0060);
+    // storms: flatten everything toward a dim ochre
+    vec3 murk = vec3(0.50, 0.30, 0.16) * (0.06 + 0.60 * day);
+    col = mix(col, murk, uDust * 0.88);
+    // leaving the atmosphere: fade to space, keep a haze band along the limb
+    space = 1.0 - exp(-max(uAlt, 0.0) / ${ATMO_H.toFixed(1)});
+    float camR = ${R.toFixed(1)} + uAlt;
+    float b = camR * sqrt(max(1.0 - mu * mu, 0.0));           // closest approach of the ray to the centre
+    float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.55).toFixed(1)});
+    limb = max(limb, exp(-max(uAlt, 0.0) / ${(ATMO_H * 2.0).toFixed(1)}) * h);
+    col = mix(col, col * limb * 1.4, space);
+    return col;
+  }
+
+  vec3 stars(vec3 v, float visibility) {
+    if (visibility <= 0.001) return vec3(0.0);
+    vec3 acc = vec3(0.0);
+    for (int layer = 0; layer < 2; layer++) {
+      float scale = layer == 0 ? 170.0 : 90.0;
+      vec3 p = v * scale;
+      vec3 ip = floor(p + 0.5);
+      float rnd = hash13(ip + float(layer) * 17.0);
+      if (rnd > (layer == 0 ? 0.965 : 0.985)) {
+        vec3 c = ip + (vec3(hash13(ip + 3.1), hash13(ip + 7.7), hash13(ip + 11.3)) - 0.5) * 0.7;
+        float d = length(p - normalize(c) * length(p));
+        float mag = pow(hash13(ip + 23.0), layer == 0 ? 7.0 : 2.5);
+        float tw = 0.85 + 0.15 * sin(uTime * (2.0 + rnd * 5.0) + rnd * 60.0);
+        float s = exp(-d * d * (layer == 0 ? 220.0 : 90.0)) * (0.35 + 5.0 * mag) * tw;
+        vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.75, 0.86, 1.0), hash13(ip + 41.0));
+        acc += tint * s;
+      }
+    }
+    return acc * visibility;
+  }
+`;
+
+const _c = new THREE.Color();
+
+export class Sky {
+  constructor() {
+    this.uniforms = {
+      uSun: { value: new THREE.Vector3(1, 0, 0) },
+      uUp: { value: new THREE.Vector3(0, 1, 0) },
+      uAlt: { value: 2 },
+      uDust: { value: 0 },
+      uTime: { value: 0 },
+      uSunDisc: { value: 1 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: true,
+      vertexShader: /* glsl */`
+        varying vec3 vDir;
+        void main() {
+          vDir = position;
+          vec4 p = projectionMatrix * vec4((viewMatrix * vec4(position, 0.0)).xyz, 1.0);
+          gl_Position = p.xyww;       // always at the far plane
+        }`,
+      fragmentShader: /* glsl */`
+        varying vec3 vDir;
+        uniform float uSunDisc;
+        ${GLSL_SKY}
+        void main() {
+          vec3 v = normalize(vDir);
+          float space;
+          vec3 col = skyColor(v, space);
+          float sunE = dot(uSun, uUp);
+          float night = 1.0 - smoothstep(-0.20, 0.06, sunE);
+          float starVis = max(night, space) * (1.0 - uDust) * smoothstep(-0.06, 0.12, dot(v, uUp) + space);
+          col += stars(v, starVis) * 0.9;
+          // the sun: a small hard disc (0.35 degrees across on Mars) with a tight halo
+          float cosT = dot(v, uSun);
+          float ang = acos(clamp(cosT, -1.0, 1.0));
+          float disc = smoothstep(0.0046, 0.0030, ang);
+          float halo = exp(-ang * 60.0) * 0.6 + exp(-ang * 14.0) * 0.08;
+          float through = (1.0 - uDust * 0.93) * smoothstep(-0.03, 0.03, sunE + (1.0 - uSunDisc));
+          vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
+          col += sunCol * (disc * 90.0 + halo * 6.0) * through;
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), mat);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = -1000;
+    this.mesh.name = 'sky';
+    this.sunColor = new THREE.Color();
+    this.ambientSky = new THREE.Color();
+    this.ambientGround = new THREE.Color();
+    this.fogColor = new THREE.Color();
+    this.sunIntensity = 1;
+    this.day = 1;
+  }
+
+  /**
+   * @param {THREE.Vector3} sunDir unit, world
+   * @param {THREE.Vector3} camPos world
+   * @param {number} dust 0..1 local storm intensity
+   * @param {number} time seconds
+   */
+  update(sunDir, camPos, dust, time) {
+    const u = this.uniforms;
+    u.uSun.value.copy(sunDir);
+    u.uUp.value.copy(camPos).normalize();
+    u.uAlt.value = camPos.length() - R;
+    u.uDust.value = dust;
+    u.uTime.value = time;
+    this.mesh.position.copy(camPos);
+    // --- values the rest of the renderer needs, consistent with the shader above ----------
+    const sunE = sunDir.dot(u.uUp.value);
+    const day = smoothstep(-0.16, 0.10, sunE);
+    const low = 1 - smoothstep(0, 0.45, sunE);
+    this.day = day;
+    this.sunE = sunE;
+    // direct sunlight: fades through the dust near the horizon; slightly blue-white when low
+    const through = smoothstep(-0.04, 0.16, sunE);
+    this.sunIntensity = 3.3 * through * (1 - dust * 0.86);
+    this.sunColor.setRGB(lerp(0.80, 1.0, 1 - low * 0.6), lerp(0.80, 0.93, 1 - low), lerp(0.86, 0.80, 1 - low));
+    // sky light: the dome's average colour above, the lit ground's bounce below
+    const k = 0.10 + 1.25 * day;
+    this.ambientSky.setRGB(lerp(0.58, 0.28, low) * k, lerp(0.41, 0.22, low) * k, lerp(0.27, 0.19, low) * k);
+    this.ambientGround.setRGB(0.30 * k * (0.3 + 0.7 * through), 0.15 * k * (0.3 + 0.7 * through), 0.08 * k * (0.3 + 0.7 * through));
+    this.fogColor.setRGB(lerp(0.86, 0.40, low) * k, lerp(0.60, 0.30, low) * k, lerp(0.39, 0.25, low) * k);
+    this.ambientSky.offsetHSL(0, 0, 0.004);
+    if (dust > 0) {
+      _c.setRGB(0.50 * (0.06 + 0.60 * day), 0.30 * (0.06 + 0.60 * day), 0.16 * (0.06 + 0.60 * day));
+      this.fogColor.lerp(_c, dust * 0.88);
+      this.ambientSky.lerp(_c, dust * 0.7);
+    }
+    const space = 1 - Math.exp(-Math.max(u.uAlt.value, 0) / ATMO_H);
+    this.space = space;
+    this.fogColor.multiplyScalar(1 - space * 0.85);
+  }
+}
+export { ATMO_H };
