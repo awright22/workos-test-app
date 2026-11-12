@@ -79,29 +79,32 @@ addI({
     switch (pl.state) {
       case 'empty':
         S.inv.regolith--; pl.state = 'soil';
+        Snd.play('fillBed');
         break;
       case 'soil':
         if (S.potatoes > 0) S.potatoes--; else S.food--;
         S.water -= BAL.waterPerDose;
         pl.state = 'growing'; pl.growth = 0.04; pl.watered = 1;
         if (plantedPlots() === 1) log('Planted. Grow, little guy. No pressure, but you\'re the food supply.');
+        Snd.play('plant');
         break;
       case 'growing':
         S.water -= BAL.waterPerDose; pl.watered++;
+        Snd.play('water');
         break;
       case 'ready':
         pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
         S.potatoes += BAL.potatoYield;
         S.stats.potatoes += BAL.potatoYield;
-        Snd.jingle();
+        Snd.play('harvest'); Snd.jingle();
         if (S.stats.potatoes === BAL.potatoYield) log('First harvest. I am the greatest botanist on this planet. Fear me.');
         checkAchievements();
         break;
       case 'dead':
         pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
+        Snd.play('clearBed');
         break;
     }
-    Snd.ok();
     syncPlot(pl);
   },
 });
@@ -121,7 +124,7 @@ addI({
     S.suit = suitCap();
     S.shake = 1.2;
     flashScreen('rgba(255,60,40,0.35)', 350);
-    Snd.boom(); setTimeout(() => Snd.ok(), 600);
+    Snd.play('suitSeal');
     setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 300);
     setTimeout(() => log(SOL_LOGS[1]), 1000);
   },
@@ -169,7 +172,7 @@ addI({
     p.dust = 0;
     S.stats.panels++;
     syncAllVisuals();
-    Snd.ok();
+    Snd.play('wipe');
     if (S.stats.panels === 1) log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.');
   },
 });
@@ -187,14 +190,14 @@ addI({
     if (!sp || sp.left <= 0) return;
     sp.left--; S.inv.regolith++;
     syncAllVisuals();
-    Snd.pickup();
+    Snd.play('dig');
   },
 });
 addI({
   pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
   visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
   label: () => 'Dig regolith here (+1, slow)',
-  use: () => { S.inv.regolith++; Snd.pickup(); },
+  use: () => { S.inv.regolith++; Snd.play('dig'); },
 });
 // hydrazine rig
 addI({
@@ -207,6 +210,7 @@ addI({
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
     World.hydFlame.visible = true;
+    Snd.play('hydrazine');
     setTimeout(() => { World.hydFlame.visible = false; }, 2600);
     if (!S.flags.hydrazineBoom) {
       S.flags.hydrazineBoom = true;
@@ -215,7 +219,7 @@ addI({
         S.shake = 1.6;
         S.o2 = clamp(S.o2 - 7, 0, 100);
         flashScreen('rgba(255,180,80,0.75)', 500);
-        Snd.boom();
+        Snd.play('hydrazineBoom');
         log('So. Small fireball. Eyebrows: gone. Water: acquired. Science!');
       }, 1200);
       log('Burning rocket fuel indoors. What could possibly go wrong?');
@@ -250,7 +254,7 @@ addI({
   use: () => {
     if (S.potatoes > 0) S.potatoes--; else S.food--;
     S.health = clamp(S.health + 12, 0, BAL.healthMax);
-    Snd.ok();
+    Snd.play('eat');
   },
 });
 // comms desk: the math, NASA chatter, disco
@@ -261,7 +265,7 @@ addI({
   label: () => 'Run the numbers',
   use: () => {
     S.flags.didMath = true;
-    Snd.ok();
+    Snd.play('terminal');
     log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The math says: farm or starve. I'm going to have to science the sh*t out of this.`);
   },
 });
@@ -278,7 +282,7 @@ addI({
       'Asked NASA for pizza. Received an orbital mechanics refresher. Same thing, apparently.',
       'NASA reminds me everything I type is broadcast live to Earth. So. Hi, Mom.',
     ];
-    Snd.ok();
+    Snd.play('nasaSend');
     log(lines[(S.flags.nasaMsg = (S.flags.nasaMsg + 1)) % lines.length], 'nasa');
   },
 });
@@ -362,6 +366,7 @@ addI({
     const rec = World._activeLander;
     if (!rec || S.salvaged[rec.data.name]) return;
     S.salvaged[rec.data.name] = true;
+    Snd.play('salvage');
     const loot = { scrap: rec.data.scrap };
     if (LANDER_CIRCUITS[rec.data.name]) loot.circuit = LANDER_CIRCUITS[rec.data.name];
     const got = gainLoot(loot);
@@ -386,7 +391,7 @@ addI({
     if (!site || site.left <= 0) return;
     site.left--; S.inv.ice++; S.stats.mined++;
     syncIce(site);
-    Snd.pickup();
+    Snd.play('drill');
     checkAchievements();
   },
 });
@@ -409,6 +414,7 @@ addI({
     if (!p || p.taken) return;
     p.taken = true;
     syncPod(p);
+    Snd.play(p.kind === 'pod' ? 'podOpen' : 'salvage');
     const got = gainLoot(p.loot);
     log(`Recovered: ${got}.`);
     if (p.blueprint) { S.blueprints[p.blueprint] = true; log(`NASA attached schematics: ${p.blueprint.toUpperCase()} blueprint unlocked.`, 'nasa'); }
@@ -424,7 +430,7 @@ addI({
     World.rtgSite.taken = true;
     syncAllVisuals();
     S.flags.hasRtg = true;
-    Snd.pickup();
+    Snd.play('rtg');
     log('One RTG: a plutonium space-heater NASA buried out of an abundance of caution. I am strapping it to my life. Socket it at the fabricator.');
   },
 });
@@ -438,7 +444,7 @@ addI({
     S.breach.active = false;
     S.breach.done = true;
     Snd.alarm(false);
-    Snd.ok();
+    Snd.play('sealBreach');
     S.shake = 0.5;
     syncAllVisuals();
     log(S.breach.cropsKilled ?
@@ -466,7 +472,7 @@ addI({
     if (!c || c.charges <= 0) return;
     c.charges--;
     S.suit = clamp(S.suit + 40, 0, suitCap());
-    Snd.ok();
+    Snd.play('o2Refill');
   },
 });
 // kit deployment
@@ -491,7 +497,7 @@ addI({
     _v1.addScaledVector(_v2, (kind === 'greenhouse' ? 6.4 : 2.6) / R).normalize();
     tangentBasis(_v1, _fe, _fn);
     buildDeployable(kind, _v1, Math.atan2(-_v2.dot(_fe), -_v2.dot(_fn)));
-    Snd.craft();
+    Snd.play('deploy');
     log(`${ITEM_NAMES[kitKey]} deployed. Mars: 0, engineering: 1.`);
     syncAllVisuals();
     onQuestEvent('deploy', deployKind);
@@ -509,7 +515,7 @@ addI({
   use: () => {
     S.flags.mavStripped = true;
     if (World.mavNose) World.mavNose.visible = false;
-    Snd.ok();
+    Snd.play('salvage');
     log('Removed the nose cone. NASA says the tarp will hold. NASA is lying, and we both know it.');
   },
 });

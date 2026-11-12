@@ -1,6 +1,7 @@
 import { log, showOverlay, toast } from '../ui/dom.js';
 import { DIFFICULTIES, S } from './state.js';
 import { Snd } from '../audio/sound.js';
+import { mountAudioControls } from '../audio/controls.js';
 import { Save, applyState, checkpoint, loadSavedData, restoreCheckpoint, saveGame, unreadableSaveExists, wipeSave } from './save.js';
 import { tryLock } from './input.js';
 import { initStorms, updateSunDir } from './sim.js';
@@ -22,7 +23,7 @@ export function die(cause) {
   if (S.over) return;
   S.over = true;
   S.dead = cause;
-  Snd.alarm(false); Snd.disco(false); Snd.bad(); Snd.rumble(0);
+  Snd.alarm(false); Snd.disco(false); Snd.play('death'); Snd.rumble(0);
   const iron = S.diff === 'iron';
   if (iron) wipeSave();
   const buttons = [];
@@ -51,6 +52,7 @@ export function showPause() {
       { label: 'RESTART RUN', ghost: true, keep: true, fn: () => { wipeSave(); tryReload(); } },
     ],
   });
+  mountAudioControls();                           // volume sliders, above the buttons
 }
 
 // ============================================================

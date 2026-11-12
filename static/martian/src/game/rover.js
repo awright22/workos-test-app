@@ -83,7 +83,7 @@ export function enterRover() {
   S.mode = 'rover';
   roverF.camInit = false; roverF.camYaw = 0; roverF.camPitch = 0;
   input.yaw = 0; input.pitch = 0;
-  Snd.click();
+  Snd.play('roverEnter');
   emit('rover-enter', {});
 }
 export function exitRover() {
@@ -94,7 +94,7 @@ export function exitRover() {
   collideUnit(player.q, 0.42);
   player.alt = 0; player.vy = 0; player.vx = 0; player.vz = 0; player.face = 0; player.onGround = true;
   syncPlayerPos();
-  Snd.click();
+  Snd.play('roverExit');
   emit('rover-exit', {});
 }
 

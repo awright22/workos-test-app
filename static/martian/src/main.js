@@ -13,6 +13,7 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
+import { updateAudio } from './audio/driver.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
 import { RockField } from './world/rocks.js';
@@ -126,6 +127,7 @@ function draw(dt, focus) {
 
 /** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
 function tick(dt) {
+  updateAudio(dt);
   if (!S.started) { titleCamera(dt); return null; }
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
   if (S.over && S.mode !== 'cutscene') return focus;
@@ -147,7 +149,6 @@ function tick(dt) {
     updatePing();
     updateEffects(dt);
   }
-  Snd.wind((S.inside ? 0.05 : 0.16) + S.storm.i * 0.65 + (S.breach.active && S.inside ? 0.4 : 0));
   blinkT += dt;
   if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
   if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
@@ -187,7 +188,7 @@ function updatePing() {
   const d = groundDist(player.pos, World.pathfinder.position);
   if (d > 90) return;
   const interval = clamp(d / 60, 0.12, 1.4);
-  if (perf() - lastPing > interval) { lastPing = perf(); Snd.beep(1200, 0.04, 'square', 0.05); }
+  if (perf() - lastPing > interval) { lastPing = perf(); Snd.play('pfPing'); }
   if (d < 10 && !S.pf.found) { S.pf.found = true; log('Signal source dead ahead. There you are.'); }
 }
 
