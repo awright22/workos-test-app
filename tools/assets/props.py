@@ -393,6 +393,22 @@ def hull(bm, pts, M=None):
     return faces
 
 
+def back_faces(bm, faces=None, gap=0.0008):
+    """Give open sheet geometry a back: a reversed copy of every face a hair behind it. The game
+    draws opaque surfaces front-face only, so a single sheet of foil or torn metal would vanish
+    when seen from behind."""
+    bm.normal_update()
+    faces = list(bm.faces) if faces is None else list(faces)
+    twin = {}
+    for f in faces:
+        vs = []
+        for v in reversed(f.verts):
+            if v not in twin:
+                twin[v] = bm.verts.new(v.co - v.normal * gap)
+            vs.append(twin[v])
+        bm.faces.new(vs)
+
+
 def text_mesh(text, size=0.1, res=1):
     """Stencil lettering as flat geometry (the built-in Blender font), centred, facing +Z."""
     cu = bpy.data.curves.new('txt', 'FONT')
@@ -712,15 +728,17 @@ def _gh_shell(K, P, edges, tris, primary):
     # meridians, a pentagon ring, ten legs to the ground); the rest are light V-section glazing bars.
     sb = K.bm('aluminium', smooth=30.0)
     for e in edges:
-        for a, b in clip_seg(P[e[0]], P[e[1]]):
+        pieces = clip_seg(P[e[0]], P[e[1]])
+        cut = pieces != [(P[e[0]], P[e[1]])]            # ends buried in hubs need no caps; cut ends do
+        for a, b in pieces:
             if (b - a).length < 0.14:
                 continue
             mid = ((a + b) / 2 - C).normalized()
             if e in primary:
                 off = mid * -0.034
-                sweep(sb, [a + off, b + off], rect(0.07, 0.13), up=mid, caps=False)
+                sweep(sb, [a + off, b + off], rect(0.07, 0.13), up=mid, caps=cut)
             else:
-                sweep(sb, [a, b], [(0.026, 0.022), (-0.026, 0.022), (0.0, -0.075)], up=mid, caps=False)
+                sweep(sb, [a, b], [(0.026, 0.022), (-0.026, 0.022), (0.0, -0.075)], up=mid, caps=cut)
 
     # hubs: a puck at every node (pentagonal where five struts meet), flats toward the struts
     nbr = {}
@@ -923,10 +941,10 @@ def _gh_lights(K, P, in_door):
         anchor(f'light_{k}', K.parent, loc=(px, py, ZF))
     # apex: a vent cowl outside, a pendant work lamp inside
     top = ZC + R_
-    K.lathe('painted_white', [(0.44, -0.05), (0.44, 0.0), (0.36, 0.075), (0.17, 0.115), (0.15, 0.20), (0.22, 0.215), (0.22, 0.25),
-                              (0.10, 0.285), (0.0, 0.285)], 14, T(0, 0, top + 0.02))
+    K.lathe('painted_white', [(0.0, -0.10), (0.44, -0.10), (0.44, 0.0), (0.36, 0.075), (0.17, 0.115), (0.15, 0.20), (0.22, 0.215),
+                              (0.22, 0.25), (0.10, 0.285), (0.0, 0.285)], 14, T(0, 0, top + 0.02))
     K.lathe('painted_dark', [(0.16, 0.115), (0.16, 0.205)], 14, T(0, 0, top + 0.02))
-    K.lathe('painted_orange', [(0.444, -0.042), (0.444, -0.006)], 14, T(0, 0, top + 0.02), smooth=60.0)
+    K.lathe('painted_orange', [(0.444, -0.05), (0.444, -0.012)], 14, T(0, 0, top + 0.02), smooth=60.0)
     K.tube('aluminium', [(0, 0, top - 0.06), (0, 0, top - 0.52)], 0.016, 6)
     K.lathe('painted_white', [(0.0, -0.035), (0.30, -0.035), (0.32, -0.005), (0.10, 0.10), (0.06, 0.17), (0.0, 0.17)], 14, T(0, 0, top - 0.68))
     K.lathe('light_white', [(0.0, -0.045), (0.26, -0.045), (0.26, -0.03)], 14, T(0, 0, top - 0.68))
@@ -1297,7 +1315,7 @@ def build_o2_cache():
     K.box('aluminium', (0.94, 0.42, 0.03), (0, 0, TZ - 0.015), bevel=0.006)
     K.box('painted_orange', (0.945, 0.012, 0.034), (0, -0.212, TZ - 0.015))
     for x in XS:                                                       # rubber boots the bottles sit in
-        K.lathe('rubber', [(0.142, 0.0), (0.142, 0.055), (0.125, 0.055)], 14, T(x, 0, TZ), smooth=50.0)
+        K.lathe('rubber', [(0.142, 0.0), (0.142, 0.055), (0.125, 0.055), (0.125, 0.012), (0.0, 0.012)], 12, T(x, 0, TZ), smooth=50.0)
     # back frame: a hoop of tube that doubles as the carry handle, two cross bars with saddles
     K.tube('aluminium', [(-0.45, 0.19, 0.03), (-0.45, 0.19, 1.44), (0.45, 0.19, 1.44), (0.45, 0.19, 0.03)], 0.021, 8, round_r=0.12)
     for z in (0.42, 0.86):
@@ -1519,6 +1537,7 @@ def build_supply_pod():
     Mc = T(0, -HY, 0)
     Ld.lathe('painted_white', [(0.40, 0.002), (0.452, 0.002), (0.452, 0.04), (0.37, 0.085), (0.15, 0.105), (0.0, 0.105)], 6, Mc, smooth=20.0)
     Ld.lathe('painted_orange', [(0.455, 0.006), (0.455, 0.036)], 6, Mc, smooth=20.0)
+    Ld.lathe('gold_foil', [(0.0, 0.086), (0.15, 0.086), (0.36, 0.066), (0.40, 0.03), (0.40, 0.002)], 6, Mc, smooth=20.0)      # lining, seen when open
     Ld.lathe('aluminium', [(0.0, 0.0), (0.15, 0.0), (0.15, 0.012), (0.0, 0.012)], 6, Mc @ T(0, 0, 0.104))
     Ld.handle('aluminium', (-0.09, 0, 0.11), (0.09, 0, 0.11), 0.05, 0.010, 5, normal=(0, 0, 1), M=Mc)
     for k in range(6):
@@ -1595,7 +1614,7 @@ def build_rtg():
     # trefoil placards across two fin tips, front and back
     for s in (-1, 1):
         P = frame((0, s * (FR * cos(rad(22.5)) + 0.004), (Z0 + Z1) / 2), (0, s, 0), (-s, 0, 0))
-        K.plate('painted_yellow', 0.26, 0.26, 0.01, 0.03, P)
+        K.prism('painted_yellow', rrect(0.26, 0.26, 0.03, 2), 0.01, P, z0=0.0)
         for b in range(3):
             a0 = rad(90 + 120 * b - 30)
             pts = [(0.034 * cos(a0 + rad(60) * i / 3), 0.034 * sin(a0 + rad(60) * i / 3), 0.012) for i in range(4)]
@@ -1836,6 +1855,7 @@ def build_debris_b():
     for i in range(7):
         for j in range(4):
             fo.faces.new((rows[i][j], rows[i + 1][j], rows[i + 1][j + 1], rows[i][j + 1]))
+    back_faces(fo)
     # a harness dragged out of it
     K.hose('rubber', [Pk[5][1], Pk[5][1] + Vector((0.1, 0.12, -0.12)), Vector((0.95, 0.52, 0.02)), Vector((1.25, 0.66, 0.015)),
                       Vector((1.42, 0.50, 0.015))], 0.012, 5, 3)
@@ -1923,6 +1943,7 @@ def build_debris_c():
         flip = (b.co - a.co).cross(a1 - a.co).dot(hc - a.co) < 0
         for q in ((a.co, b.co, b1, a1), (a1, b1, b2, a2)):
             poly(pet, [W @ p for p in (reversed(q) if flip else q)])
+    back_faces(pet)
     wb.free()
     # paint band, two mounting bands with lugs and torn struts
     K.lathe('painted_orange', [(RT + 0.003, -0.09), (RT + 0.003, 0.09)], NA, W @ T(-0.225, 0, 0) @ AX['X'], arc=rad(250), phase=rad(145), smooth=60.0)

@@ -4,7 +4,7 @@
  * of extra vertices hanging down around its edge to hide cracks between levels of detail.
  */
 import { faceToDir, FINEST } from '../planet/height.js';
-import { R } from '../planet/constants.js';
+import { DETAIL_FRAME as DF, R } from '../planet/constants.js';
 import { gnoise3, hashU } from '../core/math.js';
 
 const PI_4 = Math.PI / 4;
@@ -43,7 +43,10 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   // chunk origin: the middle of the grid, so vertex coordinates stay small (float32-exact)
   const mid = (G / 2 + 1) * W + (G / 2 + 1);
   const ox = px[mid], oy = py[mid], oz = pz[mid];
-  const tx = Math.floor(ox / TEX_PERIOD) * TEX_PERIOD, ty = Math.floor(oy / TEX_PERIOD) * TEX_PERIOD, tz = Math.floor(oz / TEX_PERIOD) * TEX_PERIOD;
+  // detail-texture coordinates: the position in the detail frame, less a whole number of periods
+  const tx = Math.floor((DF[0] * ox + DF[1] * oy + DF[2] * oz) / TEX_PERIOD) * TEX_PERIOD;
+  const ty = Math.floor((DF[3] * ox + DF[4] * oy + DF[5] * oz) / TEX_PERIOD) * TEX_PERIOD;
+  const tz = Math.floor((DF[6] * ox + DF[7] * oy + DF[8] * oz) / TEX_PERIOD) * TEX_PERIOD;
   const N = (G + 1) * (G + 1), S = 4 * G;            // grid vertices + skirt vertices
   const pos = new Float32Array((N + S) * 3);
   const nor = new Int8Array((N + S) * 3);
@@ -55,7 +58,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
       const x = px[k], y = py[k], z = pz[k];
       const lx = x - ox, ly = y - oy, lz = z - oz;
       pos[v * 3] = lx; pos[v * 3 + 1] = ly; pos[v * 3 + 2] = lz;
-      tex[v * 3] = x - tx; tex[v * 3 + 1] = y - ty; tex[v * 3 + 2] = z - tz;
+      tex[v * 3] = DF[0] * x + DF[1] * y + DF[2] * z - tx; tex[v * 3 + 1] = DF[3] * x + DF[4] * y + DF[5] * z - ty; tex[v * 3 + 2] = DF[6] * x + DF[7] * y + DF[8] * z - tz;
       const r2 = lx * lx + ly * ly + lz * lz;
       if (r2 > radius2) radius2 = r2;
       // normal from the neighbours (the face parametrisation is left-handed: cross(dt, ds) is outward)
@@ -143,7 +146,8 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
     let clear = true;
     for (let p = 0; p < pads.length; p++) {
       const pd = pads[p];
-      if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos((pd.r + pd.blend * 0.35) / R)) { clear = false; break; }
+      const keepOut = kind === 'big' ? pd.r + pd.blend * 0.35 : Math.min(pd.r, 15);      // boulders stay off a whole site; stones only off its middle
+      if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos(keepOut / R)) { clear = false; break; }
     }
     if (!clear) continue;
     const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.5)) : 0.09 + 0.36 * u * u;

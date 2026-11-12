@@ -14,3 +14,20 @@ export const HM = HKM / 1000;
 export const D2R = Math.PI / 180;
 /** Length of a Martian sol in hours, used for the local clock. */
 export const SOL_HOURS = 24.66;
+
+/**
+ * Detail textures are looked up in a frame turned away from the planet's axes, so that nowhere
+ * does level ground lie along a texture axis (where a 3D texture's pattern would visibly
+ * repeat). Rows of that rotation: the terrain workers bake coordinates with it, and the ground
+ * shader uses it to turn texture-space gradients back into world space.
+ */
+export const DETAIL_FRAME = (() => {
+  const [ax, ay, az] = [0.6155, 0.7854, 0.31];
+  const cx = Math.cos(ax), sx = Math.sin(ax), cy = Math.cos(ay), sy = Math.sin(ay), cz = Math.cos(az), sz = Math.sin(az);
+  // Rx * Ry * Rz
+  return [
+    cy * cz, -cy * sz, sy,
+    sx * sy * cz + cx * sz, -sx * sy * sz + cx * cz, -sx * cy,
+    -cx * sy * cz + sx * sz, cx * sy * sz + sx * cz, cx * cy,
+  ];
+})();

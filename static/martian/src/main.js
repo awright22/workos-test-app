@@ -13,7 +13,7 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
-import { World, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
+import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
 import { RockField } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
@@ -62,7 +62,7 @@ async function boot() {
     workerUrl: asset('terrain-worker.js'), grid: engine.q.grid, maxLevel: engine.q.maxLevel, split: engine.q.split, workers: engine.q.workers,
     shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
-  ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0 });
+  ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
   ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600 });
   initEffects();
   const mapImg = new Image();
@@ -194,7 +194,7 @@ function installDebug() {
     ctx, S, World, player, roverF, BAL, DIFFICULTIES, interactables, input, interaction,
     llToVec, surfaceAt, groundDist,
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
-    syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements,
+    syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
@@ -250,6 +250,23 @@ function installDebug() {
       initPlayerAt(up.addScaledVector(n, dist / R).normalize(), 0);
       lastFocus = tick(0.001);
     },
+    /** Stand `dist` metres from a world position on a bearing (degrees east of north), facing it. */
+    tpAround(pos, dist = 6, bearing = 0) {
+      const b = bearing * Math.PI / 180;
+      const up = pos.clone().normalize();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      initPlayerAt(up.addScaledVector(n, Math.cos(b) * dist / R).addScaledVector(e, Math.sin(b) * dist / R).normalize(), b);
+      lastFocus = tick(0.001);
+    },
+    /** Turn the astronaut (and the camera behind him) to face the sun's bearing. */
+    faceSun() {
+      const up = _v1.copy(player.pos).normalize().clone(), sun = ctx.engine.sunDir;
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      initPlayerAt(up, Math.atan2(sun.dot(e), sun.dot(n)) - Math.PI);
+      lastFocus = tick(0.001);
+    },
+    /** World position of a point given in Hab-local metres. */
+    at(lx, lz) { return siteLocalToWorld(World.hab, lx, 0, lz, new THREE.Vector3()); },
     /** Park the rover `dist` metres south of a world position. */
     roverTo(pos, dist = 6) {
       const up = pos.clone().normalize();
@@ -264,7 +281,7 @@ function installDebug() {
       lastFocus = tick(0.05);
     },
     setStorm(i) { S.storm.i = i; S.storm.hold = i; },
-    look(pitch) { player.pitch = pitch; },
+    look(pitch) { player.pitch = pitch; ctx.engine.snapLight = 3; },
     async settle() { ctx.engine.camera.updateMatrixWorld(); return ctx.terrain.settle(ctx.engine.camera.position, 20000); },
     info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats(), rocks: ctx.rocks.counts }; },
   };

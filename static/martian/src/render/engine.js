@@ -10,14 +10,16 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { SunLight } from 'three/addons/lights/SunLight.js';
 import { Sky } from './sky.js';
-import { clamp, lerp, damp } from '../core/math.js';
+import { SunShadow } from './sun-shadow.js';
+import { clamp, lerp, damp, smoothstep } from '../core/math.js';
 
 export const QUALITY = {
-  low:    { scale: 0.6, msaa: 0, shadow: 1024, shadowRange: 45, bloom: false, grid: 24, maxLevel: 8, split: 1.0, fine: false, workers: 2, rocks: 0.5, terrainShadowLevels: 0 },
-  medium: { scale: 0.8, msaa: 2, shadow: 2048, shadowRange: 60, bloom: true, grid: 32, maxLevel: 8, split: 1.15, fine: true, workers: 2, rocks: 0.8, terrainShadowLevels: 1 },
-  high:   { scale: 1.0, msaa: 4, shadow: 2048, shadowRange: 75, bloom: true, grid: 32, maxLevel: 9, split: 1.3, fine: true, workers: 3, rocks: 1.0, terrainShadowLevels: 2 },
-  ultra:  { scale: 1.0, msaa: 4, shadow: 4096, shadowRange: 95, bloom: true, grid: 48, maxLevel: 9, split: 1.6, fine: true, workers: 4, rocks: 1.3, terrainShadowLevels: 2 },
+  low:    { scale: 0.6, msaa: 0, shadow: 1024, shadowRange: 30, shadowSplit: 10, bloom: false, grid: 24, maxLevel: 8, split: 1.0, fine: false, workers: 2, rocks: 0.5, terrainShadowLevels: 0 },
+  medium: { scale: 0.8, msaa: 2, shadow: 2048, shadowRange: 80, shadowSplit: 13, bloom: true, grid: 32, maxLevel: 8, split: 1.15, fine: true, workers: 2, rocks: 0.8, terrainShadowLevels: 0 },
+  high:   { scale: 1.0, msaa: 4, shadow: 2048, shadowRange: 110, shadowSplit: 14, bloom: true, grid: 32, maxLevel: 9, split: 1.3, fine: true, workers: 3, rocks: 1.0, terrainShadowLevels: 1 },
+  ultra:  { scale: 1.0, msaa: 4, shadow: 4096, shadowRange: 150, shadowSplit: 18, bloom: true, grid: 48, maxLevel: 9, split: 1.6, fine: true, workers: 4, rocks: 1.3, terrainShadowLevels: 2 },
 };
 
 const FINAL_FRAGMENT = /* glsl */`
@@ -71,8 +73,7 @@ class FinalPass extends Pass {
   dispose() { this.material.dispose(); this.quad.dispose(); }
 }
 
-const _v = new THREE.Vector3(), _u = new THREE.Vector3(), _r = new THREE.Vector3(), _f = new THREE.Vector3();
-const _c1 = new THREE.Color();
+const _v = new THREE.Vector3(), _u = new THREE.Vector3();
 
 export class Engine {
   constructor(container, qualityName) {
@@ -93,17 +94,24 @@ export class Engine {
     this.scene.add(this.camera);
     this.sky = new Sky();
     this.scene.add(this.sky.mesh);
+    // the sky is the first thing drawn in the main pass: whatever was drawn before it was shadow maps
+    this.sky.mesh.onBeforeRender = () => { const i = this.renderer.info.render; if (!this._shadowMark) this._shadowMark = { calls: i.calls, triangles: i.triangles }; };
     this.scene.fog = new THREE.FogExp2(0xc98a5b, 0.0012);
 
     this.sunDir = new THREE.Vector3(1, 0, 0);
-    this.sun = new THREE.DirectionalLight(0xffffff, 3);
+    // the sun casts two shadow cascades: a tight one around the camera, a wide one for the base
+    this.sun = new SunLight(0xffffff, 3);
+    this.sun.shadow.dispose();
+    const sh = this.sun.shadow = new SunShadow();
     this.sun.castShadow = true;
-    const sh = this.sun.shadow;
     sh.mapSize.set(this.q.shadow, this.q.shadow);
-    sh.bias = -0.00035;
-    sh.normalBias = 0.035;
-    sh.radius = 2.2;
-    this.scene.add(this.sun, this.sun.target);
+    sh.camera.near = 1;
+    sh.camera.far = this.q.shadowRange;
+    sh.split = this.q.shadowSplit;
+    sh.bias = -0.0002;
+    sh.normalBias = 0.022;
+    sh.radius = 1.6;
+    this.scene.add(this.sun);
     this.hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
     this.scene.add(this.hemi);
 
@@ -129,6 +137,7 @@ export class Engine {
     this.envScene.add(this.envSky, this.envGround);
     this.env = { target: null, sunE: 9, dust: 9, up: new THREE.Vector3(), age: 9 };
     this.exposure = 1;
+    this.snapLight = 3;               // frames for which exposure jumps straight to its target (start-up, teleports, tests)
     this.time = 0;
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -168,7 +177,10 @@ export class Engine {
     this.sun.color.copy(sky.sunColor);
     this.sun.intensity = p.sealed ? 0 : Math.max(sky.sunIntensity, 0.0);
     _u.copy(p.focus || cam.position).normalize();
-    this._fitShadow(p.focus || cam.position, _u, night || !!p.sealed);
+    // the light shines from its position toward the origin; with no sun there is nothing to cast
+    this.sun.position.copy(this.sunDir);
+    this.sun.updateMatrixWorld();
+    this.sun.shadow.autoUpdate = !(night || p.sealed);
     // indoors the sky cannot reach: the room is lit by its own lamps
     this.indoor = lerp(this.indoor || 0, p.inside ? 1 : 0, damp(0.35, p.dt || 0.016));
     const pw = p.power === false ? 0.08 : 1;
@@ -178,15 +190,24 @@ export class Engine {
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
     this._updateEnvironment(p.dt || 0.016, p.dust || 0);
-    this.scene.environmentIntensity = lerp(1.0, 0.12, this.indoor);
+    this.scene.environmentIntensity = lerp(1.2, 0.12, this.indoor);
     // fog: aerial perspective that matches the horizon; thins out with altitude
     const fog = this.scene.fog;
     fog.color.copy(sky.fogColor);
     const alt = Math.max(0, cam.position.length() - 12000);
-    fog.density = (0.00085 + (p.dust || 0) * 0.011) * Math.exp(-alt / 500) + 0.0000015;
-    // exposure: brighter at night and indoors, eased like an eye adapting
-    const target = (p.inside ? 0.95 : lerp(3.4, 1.12, sky.day)) * (p.exposureBias || 1);
-    this.exposure = lerp(this.exposure, target, damp(0.9, p.dt));
+    const dust = p.dust || 0;
+    // a full storm closes visibility to a few tens of metres
+    fog.density = (0.00085 + 0.006 * dust + 0.031 * dust * dust) * Math.exp(-alt / 500) + 0.0000015;
+    // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
+    // light at a low angle), wider still at night, and steady indoors
+    // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one
+    const lowSun = 1 - smoothstep(0.03, 0.55, sky.sunE);
+    const facing = Math.max(0, _v.set(0, 0, -1).applyQuaternion(cam.quaternion).dot(this.sunDir));
+    const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
+    const dayExposure = lerp(1.08, 0.92, smoothstep(0.62, 1.0, sky.sunE)) * (1 + 0.55 * lowSun * (1 - 0.9 * intoSun));
+    const target = (p.inside ? 0.95 : lerp(2.3 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
+    this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
+    if (this.snapLight > 0) this.snapLight--;
     const fu = this.final.uniforms;
     fu.uExposure.value = this.exposure;
     fu.uTime.value = this.time;
@@ -195,34 +216,12 @@ export class Engine {
     cam.far = 60000;
   }
 
-  _fitShadow(focus, up, night) {
-    const range = this.q.shadowRange;
-    const light = this.sun, cam = light.shadow.camera;
-    // if the sun is below the horizon there is nothing to cast; park the shadow camera
-    light.castShadow = !night;
-    // light-space basis, texel-snapped so shadows do not shimmer as the focus moves
-    _f.copy(this.sunDir).negate();                               // light travel direction
-    _r.crossVectors(Math.abs(_f.y) > 0.95 ? _v.set(1, 0, 0) : _v.set(0, 1, 0), _f).normalize();
-    _u.crossVectors(_f, _r).normalize();
-    const texel = (2 * range) / light.shadow.mapSize.x;
-    const cx = Math.round(focus.dot(_r) / texel) * texel, cy = Math.round(focus.dot(_u) / texel) * texel, cz = focus.dot(_f);
-    _v.set(0, 0, 0).addScaledVector(_r, cx).addScaledVector(_u, cy).addScaledVector(_f, cz);
-    light.target.position.copy(_v);
-    light.position.copy(_v).addScaledVector(this.sunDir, 400);
-    light.target.updateMatrixWorld();
-    if (cam.right !== range) {
-      cam.left = -range; cam.right = range; cam.top = range; cam.bottom = -range;
-      cam.near = 10; cam.far = 800;
-      cam.updateProjectionMatrix();
-    }
-  }
-
   _updateEnvironment(dt, dust) {
     const e = this.env, sky = this.sky;
     e.age += dt;
     const up = sky.uniforms.uUp.value;
     const moved = Math.abs(sky.sunE - e.sunE) > 0.012 || Math.abs(dust - e.dust) > 0.04 || up.distanceToSquared(e.up) > 0.0004;
-    if (e.target && (!moved || e.age < 1.2)) return;
+    if (e.target && !(this.snapLight > 0 && moved) && (!moved || e.age < 1.2)) return;
     e.sunE = sky.sunE; e.dust = dust; e.up.copy(up); e.age = 0;
     // the ground as the sky sees it: sunlit regolith plus the sky's own light bounced back
     const lit = (sky.sunIntensity * Math.max(sky.sunE, 0)) / Math.PI;
@@ -244,13 +243,15 @@ export class Engine {
     const info = this.renderer.info;
     info.autoReset = false;
     info.reset();
+    this._shadowMark = null;
     this.composer.render();
-    this.frameStats = { calls: info.render.calls, triangles: info.render.triangles };
+    const s = this._shadowMark || { calls: 0, triangles: 0 };
+    this.frameStats = { calls: info.render.calls, triangles: info.render.triangles, shadowCalls: s.calls, shadowTriangles: s.triangles };
   }
 
   info() {
     const i = this.renderer.info;
     const f = this.frameStats || { calls: 0, triangles: 0 };
-    return { calls: f.calls, triangles: f.triangles, geometries: i.memory.geometries, textures: i.memory.textures, scale: +(this.q.scale * this.dynScale).toFixed(2) };
+    return { calls: f.calls, triangles: f.triangles, shadowCalls: f.shadowCalls, shadowTriangles: f.shadowTriangles, geometries: i.memory.geometries, textures: i.memory.textures, scale: +(this.q.scale * this.dynScale).toFixed(2) };
   }
 }

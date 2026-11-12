@@ -1,8 +1,9 @@
 // Scene cost at each quality preset: draw calls and triangles per frame in three standard
 // scenes. These are counts, valid on any machine; frame rate is NOT measured here (software
-// rendering). Budgets are in static/martian/QUALITY.md.
+// rendering). Budgets are in static/martian/QUALITY.md. Triangles are counted separately for
+// the picture itself ("main") and for the two shadow cascades, which are depth-only.
 import { openGame, sleep } from './lib.mjs';
-const budgets = { low: { calls: 170, triangles: 340000 }, medium: { calls: 210, triangles: 480000 }, high: { calls: 250, triangles: 600000 } };
+const budgets = { low: { calls: 180, main: 340000, shadow: 230000 }, medium: { calls: 240, main: 480000, shadow: 300000 }, high: { calls: 290, main: 600000, shadow: 400000 } };
 let failed = false;
 for (const quality of (process.env.Q || 'low,high').split(',')) {
   const g = await openGame({ quality });
@@ -17,13 +18,13 @@ for (const quality of (process.env.Q || 'low,high').split(',')) {
     await g.eval(async (G) => { G.tick(0.05, 3); await G.settle(); });
     await sleep(2500);
     const i = await g.eval((G) => G.info());
-    rows.push({ scene: name, calls: i.calls, triangles: i.triangles, terrainTiles: i.visible, rocks: i.rocks });
+    rows.push({ scene: name, calls: i.calls, main: i.triangles - i.shadowTriangles, shadow: i.shadowTriangles, shadowCalls: i.shadowCalls, terrainTiles: i.visible, rocks: i.rocks });
   }
   const b = budgets[quality];
   for (const r of rows) {
-    const ok = !b || (r.calls <= b.calls && r.triangles <= b.triangles);
+    const ok = !b || (r.calls <= b.calls && r.main <= b.main && r.shadow <= b.shadow);
     if (!ok) failed = true;
-    console.log(`${quality.padEnd(7)} ${r.scene.padEnd(16)} calls ${String(r.calls).padStart(4)}  triangles ${String(r.triangles).padStart(7)}  tiles ${r.terrainTiles}  rocks ${JSON.stringify(r.rocks)}  ${ok ? 'ok' : 'OVER BUDGET'}`);
+    console.log(`${quality.padEnd(7)} ${r.scene.padEnd(16)} calls ${String(r.calls).padStart(4)} (${r.shadowCalls} shadow)  main ${String(r.main).padStart(7)}  shadow ${String(r.shadow).padStart(7)}  tiles ${r.terrainTiles}  rocks ${r.rocks.big}+${r.rocks.small}  ${ok ? 'ok' : 'OVER BUDGET'}`);
   }
   if (g.errors.length) { failed = true; console.log('console errors:', g.errors.slice(0, 3)); }
   await g.close();

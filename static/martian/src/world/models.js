@@ -148,6 +148,8 @@ function prepare(gltf) {
         o.castShadow = false;
       } else if (name === 'void') {
         m.color.set(0x000000); m.roughness = 1;
+      } else if (name.startsWith('solar_cell')) {
+        o.castShadow = false;                     // cells lie on a backing sheet that already casts
       }
       if (m.metalness > 0.5) m.envMapIntensity = 1.25;
       m.userData.modelMaterial = true;
