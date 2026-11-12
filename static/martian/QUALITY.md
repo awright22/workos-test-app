@@ -106,7 +106,7 @@ What round 3 added or sharpened (T-numbers), most damaging first:
 | T7 | Rocks are one family of flat faceted slabs, near-black in places; few mid-size boulders; one floats (`debris-c`) | acted on: blockier rocks, less dark, more mid-size boulders; rocks and physics now rest on the ground the current quality draws (they used finer detail than low and medium meshes show, which floated some). To re-review |
 | T8 | The storm has no motion or threat; a straight band survives | open |
 | T9 | A row of pale soft discs across the mid-ground (`pod`, `pod-open`) | fixed: the storm's sheets are drawn only in a storm |
-| T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | acted on: the patches of packed soil are twice as strong and wider. To re-review |
+| T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | acted on: the patches of packed soil are twice as strong and wider; soil aprons (the heap, the wreck's scorch, the ice berm) fade out where they meet the ground and have no sheen, so no edge shows. To re-review |
 | T11 | The astronaut is pitched forward with bent knees in side views; tilted in one picture | measured: the torso is within 3.5 degrees of upright; the look comes from bent knees and raised forearms in the idle clip. Open for an animation pass |
 | T12 | Blown emitters: the nav beacon in daylight, a workbench lamp, glare blobs at the frame edge | acted on: the same ceiling before the bloom. To re-review |
 

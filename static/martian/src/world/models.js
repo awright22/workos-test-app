@@ -39,22 +39,26 @@ const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
 export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) } };
 
-let plain = null;
+let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
  *  the vertices and every such surface of a part can be one mesh with one shared material.
  *  This turns the Hab's ~100 draw calls into about fifteen. */
-function plainMaterial() {
-  if (plain) return plain;
-  plain = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1 });
-  plain.name = 'plain';
+function plainMaterial(ground = false) {
+  if (ground ? plainGround : plain) return ground ? plainGround : plain;
+  const made = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1 });
+  if (ground) { plainGround = made; made.transparent = true; } else plain = made;
+  return setUpPlain(made, ground);
+}
+function setUpPlain(plain, ground) {
+  plain.name = ground ? 'plain_ground' : 'plain';
   plain.envMapIntensity = 1.15;
   plain.userData.modelMaterial = true;
   dustUniforms.uDustGrain.value = detailTextures().grain;
   plain.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, dustUniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 aPbr;\nvarying vec3 vPbr;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = aPbr; vObjPos = position; vObjN = normal;');
+      .replace('#include <common>', '#include <common>\nattribute vec3 aPbr;\nvarying vec3 vPbr;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;' + (ground ? '\nattribute float aHem;\nvarying float vHem;' : ''))
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = aPbr; vObjPos = position; vObjN = normal;' + (ground ? ' vHem = aHem;' : ''));
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 vPbr; varying vec3 vObjPos; varying vec3 vObjN;
@@ -66,7 +70,8 @@ function plainMaterial() {
         #endif
         ${GLSL_GROUND_GRADE}
         float dustAmount;
-        float surfGrain;`)
+        float surfGrain;
+        ${ground ? 'varying float vHem;' : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
           // more on what faces up, more near the ground, in patches; none where the model has none
@@ -90,6 +95,7 @@ function plainMaterial() {
             diffuseColor.rgb = mix(diffuseColor.rgb, dust, dustAmount);
           }
           surfGrain = fine;
+          ${ground ? '// the hem of a soil apron thins out to nothing, so its edge cannot be seen against the ground\n          diffuseColor.a *= smoothstep(0.0, 1.0, vHem);' : ''}
         }`)
       // soil that is part of the ground is not a smooth casting: give it the ground's own grain
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -99,9 +105,11 @@ function plainMaterial() {
           normal = normalize(normal + normalMatrix * (gA * 0.30 + gB * 0.42));
         }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x * (0.86 + 0.28 * surfGrain), 0.05, 1.0), 0.96, dustAmount);')
+      // soil has no sheen (the terrain's own material has none): with one, an apron pales at a low angle and shows
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n if (vPbr.z > 1.5) { material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16; }')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust5';
+  plain.customProgramCacheKey = () => 'plain-pbr-dust7' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -137,11 +145,12 @@ function mergeStatic(scene, dust) {
     owner = owner || scene;
     const m = o.material;
     const special = SPECIAL.test(m.name || '') || m.transparent || m.map;
-    const target = special ? m : plainMaterial();
+    const isGround = GROUND.test(m.name || '');
+    const target = special ? m : plainMaterial(isGround);
     if (!groups.has(owner)) groups.set(owner, new Map());
     const g = groups.get(owner);
     if (!g.has(target)) g.set(target, []);
-    g.get(target).push({ mesh: o, bake: !special, ground: GROUND.test(m.name || '') });
+    g.get(target).push({ mesh: o, bake: !special, ground: isGround });
   });
   const inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
   for (const [owner, byMat] of groups) {
@@ -156,6 +165,7 @@ function mergeStatic(scene, dust) {
       const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
       if (!merged) continue;
       merged.computeBoundingSphere();
+      if (list[0].ground) merged.setAttribute('aHem', new THREE.BufferAttribute(hemOf(merged), 1));
       if (!list[0].bake) { mat.vertexColors = true; mat.needsUpdate = true; merged.deleteAttribute('aPbr'); }
       const mesh = new THREE.Mesh(merged, mat);
       mesh.name = (owner.name || 'model') + ':' + (mat.name || 'm');
@@ -168,6 +178,38 @@ function mergeStatic(scene, dust) {
 /** Surfaces of a skinned model that are shown and hidden together, each folded into one mesh of its own:
  *  the helmet shell (its lamps and visor stay separate, being driven materials) and the head under it. */
 const SKIN_GROUPS = [['helmet', /^helmet_(white|dark|metal)/], ['head', /^head_/]];
+/** For a soil apron: per vertex, 0 on the mesh's open edge rising to 1 half a metre in from it. */
+function hemOf(geo) {
+  const p = geo.attributes.position, idx = geo.index ? geo.index.array : null, n = idx ? idx.length : p.count;
+  const at = (k) => (idx ? idx[k] : k);
+  const key = (i) => `${Math.round(p.getX(i) * 400)},${Math.round(p.getY(i) * 400)},${Math.round(p.getZ(i) * 400)}`;
+  // an edge used by one triangle only is on the border (positions are welded by rounding: packing splits vertices)
+  const edges = new Map(), where = new Map();
+  for (let k = 0; k + 2 < n; k += 3) {
+    const v = [at(k), at(k + 1), at(k + 2)], ks = v.map(key);
+    for (let e = 0; e < 3; e++) {
+      const a = ks[e], b = ks[(e + 1) % 3];
+      if (a === b) continue;
+      const id = a < b ? a + '|' + b : b + '|' + a;
+      edges.set(id, (edges.get(id) || 0) + 1);
+      where.set(a, v[e]); where.set(b, v[(e + 1) % 3]);
+    }
+  }
+  const border = [];
+  for (const [id, c] of edges) if (c === 1) for (const kk of id.split('|')) { const i = where.get(kk); border.push(p.getX(i), p.getY(i), p.getZ(i)); }
+  // ... and so is wherever the apron meets the ground (its own frame's zero): what lies below is buried anyway
+  for (let i = 0; i < p.count; i++) if (p.getY(i) < 0.006) border.push(p.getX(i), p.getY(i), p.getZ(i));
+  const hem = new Float32Array(p.count).fill(1);
+  if (!border.length) return hem;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    let d2 = 1e9;
+    for (let b = 0; b < border.length; b += 3) { const dx = x - border[b], dy = y - border[b + 1], dz = z - border[b + 2], d = dx * dx + dy * dy + dz * dz; if (d < d2) d2 = d; }
+    hem[i] = Math.min(1, Math.sqrt(d2) / 0.6);
+  }
+  return hem;
+}
+
 /** The same folding for a skinned model: its plain surfaces become one skinned mesh ("body"), and each
  *  group above another. */
 function mergeSkinned(scene, dust) {
