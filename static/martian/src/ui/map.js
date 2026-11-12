@@ -134,7 +134,7 @@ function buildMarkers() {
 }
 
 /** Marker and place-name labels, placed greedily so nothing overlaps. */
-function placeLabels(you) {
+function placeLabels(you, storms) {
   const boxes = [];
   const free = (x, y, w, h) => { for (const b of boxes) if (x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1]) return false; return true; };
   const out = [];
@@ -159,6 +159,16 @@ function placeLabels(you) {
     for (const [x, y] of spots) {
       if (free(x, y, w, h) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
     }
+  }
+  // storm cells are named where there is room
+  c.font = `600 ${11 * U}px "Barlow Condensed", sans-serif`;
+  for (const st of storms) {
+    const text = 'DUST STORM';
+    const w = c.measureText(text).width + (text.length * 1.4 + 8) * U, h = 15 * U;
+    const x = st.x - w / 2, y = st.y - h / 2;
+    if (x < 4 || x + w > W - 4 || y < 4 || y + h > H - 4 || !free(x, y, w, h)) continue;
+    boxes.push([x, y, w, h]);
+    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: 11 * U, bold: true, spacing: 1.4 * U });
   }
   // place names: the largest first; small ones appear as you zoom in
   const places = [];
@@ -250,6 +260,7 @@ function draw() {
   for (let lon = Math.ceil(lonL / step) * step; lon <= lonR; lon += step) { const x = W / 2 + (lon - view.lon) * ppd; if (x > 40 * U && x < W - 30 * U && lon % (step * 2) === 0) c.fillText(`${((lon % 360) + 360) % 360}°E`, x, H - 6 * U); }
 
   // storm cells
+  const stormLabels = [];
   for (const cell of S.storm.cells) {
     const rLat = (cell.r / R) * R2D, rLon = rLat / Math.max(0.2, Math.cos(cell.lat * Math.PI / 180));
     const x = sx(cell.lon), y = sy(cell.lat);
@@ -267,7 +278,7 @@ function draw() {
       c.restore();
       c.beginPath(); c.ellipse(cx, y, rLon * ppd, rLat * ppd, 0, 0, Math.PI * 2);
       c.setLineDash([5, 4]); c.strokeStyle = 'rgba(240,210,170,.85)'; c.lineWidth = 1.25; c.stroke(); c.setLineDash([]);
-      if (rLat * ppd > 16 * U && cx > 40 * U && cx < W - 40 * U) text('DUST STORM', cx - 30 * U, y, { size: 11 * U, color: 'rgba(250,228,196,.95)', bold: true, spacing: 1.4 * U });
+      if (rLat * ppd > 16 * U) stormLabels.push({ x: cx, y });
     }
   }
 
@@ -327,7 +338,7 @@ function draw() {
   c.fillStyle = '#fff'; c.strokeStyle = 'rgba(12,10,8,.95)'; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke(); c.fill();
   c.restore();
 
-  for (const l of placeLabels(you)) text(l.text, l.x, l.y, l);
+  for (const l of placeLabels(you, stormLabels)) text(l.text, l.x, l.y, l);
 
   // status bar
   const posText = `<b>You</b> <span class="t-mono">${fmtLL(pll)}</span> · ${esc(regionName(_v1.copy(player.pos).normalize()))}`;

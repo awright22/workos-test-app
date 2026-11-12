@@ -89,7 +89,7 @@ function costChips(cost) {
   if (!keys.length) return '<span class="chip ok">No materials needed</span>';
   return keys.map((k) => {
     const have = S.inv[k] || 0, ok = have >= cost[k];
-    return `<span class="chip ${ok ? 'ok' : 'miss'}">${esc(itemName(k))} <b class="t-num">${have}/${cost[k]}</b></span>`;
+    return `<span class="chip ${ok ? 'ok' : 'miss'}">${chem(esc(itemName(k)))} <b class="t-num">${have}/${cost[k]}</b></span>`;
   }).join('');
 }
 function missingText(cost) {
@@ -154,7 +154,7 @@ export function renderColony() {
       (ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '') + '</div>' +
       `<p class="ds">${chem(esc(r.desc))}</p><div class="cost">${costChips(r.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
-      `<span class="why${can ? '' : ' bad'}">${!can ? esc(missingText(r.cost)) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
+      `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
   }
   craft = `<div class="pane-hd">Fabricator <span>${atHome ? `${ready} ready to build` : 'Out of range'}</span></div>` + craft;
 
@@ -172,7 +172,7 @@ export function renderColony() {
       (ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
       `<p class="ds">${chem(esc(u.desc))}</p><div class="cost">${costChips(u.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
-      `<span class="why${gate || !can ? ' bad' : ''}">${gate ? esc(gate) : !can ? esc(missingText(u.cost)) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
+      `<span class="why${gate || !can ? ' bad' : ''}">${gate ? esc(gate) : !can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
   }
   up = `<div class="pane-hd">Upgrades <span>${installed} of ${UPGRADES.length} installed</span></div>` + up;
 

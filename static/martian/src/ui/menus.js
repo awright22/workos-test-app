@@ -2,14 +2,13 @@
 // summary and the NASA uplink terminal. Pure presentation: the game passes in what to show and
 // what to do (see game/flow.js, game/sim.js, game/story.js). Death, rescue and other plain
 // dialogs go through showOverlay in ui/dom.js.
-import { UI, openOverlay, hideOverlay, showOverlay, esc } from './dom.js';
+import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { layout } from './layout.js';
 import { DIFFICULTIES } from '../game/state.js';
 import { ctx } from '../game/ctx.js';
 import { Snd } from '../audio/sound.js';
-import { log, toast } from './dom.js';
 
 /** Hooks the game fills in: save() writes the saved game before a reload. */
 export const menuHooks = { save: null };

@@ -79,7 +79,11 @@
 #mg-compass .mk.quest { color: var(--cold); }
 #mg-compass .mk.danger { color: var(--danger); animation: mg-pulse .8s steps(2, jump-none) infinite; }
 #mg-compass .mk.small .ic { width: .875rem; height: .875rem; }
-#mg-compass .mk.off { opacity: .55; }
+/* behind you: pinned at the end of the strip with a mark that says which way to turn */
+#mg-compass .mk.off { opacity: .8; }
+#mg-compass .mk.off::after { content: ""; position: absolute; top: 50%; width: .3125rem; height: .3125rem; margin-top: -.1875rem; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; }
+#mg-compass .mk.off.left::after { left: -.5rem; transform: rotate(-45deg); }
+#mg-compass .mk.off.right::after { right: -.5rem; transform: rotate(135deg); }
 #mg-compass .mk.dim { opacity: .5; }
 #mg-compass .caret { position: absolute; left: 50%; top: 2.75rem; width: 0; height: 0; margin-left: -.3125rem;
   border-left: .3125rem solid transparent; border-right: .3125rem solid transparent; border-bottom: .375rem solid var(--accent);

@@ -77,7 +77,7 @@ let errors = 0;
   const box = await page.locator('#mg-mapcanvas').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -400);
-  await sleep(300);
+  await page.waitForFunction((was) => document.querySelector('.map-scale span').innerText !== was, scale0, { timeout: 8000 }).catch(() => {});
   const scale1 = await page.locator('.map-scale span').innerText();
   check('map: the wheel zooms', scale0 !== scale1, { scale0, scale1 });
   await page.locator('.map-tools [data-a="hab"]').click();
@@ -96,7 +96,34 @@ let errors = 0;
   await key('Escape');
   const aria = await page.evaluate(() => { const p = document.getElementById('mg-panel'); return { role: p.getAttribute('role'), modal: p.getAttribute('aria-modal'), label: p.getAttribute('aria-label') }; });
   check('dialogs: role, modal flag and a name', aria.role === 'dialog' && aria.modal === 'true' && !!aria.label, aria);
+  // save and quit: back to the title, with the run ready to continue
+  const titleReady = () => page.waitForFunction(() => window.__MG && window.__MG.ready && !window.__MG.S.started && document.querySelector('.menu-item'), null, { timeout: 240000 });
+  await page.locator('[data-act="quit"]').click();
+  await titleReady();
+  const t1 = await page.locator('#mg-panel').innerText();
+  check('pause: Save and quit returns to a title that offers to continue', /continue\s*sol 1\b/i.test(t1), t1.slice(0, 80));
+  // a new graphics quality: saved, applied by a reload, and the run is still there
+  await page.locator('[data-act="settings"]').click();
+  await page.locator('[data-seg="quality"] [data-v="medium"]').click();
+  await page.locator('[data-act="reload"]').click();
+  await titleReady();
+  const q2 = await page.evaluate(() => ({ running: window.__MG.ctx.engine.qualityName, url: location.search, cont: !!document.querySelector('[data-act="continue"]') }));
+  check('settings: Reload to apply restarts on the chosen quality and keeps the run', q2.running === 'medium' && !/[?&]q=/.test(q2.url) && q2.cont, q2);
+  // restart asks first, then deletes the save
+  await page.locator('[data-act="continue"]').click();
+  await page.waitForFunction(() => window.__MG.S.started && document.getElementById('mg-root').classList.contains('is-playing'), null, { timeout: 60000 });
+  await g.eval((G) => { G.paused = true; });
   await key('Escape');
+  await page.locator('[data-act="restart"]').click();
+  const asks = await page.locator('#mg-panel').innerText();
+  await page.locator('#mg-panel button', { hasText: 'Keep playing' }).click();
+  const kept = await page.evaluate(() => ({ kind: document.getElementById('mg-overlay').className, save: !!localStorage.getItem('stranded2-save') }));
+  check('restart: asks first, and Keep playing goes back with the save intact', /start over/i.test(asks) && /k-pause/.test(kept.kind) && kept.save, { asks: asks.slice(0, 60), kept });
+  await page.locator('[data-act="restart"]').click();
+  await page.locator('#mg-panel button', { hasText: 'Delete and restart' }).click();
+  await titleReady();
+  const gone = await page.evaluate(() => ({ save: localStorage.getItem('stranded2-save'), cont: !!document.querySelector('[data-act="continue"]') }));
+  check('restart: Delete and restart wipes the save and returns to the title', gone.save === null && !gone.cont, gone);
   errors += g.errors.length;
   if (g.errors.length) console.log(JSON.stringify(g.errors.slice(0, 4)).slice(0, 800));
   await g.close();
@@ -145,6 +172,8 @@ for (const size of SIZES) {
   const page = g.page;
   const rem = await page.evaluate(() => parseFloat(document.documentElement.style.fontSize));
   check(`${size.name}: interface scale is sensible (root ${rem}px)`, rem >= 13 && rem <= 30, rem);
+  // entry animations are switched off for these measurements: software rendering is slow enough here that one can still be mid-flight seconds later
+  await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.paused = true; G.tick(0.05, 20); });
   await page.evaluate(() => { window.__UI.log('Suit O2 at 46% and leaking. The Hab is that way. RUN.', 'sys'); });
   await sleep(700);
@@ -152,13 +181,14 @@ for (const size of SIZES) {
   check(`${size.name}: first minute, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
   // a busy moment on foot: every gauge, two alerts, log lines, a toast, a prompt, a candle to hand
   const busy = async () => {
+    await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 20000 });      // an earlier toast has gone
     await g.eval((G) => {
       G.skipIntro(); G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };
       G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
     });
     await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
       U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'); });
-    await sleep(1300);
+    await sleep(1500);
     await g.eval((G) => { G.tick(0.05, 2); });
     return layoutProblems(await rects(page), size);
   };
@@ -188,13 +218,52 @@ for (const size of SIZES) {
     const hd = await page.evaluate(([st, sr, sb, sl]) => { const r = document.querySelector('#mg-map .close').getBoundingClientRect(); return r.right <= innerWidth - sr && r.top >= st && r.width >= 40 && r.height >= 40; }, size.safe);
     check(`${size.name}: the screen's close button is inside the safe area and thumb-sized`, hd);
     await page.locator('#mg-map .close').tap();
-    // the action button carries the verb for what is in reach
+    // the action button carries the verb for what is in reach, and holding it works the interaction
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });
     const verb = await page.locator('#mg-tE .vb').innerText();
     check(`${size.name}: the action button shows the verb`, /drive/i.test(verb), verb);
+    await page.waitForFunction(() => !document.getElementById('mg-root').classList.contains('is-modal'), null, { timeout: 10000 });
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
+    const eb = await page.locator('#mg-tE').boundingBox();
+    await touch('touchStart', [[eb.x + eb.width / 2, eb.y + eb.height / 2]]);
+    const held = await g.eval((G) => { const h = G.input.eHeld; G.tick(0.05, 6); return { h, pct: document.querySelector('#mg-tE').classList.contains('holding') }; });
+    await g.eval((G) => { G.tick(0.05, 10); });
+    await touch('touchEnd', []);
+    const drove = await g.eval((G) => ({ mode: G.S.mode, held: G.input.eHeld }));
+    check(`${size.name}: holding the action button fills it and does the thing`, held.h && held.pct && drove.mode === 'rover' && !drove.held, { held, drove });
+    await page.locator('#mg-tExit').tap();
+    await g.eval((G) => { G.tick(0.05, 3); });
+    check(`${size.name}: the EXIT button leaves the rover`, await g.eval((G) => G.S.mode === 'walk'));
+    // the stick appears under the thumb and steers; a second finger looks around
+    const jx = size.safe[3] + 150, jy = size.h - size.safe[2] - 110;
+    await touch('touchStart', [[jx, jy]]);
+    await touch('touchMove', [[jx, jy - 60]]);
+    const stick = await page.evaluate(() => { const r = document.getElementById('mg-joy').getBoundingClientRect(); return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, live: document.getElementById('mg-joy').classList.contains('live') }; });
+    const p0 = await g.eval((G) => { const a = G.player.pos.clone(); G.tick(0.05, 10); return { joy: G.input.touch.joyY, moved: G.player.pos.distanceTo(a) }; });
+    check(`${size.name}: the stick appears under the thumb and moves the astronaut`, stick.live && Math.abs(stick.cx - jx) < 3 && Math.abs(stick.cy - jy) < 3 && p0.joy < -0.9 && p0.moved > 1, { stick, p0, jx, jy });
+    await touch('touchMove', [[jx, jy - 60], [size.w / 2 + 40, size.h / 2]]).catch(() => {});
+    await touch('touchEnd', []);
+    const rest = await g.eval((G) => ({ joy: G.input.touch.joyY, id: G.input.touch.joyId }));
+    check(`${size.name}: letting go centres the stick`, rest.joy === 0 && rest.id === null, rest);
+    // pinch on the map zooms it
+    await page.locator('#mg-trow [data-t="map"]').tap();
+    const sc0 = await page.locator('.map-scale span').innerText();
+    const mb = await page.locator('#mg-mapcanvas').boundingBox();
+    const mx = mb.x + mb.width / 2, my = mb.y + mb.height / 2;
+    await page.evaluate(([x, y]) => {
+      const c = document.getElementById('mg-mapcanvas');
+      const fire = (type, id, px, py) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: px, clientY: py, bubbles: true }));
+      fire('pointerdown', 11, x - 30, y); fire('pointerdown', 12, x + 30, y);
+      for (let d = 30; d <= 150; d += 20) { fire('pointermove', 11, x - d, y); fire('pointermove', 12, x + d, y); }
+      fire('pointerup', 11, x - 150, y); fire('pointerup', 12, x + 150, y);
+    }, [mx, my]);
+    await page.waitForFunction((was) => document.querySelector('.map-scale span').innerText !== was, sc0, { timeout: 8000 }).catch(() => {});
+    const sc1 = await page.locator('.map-scale span').innerText();
+    check(`${size.name}: pinching the map zooms it`, sc0 !== sc1, { sc0, sc1 });
+    await page.locator('#mg-map .close').tap();
   }
   // the largest interface size the player can ask for is held to what this window has room for
-  await sleep(6500);                                              // let the toast from the busy moment go
   await g.eval((G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); } });
   const cap = await page.evaluate(() => { window.__UI.setSetting('hudScale', 1.4); return { scale: window.__UI.layout.scale, max: window.__UI.layout.maxScale }; });
   const badBusy = await busy(), badDrive = await driving();
@@ -209,6 +278,15 @@ for (const size of SIZES) {
   const g = await openGame({ width: 390, height: 844, touch: true, quality: 'low', query: 'safe=47,0,34,0' });
   const vis = await g.page.evaluate(() => getComputedStyle(document.getElementById('mg-rotate')).display !== 'none');
   check('portrait phone: the rotate notice is shown', vis);
+  // turned sideways the game plays; turned upright again mid-game it pauses behind the notice
+  await g.page.setViewportSize({ width: 844, height: 390 });
+  await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); });
+  await sleep(400);
+  const land = await g.page.evaluate(() => ({ rot: getComputedStyle(document.getElementById('mg-rotate')).display, ui: window.__MG.S.uiOpen }));
+  await g.page.setViewportSize({ width: 390, height: 844 });
+  await sleep(600);
+  const up = await g.page.evaluate(() => ({ rot: getComputedStyle(document.getElementById('mg-rotate')).display, ui: window.__MG.S.uiOpen, kind: document.getElementById('mg-overlay').className }));
+  check('portrait phone: turning upright mid-game pauses it', land.rot === 'none' && !land.ui && up.rot !== 'none' && up.ui && /k-pause/.test(up.kind), { land, up });
   errors += g.errors.length;
   await g.close();
 }

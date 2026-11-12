@@ -128,6 +128,7 @@ export function headingOf(pos, frameQ) {
 
 const CARDS = [['N', 0], ['NE', 45], ['E', 90], ['SE', 135], ['S', 180], ['SW', 225], ['W', 270], ['NW', 315]];
 const HALF = 70;                       // degrees of heading shown either side of centre
+const EDGE = 56;                       // where a marker for something behind you is pinned (inside the strip's faded ends)
 const R2D = 180 / Math.PI;
 const cp = { w: 0, ppd: 0, cards: null, marks: [], nodes: {}, dists: {}, listAt: 0, region: null };
 onLayout(() => { cp.w = 0; });
@@ -192,7 +193,8 @@ export function updateCompass() {
       if (n.cls !== cls) { n.el.className = 'mk' + (cls ? ' ' + cls : ''); n.cls = cls; n.state = null; }
     }
     for (const id in cp.nodes) if (!seen.has(id)) { cp.nodes[id].el.remove(); cp.nodes[id].lab.remove(); delete cp.nodes[id]; }
-    const region = regionName(_v1.copy(pp).normalize());
+    // indoors, say where you are standing rather than what the Hab is standing on
+    const region = S.inside && S.mode === 'walk' ? (groundDist(pp, World.hab.position) < 14 ? 'The Hab' : 'Greenhouse') : regionName(_v1.copy(pp).normalize());
     if (region !== cp.region) {
       const first = cp.region === null;
       cp.region = region;
@@ -217,16 +219,16 @@ export function updateCompass() {
   for (const m of cp.marks) {
     const n = m.node;
     const rel = wrapDeg(m.bearing - heading);
-    const off = Math.abs(rel) > HALF - 3;
+    const off = Math.abs(rel) > EDGE;
     let state = 'on';
     if (m.d < 6 || (off && !m.pin)) state = 'hide';
-    const x = mid + clamp(rel, -(HALF - 3), HALF - 3) * ppd;
+    const x = mid + clamp(rel, -EDGE, EDGE) * ppd;
     if (state !== 'hide') {
       let near = 1e9;
       for (const px of placed) near = Math.min(near, Math.abs(px - x));
       if (near < iconW * 0.45) state = 'hide';
       else if (near < iconW * 0.95) state = 'small';
-      else if (off) state = 'off';
+      else if (off) state = rel < 0 ? 'off left' : 'off right';
       if (state !== 'hide') placed.push(x);
     }
     if (state !== n.state) {
@@ -234,7 +236,9 @@ export function updateCompass() {
       n.el.style.display = state === 'hide' ? 'none' : '';
       n.el.classList.toggle('small', state === 'small');
       n.el.classList.toggle('dim', state === 'small');
-      n.el.classList.toggle('off', state === 'off');
+      n.el.classList.toggle('off', state.startsWith('off'));
+      n.el.classList.toggle('left', state === 'off left');
+      n.el.classList.toggle('right', state === 'off right');
     }
     m.x = x; m.state = state;
     if (state !== 'hide') {
