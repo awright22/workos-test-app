@@ -1,0 +1,521 @@
+import { HAB_R, World, buildDeployable, siteLocalToWorld } from '../world/build.js';
+import { groundDist } from '../planet/geo.js';
+import { player } from './player.js';
+import { addI } from './interact.js';
+import { BAL, S, roverPowerCap, suitCap } from './state.js';
+import { flashScreen, log, showOverlay } from '../ui/dom.js';
+import { Snd } from '../audio/sound.js';
+import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
+import { _v1, _v2, _v3 } from '../core/scratch.js';
+import { SOL_LOGS } from './text.js';
+import { syncAllVisuals } from './visuals.js';
+import { clamp } from '../core/math.js';
+import { localSunEl, sleepToDawn } from './sim.js';
+import { closeScreens, toggleScreen } from '../ui/screens.js';
+import { enterRover, exitRover, roverF } from './rover.js';
+import { ITEM_NAMES, gainLoot } from './inventory.js';
+import { R } from '../planet/constants.js';
+// Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
+export function syncPlot(pl) {
+  pl.soilMesh.visible = pl.state !== 'empty';
+  pl.plants.visible = pl.state === 'growing' || pl.state === 'ready' || pl.state === 'dead';
+  const s = 0.25 + pl.growth * 1.05;
+  pl.plants.scale.set(s, s, s);
+  pl.plants.traverse((o) => {
+    if (o.material) {
+      if (pl.state === 'dead') o.material.color.set(0x5a4a30);
+      else if (pl.state === 'ready') o.material.color.set(o.geometry.type === 'SphereGeometry' ? 0x76c04a : 0x4e8a3a);
+      else o.material.color.set(o.geometry.type === 'SphereGeometry' ? 0x4e9a3a : 0x3f7a2f);
+    }
+  });
+}
+export function plantedPlots() { return World.plots.filter(p => p.state === 'growing' || p.state === 'ready').length; }
+export function nearestPlot() {
+  let best = null, bestD = 2.2;
+  for (const pl of World.plots) {
+    if (!pl.worldPos) continue;
+    const d = groundDist(player.pos, pl.worldPos);
+    if (d < bestD) { bestD = d; best = pl; }
+  }
+  return best;
+}
+addI({
+  pos: () => { const pl = nearestPlot(); return pl ? pl.worldPos : null; },
+  r: 2.2, hold: 1.3, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside,
+  enabled: () => {
+    const pl = nearestPlot(); if (!pl) return false;
+    switch (pl.state) {
+      case 'empty': return S.inv.regolith > 0 ? true : 'Needs soil — dig regolith outside';
+      case 'soil': return (S.food + S.potatoes) > 0 ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)') : 'No seed potato left';
+      case 'growing':
+        if (pl.watered < BAL.waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)';
+        return `Growing — ${Math.round(pl.growth * 100)}%`;
+      case 'ready': case 'dead': return true;
+    }
+    return false;
+  },
+  label: () => {
+    const pl = nearestPlot(); if (!pl) return '';
+    switch (pl.state) {
+      case 'empty': return 'Fill bed with regolith';
+      case 'soil': return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5L water)`;
+      case 'growing': return 'Water the plants (5L)';
+      case 'ready': return 'Harvest potatoes';
+      case 'dead': return 'Clear out the dead crop';
+    }
+    return '';
+  },
+  use: () => {
+    const pl = nearestPlot(); if (!pl) return;
+    switch (pl.state) {
+      case 'empty':
+        S.inv.regolith--; pl.state = 'soil';
+        break;
+      case 'soil':
+        if (S.potatoes > 0) S.potatoes--; else S.food--;
+        S.water -= BAL.waterPerDose;
+        pl.state = 'growing'; pl.growth = 0.04; pl.watered = 1;
+        if (plantedPlots() === 1) log('Planted. Grow, little guy. No pressure, but you\'re the food supply.');
+        break;
+      case 'growing':
+        S.water -= BAL.waterPerDose; pl.watered++;
+        break;
+      case 'ready':
+        pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
+        S.potatoes += BAL.potatoYield;
+        S.stats.potatoes += BAL.potatoYield;
+        Snd.jingle();
+        if (S.stats.potatoes === BAL.potatoYield) log('First harvest. I am the greatest botanist on this planet. Fear me.');
+        checkAchievements();
+        break;
+      case 'dead':
+        pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
+        break;
+    }
+    Snd.ok();
+    syncPlot(pl);
+  },
+});
+
+// ============================================================
+// 18. WORLD INTERACTABLES
+// ============================================================
+// cold open: seal the suit at the hab door
+addI({
+  pos: () => siteLocalToWorld(World.hab, 0, 0, HAB_R + 1.6, _v2),
+  r: 3.4, hold: 2.2, mode: 'walk',
+  visible: () => S.flags.coldOpen,
+  label: () => 'Pull the antenna. Seal the suit.',
+  use: () => {
+    S.flags.coldOpen = false;
+    S.flags.suitSealed = true;
+    S.suit = suitCap();
+    S.shake = 1.2;
+    flashScreen('rgba(255,60,40,0.35)', 350);
+    Snd.boom(); setTimeout(() => Snd.ok(), 600);
+    setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 300);
+    setTimeout(() => log(SOL_LOGS[1]), 1000);
+  },
+});
+export function addInspect(id, lx, lz, name, doneLine) {
+  addI({
+    pos: () => siteLocalToWorld(World.hab, lx, 0, lz, _v2),
+    r: 2.6, hold: 0.7, mode: 'walk',
+    visible: () => S.started && !S.flags.coldOpen && !S.checkedSystems[id],
+    label: () => `Inspect the ${name}`,
+    use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine); },
+  });
+}
+addInspect('oxy', 5.6, -3.6, 'oxygenator',
+  'Oxygenator: alive. It eats CO2 and power, makes air. My favorite roommate.');
+addInspect('rec', 5.9, -0.4, 'water reclaimer',
+  'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.');
+// NOTE: world arrays (panels, piles, landers, ice) fill AFTER world build —
+// these interactables resolve their nearest target dynamically at query time.
+export function nearestOf(list, posOf, maxD, filter) {
+  let best = null, bestD = maxD;
+  for (const item of list) {
+    if (filter && !filter(item)) continue;
+    const d = groundDist(player.pos, posOf(item));
+    if (d < bestD) { bestD = d; best = item; }
+  }
+  return best;
+}
+// solar panels
+export function panelPos(p) {
+  return _v3.copy(p.group.position).applyQuaternion(World.solarGroup.quaternion).add(World.solarGroup.position);
+}
+addI({
+  pos: () => {
+    const p = nearestOf(World.panels, panelPos, 3.0);
+    return p ? panelPos(World._activePanel = p) : null;
+  },
+  r: 3.0, hold: 1.6, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : 'Panel is clean',
+  label: () => `Wipe solar panel (${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output)`,
+  use: () => {
+    const p = World._activePanel;
+    if (!p) return;
+    p.dust = 0;
+    S.stats.panels++;
+    syncAllVisuals();
+    Snd.ok();
+    if (S.stats.panels === 1) log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.');
+  },
+});
+// regolith piles (fast) + dig-anywhere (slow, lowest priority)
+addI({
+  pos: () => {
+    const sp = nearestOf(World.soilPiles, s => s.group.position, 2.8, s => s.left > 0);
+    return sp ? (World._activePile = sp).group.position : null;
+  },
+  r: 2.8, hold: 1.4, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  label: () => 'Dig regolith (+1)',
+  use: () => {
+    const sp = World._activePile;
+    if (!sp || sp.left <= 0) return;
+    sp.left--; S.inv.regolith++;
+    syncAllVisuals();
+    Snd.pickup();
+  },
+});
+addI({
+  pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
+  visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
+  label: () => 'Dig regolith here (+1, slow)',
+  use: () => { S.inv.regolith++; Snd.pickup(); },
+});
+// hydrazine rig
+addI({
+  pos: () => siteLocalToWorld(World.hab, 5.5, 0, 2.6, _v2),
+  r: 2.4, hold: 2.0, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside,
+  enabled: () => S.hydrazine > 0 ? true : 'Hydrazine tank is empty',
+  label: () => `Burn hydrazine for water (+${BAL.hydrazineWater}L) — ${S.hydrazine} left`,
+  use: () => {
+    S.hydrazine--;
+    S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
+    World.hydFlame.visible = true;
+    setTimeout(() => { World.hydFlame.visible = false; }, 2600);
+    if (!S.flags.hydrazineBoom) {
+      S.flags.hydrazineBoom = true;
+      S.stats.booms++;
+      setTimeout(() => {
+        S.shake = 1.6;
+        S.o2 = clamp(S.o2 - 7, 0, 100);
+        flashScreen('rgba(255,180,80,0.75)', 500);
+        Snd.boom();
+        log('So. Small fireball. Eyebrows: gone. Water: acquired. Science!');
+      }, 1200);
+      log('Burning rocket fuel indoors. What could possibly go wrong?');
+    } else {
+      S.stats.booms++;
+      Snd.ok();
+      log(`+${BAL.hydrazineWater}L water. Eyebrow count stable. Progress.`);
+      checkAchievements();
+    }
+  },
+});
+// bunk
+addI({
+  pos: () => siteLocalToWorld(World.hab, -5.0, 0, -4.9, _v2),
+  r: 2.3, hold: 1.2, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside,
+  enabled: () => {
+    if (S.breach.active) return 'Not with the Hab screaming, no';
+    if (localSunEl() > 0.25) return 'Too much daylight to waste';
+    return true;
+  },
+  label: () => 'Sleep until dawn',
+  use: () => sleepToDawn(false),
+});
+// shelf
+addI({
+  pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
+  r: 2.2, hold: 0.8, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside,
+  enabled: () => S.health > 92 ? 'Not hungry right now' : (S.potatoes > 0 || S.food > 0) ? true : 'The shelf is bare',
+  label: () => `Eat a ${S.potatoes > 0 ? 'potato. Again.' : 'ration'} (+12 vitals)`,
+  use: () => {
+    if (S.potatoes > 0) S.potatoes--; else S.food--;
+    S.health = clamp(S.health + 12, 0, BAL.healthMax);
+    Snd.ok();
+  },
+});
+// comms desk: the math, NASA chatter, disco
+addI({
+  pos: () => siteLocalToWorld(World.hab, 0, 0, -6.6, _v2),
+  r: 2.4, hold: 0.8, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside && !S.flags.didMath,
+  label: () => 'Run the numbers',
+  use: () => {
+    S.flags.didMath = true;
+    Snd.ok();
+    log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The math says: farm or starve. I'm going to have to science the sh*t out of this.`);
+  },
+});
+addI({
+  pos: () => siteLocalToWorld(World.hab, -0.9, 0, -6.4, _v2),
+  r: 2.2, hold: 0.8, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside && S.pf.connected,
+  label: () => 'Message NASA',
+  use: () => {
+    const lines = [
+      'Please tell Commander Lewis her taste in music is a war crime. — M.W.',
+      'Status: alive. Potatoes: thriving. Dignity: pending. — M.W.',
+      'NASA says the whole world is watching. Waved at the sky. Felt weird. Did it again.',
+      'Asked NASA for pizza. Received an orbital mechanics refresher. Same thing, apparently.',
+      'NASA reminds me everything I type is broadcast live to Earth. So. Hi, Mom.',
+    ];
+    Snd.ok();
+    log(lines[(S.flags.nasaMsg = (S.flags.nasaMsg + 1)) % lines.length], 'nasa');
+  },
+});
+addI({
+  pos: () => siteLocalToWorld(World.hab, 0.9, 0, -6.4, _v2),
+  r: 2.2, hold: 0.6, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside && S.pf.connected,
+  label: () => S.disco ? 'Mercifully stop the disco' : "Play Lewis's disco playlist",
+  use: () => {
+    S.disco = !S.disco;
+    Snd.disco(S.disco);
+    log(S.disco ? 'Disco: ON. I hate it. ...It\'s growing on me. I hate that more.' : 'Disco: OFF. Blessed silence.');
+  },
+});
+// workbench — opens the colony screen
+addI({
+  pos: () => siteLocalToWorld(World.hab, -4.6, 0, 3.9, _v2),
+  r: 2.4, hold: 0.5, mode: 'walk',
+  visible: () => !S.flags.coldOpen && S.inside,
+  label: () => 'Use the fabricator [C]',
+  use: () => toggleScreen('colony'),
+});
+// rover enter + exit + camp
+addI({
+  pos: () => World.rover.group.position,
+  r: 3.8, hold: 0.6, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  label: () => 'Drive the rover',
+  sub: () => `PWR ${Math.round(S.roverPower)}/${roverPowerCap()} · O2 tank ${Math.round(S.roverO2)}`,
+  use: () => enterRover(),
+});
+addI({
+  pos: () => World.rover.group.position, r: 1e9, hold: 0.4, mode: 'rover',
+  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() >= 0.05,
+  label: () => 'Step out',
+  use: () => exitRover(),
+});
+addI({
+  pos: () => World.rover.group.position, r: 1e9, hold: 2.2, mode: 'rover',
+  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() < 0.05,
+  label: () => 'Camp in the rover until dawn',
+  sub: () => 'press F to step out instead',
+  use: () => sleepToDawn(true),
+});
+// pathfinder pickup + uplink connect
+addI({
+  pos: () => World.pathfinder.position,
+  r: 5.5, hold: 2.6, mode: 'walk',
+  visible: () => S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected,
+  enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Too heavy to carry — bring the rover closer',
+  label: () => 'Dig out Pathfinder and load it up',
+  use: () => {
+    S.pf.loaded = true;
+    S.pf.found = true;
+    World.pfCollider.r = 0.001;
+    syncAllVisuals();
+    Snd.jingle();
+    log('Hello, little guy. You\'ve been dead since 1997. Let\'s fix that. Next stop: home.');
+  },
+});
+addI({
+  pos: () => World.uplink.position,
+  r: 5.0, hold: 2.6, mode: 'walk',
+  visible: () => S.pf.loaded && !S.pf.connected,
+  enabled: () => groundDist(World.rover.group.position, World.uplinkRing.position) < 9 ? true : 'Park the rover on the marked ring first',
+  label: () => 'Connect Pathfinder to the uplink',
+  use: () => connectPathfinder(),
+});
+// landers: salvage + quest hooks (dynamic — landers exist only after world build)
+export const LANDER_CIRCUITS = { 'Spirit': 3, 'Beagle 2': 1, 'InSight': 2, 'Curiosity': 1, 'Zhurong': 1, 'Opportunity': 2 };
+addI({
+  pos: () => {
+    const rec = nearestOf(World.landers, l => l.group.position, 5.0,
+      l => l.data.name !== 'Pathfinder' && !S.salvaged[l.data.name]);
+    return rec ? (World._activeLander = rec).group.position : null;
+  },
+  r: 5.0, hold: 2.4, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  label: () => World._activeLander ? `Salvage ${World._activeLander.data.name} (${World._activeLander.data.year})` : '',
+  use: () => {
+    const rec = World._activeLander;
+    if (!rec || S.salvaged[rec.data.name]) return;
+    S.salvaged[rec.data.name] = true;
+    const loot = { scrap: rec.data.scrap };
+    if (LANDER_CIRCUITS[rec.data.name]) loot.circuit = LANDER_CIRCUITS[rec.data.name];
+    const got = gainLoot(loot);
+    log(`Salvaged ${rec.data.name}: ${got}. ${rec.data.note}`, 'disc');
+    discover(rec.data.name, rec.data.note, true);
+    onQuestEvent('salvage', rec.data.name);
+    checkAchievements();
+  },
+});
+// ice deposits (dynamic)
+addI({
+  pos: () => {
+    const site = nearestOf(World.iceSites, s => s.group.position, 4.5, s => s.left > 0);
+    return site ? (World._activeIce = site).group.position : null;
+  },
+  r: 4.5, hold: 1.6, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  enabled: () => S.upgrades.drill ? true : 'Needs the Ice Drill upgrade',
+  label: () => `Mine water ice (+1, ${World._activeIce ? World._activeIce.left : 0} left)`,
+  use: () => {
+    const site = World._activeIce;
+    if (!site || site.left <= 0) return;
+    site.left--; S.inv.ice++; S.stats.mined++;
+    if (site.left <= 0) site.group.visible = false;
+    Snd.pickup();
+    checkAchievements();
+  },
+});
+// debris & supply pods
+addI({
+  pos: () => {
+    let best = null, bestD = 4.5;
+    for (const p of World.pods) {
+      if (p.taken) continue;
+      const d = groundDist(player.pos, p.group.position);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best ? (World._activePod = best).group.position : null;
+  },
+  r: 4.5, hold: 1.6, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  label: () => World._activePod ? World._activePod.label : '',
+  use: () => {
+    const p = World._activePod;
+    if (!p || p.taken) return;
+    p.taken = true;
+    p.group.visible = false;
+    const got = gainLoot(p.loot);
+    log(`Recovered: ${got}.`);
+    if (p.blueprint) { S.blueprints[p.blueprint] = true; log(`NASA attached schematics: ${p.blueprint.toUpperCase()} blueprint unlocked.`, 'nasa'); }
+  },
+});
+// the buried RTG
+addI({
+  pos: () => World.rtgSite.group.position,
+  r: 4.0, hold: 3.0, mode: 'walk',
+  visible: () => !S.flags.coldOpen && !World.rtgSite.taken && S.flags.didMath,
+  label: () => 'Dig up the RTG (radioactive. cozy.)',
+  use: () => {
+    World.rtgSite.taken = true;
+    World.rtgSite.group.visible = false;
+    S.flags.hasRtg = true;
+    Snd.pickup();
+    log('One RTG: a plutonium space-heater NASA buried out of an abundance of caution. I am strapping it to my life. Socket it at the fabricator.');
+  },
+});
+// breach patch
+addI({
+  pos: () => siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2, _v2),
+  r: 3.2, hold: 3.0, mode: 'walk',
+  visible: () => S.breach.active && S.inside,
+  label: () => 'Seal the breach (canvas, tape, prayer)',
+  use: () => {
+    S.breach.active = false;
+    S.breach.done = true;
+    Snd.alarm(false);
+    Snd.ok();
+    S.shake = 0.5;
+    syncAllVisuals();
+    log(S.breach.cropsKilled ?
+      'Sealed. Too late for the crops. The Hab and I are no longer on speaking terms.' :
+      'Breach sealed. Crops: alive. Heart rate: unpublishable. Duct tape: undefeated.');
+  },
+});
+// deployed O2 caches
+addI({
+  pos: () => {
+    let best = null, bestD = 3.5;
+    for (const b of World.builtMeshes) {
+      if (b.kind !== 'cache' || b.charges <= 0) continue;
+      const d = groundDist(player.pos, b.group.position);
+      if (d < bestD) { bestD = d; best = b; }
+    }
+    return best ? (World._activeCache = best).group.position : null;
+  },
+  r: 3.5, hold: 1.0, mode: 'walk',
+  visible: () => !S.flags.coldOpen,
+  enabled: () => S.suit < suitCap() - 5 ? true : 'Suit is full',
+  label: () => `Refill suit O2 (${World._activeCache ? World._activeCache.charges : 0} charges left)`,
+  use: () => {
+    const c = World._activeCache;
+    if (!c || c.charges <= 0) return;
+    c.charges--;
+    S.suit = clamp(S.suit + 40, 0, suitCap());
+    Snd.ok();
+  },
+});
+// kit deployment
+export let deployKind = null;
+export function startDeploy(kind) {
+  deployKind = kind;
+  closeScreens();
+  log('Pick a spot outside and place it.', 'sys');
+}
+addI({
+  pos: () => player.pos, r: 99, hold: 1.6, mode: 'walk', priority: 2,
+  visible: () => !!deployKind && !S.inside,
+  label: () => `Place the ${ITEM_NAMES['kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1)] || deployKind} here`,
+  use: () => {
+    const kitKey = 'kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1);
+    if ((S.inv[kitKey] || 0) <= 0) { deployKind = null; return; }
+    S.inv[kitKey]--;
+    _v1.copy(player.pos).normalize();
+    _v2.set(0, 0, -1).applyQuaternion(player.q);
+    _v1.addScaledVector(_v2, 5 / R).normalize();
+    const kind = deployKind;
+    buildDeployable(kind, _v1);
+    Snd.craft();
+    log(`${ITEM_NAMES[kitKey]} deployed. Mars: 0, engineering: 1.`);
+    if (deployKind === 'greenhouse') syncAllVisuals();
+    onQuestEvent('deploy', deployKind);
+    deployKind = null;
+    checkAchievements();
+  },
+});
+// MAV: strip + launch
+addI({
+  pos: () => World.mav.position,
+  r: 8.0, hold: 3.0, mode: 'walk',
+  visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
+  enabled: () => S.sol >= S.rescueSol ? true : `Launch window opens Sol ${S.rescueSol} — NASA was firm about this`,
+  label: () => 'Strip excess weight (nose cone, seats, dignity)',
+  use: () => {
+    S.flags.mavStripped = true;
+    World.mavNose.visible = false;
+    Snd.ok();
+    log('Removed the nose cone. NASA says the tarp will hold. NASA is lying, and we both know it.');
+  },
+});
+addI({
+  pos: () => World.mav.position,
+  r: 8.0, hold: 1.6, mode: 'walk',
+  visible: () => S.flags.mavStripped && !S.won,
+  label: () => 'Climb in. Go home.',
+  use: () => {
+    showOverlay({
+      title: 'LAUNCH?',
+      body: 'The MAV is a convertible now. The math says Hermes can catch you.\nThe math has been wrong before.\n\nNo coming back. The potatoes forgive you.',
+      buttons: [
+        { label: 'PUNCH IT', fn: () => startLaunch() },
+        { label: 'Not yet', ghost: true, fn: () => {} },
+      ],
+    });
+  },
+});

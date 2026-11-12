@@ -112,6 +112,32 @@ export class Planet {
     this.unit = data.q * HM;
     this.rough = data.rough;
     this.rsize = data.rough ? data.rough.m + 2 * data.rough.pad : 0;
+    /** Levelled building sites: {x,y,z unit centre, r metres flat, blend metres, h radius, cos} */
+    this.pads = [];
+  }
+
+  /** Level the ground around a unit direction: flat within r metres, easing back to the
+   *  natural surface over `blend` metres. Returns the pad (send planet.pads to the workers). */
+  addPad(x, y, z, r, blend) {
+    const h = this.radius(x, y, z, 12);          // the site's own broad-scale height
+    const pad = { x, y, z, r, blend, h, cos: Math.cos((r + blend) / R) };
+    this.pads.push(pad);
+    return pad;
+  }
+
+  _pad(x, y, z, r0) {
+    const pads = this.pads;
+    for (let i = 0; i < pads.length; i++) {
+      const p = pads[i];
+      const dot = x * p.x + y * p.y + z * p.z;
+      if (dot <= p.cos) continue;
+      const d = Math.sqrt(Math.max(0, 2 - 2 * dot)) * R;
+      if (d >= p.r + p.blend) continue;
+      let w = d <= p.r ? 1 : 1 - (d - p.r) / p.blend;
+      w = w * w * (3 - 2 * w);
+      r0 += (p.h - r0) * w;
+    }
+    return r0;
   }
 
   /** Real elevation in metres above the areoid (not exaggerated), bicubic. */
@@ -132,7 +158,8 @@ export class Planet {
     locate(x, y, z);
     const base = this._mola();
     const rough = this._rough();
-    return R + base + this._detail(x, y, z, rough, minW);
+    const r = R + base + this._detail(x, y, z, rough, minW);
+    return this.pads.length ? this._pad(x, y, z, r) : r;
   }
 
   /** As radius(), for a direction given as face coordinates; faster for mesh grids. */
@@ -140,7 +167,8 @@ export class Planet {
     _f = face; _s = s; _t = t; _sc = Math.tan(s * PI_4); _tc = Math.tan(t * PI_4);
     const base = this._mola();
     const rough = this._rough();
-    return R + base + this._detail(x, y, z, rough, minW);
+    const r = R + base + this._detail(x, y, z, rough, minW);
+    return this.pads.length ? this._pad(x, y, z, r) : r;
   }
 
   _mola() {

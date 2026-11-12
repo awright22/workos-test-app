@@ -1,0 +1,134 @@
+// Scripted playthrough of the whole story arc through the debug hook. Every later change to the
+// game must keep this green. Steps the simulation directly, so it does not depend on frame rate.
+import { openGame, sleep } from './lib.mjs';
+
+const g = await openGame({ quality: 'low' });
+const results = [];
+const check = (name, ok, detail) => { results.push({ name, ok: !!ok, detail }); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); };
+const ev = (fn, arg) => g.eval(fn, arg);
+const click = async (text) => { await g.page.locator('#mg-panel button', { hasText: text }).first().click({ timeout: 20000 }); };
+
+await ev(async (G) => { await G.start(2.0, 303.7); G.paused = true; });
+let s = await ev((G) => ({ cold: G.S.flags.coldOpen, suit: G.S.suit, sol: G.S.sol, habDist: G.groundDist(G.player.pos, G.World.hab.position) }));
+check('new game starts in the cold open', s.cold && s.suit < 60 && Math.abs(s.habDist - 85) < 2, s);
+
+s = await ev((G) => { G.tpLocal(0, 8.4 + 1.6); G.hold(2.6); return { sealed: G.S.flags.suitSealed, cold: G.S.flags.coldOpen, suit: G.S.suit }; });
+check('sealing the suit at the Hab door ends the cold open', s.sealed && !s.cold && s.suit >= 99, s);
+
+s = await ev((G) => { G.tpLocal(4.0, -3.0); G.hold(1.0); G.tpLocal(4.3, -0.4); G.hold(1.0); G.tpLocal(0, -5.0); G.hold(1.1); return { checked: G.S.checkedSystems, math: G.S.flags.didMath, inside: G.S.inside }; });
+check('inspecting systems and running the numbers', s.checked.oxy && s.checked.rec && s.math && s.inside, s);
+
+s = await ev((G) => {
+  const T = G.ctx.engine.camera.position.constructor;
+  for (let i = 0; i < 3; i++) {
+    const p = G.World.panels[i];
+    const w = new T().copy(p.group.position).applyQuaternion(G.World.solarGroup.quaternion).add(G.World.solarGroup.position);
+    G.tpNear(w, 1.6); G.hold(1.8);
+  }
+  return { panels: G.S.stats.panels, dust: G.World.panels.slice(0, 3).map((p) => +p.dust.toFixed(2)) };
+});
+check('wiping three solar panels', s.panels === 3 && s.dust.every((d) => d < 0.01), s);
+
+s = await ev((G) => { G.tpNear(G.World.soilPiles[0].group.position, 1.2); G.hold(1.6); G.hold(1.6); return { regolith: G.S.inv.regolith, left: G.World.soilPiles[0].left }; });
+check('digging regolith from a pile', s.regolith === 2 && s.left === 0, s);
+
+s = await ev((G) => {
+  const out = {};
+  G.tpLocal(-4.1, -3.2);
+  G.hold(1.5); out.afterFill = G.World.plots[0].state;
+  const w0 = G.S.water;
+  G.hold(1.5); out.afterPlant = G.World.plots[0].state; out.waterUsed = +(w0 - G.S.water).toFixed(1);
+  G.World.plots[0].growth = 0.45; G.hold(1.5); out.watered = G.World.plots[0].watered;
+  G.World.plots[0].growth = 0.995; G.tick(0.05, 400); out.ripe = G.World.plots[0].state;
+  G.hold(1.5); out.potatoes = G.S.potatoes; out.afterHarvest = G.World.plots[0].state;
+  return out;
+});
+check('farming: fill, plant, water, grow, harvest', s.afterFill === 'soil' && s.afterPlant === 'growing' && s.watered === 2 && s.ripe === 'ready' && s.potatoes === 4 && s.afterHarvest === 'soil', s);
+
+s = await ev((G) => { const w0 = G.S.water; G.tpLocal(4.2, 2.6); G.hold(2.2); return { hydrazine: G.S.hydrazine, gained: +(G.S.water - w0).toFixed(1) }; });
+check('burning hydrazine makes water', s.hydrazine === 2 && s.gained > 27, s);
+await sleep(1600);
+
+s = await ev((G) => { G.S.health = 80; G.tpLocal(3.2, 3.9); G.hold(1.0); return { health: Math.round(G.S.health), food: G.S.food, potatoes: G.S.potatoes }; });
+check('eating at the shelf restores vitals', s.health === 92 && s.potatoes === 3, s);
+
+const sol0 = (await ev((G) => G.S.sol));
+await ev((G) => { G.setLocalTime(21); G.tpLocal(-5.0, -6.2); G.hold(1.4); });
+await sleep(3400);
+s = await ev((G) => ({ sol: G.S.sol, sleeping: G.S.sleeping, ui: G.S.uiOpen, over: G.S.over }));
+check('sleeping until dawn advances the sol', s.sol === sol0 + 1 && !s.sleeping && !s.ui && !s.over, { ...s, sol0 });
+
+s = await ev((G) => {
+  G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8);
+  const mode1 = G.S.mode, p0 = G.S.roverPower;
+  G.input.keys['w'] = true; G.tick(0.05, 160); G.input.keys['w'] = false;
+  const out = { mode1, speed: +G.roverF.speed.toFixed(1), driven: Math.round(G.S.stats.driven), drained: +(p0 - G.S.roverPower).toFixed(2) };
+  G.tick(0.05, 80);
+  return out;
+});
+check('driving the rover', s.mode1 === 'rover' && s.speed > 20 && s.driven > 100 && s.drained > 0, s);
+s = await ev((G) => { G.input.keys['f'] = false; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); return { mode: G.S.mode }; });
+check('F steps out of the rover', s.mode === 'walk', s);
+
+s = await ev((G) => {
+  G.S.flags.pfRevealed = true;
+  G.roverTo(G.World.pathfinder.position, 8); G.tpNear(G.World.pathfinder.position, 2.5); G.hold(2.8);
+  const loaded = G.S.pf.loaded;
+  G.roverTo(G.World.uplinkRing.position, 0.5); G.tpNear(G.World.uplink.position, 2.5); G.hold(2.8);
+  return { loaded, connected: G.S.pf.connected, ui: G.S.uiOpen };
+});
+check('fetching Pathfinder and connecting the uplink', s.loaded && s.connected && s.ui, s);
+for (let i = 0; i < 6; i++) { await click(i < 5 ? 'NEXT' : 'CLOSE CHANNEL'); await sleep(120); }
+s = await ev((G) => ({ quests: Object.values(G.S.quests).filter((q) => q === 'active').length, pods: G.World.pods.length, ui: G.S.uiOpen }));
+check('NASA conversation offers survey quests and a care package', s.quests === 7 && s.pods >= 4 && !s.ui, s);
+
+s = await ev((G) => { G.S.inv.scrap = 10; G.S.inv.regolith = 2; G.tpLocal(-3.4, 3.2); return { inside: G.S.inside }; });
+await g.page.keyboard.press('c');
+await g.page.locator('button[data-r="candle"]').click({ timeout: 20000 });
+await g.page.keyboard.press('c');
+s = await ev((G) => ({ candle: G.S.inv.candle, scrap: G.S.inv.scrap, crafted: G.S.stats.crafted }));
+check('fabricating an O2 candle at the bench', s.candle === 1 && s.scrap === 8 && s.crafted === 1, s);
+
+s = await ev((G) => {
+  G.S.inv.kitBeacon = 1;
+  G.tpLocal(0, 30);
+  return { inside: G.S.inside };
+});
+await g.page.keyboard.press('c');
+await g.page.locator('[data-deploy="beacon"]').click({ timeout: 20000 });
+s = await ev((G) => { G.tick(0.05, 2); G.hold(1.8); return { built: G.World.builtMeshes.map((b) => b.kind), kit: G.S.inv.kitBeacon }; });
+check('deploying a nav beacon', s.built.length === 1 && s.built[0] === 'beacon' && s.kit === 0, s);
+
+s = await ev((G) => {
+  const snap = JSON.parse(JSON.stringify(G.serializeState()));
+  const before = { water: G.S.water, sol: G.S.sol, potatoes: G.S.potatoes, built: G.World.builtMeshes.length, pf: G.S.pf.connected };
+  G.S.water = 1; G.S.sol = 99; G.S.potatoes = 0;
+  G.applyState(snap);
+  return { before, after: { water: G.S.water, sol: G.S.sol, potatoes: G.S.potatoes, built: G.World.builtMeshes.length, pf: G.S.pf.connected } };
+});
+check('save and load round-trips the state', JSON.stringify(s.before) === JSON.stringify(s.after), s);
+
+s = await ev((G) => { G.checkpoint(); G.tpLocal(0, 60); G.S.suit = 0; G.S.health = 0.5; G.tick(0.05, 10); return { over: G.S.over, dead: G.S.dead }; });
+check('running out of air outside is fatal', s.over && /sphyx/.test(s.dead || ''), s);
+await click('WAKE AT DAWN');
+s = await ev((G) => ({ over: G.S.over, health: G.S.health, suit: G.S.suit }));
+check('waking at the dawn checkpoint restores the run', !s.over && s.health >= 50 && s.suit >= 100, s);
+
+s = await ev((G) => {
+  G.S.sol = G.S.rescueSol; G.S.flags.mavRevealed = true;
+  G.tpNear(G.World.mav.position, 5.5); G.hold(3.2);
+  const stripped = G.S.flags.mavStripped;
+  G.hold(1.8);
+  return { stripped, ui: G.S.uiOpen };
+});
+check('stripping the MAV opens the launch prompt', s.stripped && s.ui, s);
+await click('PUNCH IT');
+s = await ev((G) => { const m = G.S.mode; G.tick(0.05, 900); return { mode: m, won: G.S.won, ui: G.S.uiOpen }; });
+check('launching reaches orbit and wins', s.mode === 'cutscene' && s.won && s.ui, s);
+await g.shot('arc-win');
+
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length}/${results.length} checks passed; console errors: ${g.errors.length}`);
+if (g.errors.length) console.log(JSON.stringify(g.errors.slice(0, 5)).slice(0, 1200));
+await g.close();
+process.exit(failed.length || g.errors.length ? 1 : 0);

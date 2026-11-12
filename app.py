@@ -157,37 +157,23 @@ def game_page():
     else:
         return redirect("/login")
 
+# --- Stranded II (the Mars game) -------------------------------------------------------------
+# The game is a self-contained static site in static/martian (the same files that are published
+# to GitHub Pages). Serving it under /martian/ keeps every URL in it relative, so one index.html,
+# one manifest and one service worker (scoped to /martian/) work everywhere.
+MARTIAN_DIR = os.path.join(app.root_path, "static", "martian")
+
+
 @app.route("/martian")
-def martian_page():
-    return render_template("martian.html")
+def martian_redirect():
+    return redirect("/martian/")
 
 
-@app.route("/martian-sw.js")
-def martian_sw():
-    resp = app.send_static_file("martian/sw.js")
-    resp.headers["Content-Type"] = "application/javascript"
-    resp.headers["Service-Worker-Allowed"] = "/"
-    return resp
-
-
-@app.route("/martian.webmanifest")
-def martian_manifest():
-    import flask
-    return flask.jsonify({
-        "name": "Stranded on Mars",
-        "short_name": "Stranded",
-        "description": "A full-planet Martian survival game. Farm. Salvage. Phone home. Fly out.",
-        "start_url": "/martian",
-        "scope": "/",
-        "display": "fullscreen",
-        "orientation": "landscape",
-        "background_color": "#160a04",
-        "theme_color": "#160a04",
-        "icons": [
-            {"src": "/static/martian/icon-192.png", "sizes": "192x192", "type": "image/png"},
-            {"src": "/static/martian/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
-        ],
-    })
+@app.route("/martian/")
+@app.route("/martian/<path:filename>")
+def martian_files(filename="index.html"):
+    from flask import send_from_directory
+    return send_from_directory(MARTIAN_DIR, filename)
 
 
 if __name__ == "__main__":

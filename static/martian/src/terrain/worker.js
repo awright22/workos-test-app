@@ -8,6 +8,8 @@ self.onmessage = (e) => {
   if (m.type === 'init') {
     planet = new Planet(m.data);
     self.postMessage({ type: 'ready' });
+  } else if (m.type === 'pads') {
+    planet.pads = m.pads;
   } else if (m.type === 'build') {
     const c = buildChunk(planet, m.face, m.level, m.ix, m.iy, m.G);
     c.type = 'chunk';

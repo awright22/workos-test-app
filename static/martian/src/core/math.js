@@ -72,3 +72,8 @@ export function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+export const perf = () => performance.now() / 1000;
+let _seed = 1337;
+/** Deterministic sequence used for decorative placement (same every run). */
+export function srand() { _seed = (_seed * 16807) % 2147483647; return (_seed - 1) / 2147483646; }

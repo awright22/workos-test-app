@@ -14,7 +14,7 @@ import { Sky } from './sky.js';
 import { clamp, lerp, damp } from '../core/math.js';
 
 export const QUALITY = {
-  low:    { scale: 0.6, msaa: 0, shadow: 1024, shadowRange: 45, bloom: false, grid: 24, maxLevel: 8, split: 1.0, fine: false, workers: 1, rocks: 0.5 },
+  low:    { scale: 0.6, msaa: 0, shadow: 1024, shadowRange: 45, bloom: false, grid: 24, maxLevel: 8, split: 1.0, fine: false, workers: 2, rocks: 0.5 },
   medium: { scale: 0.8, msaa: 2, shadow: 2048, shadowRange: 60, bloom: true, grid: 32, maxLevel: 8, split: 1.15, fine: true, workers: 2, rocks: 0.8 },
   high:   { scale: 1.0, msaa: 4, shadow: 2048, shadowRange: 75, bloom: true, grid: 32, maxLevel: 9, split: 1.3, fine: true, workers: 3, rocks: 1.0 },
   ultra:  { scale: 1.0, msaa: 4, shadow: 4096, shadowRange: 95, bloom: true, grid: 48, maxLevel: 9, split: 1.6, fine: true, workers: 4, rocks: 1.3 },

@@ -1,60 +1,251 @@
-// TEMPORARY entry point: a planet viewer used to bring up the new terrain and renderer.
+// Stranded II — entry point: load the planet, build the engine, run the game loop.
 import * as THREE from 'three';
 import { Engine } from './render/engine.js';
 import { loadPlanet, asset } from './planet/load.js';
 import { Terrain } from './terrain/terrain.js';
 import { makeTerrainMaterial } from './render/terrain-material.js';
-import { llToVec, tangentBasis } from './planet/geo.js';
+import { llToVec, groundDist } from './planet/geo.js';
+import { surfaceAt } from './planet/surface.js';
 import { R } from './planet/constants.js';
+import { clamp, perf } from './core/math.js';
+import { _v1, _v2, _v3 } from './core/scratch.js';
+import { ctx } from './game/ctx.js';
+import { S, BAL, DIFFICULTIES } from './game/state.js';
+import { root, UI, log, showOverlay } from './ui/dom.js';
+import { Snd } from './audio/sound.js';
+import { World, siteLocalToWorld } from './world/build.js';
+import { input, initInput } from './game/input.js';
+import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
+import { roverF, updateRover, initRoverAt } from './game/rover.js';
+import { updateInteract, interactables, interaction } from './game/interact.js';
+import './game/interactables.js';
+import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
+import { updateDiscoveries, checkAchievements } from './game/story.js';
+import { updateHud, updateCompass, updateObjectivesHud } from './ui/hud.js';
+import { screenOpen, renderMap } from './ui/screens.js';
+import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
+import { showStart, newGame, continueGame } from './game/flow.js';
+import { syncAllVisuals } from './game/visuals.js';
 
-const root = document.createElement('div');
-root.id = 'mg-root';
-document.body.appendChild(root);
+function pickQuality() {
+  const q = new URLSearchParams(location.search).get('q');
+  if (q) return q;
+  try { const saved = localStorage.getItem('stranded2-quality'); if (saved) return saved; } catch (e) { /* private mode */ }
+  const mobile = input.isTouch && Math.min(screen.width, screen.height) < 900;
+  return mobile ? 'low' : 'high';
+}
+
+function loading(fraction, label) {
+  UI.panel.innerHTML = `<h1>STRANDED II</h1><h2>${label || 'Loading'}</h2>` +
+    `<div style="height:6px;border:1px solid rgba(242,216,184,.4)"><div style="height:100%;width:${Math.round(fraction * 100)}%;background:#ffb45e"></div></div>`;
+  UI.overlay.style.display = 'flex';
+}
 
 async function boot() {
-  const params = new URLSearchParams(location.search);
-  const engine = new Engine(root, params.get('q') || 'high');
-  const data = await loadPlanet(() => {});
+  loading(0, 'Receiving orbital survey');
+  const engine = ctx.engine = new Engine(root, pickQuality());
+  ctx.world = new THREE.Group();
+  ctx.world.name = 'world';
+  engine.scene.add(ctx.world);
+  const data = await loadPlanet(loading, { maxColorFace: engine.q.scale < 0.7 ? 512 : 1024 });
+  ctx.planet = data.planet;
   const material = makeTerrainMaterial(data.albedoCube, { fine: engine.q.fine });
-  const terrain = new Terrain({
+  ctx.terrainMaterial = material;
+  ctx.terrain = new Terrain({
     planet: data.planet, heightData: data.heightData, parent: engine.scene, material,
     workerUrl: asset('terrain-worker.js'), grid: engine.q.grid, maxLevel: engine.q.maxLevel, split: engine.q.split, workers: engine.q.workers,
   });
-  const state = { lat: 0, lon: 0, alt: 2, heading: 0, pitch: -0.05, tod: 0.3, dust: 0 };
-  const up = new THREE.Vector3(), east = new THREE.Vector3(), north = new THREE.Vector3(), fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
-  const m = new THREE.Matrix4();
-  function place() {
-    llToVec(state.lat, state.lon, up);
-    const ground = state.agl === false ? R : data.planet.radius(up.x, up.y, up.z);
-    engine.camera.position.copy(up).multiplyScalar(ground + state.alt);
-    tangentBasis(up, east, north);
-    fwd.copy(north).multiplyScalar(Math.cos(state.heading)).addScaledVector(east, Math.sin(state.heading));
-    fwd.multiplyScalar(Math.cos(state.pitch)).addScaledVector(up, Math.sin(state.pitch));
-    tmp.copy(engine.camera.position).add(fwd);
-    m.lookAt(engine.camera.position, tmp, up);
-    engine.camera.quaternion.setFromRotationMatrix(m);
-    // sun: local solar time `tod` (0 = midnight, 0.5 = noon) at this longitude
-    const ha = (state.tod - 0.5) * Math.PI * 2;
-    const lonR = state.lon * Math.PI / 180;
-    engine.sunDir.set(Math.cos(lonR + ha), 0, -Math.sin(lonR + ha));
-  }
-  let last = performance.now();
-  function frame() {
-    requestAnimationFrame(frame);
-    const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    place();
-    terrain.update(engine.camera.position);
-    engine.update({ dt, dust: state.dust, focus: engine.camera.position });
-    engine.render();
-  }
-  window.__MG = {
-    engine, terrain, planet: data.planet, state,
-    async view(v) { state.agl = true; state.dust = 0; Object.assign(state, v); place(); const ok = await terrain.settle(engine.camera.position); place(); return { ok, ...terrain.stats(), ...engine.info() }; },
-  };
-  place();
-  await terrain.settle(engine.camera.position);
-  frame();
+  const mapImg = new Image();
+  mapImg.onload = () => { ctx.mapImage = mapImg; };
+  mapImg.src = asset('assets/mars/map.jpg');
+
+  buildAstronaut();
+  initInput();
+  updateSunDir();
+  installDebug();
+  // title: the camera drifts over the day side while the first tiles arrive
+  titleCamera(0);
+  loading(1, 'Building terrain');
+  await ctx.terrain.settle(engine.camera.position, 15000);
+  showStart();
+  lastT = perf();
+  requestAnimationFrame(frame);
   window.__MG.ready = true;
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register(asset('sw.js')).catch(() => {});
+  }
 }
-boot().catch((e) => { console.error(e); document.body.insertAdjacentHTML('beforeend', `<pre style="color:#fff;position:fixed;inset:0;padding:20px">${e.stack || e}</pre>`); });
+
+// ------------------------------------------------------------------------------------------
+// Main loop
+// ------------------------------------------------------------------------------------------
+let lastT = 0, startOrbitA = 0, mapOpenTimer = 0, blinkT = 0, lastPing = 0, slowFrames = 0, fpsAcc = 0, fpsN = 0;
+
+function titleCamera(dt) {
+  const cam = ctx.engine.camera, sun = ctx.engine.sunDir;
+  startOrbitA += dt * 0.012;
+  updateSunDir();
+  _v1.copy(sun).multiplyScalar(R * 2.6);
+  _v2.set(-sun.z, 0, sun.x);                      // sideways drift around the subsolar point
+  cam.position.copy(_v1).addScaledVector(_v2, Math.sin(startOrbitA) * R * 1.1).setY(R * (0.5 + 0.35 * Math.sin(startOrbitA * 0.6)));
+  camLookAt(_v3.set(0, 0, 0), _v2.set(0, 1, 0));
+}
+
+function draw(dt, focus) {
+  const e = ctx.engine;
+  e.camera.updateMatrixWorld();
+  ctx.terrain.update(e.camera.position);
+  e.update({ dt, dust: S.started ? S.storm.i : 0, inside: S.started && S.inside, focus });
+  e.final.uniforms.uDanger.value = World.danger || 0;
+  e.final.uniforms.uCold.value = World.cold || 0;
+  e.render();
+}
+
+/** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
+function tick(dt) {
+  if (!S.started) { titleCamera(dt); return null; }
+  const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
+  if (S.over && S.mode !== 'cutscene') return focus;
+  if ((S.uiOpen || screenOpen()) && !S.sleeping) return focus;
+  if (S.mode === 'cutscene') {
+    if (World.launchAnim) World.launchAnim(dt);
+    updateSunDir();
+    return World.mav.position;
+  }
+  if (!S.sleeping) {
+    advanceTime(dt);
+    applyRates(dt, false);
+    if (S.mode === 'walk') updateWalk(dt);
+    else if (S.mode === 'rover') updateRover(dt);
+    updateAstronaut(dt);
+    updateInteract(dt);
+    updateDiscoveries(dt);
+    updatePing();
+  }
+  Snd.wind((S.inside ? 0.05 : 0.16) + S.storm.i * 0.65 + (S.breach.active && S.inside ? 0.4 : 0));
+  blinkT += dt;
+  if (World.beacon) World.beacon.material.emissive.setHex(Math.sin(blinkT * 5) > 0 ? 0x33ff66 : 0x0a3315);
+  if (World.mavStrobe) World.mavStrobe.material.emissive.setHex(Math.sin(blinkT * 7) > 0 ? 0xff4020 : 0x330a05);
+  updateSunDir();
+  updateHud();
+  updateCompass();
+  updateObjectivesHud();
+  if (UI.mapScreen.style.display === 'block') {
+    mapOpenTimer += dt;
+    if (mapOpenTimer > 0.7) { mapOpenTimer = 0; renderMap(); }
+  }
+  return focus;
+}
+
+let lastFocus = null;
+function frame() {
+  requestAnimationFrame(frame);
+  const now = perf();
+  const rawDt = now - lastT;
+  const dt = Math.min(rawDt, 0.05);
+  lastT = now;
+  // hold the frame rate by trading resolution (checked about once a second)
+  fpsAcc += rawDt; fpsN++;
+  if (fpsAcc > 1) { if (!window.__MG.fixedResolution) ctx.engine.adaptResolution((fpsAcc / fpsN) * 1000, 1000 / 55); window.__MG.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+  if (!window.__MG.paused) lastFocus = tick(dt);
+  draw(window.__MG.paused ? 0 : dt, lastFocus);
+}
+
+// pathfinder proximity ping
+function updatePing() {
+  if (!S.flags.pfRevealed || S.pf.found || S.pf.loaded || S.pf.connected) return;
+  const d = groundDist(player.pos, World.pathfinder.position);
+  if (d > 90) return;
+  const interval = clamp(d / 60, 0.12, 1.4);
+  if (perf() - lastPing > interval) { lastPing = perf(); Snd.beep(1200, 0.04, 'square', 0.05); }
+  if (d < 10 && !S.pf.found) { S.pf.found = true; log('Signal source dead ahead. There you are.'); }
+}
+
+// ------------------------------------------------------------------------------------------
+// Debug and test hook: reach any place, time and state on demand (used by tools/tests)
+// ------------------------------------------------------------------------------------------
+function installDebug() {
+  window.__MG = {
+    ctx, S, World, player, roverF, BAL, DIFFICULTIES, interactables, input, interaction,
+    llToVec, surfaceAt, groundDist,
+    applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
+    syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements,
+    ready: false, fps: 0, paused: false,
+    /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
+    tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
+    fixedResolution: new URLSearchParams(location.search).has('fixed'),
+    /** Start a new game at a chosen crash site without the menus. */
+    async start(lat, lon, diff = 'survival') {
+      if (lat !== undefined) {
+        const real = Math.random; const q = [(lat / 52 + 1) / 2, lon / 360];
+        Math.random = () => (q.length ? q.shift() : real());
+        try { newGame(diff); } finally { Math.random = real; }
+      } else newGame(diff);
+      UI.overlay.style.display = 'none'; S.uiOpen = false;
+      await this.settle();
+      return { lat: World.spawn.lat, lon: World.spawn.lon };
+    },
+    /** Skip the cold open (suit sealed, systems checked, numbers run). */
+    skipIntro() {
+      Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true });
+      S.checkedSystems = { oxy: true, rec: true };
+      S.suit = 100;
+    },
+    /** Put the astronaut at a latitude/longitude, facing `yaw`. */
+    async tp(lat, lon, yaw = 0) {
+      initPlayerAt(llToVec(lat, lon), yaw);
+      if (S.mode === 'walk') updateWalk(0.001);
+      return this.settle();
+    },
+    /** Put the astronaut `east`,`north` metres from the Hab centre. */
+    async tpHab(east, north, yaw = 0) {
+      const up = World.hab.position.clone().normalize();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      initPlayerAt(up.addScaledVector(e, east / R).addScaledVector(n, north / R).normalize(), yaw);
+      if (S.mode === 'walk') updateWalk(0.001);
+      return this.settle();
+    },
+    /** Set the local solar time (hours, 0-24.66) where the astronaut stands. */
+    setLocalTime(hours) {
+      const up = _v1.copy(player.pos).normalize();
+      const lon = ((Math.atan2(-up.z, up.x) * 180 / Math.PI) + 360) % 360;
+      S.tod = (((hours / 24.66 - 0.5) - lon / 360) % 1 + 1) % 1;
+      updateSunDir();
+    },
+    /** Stand at Hab-local coordinates (x, z in metres; the door is at +z). */
+    tpLocal(lx, lz, yaw = 0) {
+      const w = siteLocalToWorld(World.hab, lx, 0, lz, new THREE.Vector3());
+      initPlayerAt(w.normalize(), yaw);
+      lastFocus = tick(0.001);
+    },
+    /** Stand `dist` metres north of a world position. */
+    tpNear(pos, dist = 1.5) {
+      const up = pos.clone().normalize();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      initPlayerAt(up.addScaledVector(n, dist / R).normalize(), 0);
+      lastFocus = tick(0.001);
+    },
+    /** Park the rover `dist` metres south of a world position. */
+    roverTo(pos, dist = 6) {
+      const up = pos.clone().normalize();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      initRoverAt(up.addScaledVector(n, -dist / R).normalize(), 0);
+    },
+    /** Hold the interact button for `sec` seconds of game time. */
+    hold(sec) {
+      input.eHeld = true;
+      for (let i = 0; i < Math.ceil(sec / 0.05); i++) lastFocus = tick(0.05);
+      input.eHeld = false;
+      lastFocus = tick(0.05);
+    },
+    setStorm(i) { S.storm.i = i; S.storm.hold = i; },
+    look(pitch) { player.pitch = pitch; },
+    async settle() { ctx.engine.camera.updateMatrixWorld(); return ctx.terrain.settle(ctx.engine.camera.position, 20000); },
+    info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats() }; },
+  };
+}
+
+boot().catch((e) => {
+  console.error(e);
+  showOverlay({ title: 'SOMETHING BROKE', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload the page to try again.`, buttons: [] });
+});

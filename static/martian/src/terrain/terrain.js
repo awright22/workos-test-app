@@ -96,6 +96,7 @@ export class Terrain {
       const node = this.pending.get(m.id);
       this.pending.delete(m.id);
       if (node) this.ready.push([node, m]);
+      this._dispatch(true);            // keep the worker busy; do not wait for the next frame
     }
   }
 
@@ -106,9 +107,10 @@ export class Terrain {
     this.queue.push(node);
   }
 
-  _dispatch() {
+  _dispatch(fromWorker) {
     if (!this.queue.length) return;
     if (this.sync) {
+      if (fromWorker) return;
       // main-thread fallback: a few chunks per frame
       this.queue.sort((a, b) => a.priority - b.priority);
       for (let n = 0; n < 2 && this.queue.length; n++) {
@@ -118,7 +120,7 @@ export class Terrain {
       return;
     }
     if (!this.idle.length) return;
-    this.queue.sort((a, b) => a.priority - b.priority);
+    if (!fromWorker) this.queue.sort((a, b) => a.priority - b.priority);
     while (this.idle.length && this.queue.length) {
       const node = this.queue.shift();
       if (node.used < this.frame - 2) { node.state = 0; continue; }       // no longer wanted
@@ -183,7 +185,7 @@ export class Terrain {
   update(camPos) {
     this.frame++;
     // adopt finished chunks (bounded per frame so uploads never hitch)
-    for (let n = 0; n < 8 && this.ready.length; n++) {
+    for (let n = 0; n < 12 && this.ready.length; n++) {
       const [node, c] = this.ready.shift();
       if (node.state === 1) this._adopt(node, c);
     }
@@ -253,6 +255,41 @@ export class Terrain {
       return empty && n.state === 0 && n.used < this.frame - 90;
     };
     for (const r of this.roots) trim(r);
+  }
+
+  /** Tell the workers about the levelled building sites and rebuild any tile that overlaps one
+   *  of `changed` (pads added since the last call). */
+  syncPads(changed = []) {
+    for (const w of this.workers) w.postMessage({ type: 'pads', pads: this.planet.pads });
+    if (!changed.length) return;
+    const hit = (n) => changed.some((p) => {
+      const d = Math.acos(Math.min(1, Math.max(-1, n.dir.x * p.x + n.dir.y * p.y + n.dir.z * p.z)));
+      return d < n.angle + (p.r + p.blend) / R;
+    });
+    const walk = (n) => {
+      if (n.children) for (const c of n.children) walk(c);
+      if (n.state !== 0 && hit(n)) { n._stale = true; }
+    };
+    for (const r of this.roots) walk(r);
+    // stale tiles are rebuilt in place: keep showing the old mesh until the new one arrives
+    const redo = (n) => {
+      if (n.children) for (const c of n.children) redo(c);
+      if (n._stale && n.state === 2) { n._stale = false; this._rebuild(n); }
+      else if (n._stale) { n._stale = false; }
+    };
+    for (const r of this.roots) redo(r);
+  }
+
+  _rebuild(node) {
+    const c = buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G);
+    const old = node.mesh;
+    if (this.onDispose) this.onDispose(node);
+    this.parent.remove(old);
+    old.geometry.dispose();
+    this.live--;
+    node.mesh = null;
+    this._adopt(node, c);
+    node.mesh.visible = old.visible;
   }
 
   /** Resolve once the tiles needed for `camPos` are all built (for load screens and teleports). */
