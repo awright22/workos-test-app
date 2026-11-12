@@ -15,6 +15,7 @@ import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
 import { MATERIALS, analyseAll, catalogue, identify, scienceSummary, takeSample } from './game/science.js';
 import { updateAudio } from './audio/driver.js';
+import { devils, spawnDevil, updateDevils } from './game/devils.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
 import { RockField, rockColliders } from './world/rocks.js';
@@ -149,6 +150,7 @@ function tick(dt) {
     updateDiscoveries(dt);
     updatePing();
     updateEffects(dt);
+    updateDevils(dt);
   }
   blinkT += dt;
   if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
@@ -203,7 +205,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    rockColliders,
+    rockColliders, devils, spawnDevil,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
