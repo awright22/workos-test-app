@@ -251,6 +251,10 @@ function installDebug() {
       const lon = ((Math.atan2(-up.z, up.x) * 180 / Math.PI) + 360) % 360;
       S.tod = (((hours / 24.66 - 0.5) - lon / 360) % 1 + 1) % 1;
       updateSunDir();
+      // the clock jumped: let the sky, the exposure and the lamps catch up at once, not over the next second
+      const e = ctx.engine;
+      e.sky.update(e.sunDir, e.camera.position, S.started ? S.storm.i : 0, e.time);
+      e.snapLight = 3;
     },
     /** Stand at Hab-local coordinates (x, z in metres; the door is at +z). */
     tpLocal(lx, lz, yaw = 0) {
