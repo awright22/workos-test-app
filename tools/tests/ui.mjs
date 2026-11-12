@@ -4,14 +4,15 @@
 import { openGame, sleep } from './lib.mjs';
 import { auditInPage, auditLines } from './audit-lib.mjs';
 
-// node tools/tests/ui.mjs --size=667   runs only the layout checks at the sizes whose name contains that text (for quick work on one size)
+// node tools/tests/ui.mjs --size=667   runs only the layout checks at the sizes whose name contains that text (for quick work on one size);
+// --size=keys, --size=play and --size=portrait run only the keyboard, play and portrait parts
 const onlySize = (process.argv.find((a) => a.startsWith('--size=')) || '').slice(7);
 const results = [];
 const check = (name, ok, detail) => { results.push({ name, ok: !!ok }); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined && !ok ? '  ' + JSON.stringify(detail) : '')); };
 let errors = 0;
 
 // ---------------------------------------------------------------------------------- keyboard and settings (desktop)
-if (!onlySize) {
+if (!onlySize || onlySize === 'keys') {
   const g = await openGame({ quality: 'low' });
   const page = g.page, key = (k) => page.keyboard.press(k);
   const focused = () => page.evaluate(() => (document.activeElement && (document.activeElement.dataset.act || document.activeElement.dataset.diff || document.activeElement.className)) || '');
@@ -470,7 +471,7 @@ for (const size of SIZES) {
 }
 
 // ---------------------------------------------------------------------------------- portrait phones are asked to rotate
-if (!onlySize) {
+if (!onlySize || onlySize === 'portrait') {
   const g = await openGame({ width: 390, height: 844, touch: true, quality: 'low', query: 'safe=47,0,34,0' });
   const vis = await g.page.evaluate(() => getComputedStyle(document.getElementById('mg-rotate')).display !== 'none');
   check('portrait phone: the rotate notice is shown', vis);

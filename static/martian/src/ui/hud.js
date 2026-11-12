@@ -694,7 +694,7 @@ export function updateHud() {
   if (S.storm.i > 0.15) {
     // (what the storm is doing depends on where it is: over the Hab it starves the panels, out here it only blinds)
     const atHab = stormIntensityAt(World.hab.position) > 0.15;
-    al.push(['warn', 'storm', 'Dust storm', atHab ? 'the panels are making little power' : 'keep the Hab or the rover in sight', atHab ? 'panels make little power' : 'keep your bearings']);
+    al.push(['warn', 'storm', 'Dust storm', atHab ? 'solar power is down' : 'keep the Hab in sight', atHab ? 'solar power is down' : 'keep your bearings']);
   }
   if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Extreme cold', 'the suit heater is drawing <span class="chem">O<sub>2</sub></span>', 'the heater burns more <span class="chem">O<sub>2</sub></span>']);
   const critical = al.some((a) => a[0] === 'crit');

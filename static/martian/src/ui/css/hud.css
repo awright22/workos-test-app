@@ -431,8 +431,6 @@
 #mg-way.off.urgent .wp { border-bottom-color: var(--danger); }
 @keyframes mg-way-bob { 50% { margin-top: -.25rem; margin-bottom: .25rem; } }
 .mg-reduced #mg-way .wp { animation: none; }
-/* (it is moved every frame: with motion reduced, the blanket one-millisecond transition must not apply to it, or it trails its place) */
-.mg-reduced #mg-way, .mg-reduced #mg-way .wp { transition: none !important; }
 .is-modal #mg-way, .is-photo #mg-way, .is-cutscene #mg-way { display: none !important; }
 
 /* on a phone the log sits between the bars and the joystick: room for the newest message only
@@ -498,6 +496,18 @@
 .mg-compact #mg-prompt .sub { font-size: var(--t11); }
 .mg-compact #mg-way b { font-size: var(--t11); }
 .mg-compact .ph-hint, .mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t11); }
+
+/* ================================================================ desktops: a banner keeps between the bars and the mission panel
+   (the longest of them, at the largest interface size, reached a few pixels into the bars: past the room there is,
+   the instruction goes onto a line of its own, as it does on a phone) */
+#mg-root:not(.mg-compact) .alert { flex-wrap: wrap; justify-content: center; row-gap: .25rem; max-width: calc(100vw - 48.5rem); }
+#mg-root:not(.mg-compact) #mg-toast { top: calc(var(--m) + var(--sat) + 9.875rem + var(--al2, 0) * 3.25rem); }
+/* ... and the log keeps under the bars: the newest entry shows whole, the two before it two lines each (three long
+   ones together stood as tall as the screen at the largest interface size) */
+#mg-root:not(.mg-compact) #mg-log { justify-content: flex-end; overflow: hidden; max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 13rem); }
+#mg-root:not(.mg-compact) #mg-log .mg-line:not(:last-child) .tx { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* (on a tablet the log stands above the stick, so it has that much less room under the bars) */
+#mg-root.mg-touch:not(.mg-compact) #mg-log { max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 23.5rem); }
 
 /* ================================================================ phones: a banner is two lines, what is wrong over what to do
    (on one line the longer ones reached to within 2 px of the bars, and the narrowest phones dropped the second half) */
