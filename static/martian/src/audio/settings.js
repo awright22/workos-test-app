@@ -12,6 +12,7 @@ export function getAudioVolumes() { return { ...Snd.vol }; }
 export function loadAudioVolumes() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (saved) for (const k in Snd.vol) if (typeof saved[k] === 'number') Snd.setVolume(k, saved[k]);
+    // (the master level belongs to the interface's settings; only the three mixes are kept here)
+    if (saved) for (const k in Snd.vol) if (k !== 'master' && typeof saved[k] === 'number') Snd.setVolume(k, saved[k]);
   } catch (e) { /* nothing saved, or not readable */ }
 }

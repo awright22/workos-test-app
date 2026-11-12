@@ -162,7 +162,8 @@ export function buildAstronaut() {
   for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
   anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 46, 0.66, 1.0, 1.7);
+  // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 50, 0.66, 1.0, 1.25);
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
   tgt.position.set(0, -1.1, 8);
@@ -264,7 +265,7 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 95 : lerp(anim.lamp.intensity, lampOn * 95, damp(0.25, dt));
+  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 40 : lerp(anim.lamp.intensity, lampOn * 40, damp(0.25, dt));
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
@@ -397,6 +398,8 @@ export function updateWalk(dt) {
  *  the farm (they hang at 2.27 m), under the duct ring near the wall, under the trusses elsewhere. */
 function habCeiling(x, z) {
   if (x > -6.6 && x < -1.9 && z > -4.5 && z < 2.9) return 2.08;
+  // string lights hang over the galley table once he has put them up: the camera stays under them
+  if (S.comforts && S.comforts.lights && Math.hypot(x - 1.75, z + 2.35) < 2.3) return 2.45;
   return Math.hypot(x, z) > 6.2 ? 2.6 : 3.3;
 }
 

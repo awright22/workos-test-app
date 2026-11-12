@@ -34,16 +34,19 @@ function rockGeometry(detail, seed, squash, cuts, crease = 0.8) {
   const planes = [];
   for (let i = 0; i < cuts; i++) {
     const z = rnd() * 1.5 - 0.5, a = rnd() * Math.PI * 2, r = Math.sqrt(Math.max(0, 1 - z * z));       // more cuts on the upper half
-    planes.push([r * Math.cos(a), z, r * Math.sin(a), 0.60 + rnd() * 0.30]);
+    planes.push([r * Math.cos(a), z, r * Math.sin(a), 0.48 + rnd() * 0.36]);      // some deep: broken faces, not a tumbled pebble
   }
+  // no rock is as wide as it is long
+  const sx = 0.8 + rnd() * 0.5, sz = 0.72 + rnd() * 0.4;
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const k = 1 + gnoise3(x * 1.3 + seed, y * 1.3, z * 1.3) * 0.36 + gnoise3(x * 2.9, y * 2.9 + seed, z * 2.9) * 0.15 + gnoise3(x * 6.3, y * 6.3, z * 6.3 + seed) * 0.05;
+    const k = 1 + gnoise3(x * 1.3 + seed, y * 1.3, z * 1.3) * 0.36 + gnoise3(x * 2.9, y * 2.9 + seed, z * 2.9) * 0.12;
     x *= k; y *= k; z *= k;
     for (const [nx, ny, nz, d] of planes) {
       const over = x * nx + y * ny + z * nz - d;
       if (over > 0) { x -= nx * over; y -= ny * over; z -= nz * over; }
     }
+    x *= sx; z *= sz;
     y *= squash;
     if (y < -0.2) y = -0.2 + (y + 0.2) * 0.3;               // the buried part is flattened
     p.setXYZ(i, x, y, z);
@@ -109,8 +112,9 @@ function rockMaterial(albedoCube) {
         vec3 ground = mix(groundGrade(rawGround), vec3(0.56, 0.62, 0.70), icy);
         float gl = dot(ground, vec3(0.3, 0.55, 0.15));
         // diffuseColor carries the rock's own tone (instance colour): how dark, how grey
-        vec3 stone = mix(mix(vec3(gl), ground, 0.55), vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
-        float dust = clamp(vRockMix.x * 1.25 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
+        // basalt: darker and greyer than the dust that settles on it, which lies on what faces up
+        vec3 stone = mix(mix(vec3(gl), ground, 0.36) * 0.74, vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
+        float dust = clamp(vRockMix.x * 1.1 - 0.1 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
         diffuseColor.rgb = mix(stone, ground * 0.92, dust) * vRockMix.y * (1.0 + (rg1.a - 0.5) * 0.7 + (rg2.a - 0.5) * 0.45);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         {
@@ -120,7 +124,7 @@ function rockMaterial(albedoCube) {
           normal = normalize(normal - vRockRot * g);
         }`);
   };
-  mat.customProgramCacheKey = () => 'rock3';
+  mat.customProgramCacheKey = () => 'rock4';
   return mat;
 }
 
@@ -151,11 +155,11 @@ export class RockField {
       return m;
     };
     // boulders close by get the detailed shapes and a shadow; the rest are cheap
-    this.near = [rockGeometry(3, 1.7, 0.74, 4, 0.85), rockGeometry(3, 5.3, 0.62, 5, 0.85)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
-    this.far = [rockGeometry(1, 9.2, 0.6, 3, 1.1), rockGeometry(1, 4.4, 0.82, 4, 1.1)].map((g) => mk(g, Math.round(700 * this.density), false));
+    this.near = [rockGeometry(3, 1.7, 0.78, 10, 0.5), rockGeometry(3, 5.3, 0.64, 12, 0.5)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
+    this.far = [rockGeometry(1, 9.2, 0.62, 6, 0.6), rockGeometry(1, 4.4, 0.84, 7, 0.6)].map((g) => mk(g, Math.round(700 * this.density), false));
     // stones: a rounder shape underfoot, the simplest one beyond
-    this.smallNear = mk(rockGeometry(2, 2.6, 0.66, 3, 1.0), Math.round(260 * this.density), this.shadowRange > 0);
-    this.small = mk(rockGeometry(0, 6.1, 0.62, 0, 3.2), Math.round(3600 * this.density), false);
+    this.smallNear = mk(rockGeometry(2, 2.6, 0.66, 7, 0.55), Math.round(260 * this.density), this.shadowRange > 0);
+    this.small = mk(rockGeometry(0, 6.1, 0.62, 2, 0.5), Math.round(3600 * this.density), false);
     this.gravel = new GravelField(parent, terrain.planet, mat, { reach: this.density < 0.7 ? 9 : 14, cap: Math.round(2600 * Math.min(1, this.density)) });
     this.smallCap = this.small.instanceMatrix.count;
     terrain.onChunk = (node, c) => { if (c.rocks && c.rocks.length) { this.sets.set(node, { kind: node.level === terrain.rockLevels.big ? 'big' : 'small', data: c.rocks, origin: c.origin }); this.dirty = true; } };

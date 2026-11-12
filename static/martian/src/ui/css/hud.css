@@ -225,7 +225,7 @@
 .is-fp #mg-crosshair { opacity: .8; }
 
 /* ---------------------------------------------------------------- toasts */
-#mg-toast { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 8.625rem + var(--al2, 0) * 2.25rem); transform: translateX(-50%); z-index: 40; pointer-events: none;
+#mg-toast { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 9.875rem + var(--al2, 0) * 2.25rem); transform: translateX(-50%); z-index: 40; pointer-events: none;
   display: none; }
 .is-playing #mg-toast { display: block; }
 .is-modal #mg-toast { display: none; }
@@ -332,3 +332,40 @@
 
 /* tablets: the stick lives where the log would be */
 .mg-touch:not(.mg-compact) #mg-log { bottom: calc(var(--sab) + 12.5rem); }
+
+/* ================================================================ photo mode */
+#mg-photo, #mg-photo-flash, #mg-photo-bars { display: none; }
+.is-photo #mg-hud, .is-photo #mg-toast, .is-photo #mg-prompt { visibility: hidden !important; opacity: 0; }
+.is-photo #mg-touch { display: none !important; }
+.is-photo #mg-photo { display: block; position: absolute; z-index: 60; left: calc(var(--sal) + var(--m)); right: calc(var(--sar) + var(--m)); bottom: calc(var(--sab) + var(--m));
+  padding: .625rem .875rem .75rem; background: rgba(19, 17, 15, .86); border: 1px solid var(--line-2); border-top: 2px solid var(--accent); backdrop-filter: blur(6px); }
+.ph-top { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+.ph-title { display: inline-flex; align-items: center; gap: .5rem; font: 600 .875rem/1 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; }
+.ph-title .ic { width: 1rem; height: 1rem; color: var(--accent); }
+.ph-hint { font-size: .75rem; color: var(--ink-3); text-align: right; }
+.ph-row { display: flex; gap: 1.25rem; align-items: flex-end; }
+.ph-sliders { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .375rem .875rem; }
+.ph-s { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .125rem .5rem; }
+.ph-s span { font: 500 .6875rem/1 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.ph-s output { font: 600 .75rem/1 var(--f-cond); letter-spacing: .04em; color: var(--ink); text-align: right; }
+.ph-s input { grid-column: 1 / -1; width: 100%; }
+.ph-side { flex: none; display: grid; gap: .5rem; justify-items: end; }
+.ph-looks button { min-width: 0; padding: 0 .625rem; }
+.ph-btns { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+.ph-btns .mg-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.is-photo #mg-photo-flash { display: block; position: absolute; inset: 0; z-index: 59; background: #fff; opacity: 0; pointer-events: none; }
+#mg-photo-flash.go { animation: mg-photo-flash .45s ease-out; }
+@keyframes mg-photo-flash { 0% { opacity: .75; } 100% { opacity: 0; } }
+.is-photo.ph-bars #mg-photo-bars { display: block; position: absolute; inset: 0; z-index: 58; pointer-events: none;
+  box-shadow: inset 0 calc((100vh - 100vw / 2.39) / 2) 0 0 #000, inset 0 calc((100vw / 2.39 - 100vh) / 2) 0 0 #000; }
+.mg-compact #mg-photo { padding: .375rem .5rem .4375rem; }
+.mg-compact .ph-top { margin-bottom: .25rem; }
+.mg-compact .ph-hint { display: none; }
+.mg-compact .ph-row { gap: .625rem; }
+.mg-compact .ph-sliders { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem .5rem; }
+.mg-compact .ph-btns .mg-btn { min-height: 2rem; padding: 0 .5rem; font-size: .6875rem; }
+.mg-compact .ph-looks button { padding: 0 .375rem; font-size: .625rem; min-height: 1.75rem; }
+
+/* an emergency at the head of the mission list is the largest thing in it */
+.obj.urgent.first { font-size: .9375rem; }
+.mg-compact .obj.urgent.first { font-size: .8125rem; }

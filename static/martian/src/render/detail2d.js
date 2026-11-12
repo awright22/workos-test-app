@@ -6,8 +6,9 @@
  * with two generated 2D textures, addressed in metres across the cube face (see terrain/chunk.js):
  *
  *   sand   2 m across, 4 mm a texel: grains and grit
- *   field  16 m across, 3 cm a texel: lumps and hollows, wind ripples in places, cracked crust
- *          in others, and where the gravel lies
+ *   field  16 m across, 3 cm a texel: lumps and hollows, wind ripples in places, and where the
+ *          gravel lies
+ *   crust  12.8 m across: the polygons of patterned ground, laid only at high latitudes and on ice
  *
  * Each stores the surface's slope in RG (for the shading normal), a brightness in B, and a mask
  * in A (sand: stone, as opposed to dust; field: gravel patches).
@@ -106,29 +107,48 @@ function sandTexture(size, anisotropy) {
 
 function fieldTexture(size, anisotropy) {
   const SPAN = 16;
-  const broad = fbm(size, 4, 5, 41, 0.55), warp = fbm(size, 6, 3, 53), where = fbm(size, 3, 3, 67), tone = fbm(size, 5, 4, 71, 0.6), gravel = fbm(size, 4, 4, 83, 0.55);
+  const broad = fbm(size, 4, 5, 41, 0.55), warp = fbm(size, 3, 2, 53), where = fbm(size, 3, 3, 67), tone = fbm(size, 5, 4, 71, 0.6), gravel = fbm(size, 4, 4, 83, 0.55);
+  const swell = fbm(size, 6, 2, 59);
   const h = new Float32Array(size * size), bright = new Float32Array(size * size), mask = new Float32Array(size * size);
-  // cracked crust: cells of a periodic Voronoi pattern; the cracks are where two cells meet
-  const C = 22, rnd = rng(97), pts = new Float32Array(C * C * 2);
-  for (let i = 0; i < C * C; i++) { pts[i * 2] = rnd(); pts[i * 2 + 1] = rnd(); }
   for (let j = 0, k = 0; j < size; j++) for (let i = 0; i < size; i++, k++) {
-    // ripples: ridges about 30 cm apart, running roughly across the texture, bent by the warp field
-    const phase = ((i / size) * 54 + warp[k] * 5.5 + (j / size) * 6) % 1;
+    // ripples: ridges about 30 cm apart, laid across the wind, only gently bent (a strong bend closes them
+    // into whorls like a fingerprint), taller in some places than others, in patches with bare sand between
+    const phase = ((i / size) * 54 + warp[k] * 1.5 + (j / size) * 5) % 1;
     const ridge = 1 - Math.abs((phase + 1) % 1 - 0.5) * 2;               // 0 in the trough .. 1 on the crest
-    const rippled = Math.max(0, Math.min(1, (where[k] - 0.08) * 5));
-    // crust
-    const gx = (i / size) * C, gy = (j / size) * C, cx = Math.floor(gx), cy = Math.floor(gy);
+    const rippled = Math.max(0, Math.min(1, (where[k] - 0.02) * 4)) * (0.55 + 0.45 * Math.max(0, Math.min(1, swell[k] * 2 + 0.5)));
+    h[k] = broad[k] * 0.11 + Math.pow(ridge, 1.6) * 0.022 * rippled;
+    bright[k] = 0.56 + tone[k] * 0.22 + (ridge - 0.5) * 0.08 * rippled - Math.max(0, -broad[k]) * 0.10;
+    mask[k] = Math.max(0, Math.min(1, (gravel[k] - 0.02) * 4)) * (1 - rippled * 0.8);
+  }
+  return pack(size, h, bright, mask, 1, SPAN, anisotropy);
+}
+
+/** Patterned ground: the polygons that freezing and thawing crack into high-latitude soil and ice.
+ *  Troughs of uneven width between cells of uneven size, missing altogether in places. */
+function crustTexture(size, anisotropy) {
+  const SPAN = 12.8;
+  const where = fbm(size, 3, 3, 167), wide = fbm(size, 7, 3, 173), tone = fbm(size, 5, 3, 179, 0.6), dome = fbm(size, 9, 3, 181);
+  const h = new Float32Array(size * size), bright = new Float32Array(size * size), mask = new Float32Array(size * size);
+  const C = 9, rnd = rng(97), pts = new Float32Array(C * C * 2);
+  for (let i = 0; i < C * C; i++) { pts[i * 2] = 0.15 + rnd() * 0.7; pts[i * 2 + 1] = 0.15 + rnd() * 0.7; }
+  for (let j = 0, k = 0; j < size; j++) for (let i = 0; i < size; i++, k++) {
+    const gx = (i / size) * C + wide[k] * 0.35, gy = (j / size) * C + dome[k] * 0.35, cx = Math.floor(gx), cy = Math.floor(gy);
     let d1 = 9, d2 = 9;
     for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
       const qx = ((cx + a) % C + C) % C, qy = ((cy + b) % C + C) % C, q = (qy * C + qx) * 2;
       const dx = cx + a + pts[q] - gx, dy = cy + b + pts[q + 1] - gy, d = dx * dx + dy * dy;
       if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
     }
-    const crack = Math.max(0, 1 - (Math.sqrt(d2) - Math.sqrt(d1)) * 9);    // 1 in a crack
-    const crusted = Math.max(0, Math.min(1, (-where[k] - 0.10) * 5));
-    h[k] = broad[k] * 0.11 + Math.pow(ridge, 1.6) * 0.022 * rippled - crack * crack * 0.03 * crusted;
-    bright[k] = 0.56 + tone[k] * 0.20 + (ridge - 0.5) * 0.07 * rippled - crack * 0.16 * crusted - Math.max(0, -broad[k]) * 0.10;
-    mask[k] = Math.max(0, Math.min(1, (gravel[k] - 0.02) * 4)) * (1 - rippled * 0.8);
+    const edge = Math.sqrt(d2) - Math.sqrt(d1);                          // 0 on a cell boundary
+    const width = 0.05 + 0.09 * Math.max(0, wide[k] + 0.5);               // troughs 6 to 18 cm across
+    const trough = Math.max(0, 1 - edge / width);
+    const here = Math.max(0, Math.min(1, (where[k] + 0.25) * 3));         // most of the ground, not all of it
+    const t2 = trough * trough * (3 - 2 * trough) * here;
+    // each polygon is slightly domed, its rim a little raised beside the trough
+    const rim = Math.max(0, 1 - Math.abs(edge - width * 1.6) / (width * 1.2)) * here;
+    h[k] = -t2 * 0.045 + rim * 0.008 + dome[k] * 0.01;
+    bright[k] = 0.56 + tone[k] * 0.12 - t2 * 0.2 + rim * 0.04;
+    mask[k] = t2;
   }
   return pack(size, h, bright, mask, 1, SPAN, anisotropy);
 }
@@ -136,6 +156,6 @@ function fieldTexture(size, anisotropy) {
 let cache = null;
 /** @param {number} anisotropy  the renderer's limit, capped by the quality preset */
 export function groundTextures(anisotropy = 8) {
-  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy) };
+  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy), crust: crustTexture(512, anisotropy) };
   return cache;
 }

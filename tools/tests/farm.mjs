@@ -4,7 +4,7 @@ import { openGame } from './lib.mjs';
 
 const g = await openGame({ quality: 'low' });
 const results = [];
-const check = (name, ok, detail) => { results.push(!!ok); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined ? '  ' + JSON.stringify(detail).slice(0, 420) : '')); };
+const check = (name, ok, detail) => { results.push(!!ok); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined ? '  ' + JSON.stringify(detail).slice(0, 1400) : '')); };
 const ev = (fn, arg) => g.eval(fn, arg);
 
 await ev(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.paused = true; G.S.flags.didMath = true; G.S.storm.cells.forEach((c) => { c.peak = 0; }); G.setStorm(0); });
@@ -32,7 +32,7 @@ s = await ev((G) => {
   return out;
 });
 check('a bed of soil asks what to plant and takes a seed packet and 5 L',
-  s.label === 'Plant this bed…' && s.rows.length === 3 && /Radishes \| Ready in 1\.1 sols · 1 watering · 3 a bed \| 2 to plant/.test(s.rows[1]) && s.plot.state === 'growing' && s.plot.crop === 'radish' && s.seeds === 1 && Math.abs(s.water - 55) < 0.1 && s.uiOpen === false, s);
+  s.label === 'Plant this bed…' && s.rows.length === 3 && /Radishes \| Ready in 1\.1 sols · 1 watering · yields 3 \| 2 to plant/.test(s.rows[1]) && s.plot.state === 'growing' && s.plot.crop === 'radish' && s.seeds === 1 && Math.abs(s.water - 55) < 0.1 && s.uiOpen === false, s);
 
 s = await ev((G) => {
   const out = {}, pl = G.World.plots[0];
@@ -134,6 +134,34 @@ check('seed packets arrive as loot; pantry, morale and each bed\'s crop survive 
   /2 soy seed packets, 1 tomato seed packet, 1 Scrap Metal/.test(s.got || '') && s.seeds.soy === 2 && s.seeds.tomato === 1 &&
   s.loaded.morale === 41.5 && s.loaded.pantry.tomato === 4 && s.loaded.soy === 2 && s.loaded.meals === 5 && s.loaded.crop === 'tomato' && s.loaded.state === 'growing' && s.loaded.tomatoShown && !s.loaded.potatoShown &&
   s.old.morale === 62 && s.old.seeds.radish === 2 && s.old.crop === 'potato', s);
+
+// comforts: things made for the Hab
+s = await ev((G) => {
+  const C = G.comforts, S = G.S, W = G.World, out = {};
+  S.comforts = {}; S.inv.scrap = 0; S.inv.circuit = 0; S.mail = {}; S.salvaged = {}; S.stats.produce = 0;
+  out.blocks = Object.fromEntries(C.COMFORTS.map((c) => [c.id, C.comfortBlock(c.id, W)]));
+  S.inv.scrap = 4; S.inv.circuit = 1; S.morale = 50;
+  out.line = C.makeComfort('lights', W);
+  out.after = { made: !!S.comforts.lights, scrap: S.inv.scrap, circuit: S.inv.circuit, morale: S.morale, again: C.comfortBlock('lights', W), count: C.comfortCount(), dawn: C.comfortCheer() };
+  S.mail.lewis = 1; out.photos = C.comfortBlock('photos', W);
+  C.makeComfort('photos', W); C.makeComfort('chair', W);
+  out.dawn3 = C.comfortCheer();
+  G.syncAllVisuals();
+  out.parts = Object.keys(W.comfortParts || {}).length;
+  out.shown = Object.entries(W.comfortParts || {}).filter(([, n]) => n.visible).map(([k]) => k).sort();
+  const saved = JSON.parse(JSON.stringify(G.serializeState()));
+  S.comforts = {}; G.applyState(saved);
+  out.loaded = Object.keys(S.comforts).sort();
+  S.morale = 50; S.potatoes = 3; S.pantry = { radish: 0, lettuce: 0, soy: 0, tomato: 0 }; S.diet.same = 0; G.setStorm(0);
+  G.newSol();
+  out.dawnMorale = +S.morale.toFixed(1);
+  return out;
+});
+check('comforts: gated by what the mission has turned up, paid for once, shown in the Hab, saved, and worth morale every dawn',
+  s.blocks.lights === 'Not enough materials' && /letter/.test(s.blocks.photos) && /Salvage/.test(s.blocks.flag) && /potato/.test(s.blocks.herbs) && /String lights up/.test(s.line || '') &&
+  s.after.made && s.after.scrap === 3 && s.after.circuit === 0 && s.after.morale === 54 && s.after.again === 'Made' && s.after.count === 1 && s.after.dawn === 1 &&
+  s.photos === null && s.dawn3 === 3 && s.parts === 9 && s.shown.join() === 'chair,lights,photos' && s.loaded.join() === 'chair,lights,photos' &&
+  Math.abs(s.dawnMorale - (50 - 1 - 5 + 3)) < 0.01, s);
 
 const errors = g.errors.filter((e) => !/favicon/.test(e));
 const passed = results.filter(Boolean).length;

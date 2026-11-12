@@ -5,6 +5,8 @@
 //
 // The rest of src/audio knows nothing about the game, so this is the only file to change when
 // the game's state moves about.
+import { devils } from '../game/devils.js';
+import { R } from '../planet/constants.js';
 import { Snd } from './sound.js';
 import { setAudioVolume, getAudioVolumes, loadAudioVolumes } from './settings.js';
 import { clamp, smooth } from './dsp.js';
@@ -46,7 +48,7 @@ export function updateAudio(dt) {
   if (!Snd.sys) return;
   try {
     frame++;
-    const started = S.started, ui = S.uiOpen || screenOpen();
+    const started = S.started, ui = S.uiOpen || screenOpen() || !!S.photo;      // photo mode is a pause as far as sound goes
     const scene = !started ? 'title' : S.won ? 'won' : S.mode === 'cutscene' ? 'cutscene' : S.over ? 'dead' : 'play';
     const playing = scene === 'play';
     const rover = S.mode === 'rover';
@@ -56,6 +58,10 @@ export function updateAudio(dt) {
     P.sleeping = S.sleeping;
     P.paused = ui && playing && !S.sleeping;
     P.storm = started ? S.storm.i : 0;
+    // the nearest dust devil: silent beyond about 110 m, full when it is on top of him
+    let near = 1e9;
+    if (playing) for (const d of devils) near = Math.min(near, where.angleTo(d.u) * R);
+    P.devil = playing ? Math.pow(clamp(1 - (near - 6) / 105, 0, 1), 1.6) : 0;
     const sunEl = started ? player.up.dot(ctx.engine.sunDir) : 1;
     P.day = smooth(-0.08, 0.3, sunEl);
     // the astronaut

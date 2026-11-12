@@ -1,3 +1,5 @@
+import { COMFORTS, comfortBlock, comfortCheer, comfortCount, comforts, makeComfort } from '../game/comforts.js';
+import { syncAllVisuals } from '../game/visuals.js';
 import { catalogue, scienceSummary } from '../game/science.js';
 import { MACHINES, serviceCost } from '../game/machines.js';
 import { CROPS, MORALE_WORD, PRODUCE, farm, moraleBand } from '../game/farm.js';
@@ -10,7 +12,7 @@ import { World } from '../world/build.js';
 import { player } from '../game/player.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
 import { startDeploy } from '../game/interactables.js';
-import { ACHIEVEMENTS, QUEST_DEFS, questTargetPos } from '../game/story.js';
+import { ACHIEVEMENTS, QUEST_DEFS, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
 import { OBJECTIVES } from './hud.js';
 import { initMap, openMap, renderMap as drawMap } from './map.js';
@@ -118,7 +120,7 @@ export function renderColony() {
   const keep = {};
   body.querySelectorAll('.pane').forEach((p) => { keep[p.id] = p.scrollTop; });
   const focusKey = document.activeElement && body.contains(document.activeElement)
-    ? ['r', 'u', 'deploy', 'tab'].map((a) => document.activeElement.dataset[a] && `[data-${a}="${document.activeElement.dataset[a]}"]`).find(Boolean) : null;
+    ? ['r', 'u', 'comfort', 'deploy', 'tab'].map((a) => document.activeElement.dataset[a] && `[data-${a}="${document.activeElement.dataset[a]}"]`).find(Boolean) : null;
   const atHome = nearHab();
 
   // --- inventory ---
@@ -135,13 +137,14 @@ export function renderColony() {
     inv += row('food', CROPS[id].name, have, '', packets > 0 ? `${packets} seed packet${packets > 1 ? 's' : ''} · ${CROPS[id].note}` : CROPS[id].note);
   }
   if (PRODUCE.every((id) => S.pantry[id] + S.seeds[id] <= 0) && !(S.stats.produce > 0)) inv += row('seed', 'Seed packets', 0, '', 'NASA sends seeds with pods and science grants');
-  inv += `<div class="inv-row has morale ${moraleBand()}">${icon('mood')}<span class="nm">Morale<small>${MORALE_WORD[moraleBand()]}. ${moraleBand() === 'high' ? 'Working and mending faster.' : moraleBand() === 'low' ? 'Everything takes longer. Cook, play music, hear from home.' : 'Variety on the plate and a cooked dinner lift it.'}</small></span><span class="ct t-num">${Math.round(S.morale)}</span></div>`;
   inv += row('water', 'Water', Math.round(S.water), 'L');
   inv += row('power', 'Hydrazine burns', S.hydrazine, '', 'Each makes water at the rig');
+  inv += '<div class="pane-hd">Morale <span>0 to 100</span></div>';
+  inv += `<div class="inv-row has morale ${moraleBand()}">${icon('mood')}<span class="nm">Morale<small>${MORALE_WORD[moraleBand()]}. ${moraleBand() === 'high' ? 'Working and mending faster.' : moraleBand() === 'low' ? 'Everything takes longer. Cook, play music, hear from home.' : 'Variety on the plate and a cooked dinner lift it.'}</small></span><span class="ct t-num">${Math.round(S.morale)}</span></div>`;
   inv += '<div class="pane-hd">Equipment <span>Service each at the machine</span></div>';
   for (const id of Object.keys(MACHINES)) {
     const c = Math.round(S.machines ? S.machines[id] : 100), cost = serviceCost(id);
-    const state = c >= 85 ? 'In good order' : c >= 60 ? 'Worn: a service now is free' : c >= 50 ? 'Losing output: a service now is free' : c >= 20 ? 'Losing output: a service needs 1 scrap' : 'Failed: needs 1 scrap and 1 circuit board';
+    const state = c >= 85 ? 'In good order' : c >= 60 ? 'Worn: a service now is free' : c >= 50 ? 'Losing output: a service now is free' : c >= 20 ? 'Losing output: a service needs 1 scrap' : 'Failing: a service needs 1 scrap and 1 circuit board';
     inv += `<div class="inv-row has mach ${c < 20 ? 'crit' : c < 60 ? 'warn' : ''}">${icon(MACH_ICON[id])}<span class="nm">${esc(MACHINES[id].name[0].toUpperCase() + MACHINES[id].name.slice(1))}<small>${state}${cost ? '' : ''}</small></span><span class="ct t-num">${c}<small>%</small></span></div>`;
   }
   inv += '<div class="pane-hd">Materials</div>';
@@ -172,6 +175,8 @@ export function renderColony() {
       (ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '') + '</div>' +
       `<p class="ds">${chem(esc(r.desc))}</p><div class="cost">${costChips(r.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
+      // a kit he is carrying can be set down from here too, without a trip to the Inventory tab
+      (/^kit/.test(r.id) && have > 0 ? `<button type="button" class="mg-btn small" data-deploy="${r.id.slice(3).toLowerCase()}">Deploy</button>` : '') +
       `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
   }
   craft = `<div class="pane-hd">Fabricator <span>${atHome ? `${ready} ready to build` : 'Out of range'}</span></div>` + craft;
@@ -194,15 +199,34 @@ export function renderColony() {
   }
   up = `<div class="pane-hd">Upgrades <span>${installed} of ${UPGRADES.length} installed</span></div>` + up;
 
+  // --- home: comforts for the Hab ---
+  let home = '', homeReady = 0;
+  const madeN = comfortCount();
+  for (const c of COMFORTS) {
+    const made = !!comforts()[c.id], block = made ? null : comfortBlock(c.id, World), locked = !made && !!(c.needs && !c.needs(World));
+    const ok = !made && !block && atHome;
+    if (ok) homeReady++;
+    const costHtml = Object.keys(c.cost).length ? costChips(c.cost) : '<span class="chip ok">Nothing but time</span>';
+    home += `<article class="rcp ${made ? 'done' : ok ? 'ready' : locked ? 'locked' : ''}" data-card="${c.id}"><div class="rcp-hd"><h4>${esc(c.name)}</h4>` +
+      (made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Not yet</span>` : '') +
+      `<span class="badge mood">${icon('mood')}+${c.cheer} a sol</span></div><p class="ds">${esc(c.desc)}</p>` +
+      (made ? '' : `<div class="cost">${costHtml}</div><div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
+        `<span class="why${block && !locked && block !== 'Made' ? ' bad' : ''}">${locked ? esc(c.why) : block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`) +
+      '</article>';
+  }
+  home = `<div class="pane-hd">Home <span>${madeN} of ${COMFORTS.length} made · morale +${comfortCheer()} a sol</span></div>` +
+    '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home;
+
   const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}">${icon(ic)}${label}${n ? `<em>${n}</em>` : ''}</button>`;
   body.innerHTML = '<div class="colony">' +
     `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
     `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +
-    `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}</div>` +
+    `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}${tab('home', 'hab', 'Home', homeReady)}</div>` +
     '<div class="cols">' +
     `<section class="pane mg-scroll${colonyTab === 'inv' ? ' on' : ''}" id="mg-inv" aria-label="Inventory">${inv}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'craft' ? ' on' : ''}" id="mg-craft" aria-label="Fabrication">${craft}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'build' ? ' on' : ''}" id="mg-build" aria-label="Upgrades">${up}</section>` +
+    `<section class="pane mg-scroll${colonyTab === 'home' ? ' on' : ''}" id="mg-home" aria-label="Home">${home}</section>` +
     '</div></div>';
   body.querySelectorAll('.pane').forEach((p) => { if (keep[p.id]) p.scrollTop = keep[p.id]; });
 
@@ -224,6 +248,17 @@ export function renderColony() {
     Snd.craft();
     renderColony();
     bump(r.id);
+  }));
+  body.querySelectorAll('button[data-comfort]').forEach((b) => b.addEventListener('click', () => {
+    if (!nearHab()) return;
+    const line = makeComfort(b.dataset.comfort, World);
+    if (!line) return;
+    Snd.craft();
+    log(line);
+    syncAllVisuals();
+    checkAchievements();
+    renderColony();
+    bump(b.dataset.comfort);
   }));
   body.querySelectorAll('button[data-u]').forEach((b) => b.addEventListener('click', () => {
     const u = UPGRADES.find((x) => x.id === b.dataset.u);
@@ -249,6 +284,7 @@ const ACH_PROGRESS = {
   botanist: () => [S.stats.potatoes, 50, ''], eyebrows: () => [S.stats.booms, 5, ''], arch: () => [Object.keys(S.salvaged).length, 8, ''],
   circum: () => [S.stats.driven / 1000, 75.4, ' km'], ice: () => [S.stats.mined, 25, ''], storm: () => [S.stats.stormOut, 60, ' s'],
   marathon: () => [S.stats.walked / 1000, 10, ' km'], disco: () => [S.stats.discoTime, 180, ' s'],
+  fiveaday: () => [S.stats.grown ? Object.keys(S.stats.grown).length : 0, 5, ''], chef: () => [S.diet ? S.diet.meals : 0, 5, ''], home: () => [S.comforts ? Object.keys(S.comforts).length : 0, 6, ''],
 };
 const FEATURE_KIND = { volcano: 'Volcano', basin: 'Impact basin', crater: 'Crater', canyon: 'Canyon', cap: 'Polar cap' };
 const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1));

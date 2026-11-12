@@ -178,7 +178,7 @@ async function run(size) {
   });
   await key('c');
   if (await visible('.colony .tabs')) await click('.colony [data-tab="inv"]');
-  await click('[data-deploy="beacon"]');
+  await click('.pane.on [data-deploy="beacon"]');
   await ev((G) => { G.tick(0.05, 2); G.hold(1.8); G.tpLocal(0, 30, 0); G.tick(0.05, 3); });
   await sleep(3600);
   await ev((G) => { G.tick(0.05, 6); });
@@ -200,12 +200,22 @@ async function run(size) {
   await key('Escape');
 
   // colony
-  await ev((G) => { G.tpLocal(-3.4, 3.2); G.tick(0.05, 3); });
+  await ev((G) => {
+    // a mid-game larder, catalogue and home, so the newer pages have something to show
+    const S = G.S; G.farm.farm();
+    S.pantry = { radish: 3, lettuce: 0, soy: 4, tomato: 2 }; S.seeds = { radish: 1, lettuce: 2, soy: 0, tomato: 1 }; S.stats.produce = 9; S.morale = 71;
+    if (!S.science) G.science.scienceSummary();
+    Object.assign(S.science, { found: { basalt: 2, dust: 1, hematite: 1, sulfate: 1 }, points: 52, serial: 5 });
+    S.machines = { oxygenator: 88, reclaimer: 54, rover: 31, suit: 12 };
+    S.mail = { ...(S.mail || {}), lewis: 1 }; S.comforts = { lights: true, greg: true }; S.inv.scrap = Math.max(S.inv.scrap, 3);
+    G.tpLocal(-3.4, 3.2); G.tick(0.05, 3);
+  });
   await key('c');
   if (await visible('.colony .tabs')) {
     await click('.colony [data-tab="craft"]'); await shot('colony');
     await click('.colony [data-tab="inv"]'); await shot('colony-inventory', 250);
     await click('.colony [data-tab="build"]'); await shot('colony-upgrades', 250);
+    await click('.colony [data-tab="home"]'); await shot('colony-home', 250);
     await click('.colony [data-tab="craft"]');
   } else await shot('colony');
   await key('Escape');
@@ -218,12 +228,20 @@ async function run(size) {
   await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 3); });
   await key('j');
   await shot('journal-tasks');
-  for (const [t, name] of [['disc', 'discoveries'], ['ach', 'achievements'], ['stats', 'statistics'], ['log', 'log']]) {
+  for (const [t, name] of [['disc', 'discoveries'], ['samples', 'samples'], ['ach', 'achievements'], ['stats', 'statistics'], ['log', 'log']]) {
     await click(`.journal [data-tab="${t}"]`);
     await shot('journal-' + name, 250);
   }
   await click('.journal [data-tab="tasks"]');
   await key('Escape');
+
+  // ---------------------------------------------------------------- the farm's seed chooser, and photo mode
+  await ev((G) => { G.S.seeds.soy = 2; G.S.seeds.tomato = 1; G.World.plots[0].state = 'soil'; G.syncAllVisuals(); G.tpLocal(-6.7, -3.2); G.tick(0.05, 6); G.hold(1.6); });
+  await shot('farm-chooser', 400);
+  await ev(() => { const b = document.querySelector('#mg-panel [data-act="cancel"]'); if (b) b.click(); });
+  await ev((G) => { G.tpLocal(8, 30, 0); G.tick(0.05, 6); G.photoMode.enterPhoto(); });
+  await shot('photo-mode', 600);
+  await ev((G) => { G.photoMode.exitPhoto(); });
 
   // ---------------------------------------------------------------- pause and what hangs off it
   await ev((G) => { G.tick(0.05, 2); });

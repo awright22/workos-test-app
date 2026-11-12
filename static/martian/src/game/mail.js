@@ -69,6 +69,9 @@ export const MAIL = [
   { id: 'greenhouse', when: () => World_built('greenhouse'), lines: [
     ['n', 'Botany would like the record to show that you have built a second farm. On Mars. From salvage. They are having shirts made.'],
     ['w', 'I want a shirt. Large. I have been on a diet.'] ] },
+  { id: 'home', when: () => !!S.comforts && Object.keys(S.comforts).length >= 3, lines: [
+    ['Johanssen', 'Mark, Hab telemetry shows a lighting circuit that is not in the schematics, and the internal camera shows... is that a rug?'],
+    ['w', 'It is called interior design, Johanssen. Tell NASA the Hab was a three-star rating at best when they left it.'] ] },
   { id: 'science2', when: () => kinds() >= 8, lines: [
     ['n', 'Eight materials. Mark, sample return missions were budgeted at nine billion dollars to bring back a tenth of what is in your case.'],
     ['w', 'I accept payment in pizza. One pizza. Delivered. I will wait.'] ] },

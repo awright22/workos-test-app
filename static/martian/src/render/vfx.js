@@ -66,7 +66,7 @@ export class Vfx {
     this.drift = new THREE.Vector3();          // how far the wind has carried the dust (wrapped), and how far it has settled
     this.fall = 0;
     this._initAir(o.air === undefined ? 1400 : o.air);
-    this._initSheets(o.sheets === undefined ? 36 : o.sheets);
+    this._initSheets(o.sheets === undefined ? 60 : o.sheets);
     this._initStreaks(o.streaks === undefined ? 1800 : o.streaks);
     this._initPuffs(o.puffs || 500);
     this._initMarks(o.marks || 900);
@@ -153,13 +153,14 @@ export class Vfx {
           vec2 w = (viewMatrix * vec4(uWind, 0.0)).xy;
           float along = length(w);
           vec2 dir = along > 1e-4 ? w / along : vec2(1.0, 0.0);
-          float len = (0.05 + 0.24 * uStorm) * (0.5 + aRnd) * max(along, 0.12), wide = 0.006 + 0.010 * aRnd;
+          // (soft smears of blown grit, not hairlines: thin bright lines read as rain)
+          float len = (0.08 + 0.34 * uStorm) * (0.5 + aRnd) * max(along, 0.12), wide = 0.014 + 0.034 * aRnd;
           mv.xy += dir * (position.x * len) + vec2(-dir.y, dir.x) * (position.y * wide);
           mv.w = 1.0;
           gl_Position = projectionMatrix * mv;
           vQ = position.xy;
           float d = length(rel);
-          vA = smoothstep(0.25, 1.0, uStorm) * 0.55 * smoothstep(0.5, 2.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
+          vA = smoothstep(0.25, 1.0, uStorm) * 0.30 * smoothstep(0.5, 2.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uLight;
@@ -214,7 +215,7 @@ export class Vfx {
           gl_Position = projectionMatrix * mv;
           vUv = position.xy * 0.5 + 0.5;
           float d = length(centre);
-          vA = uStorm * uStorm * 0.30 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
+          vA = uStorm * uStorm * 0.42 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
              * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
         }`,
       fragmentShader: /* glsl */`
@@ -399,7 +400,7 @@ export class Vfx {
     const st = this.streakU;
     this.streaks.visible = this.air.visible && p.storm > 0.25;
     st.uFall.value = this.fall; st.uCam.value.copy(camera.position); st.uUp.value.copy(up); st.uWind.value.copy(_s); st.uStorm.value = p.storm;
-    st.uLight.value.copy(a.uLight.value).multiplyScalar(0.8);
+    st.uLight.value.copy(a.uLight.value); st.uLight.value.r *= 0.74; st.uLight.value.g *= 0.60; st.uLight.value.b *= 0.46;      // dust-coloured, never white
     const sh = this.sheetU;
     this.sheets.visible = this.air.visible && p.storm > 0.08;
     sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm;

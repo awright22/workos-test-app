@@ -67,6 +67,8 @@ export function harvest(id) {
   const c = CROPS[id] || CROPS.potato;
   if (id === 'potato' || !CROPS[id]) { S.potatoes += c.yield; S.stats.potatoes += c.yield; }
   else { S.pantry[id] += c.yield; S.stats.produce = (S.stats.produce || 0) + c.yield; }
+  if (!S.stats.grown) S.stats.grown = {};
+  S.stats.grown[CROPS[id] ? id : 'potato'] = (S.stats.grown[CROPS[id] ? id : 'potato'] || 0) + c.yield;
   cheer(2);
   return c.yield;
 }

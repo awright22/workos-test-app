@@ -1,4 +1,4 @@
-import { foodTotal } from '../game/farm.js';
+import { CROPS, foodTotal } from '../game/farm.js';
 import { BAL, S, suitCap, roverPowerCap } from '../game/state.js';
 import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
@@ -27,13 +27,14 @@ export const OBJECTIVES = [
   { id: 'math', text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
   { id: 'panels', text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
   { id: 'farm', text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
+  { id: 'water', text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
   { id: 'hydra', text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
   { id: 'pf', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
     dist: () => groundDist(player.pos, S.pf.loaded ? World.uplink.position : World.pathfinder.position),
     shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
   { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
-  { id: 'dinner', text: () => 'Cook a dinner at the food shelf — a potato and two different vegetables', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
-  { id: 'breach', text: () => 'Seal the breach', shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
+  { id: 'dinner', text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
+  { id: 'breach', text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
   { id: 'mav', text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
@@ -58,8 +59,10 @@ export function updateObjectivesHud() {
   if (!objHead) objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span>');
   const rows = [];
   let shown = 0, primary = false;
-  for (const o of OBJECTIVES) {
-    if (!o.shown()) continue;
+  // an emergency leads the list, whatever else is going on
+  const order = OBJECTIVES.filter((o) => o.shown());
+  order.sort((a, b) => (b.urgent && !b.done() ? 1 : 0) - (a.urgent && !a.done() ? 1 : 0));
+  for (const o of order) {
     const d = o.done();
     if (d && !objDone.has(o.id)) {
       objDone.add(o.id);
@@ -70,7 +73,7 @@ export function updateObjectivesHud() {
     if (d && !justDone && o.id !== 'mav') continue;
     if (shown >= 4) break;
     let cls = d ? 'done' : o.urgent ? 'urgent' : '';
-    if (!d && !primary) { primary = true; if (!o.urgent) cls = 'primary'; }
+    if (!d && !primary) { primary = true; cls = o.urgent ? 'urgent first' : 'primary'; }
     rows.push({ key: o.id, text: o.text(), dist: !d && o.dist ? fmtDist(o.dist()) : '', cls });
     shown++;
   }
@@ -91,7 +94,7 @@ export function updateObjectivesHud() {
     const n = objRow(r.key);
     if (n.text !== r.text) { n.text = r.text; n.tx.textContent = r.text; }
     if (n.dist !== r.dist) { n.dist = r.dist; n.ds.textContent = r.dist; }
-    if (n.cls !== r.cls) { n.el.classList.remove('done', 'urgent', 'primary', 'quest'); if (r.cls) n.el.classList.add(r.cls); n.cls = r.cls; }
+    if (n.cls !== r.cls) { n.el.classList.remove('done', 'urgent', 'first', 'primary', 'quest'); if (r.cls) n.el.classList.add(...r.cls.split(' ')); n.cls = r.cls; }
     if (prev.nextSibling !== n.el) UI.objectives.insertBefore(n.el, prev.nextSibling);
     prev = n.el;
   }
@@ -405,7 +408,7 @@ export function updateHud() {
 
   // --- screen-edge effects, drawn by the renderer's final pass ---
   const danger = clamp(Math.max(1 - S.suit / (cap * 0.25), 1 - S.health / 45, S.breach.active && S.inside ? 0.5 : 0), 0, 1) * 0.9;
-  const cold = clamp((-70 - t) / 40, 0, 1) * (S.inside || S.mode === 'rover' ? 0 : 0.85);
+  const cold = clamp((-70 - t) / 40, 0, 1) * (S.inside || S.mode === 'rover' ? 0 : 0.6);
   const ease = dt > 0 ? 1 - Math.exp(-dt / 0.5) : 1;
   hud.danger += (danger - hud.danger) * ease;
   hud.cold += (cold - hud.cold) * ease;

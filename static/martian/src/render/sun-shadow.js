@@ -35,7 +35,9 @@ export class SunShadow extends SunLightShadow {
     const insetY = Math.min(0.25, (Math.ceil(this.radius) + 1) / this.mapSize.y);
     for (let i = 0; i < n; i++) this._viewports[i].set(i + insetX, insetY, 1 - 2 * insetX, 1 - 2 * insetY);
     const res = Math.min(this.mapSize.x * (1 - 2 * insetX), this.mapSize.y * (1 - 2 * insetY));
-    const camNear = viewCamera.near;
+    // the near distance is read back from the projection itself, so a camera whose near plane was changed
+    // without its matrix being rebuilt cannot mis-size the cascades
+    const camNear = -_c.set(0, 0, -1).applyMatrix4(viewCamera.projectionMatrixInverse).z;
     const camFar = Math.max(camNear + 1e-6, Math.min(this.camera.far, viewCamera.far));
     const splits = [camNear, Math.min(this.split, camFar * 0.6), camFar];
 

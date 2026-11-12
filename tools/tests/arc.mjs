@@ -133,7 +133,7 @@ s = await ev((G) => {
   return { inside: G.S.inside };
 });
 await g.page.keyboard.press('c');
-await g.page.locator('[data-deploy="beacon"]').click({ timeout: 20000 });
+await g.page.locator('.pane.on [data-deploy="beacon"]').click({ timeout: 20000 });
 s = await ev((G) => { G.tick(0.05, 2); G.hold(1.8); return { built: G.World.builtMeshes.map((b) => b.kind), kit: G.S.inv.kitBeacon }; });
 check('deploying a nav beacon', s.built.length === 1 && s.built[0] === 'beacon' && s.kit === 0, s);
 

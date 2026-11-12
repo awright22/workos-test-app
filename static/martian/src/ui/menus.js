@@ -9,6 +9,8 @@ import { layout } from './layout.js';
 import { DIFFICULTIES } from '../game/state.js';
 import { ctx } from '../game/ctx.js';
 import { Snd } from '../audio/sound.js';
+import { setAudioVolume, getAudioVolumes } from '../audio/settings.js';
+const busVolume = (bus) => { try { const v = getAudioVolumes()[bus]; return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 1; } catch (e) { return 1; } };
 
 /** Hooks the game fills in: save() writes the saved game before a reload. */
 export const menuHooks = { save: null };
@@ -16,14 +18,13 @@ export const menuHooks = { save: null };
 const WORDMARK = '<h1 class="mg-wordmark" aria-label="Stranded 2">STRANDED<em>II</em></h1>';
 const on = (scope, sel, fn) => scope.querySelectorAll(sel).forEach((n) => n.addEventListener('click', (ev) => { ev.stopPropagation(); fn(n, ev); Snd.click(); }));
 
-/** Master volume. The sound module's own level (0.5) is "100%". */
+/** Master volume: the interface's setting is the one master level. (This once passed the level where the
+ *  sound module expects a bus name, so the slider did nothing.) */
 export function applyAudioSettings() {
-  try {
-    if (typeof Snd.setVolume === 'function') Snd.setVolume(settings.volume);
-    else if (Snd.master && Snd.master.gain) Snd.master.gain.value = 0.5 * settings.volume;
-  } catch (e) { /* no audio */ }
+  try { Snd.setVolume('master', settings.volume); } catch (e) { /* no audio */ }
 }
 onSettingsChange(applyAudioSettings);
+applyAudioSettings();
 
 // ------------------------------------------------------------------------------------------
 // Loading
@@ -128,7 +129,7 @@ export function showPauseMenu(o) {
     `<div class="menu-col"><div class="t-kicker">Sol ${o.sol} · ${esc(o.time)} · ${esc(o.diffName)}</div><h1 class="pz">Paused</h1>` +
     '<p class="tag">Progress saved. The potatoes are fine. Probably.</p>' +
     '<nav class="menu" aria-label="Pause menu">' +
-    menuItem('resume', 'Resume', '', 'first') + menuItem('settings', 'Settings') + menuItem('controls', 'Controls') +
+    menuItem('resume', 'Resume', '', 'first') + (o.onPhoto ? menuItem('photo', 'Photo mode') : '') + menuItem('settings', 'Settings') + menuItem('controls', 'Controls') +
     menuItem('quit', 'Save and quit') + menuItem('restart', 'Restart run', '', 'danger') +
     '</nav></div>' +
     '<aside class="pause-side"><div class="kv">' +
@@ -139,6 +140,7 @@ export function showPauseMenu(o) {
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;
     if (a === 'resume') resume();
+    else if (a === 'photo') { hideOverlay(); o.onPhoto(); }
     else if (a === 'settings') showSettings(again, false);
     else if (a === 'controls') showControls(again);
     else if (a === 'quit') o.onQuit();
@@ -189,7 +191,10 @@ export function showSettings(back, overTitle) {
     `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div></section>` +
     // audio
     `<section class="set-sec"><h3>${icon('volume')}Sound</h3>` +
-    `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div></section>` +
+    `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div>` +
+    // the three kinds of sound, each against the master (kept by the sound module itself)
+    [['music', 'Music'], ['sfx', 'Effects'], ['ambience', 'Ambience']].map(([bus, label]) =>
+      `<div class="set-row"><label for="set-bus-${bus}">${label}</label><div class="ctl">${range('bus-' + bus, label + ' volume', 0, 1, 0.05, busVolume(bus), pct)}</div></div>`).join('') + '</section>' +
     // interface
     `<section class="set-sec" style="grid-column:1/-1"><h3>${icon('eye')}Interface</h3>` +
     `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct)}</div>` +
@@ -249,6 +254,12 @@ export function showSettings(back, overTitle) {
       out.textContent = pct(+r.value);
     };
     // the interface size re-lays-out the slider itself, so it is applied when the slider is released
+    if (key.startsWith('bus-')) {
+      const bus = key.slice(4);
+      r.addEventListener('input', () => { show(); setAudioVolume(bus, +r.value); });
+      r.addEventListener('change', () => { show(); setAudioVolume(bus, +r.value); if (typeof Snd.audition === 'function') Snd.audition(bus); });
+      return;
+    }
     r.addEventListener('input', () => { show(); if (key !== 'hudScale') setSetting(key, +r.value); });
     r.addEventListener('change', () => { show(); setSetting(key, +r.value); if (key === 'volume') Snd.click(); if (key === 'hudScale') scaleNote(); });
   });
@@ -279,12 +290,12 @@ const kbd = (...keys) => keys.map((k) => `<kbd class="mg-kbd">${k}</kbd>`).join(
 const KEYBOARD = [
   ['Move, drive', kbd('W', 'A', 'S', 'D')], ['Look', `${icon('mouse')}Mouse`], ['Run', kbd('Shift')], ['Jump', kbd('Space')],
   ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Leave the rover', kbd('F')], ['Switch camera', kbd('V')],
-  ['Map', kbd('M')], ['Colony and fabrication', kbd('C')], ['Journal', kbd('J')], ['Pause, back', kbd('Esc')],
+  ['Map', kbd('M')], ['Colony and fabrication', kbd('C')], ['Journal', kbd('J')], ['Photo mode', kbd('P')], ['Pause, back', kbd('Esc')],
 ];
 const TOUCH = [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
   ['Jump', `${icon('jump')}Jump`], ['Leave the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', '<span class="chem">O<sub>2</sub></span> button, when carrying one'], ['Switch camera', `${icon('camera')}Camera`],
-  ['Map', `${icon('map')}Top right`], ['Colony and fabrication', `${icon('colony')}Top right`], ['Journal', `${icon('journal')}Top right`], ['Pause, settings', `${icon('pause')}Top right`],
+  ['Map', `${icon('map')}Top right`], ['Colony and fabrication', `${icon('colony')}Top right`], ['Journal', `${icon('journal')}Top right`], ['Pause, settings', `${icon('pause')}Top right`], ['Photo mode', 'In the pause menu'],
 ];
 export function showControls(back, which) {
   const mode = which || (layout.touch ? 'touch' : 'keys');

@@ -169,6 +169,9 @@ export const ACHIEVEMENTS = [
   { id: 'rockhound', name: 'Rock Hound', desc: 'Catalogue 5 different materials', check: () => S.science && Object.keys(S.science.found).length >= 5 },
   { id: 'curator', name: 'Curator of Mars', desc: 'Catalogue 12 different materials', check: () => S.science && Object.keys(S.science.found).length >= 12 },
   { id: 'oldiron', name: 'Older Than the Planet', desc: 'Find an iron meteorite', check: () => S.science && !!S.science.found.meteorite },
+  { id: 'fiveaday', name: 'Five a Day', desc: 'Harvest all five crops', check: () => !!S.stats.grown && Object.keys(S.stats.grown).length >= 5 },
+  { id: 'chef', name: 'Chef de Mars', desc: 'Cook 5 dinners', check: () => !!(S.diet && S.diet.meals >= 5) },
+  { id: 'home', name: 'No Place Like Hab', desc: 'Make 6 comforts for the Hab', check: () => !!S.comforts && Object.keys(S.comforts).length >= 6 },
   { id: 'pirate', name: 'Space Pirate', desc: 'Leave Mars', check: () => S.won },
 ];
 export function checkAchievements() {

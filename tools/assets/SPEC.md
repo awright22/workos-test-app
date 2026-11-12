@@ -261,3 +261,15 @@ open, deflated airbags, a part `lid`, a strobe (`light_amber`).
 caps, lifting lugs and warning bands.
 `debris_a.glb`, `debris_b.glb`, `debris_c.glb` (≤ 2,500 each): wreckage from the descent
 vehicle: a torn hull panel, a bent truss section, a ruptured tank.
+
+## Family F — comforts for the Hab (`comforts.py`)
+
+`hab_comforts.glb` (≤ 14,000 triangles in all): nine things the astronaut makes to turn the Hab
+into a home, built in the Hab's own frame and already standing in their places, so the game adds
+the file to the Hab with no offset and only shows or hides each one. Each is a part named
+`comfort_<id>` whose geometry sits in an inner part `comfort_<id>_body` (so that only the nine
+part nodes carry the bare name): `comfort_lights` (string lights over the galley table; lamps in
+`light_warm`, which the game drives with Hab power), `comfort_herbs`, `comfort_photos`,
+`comfort_chair` (with the collider anchor `col_chair`), `comfort_rocks`, `comfort_flag`,
+`comfort_rug`, `comfort_greg`, `comfort_chess`. Positions are quoted from `hab.py` (table, truss,
+ribs, liner, wall modules): if those move, this script must follow.

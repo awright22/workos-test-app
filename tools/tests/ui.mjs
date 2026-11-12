@@ -58,7 +58,7 @@ let errors = 0;
   await key('Escape');
   s = await g.eval((G) => ({ ui: G.S.uiOpen, kind: document.getElementById('mg-overlay').className, saved: !!localStorage.getItem('stranded2-save') }));
   check('pause: Escape pauses and saves', s.ui && /k-pause/.test(s.kind) && s.saved, s);
-  await key('ArrowDown'); await key('ArrowDown'); await key('Enter');
+  await key('ArrowDown'); await key('ArrowDown'); await key('ArrowDown'); await key('Enter');      // Resume, Photo mode, Settings, Controls
   check('pause: Controls opens from the keyboard', await page.locator('.ctl-grid').isVisible());
   await key('Escape'); await key('Escape');
   s = await g.eval((G) => ({ ui: G.S.uiOpen }));

@@ -131,10 +131,12 @@ export class Ambience {
     else if (p.scene === 'title') scene = 0.55;
     else if (p.scene === 'cutscene' || p.scene === 'won') scene = 1 - clamp(p.space || 0, 0, 1);
     const calm = lerp(0.04, 0.17, p.day);
-    const w = clamp(calm + Math.pow(p.storm, 0.85) * 0.52, 0, 0.8) * this.gust;
+    // a dust devil passing close is a storm in miniature: the wind rises, whistles and throws grit
+    const dv = p.devil || 0;
+    const w = clamp(calm + Math.pow(p.storm, 0.85) * 0.52 + dv * 0.3, 0, 0.8) * this.gust;
     if (scene * w > 0.002) {
       const c = this.wind.use(), h = this.hear;
-      const st = smooth(0.3, 0.9, p.storm), g = this.gust;
+      const st = Math.max(smooth(0.3, 0.9, p.storm), dv * 0.85), g = this.gust;
       c.low.to(0.42 * w * h.low * scene, 0.25);
       c.lowCut.to(Math.min(h.cut, 170 + 820 * Math.pow(w, 1.4)), 0.3);
       const mid = 0.52 * Math.pow(w, 1.3) * g * h.mid * scene;
@@ -142,7 +144,7 @@ export class Ambience {
       c.midF1.to(420 + 520 * w, 0.5); c.midF2.to(540 + 600 * w, 0.6);
       c.howl1.to(1.2 * st * this.howlGust * h.howl * scene, 0.7); c.howl2.to(1.0 * st * (1.4 - this.howlGust) * h.howl * scene, 0.8);
       c.howlF1.to(this.hf1, 1.1); c.howlF2.to(this.hf2, 1.3);
-      c.grit.to(0.3 * smooth(0.22, 0.85, p.storm) * (0.45 + 0.6 * g) * h.grit * scene, 0.2);
+      c.grit.to(0.3 * Math.max(smooth(0.22, 0.85, p.storm), dv) * (0.45 + 0.6 * g) * h.grit * scene, 0.2);
       c.gritCut.to(h.gritCut, 0.3);
     } else if (this.wind.on) {
       const c = this.wind.c;

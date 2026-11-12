@@ -1,5 +1,9 @@
 // Stranded II — entry point: load the planet, build the engine, run the game loop.
 import * as farmApi from './game/farm.js';
+import { photo, photoCamera, updatePhoto, enterPhoto, exitPhoto, takePhoto } from './game/photo.js';
+import { initPhotoUi, togglePhoto } from './ui/photo.js';
+import { inputHooks } from './game/input.js';
+import * as comfortsApi from './game/comforts.js';
 import { gainLoot } from './game/inventory.js';
 import * as THREE from 'three';
 import { Engine } from './render/engine.js';
@@ -70,17 +74,19 @@ async function boot() {
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
   dustUniforms.uDustAlbedo.value = data.albedoCube;
   ctx.lamps = new LampPool(engine.scene, engine.q.scale < 0.7 ? 3 : 5);
-  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 18 : 36, streaks: engine.q.scale < 0.7 ? 800 : 1800 });
+  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 28 : 60, streaks: engine.q.scale < 0.7 ? 800 : 1800 });
   initEffects();
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
 
   await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish',
-    'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'm2020', 'ingenuity', 'crop_radish', 'crop_lettuce', 'crop_soy', 'crop_tomato', 'zhurong', 'schiaparelli_wreck',
+    'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'm2020', 'ingenuity', 'crop_radish', 'crop_lettuce', 'crop_soy', 'crop_tomato', 'hab_comforts', 'zhurong', 'schiaparelli_wreck',
     'greenhouse', 'solar_kit', 'beacon', 'o2_cache', 'supply_pod', 'rtg', 'debris_a', 'debris_b', 'debris_c', 'regolith_pile', 'ice_outcrop', 'uplink_pad'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
   buildAstronaut();
   initInput();
+  initPhotoUi(() => draw(0, lastFocus));
+  inputHooks.photo = togglePhoto;
   updateSunDir();
   installDebug();
   // title: the camera drifts over the day side while the first tiles arrive
@@ -118,13 +124,14 @@ let photoCam = null;                 // a free camera for pictures, set through 
 function draw(dt, focus) {
   const e = ctx.engine;
   if (photoCam) { e.camera.position.copy(photoCam.pos); camLookAt(photoCam.look, photoCam.up); }
+  const exposureBias = photo.on ? photoCamera() : 1;
   e.camera.updateMatrixWorld();
   ctx.terrain.update(e.camera.position);
   ctx.rocks.update(e.camera.position);
   updateSites(e.camera.position);
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;
-  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus,
+  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus, exposureBias,
     roof: sealed ? _roof.copy(World.hab.position).addScaledVector(World.hab.userData.up, 2.8) : null });
   ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
@@ -142,6 +149,7 @@ function tick(dt) {
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
   if (S.over && S.mode !== 'cutscene') return focus;
   if ((S.uiOpen || screenOpen()) && !S.sleeping) return focus;
+  if (photo.on) { updatePhoto(dt); return focus; }             // photo mode: the clock is stopped, only the camera moves
   if (S.mode === 'cutscene') {
     if (World.launchAnim) World.launchAnim(dt);
     updateEffects(dt);
@@ -220,7 +228,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, gainLoot, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },

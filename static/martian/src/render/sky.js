@@ -20,6 +20,7 @@ const GLSL_SKY = /* glsl */`
   uniform vec3 uUp;         // unit, world: straight up at the camera
   uniform float uAlt;       // camera altitude above the mean surface (m)
   uniform float uDust;      // 0 clear .. 1 thick dust storm
+  uniform vec3 uFogCol;     // what distant ground fades to (set from the same numbers as the scene's fog)
   uniform float uTime;
   const float PI = 3.14159265;
 
@@ -62,8 +63,8 @@ const GLSL_SKY = /* glsl */`
     float tw = smoothstep(-0.34, -0.02, sunE) * (1.0 - sunUp);
     col += vec3(0.20, 0.25, 0.42) * tw * pow(max(cosT * 0.5 + 0.5, 0.0), 3.0) * (0.25 + h) * 0.55;
     // storms: flatten everything toward a dim ochre
-    vec3 murk = vec3(0.40, 0.215, 0.095) * (0.02 + 0.40 * day);
-    col = mix(col, murk, uDust * 0.94);
+    // in a storm the sky is the dust itself: the very colour the ground fades into, so no horizon shows
+    col = mix(col, uFogCol, smoothstep(0.0, 0.8, uDust));
     // leaving the atmosphere: fade to space, keep a haze band along the limb
     space = 1.0 - exp(-max(uAlt, 0.0) / ${ATMO_H.toFixed(1)});
     float camR = ${R.toFixed(1)} + uAlt;
@@ -110,7 +111,7 @@ export class Sky {
       uSun: { value: new THREE.Vector3(1, 0, 0) },
       uUp: { value: new THREE.Vector3(0, 1, 0) },
       uAlt: { value: 2 },
-      uDust: { value: 0 },
+      uDust: { value: 0 }, uFogCol: { value: new THREE.Color() },
       uTime: { value: 0 },
       uSunDisc: { value: 1 },
     };
@@ -200,6 +201,7 @@ export class Sky {
       this.fogColor.lerp(_c, dust * 0.94);
       this.ambientSky.lerp(_c, dust * 0.85);
     }
+    u.uFogCol.value.copy(this.fogColor);
     const space = 1 - Math.exp(-Math.max(u.uAlt.value, 0) / ATMO_H);
     this.space = space;
     this.fogColor.multiplyScalar(1 - space * 0.85);

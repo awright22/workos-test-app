@@ -10,7 +10,7 @@ import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { SOL_LOGS } from './text.js';
 import { syncAllVisuals, syncIce, syncPod } from './visuals.js';
 import { clamp } from '../core/math.js';
-import { localSunEl, sleepToDawn } from './sim.js';
+import { localSunEl, sleepTime, sleepToDawn } from './sim.js';
 import { closeScreens, toggleScreen } from '../ui/screens.js';
 import { enterRover, exitRover, roverF } from './rover.js';
 import { ITEM_NAMES, gainLoot } from './inventory.js';
@@ -101,8 +101,8 @@ addI({
             kicker: 'Farm', title: 'What goes in this bed?', note: 'Each bed takes 5 L of water to plant.',
             items: can.map((id) => {
               const c = CROPS[id], n = seedStock(id);
-              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · ${c.yield} a bed`,
-                note: c.note, count: id === 'potato' ? `${n} left` : `${n} to plant`, fn: () => plant(pl, id) };
+              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield}${id === 'potato' ? ' · uses 1 of your food' : ''}`,
+                note: c.note, count: `${n} to plant`, fn: () => plant(pl, id) };
             }),
           });
         } else plant(pl, can[0] || 'potato');
@@ -263,9 +263,8 @@ addI({
   r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => {
-    if (S.breach.active) return 'Not with the Hab screaming, no';
-    if (localSunEl() > 0.25) return 'Too much daylight to waste';
-    return true;
+    if (S.breach.active) return 'Seal the breach first: the far wall, behind the comms desk';
+    return sleepTime();
   },
   label: () => 'Sleep until dawn',
   use: () => sleepToDawn(false),
@@ -279,6 +278,8 @@ addI({
   visible: () => !S.flags.coldOpen && S.inside && !dinnerPlan().ok,
   enabled: () => S.health > 92 ? 'Not hungry right now' : foodTotal() > 0 ? true : 'The shelf is bare',
   label: () => `Eat a ${SNACK[nextSnack()] || 'ration'} (+12 vitals)`,
+  // once there is produce, say what a cooked dinner still wants
+  sub: () => (S.stats.produce > 0 ? `Dinner: ${dinnerPlan().why.toLowerCase()}` : ''),
   use: () => {
     if (!snack()) return;
     S.health = clamp(S.health + 12, 0, BAL.healthMax);
@@ -365,7 +366,7 @@ addI({
 });
 addI({
   pos: () => World.rover.group.position, r: 1e9, hold: 2.2, mode: 'rover',
-  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() < 0.05,
+  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() < 0.05 && sleepTime() === true,
   label: () => 'Camp in the rover until dawn',
   sub: () => 'press F to step out instead',
   use: () => sleepToDawn(true),

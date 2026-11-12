@@ -301,3 +301,8 @@
 .mg-compact .dlg.pick .btns { margin-top: .625rem; }
 .inv-row.morale.high .ct, .inv-row.morale.high .ic { color: var(--ok); }
 .inv-row.morale.low .ct, .inv-row.morale.low .ic { color: var(--accent); }
+
+/* the pause menu has six entries: on a phone they are a little shorter so the last stays above the home bar */
+.mg-compact #mg-overlay.k-pause .menu-item { min-height: 2.25rem; padding-top: .125rem; padding-bottom: .125rem; }
+.mg-compact #mg-overlay.k-pause .menu-col h1.pz { font-size: 1.875rem; margin-top: .25rem; }
+.mg-compact #mg-overlay.k-pause .menu-col .tag { margin-top: .3125rem; }

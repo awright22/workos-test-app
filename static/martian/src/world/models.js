@@ -24,11 +24,13 @@ const SPECIAL = /^(light_|screen|flame|window_glow|glass_clear|solar_cell|void|v
  */
 const DUST = {
   default: 0.3,
-  hab: 0.3, rover: 0.34, astronaut: 0.14, mav: 0.24, hermes: 0, farm_plot: 0, solar_panel: 0.2, uplink_dish: 0.3, uplink_pad: 0.12,
-  pathfinder: 0.5, viking: 0.78, mars3: 0.82, beagle2: 0.78, mer: 0.78, phoenix: 0.72, msl: 0.55, m2020: 0.42, insight: 0.68, ingenuity: 0.5, zhurong: 0.6,
-  schiaparelli_wreck: 0.45, debris_a: 0.6, debris_b: 0.6, debris_c: 0.6, rtg: 0.55, supply_pod: 0.28,
-  greenhouse: 0.12, solar_kit: 0.12, beacon: 0.15, o2_cache: 0.12, regolith_pile: 0, ice_outcrop: 0,
-  crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0,
+  // (the second review: decades-old landers were a uniform beige wash, and his own gear showroom-clean.
+  //  Dust now lies mostly on what faces up and near the ground, so less of it goes further.)
+  hab: 0.46, rover: 0.5, astronaut: 0.16, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
+  pathfinder: 0.5, viking: 0.6, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
+  schiaparelli_wreck: 0.42, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
+  greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
+  crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
 };
 /** Materials that are the ground itself: drawn in the local ground colour, tinted by their vertex colours. */
 const GROUND = /^ground_dust/;
@@ -78,7 +80,7 @@ function plainMaterial() {
             dustAmount = 0.0;
             diffuseColor.rgb *= dust * (0.86 + 0.28 * fine);
           } else {
-            dustAmount = clamp(vPbr.z * (0.22 + 0.95 * facing + 0.55 * low) * (0.45 + 1.3 * patchy) + vPbr.z * (fine - 0.5) * 0.5, 0.0, 0.92);
+            dustAmount = clamp(vPbr.z * (0.07 + 1.15 * facing * facing + 0.6 * low) * (0.45 + 1.3 * patchy) + vPbr.z * (fine - 0.5) * 0.3, 0.0, 0.92);
             diffuseColor.rgb = mix(diffuseColor.rgb, dust, dustAmount);
           }
         }`)
@@ -92,7 +94,7 @@ function plainMaterial() {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x, 0.05, 1.0), 0.96, dustAmount);')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust2';
+  plain.customProgramCacheKey = () => 'plain-pbr-dust3';
   return plain;
 }
 
@@ -110,7 +112,7 @@ function floatGeometry(src, color, rough, metal, dust = 0) {
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   // polished metal sparkles into the bloom at a distance: keep a little roughness on it
-  if (metal > 0.5) rough = Math.max(rough, 0.22);
+  if (metal > 0.5) rough = Math.max(rough, 0.34);
   const pbr = new Float32Array(p.count * 3);
   for (let i = 0; i < p.count; i++) { pbr[i * 3] = rough; pbr[i * 3 + 1] = metal; pbr[i * 3 + 2] = dust; }
   g.setAttribute('aPbr', new THREE.BufferAttribute(pbr, 3));
@@ -214,7 +216,8 @@ function prepare(gltf, name) {
       seen.add(m);
       const name = m.name || '';
       if (name.startsWith('glass_clear')) {
-        m.transparent = true; m.depthWrite = false; m.opacity = 0.28; m.roughness = 0.06; m.metalness = 0.0;
+        // (not mirror-smooth: a lamp a metre away would otherwise reflect as a white-out)
+        m.transparent = true; m.depthWrite = false; m.opacity = 0.28; m.roughness = 0.17; m.metalness = 0.0;
         m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
@@ -225,7 +228,7 @@ function prepare(gltf, name) {
         m.color.set(0x000000); m.roughness = 1;
       } else if (name.startsWith('solar_cell')) {
         o.castShadow = false;                     // cells lie on a backing sheet that already casts
-        if (dust > 0.5) { m.color.lerp(_dustTint, dust * 0.6); m.roughness = Math.max(m.roughness, 0.7); m.metalness *= 0.4; }   // decades of dust on the old landers
+        if (dust >= 0.45) { m.color.lerp(_dustTint, dust * 0.75); m.roughness = Math.max(m.roughness, 0.7); m.metalness *= 0.4; }   // decades of dust on the old landers
       } else if (name === 'ice') {
         // water ice: cold, a little glossy, and never quite as dark as rock in shadow
         m.color.setRGB(0.74, 0.88, 1.0); m.roughness = 0.24; m.metalness = 0; m.envMapIntensity = 1.5;

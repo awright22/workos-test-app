@@ -1,7 +1,7 @@
+import { canPhoto, enterPhoto } from './photo.js';
 import { log, showOverlay, toast, uiHooks } from '../ui/dom.js';
 import { DIFFICULTIES, S } from './state.js';
 import { Snd } from '../audio/sound.js';
-import { mountAudioControls } from '../audio/controls.js';
 import { Save, applyState, checkpoint, loadSavedData, restoreCheckpoint, saveGame, unreadableSaveExists, wipeSave } from './save.js';
 import { tryLock } from './input.js';
 import { initStorms, updateSunDir } from './sim.js';
@@ -47,10 +47,10 @@ export function showPause() {
     sol: S.sol, time: fmtClock(), diffName: DIFFICULTIES[S.diff].name, rescueSol: S.rescueSol,
     region: regionName(_v1.copy(player.pos).normalize()),
     onResume: () => tryLock(),
+    onPhoto: canPhoto() ? () => { enterPhoto(); } : null,
     onRestart: () => { wipeSave(); tryReload(); },
     onQuit: () => { saveGame(); tryReload(); },
   });
-  mountAudioControls();                           // volume sliders, above the buttons
 }
 // the interface pauses the game itself in two cases: a phone turned upright, and before a reload
 uiHooks.pause = showPause;

@@ -11,6 +11,8 @@ import { useCandle } from './inventory.js';
 import { settings, onSettingsChange } from '../ui/settings.js';
 import { layout } from '../ui/layout.js';
 
+/** Set by the modules that own these actions (the input module must not import them). */
+export const inputHooks = { photo: () => {} };
 export const input = {
   keys: {},
   eHeld: false,
@@ -66,8 +68,11 @@ export function initInput() {
     keys[k] = true;
     // menus and screens use these keys themselves (buttons, sliders, focus)
     if (!S.uiOpen && !screenOpen() && ['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) ev.preventDefault();
-    if (k === 'e') input.eHeld = true;
+    if (k === 'e' && !S.photo) input.eHeld = true;
     if (!S.started || S.over || S.mode === 'cutscene') return;
+    // photo mode: P or Escape leaves it; nothing else in the game answers the keyboard meanwhile
+    if (S.photo) { if (k === 'escape' || k === 'p') { ev.preventDefault(); inputHooks.photo(); } return; }
+    if (k === 'p' && !S.uiOpen && !screenOpen()) { inputHooks.photo(); return; }
     if (k === 'escape') {
       if (screenOpen()) { closeScreens(); tryLock(); }
       else if (!S.uiOpen) showPause();
@@ -97,11 +102,12 @@ export function initInput() {
     // a lock that arrives after a menu or screen has opened is given straight back
     if (pointerLocked && (S.uiOpen || screenOpen())) { try { document.exitPointerLock(); } catch (e) { /* already free */ } return; }
     if (pointerLocked) dragMode = false;
-    if (!pointerLocked && S.started && !S.uiOpen && !screenOpen() && !S.over && S.mode !== 'cutscene') showPause();
+    if (!pointerLocked && S.started && !S.uiOpen && !screenOpen() && !S.over && S.mode !== 'cutscene' && !S.photo) showPause();
   });
   document.addEventListener('pointerlockerror', () => { dragMode = true; });
   canvas.addEventListener('mousedown', (ev) => {
     if (!S.started || S.uiOpen || screenOpen()) return;
+    if (S.photo) { dragging = true; lastMX = ev.clientX; lastMY = ev.clientY; return; }      // the pointer stays free for the controls
     if (!pointerLocked) tryLock();
     if (dragMode) { dragging = true; lastMX = ev.clientX; lastMY = ev.clientY; }
   });
@@ -114,7 +120,7 @@ export function initInput() {
       if (perf() - lockChangedAt < 0.15) return;
       dx = ev.movementX || 0; dy = ev.movementY || 0;
       if (Math.abs(dx) > 400 || Math.abs(dy) > 400) return;
-    } else if (dragMode && dragging) {
+    } else if ((dragMode || S.photo) && dragging) {
       dx = ev.clientX - lastMX; dy = ev.clientY - lastMY;
       lastMX = ev.clientX; lastMY = ev.clientY;
     } else return;

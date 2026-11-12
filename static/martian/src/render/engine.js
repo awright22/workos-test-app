@@ -26,7 +26,7 @@ const FINAL_FRAGMENT = /* glsl */`
   #include <common>
   #include <tonemapping_pars_fragment>
   uniform sampler2D tDiffuse;
-  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade;
+  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono;
   uniform vec3 uTint;
   varying vec2 vUv;
   float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -41,8 +41,12 @@ const FINAL_FRAGMENT = /* glsl */`
     float r2 = dot(q, q);
     col *= 1.0 - uVignette * smoothstep(0.10, 0.75, r2);
     col = mix(col, vec3(0.45, 0.02, 0.0) * (0.4 + lum), uDanger * smoothstep(0.08, 0.55, r2));
-    col = mix(col, vec3(0.55, 0.75, 1.0), uCold * smoothstep(0.16, 0.62, r2) * 0.55);
+    // deep cold frosts the edge of the visor: a cold cast on what is there, never a pale veil over it
+    col = mix(col, col * vec3(0.72, 0.92, 1.3) + vec3(0.006, 0.012, 0.022), uCold * smoothstep(0.26, 0.78, r2));
     col = sRGBTransferOETF(vec4(col, 1.0)).rgb;
+    // a look (photo mode): contrast about middle grey, and black and white
+    col = clamp((col - 0.5) * uContrast + 0.5, 0.0, 1.0);
+    col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), uMono);
     float n = hash12(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5;
     col += n * (uGrain + 1.0 / 255.0);
     col *= 1.0 - uFade;
@@ -55,7 +59,7 @@ class FinalPass extends Pass {
     this.uniforms = {
       tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
-      uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 },
+      uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -180,7 +184,7 @@ export class Engine {
       // sealed in the Hab: the shadowed light becomes the room's ceiling light, straight down from
       // under the roof, so people and furniture stand on the floor instead of floating over it
       this.sun.color.setRGB(1.0, 0.93, 0.82);
-      this.sun.intensity = p.power === false ? 0.06 : 1.25;
+      this.sun.intensity = p.power === false ? 0.06 : 2.9;
       this.sun.position.copy(_u);
       sh.roof = p.roof || null; sh.radius = 3.0; sh.autoUpdate = true;
     } else {
@@ -201,7 +205,7 @@ export class Engine {
     const io = this.indoor;
     this.hemi.color.setRGB(lerp(nr, 0.50 * pw, io), lerp(ng, 0.46 * pw, io), lerp(nb, 0.40 * pw, io));
     this.hemi.groundColor.setRGB(lerp(0.02, 0.26 * pw, io), lerp(0.02, 0.24 * pw, io), lerp(0.03, 0.21 * pw, io));
-    this.hemi.intensity = lerp(dusk * 1.6, 1, io);
+    this.hemi.intensity = lerp(dusk * 1.6, p.sealed ? 0.6 : 1, io);
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
     this._updateEnvironment(p.dt || 0.016, p.dust || 0);
@@ -221,7 +225,8 @@ export class Engine {
     const lowSun = 1 - smoothstep(0.03, 0.55, sky.sunE);
     const facing = Math.max(0, _v.set(0, 0, -1).applyQuaternion(cam.quaternion).dot(this.sunDir));
     const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
-    const dayExposure = lerp(1.0, 0.88, smoothstep(0.62, 1.0, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun));
+    // (a high sun flattens everything: close down further toward noon, or the ground washes out to peach)
+    const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun));
     const target = (p.inside ? 0.95 : lerp(2.3 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
     this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
     if (this.snapLight > 0) this.snapLight--;
@@ -229,7 +234,9 @@ export class Engine {
     fu.uExposure.value = this.exposure;
     fu.uTime.value = this.time;
     // near/far follow altitude so depth precision is spent where the camera is
-    cam.near = alt > 400 ? 2 : 0.12;
+    // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
+    const near = alt > 400 ? 2 : 0.12;
+    if (cam.near !== near || cam.far !== 60000) { cam.near = near; cam.far = 60000; cam.updateProjectionMatrix(); }
     cam.far = 60000;
   }
 

@@ -6,7 +6,7 @@ import { ctx } from '../game/ctx.js';
 import { R } from '../planet/constants.js';
 import { S } from '../game/state.js';
 import { hash3, srand } from '../core/math.js';
-import { colliderAnchors, model, ownMaterials } from './models.js';
+import { colliderAnchors, model, ownMaterials, hasModel } from './models.js';
 import { addLamp } from './lamps.js';
 import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
@@ -102,6 +102,7 @@ export function buildHabColony(spawn) {
   World.commsMats = ownMaterials(hab.part('comms_screen'));
   World.hydFlame = hab.part('hydrazine_flame');
   World.breachHole = hab.part('breach_hole');
+  World.breachPos = siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2);       // where a breach is sealed from: the far wall
   World.breachPatch = hab.part('breach_patch');
   for (const n of [World.hydFlame, World.breachHole, World.breachPatch]) if (n) n.visible = false;
   World.habInterior = hab.part('interior');
@@ -129,7 +130,10 @@ export function buildHabColony(spawn) {
   const dark = () => World.dark || 0;
   for (const n of ['light_0', 'light_1', 'light_2', 'light_3']) {
     const a = hab.part(n);
-    if (a) addLamp(a, { color: 0xffe4c4, power: 15, range: 26, decay: 1.6, level: powered, room: true });
+    // Sealed in, most of the ceiling's light comes from the one light that casts shadows (render/engine.js),
+    // so things stand on the floor; these then only add the glow near each fitting. With a door open that
+    // light is the sun again, and these carry the room.
+    if (a) addLamp(a, { color: 0xffe4c4, power: 15, range: 26, decay: 1.6, level: () => powered() * (World.sealedInside ? 0.36 : 1), room: true });
   }
   // the grow lights over the farm: two pink pools, one for each pair of trays
   for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 2.6, range: 4.5, level: powered, room: true });
@@ -151,6 +155,23 @@ export function buildHabColony(spawn) {
     for (let p = o; p; p = p.parent) if (p === World.habInterior) inRoom = true;
     (inRoom ? World.habRoomLampMats : World.habLampMats).push(...ownMaterials(o));
   });
+
+  // comforts he can make: one model in the Hab's frame, a part for each, shown when it is made (game/visuals.js)
+  World.comfortParts = {}; World.comfortLampMats = []; World.comfortCols = {};
+  if (hasModel('hab_comforts')) {
+    const cm = model('hab_comforts');
+    World.habFurnishings.add(cm.root);
+    cm.inner.traverse((n) => { if (n.name && /^comfort_[a-z]+$/.test(n.name)) { World.comfortParts[n.name.slice(8)] = n; n.visible = false; } });
+    World.comfortLampMats = ownMaterials(cm.root, /^light_warm/);
+    for (const c of colliderAnchors(cm)) {
+      c.node.updateWorldMatrix(true, false);
+      const local = World.hab.worldToLocal(c.node.getWorldPosition(new THREE.Vector3()));
+      World.comfortCols[c.name.slice(4)] = [siteCollider(World.hab, local.x, local.z, c.r)];
+    }
+    // the string lights are a lamp of their own: a warm pool over the table, when there is power and they are up
+    const lights = World.comfortParts.lights;
+    if (lights) addLamp(World.hab, { offset: new THREE.Vector3(1.75, HAB_FLOOR + 2.4, -2.35), color: 0xffc48a, power: 5, range: 7, room: true, level: () => (lights.visible && S.power > 0.5 ? 1 : 0) });
+  }
 
   // farm plots (6 base; greenhouses add more)
   for (let i = 0; i < 6; i++) {
@@ -454,8 +475,8 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     const gm = addSiteModel(g, 'greenhouse');
     // its lights: white from the apex, pink from the grow strips; they carry the dome at night
     const lit = () => 0.3 + 0.7 * (World.dark || 0);
-    addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 13, level: lit });
-    addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 8, range: 9, level: lit });
+    addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 20, range: 18, level: lit });
+    addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 12, range: 11, level: lit });
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
     // the door swings outward on its left jamb as someone walks up to it, from either side
     b.door = { node: gm.part('door_leaf'), k: 0, cols: [siteCollider(g, 0, GREENHOUSE.portalEnd, 0.7)] };

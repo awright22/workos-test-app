@@ -21,11 +21,12 @@ export function serializeState() {
     inv: { ...S.inv }, upgrades: { ...S.upgrades }, blueprints: { ...S.blueprints },
     quests: { ...S.quests }, salvaged: { ...S.salvaged }, discovered: { ...S.discovered },
     achieved: { ...S.achieved }, checkedSystems: { ...S.checkedSystems },
-    flags: { ...S.flags }, stats: { ...S.stats },
+    flags: { ...S.flags }, stats: JSON.parse(JSON.stringify(S.stats)),            // stats hold nested counts: copy them whole
     science: S.science ? JSON.parse(JSON.stringify(S.science)) : null,
     machines: S.machines ? { ...S.machines } : null,
     mail: { ...(S.mail || {}) },
     pantry: { ...farm().pantry }, seeds: { ...S.seeds }, morale: S.morale, diet: { ...S.diet },
+    comforts: { ...(S.comforts || {}) },
     breach: { ...S.breach }, pf: { ...S.pf },
     stormCells: S.storm.cells.map(c => ({ ...c })),
     plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered, crop: p.crop || 'potato' })),
@@ -59,6 +60,7 @@ export function applyState(d) {
   S.pantry = d.pantry ? { ...d.pantry } : null; S.seeds = d.seeds ? { ...d.seeds } : null;
   S.morale = typeof d.morale === 'number' ? d.morale : undefined; S.diet = d.diet ? { ...d.diet } : null;
   farm();
+  S.comforts = { ...(d.comforts || {}) };
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore

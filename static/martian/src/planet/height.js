@@ -177,15 +177,27 @@ export class Planet {
    * ledges with short steep faces between them. Gentle ground is left alone.
    */
   _ledges(base, x, y, z, minW) {
-    if (_slope < 0.42 || minW > 6) return base;
+    if (_slope < 0.42) return base;
     let w = _slope >= 0.85 ? 1 : (_slope - 0.42) / 0.43;
-    w = w * w * (3 - 2 * w) * (minW > 3 ? (6 - minW) / 3 : 1);
+    w = w * w * (3 - 2 * w);
     // the layers are neither level nor evenly thick: tilt and swell them with broad noise
-    const H = 7.0;
-    const q = (base + gnoise3(x * R / 210 + 4.1, y * R / 210, z * R / 210 - 8.3) * 7) / H;
-    const f = q - Math.floor(q);
-    const step = f < 0.64 ? f * (0.26 / 0.64) : 0.26 + (f - 0.64) * (0.74 / 0.36);    // a wide bench, then a riser
-    return base + (step - f) * H * 0.9 * w;
+    const tilt = gnoise3(x * R / 210 + 4.1, y * R / 210, z * R / 210 - 8.3);
+    let out = base;
+    // Two sizes of ledge: broad terraces that carry at a distance, and benches a man can stand on.
+    // Each is laid only where the mesh asking can draw it: on a face of this steepness its riser
+    // must be at least a cell wide, or a coarse mesh samples the steps at random and the wall
+    // breaks into flecks and teeth.
+    for (let i = 0; i < 2; i++) {
+      const H = i ? 7 : 20;
+      const drawable = 0.45 * H / (_slope * minW);
+      if (drawable <= 0.8) continue;
+      const k = drawable >= 1.25 ? 1 : (drawable - 0.8) / 0.45;
+      const q = (base + tilt * H) / H + i * 0.37;
+      const f = q - Math.floor(q);
+      const step = f < 0.64 ? f * (0.26 / 0.64) : 0.26 + (f - 0.64) * (0.74 / 0.36);    // a wide bench, then a riser
+      out += (step - f) * H * (i ? 0.9 : 0.5) * w * k;
+    }
+    return out;
   }
 
   /** As radius(), for a direction given as face coordinates; faster for mesh grids. */

@@ -1,3 +1,4 @@
+import { comfortCheer } from './comforts.js';
 import { CROPS, MORALE_WORD, breakfast, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
 import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
@@ -43,6 +44,19 @@ function advanceClock(dtSol) {
 }
 
 /** Sine of the sun's elevation at the camera. */
+/** Local clock where the astronaut is, in hours (a sol has 24.66). */
+export function localHour() {
+  _du.copy(player.pos).normalize();
+  const lon = Math.atan2(-_du.z, _du.x) / (Math.PI * 2);
+  return ((((lon + S.tod + 0.5) % 1) + 1) % 1) * SOL_HOURS;
+}
+/** Is it a time to sleep? True, or why not. Sleeping runs to the next dawn, so it is not offered in the
+ *  morning: a second press just after waking would throw a whole sol away. */
+export function sleepTime() {
+  const h = localHour();
+  if (localSunEl() <= 0.25 && (h >= 16 || h < 4.5)) return true;
+  return h >= 4.5 && h < 10 ? 'The day has only just started' : 'Too much daylight to waste';
+}
 export function localSunEl() { return _du.copy(ctx.engine.camera.position).normalize().dot(ctx.engine.sunDir); }
 
 // local air temperature (°C) — display + cold penalties
@@ -259,6 +273,11 @@ export function newSol() {
   const band = moraleBand();
   if (breakfast() === 'skipped') log('No breakfast. The stomach files a formal complaint.', 'sys');
   if (S.storm.i > 0.5) cheer(-2);                         // another morning with no sky
+  cheer(comfortCheer());                                 // what he has made of the place
+  if (!S.flags.moraleTold) {
+    S.flags.moraleTold = true;
+    setTimeout(() => log('MORALE is how I am holding up. Monotony and bad days wear it down. Different things on the plate, a cooked dinner, music, word from home and making this tent a home bring it back. In good spirits I work faster.', 'sys'), 16000);
+  }
   if (moraleBand() !== band) {
     const now = moraleBand();
     setTimeout(() => log(now === 'low' ? 'I am tired in a way sleep does not fix. A hot dinner, some music, a word from home: I need one of them.'

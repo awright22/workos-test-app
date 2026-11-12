@@ -49,6 +49,12 @@ export function syncAllVisuals() {
   setGlow(World.commsMats, S.pf.connected && powered ? 1 : 0.04);
   setGlow(World.oxyMats, powered ? 1 : 0.05);
   setGlow(World.habRoomLampMats || [], powered ? 0.55 : 0.03);
+  for (const [id, node] of Object.entries(World.comfortParts || {})) {
+    const made = !!(S.comforts && S.comforts[id]);
+    node.visible = made;
+    if (World.comfortCols[id]) setColliders(World.comfortCols[id], made);
+  }
+  setGlow(World.comfortLampMats || [], powered ? 1 : 0.02);
   for (const rec of World.pods) syncPod(rec);
   if (World.rtgSite) { setSiteShown(World.rtgSite.group, !World.rtgSite.taken); setColliders(World.rtgSite.cols, !World.rtgSite.taken); }
   for (const site of World.iceSites) syncIce(site);

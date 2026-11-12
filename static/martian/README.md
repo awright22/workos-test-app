@@ -39,6 +39,11 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 - **Morale**: a man alone on a planet runs on more than calories. It sinks a little each sol
   and with every bad day, and rises with variety on the plate, a hot dinner, mail, music, a
   harvest, a discovery. In good spirits he works and mends faster; worn down, slower.
+- **Home**: nine comforts to make for the Hab from scrap and from what the mission turns up
+  (string lights, a reading chair, crew photos, a specimen shelf, a rug cut from a parachute,
+  Greg the rock). Each appears in the Hab and lifts morale a little every dawn.
+- **Photo mode** (`P`, or the pause menu): the clock stops and the camera comes free. Orbit,
+  slide, change the lens and the exposure, pick a look, and save a full-resolution PNG.
 - **Upkeep**: the oxygenator, the water reclaimer, the rover and the suit's scrubber wear and
   need servicing. Done in time it costs nothing; left to fail it costs parts.
 - **Field science**: chip samples off boulders and bag soil wherever you dig. What a sample
@@ -71,12 +76,14 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 | `F` | Leave the rover |
 | `V` | Helmet view / suit view |
 | `M` / `C` / `J` | Map · Colony and crafting · Journal |
+| `P` | Photo mode: free camera, lens, looks, saves a PNG |
 | `Esc` | Pause (saves): settings, controls, save and quit, restart |
 | `F3` | Diagnostics (frame rate, GPU, errors) |
 
 On a phone (landscape): the left thumb moves, dragging anywhere else looks, and the big button
 on the right is the one verb: it shows what it will do and fills as you hold it. Run, jump,
 camera and the oxygen candle sit around it; pause, map, colony and journal are top right.
+Photo mode is in the pause menu.
 Four quick taps in the top-left corner open the diagnostics.
 
 ## Interface
@@ -103,7 +110,7 @@ static/martian/
   index.html, manifest.webmanifest, icons         the page and the app manifest
   game.js, terrain-worker.js, game.css, sw.js     build products (committed; do not edit)
   assets/mars/     height.bin (MOLA), color.jpg (Viking), map.jpg
-  assets/models/   36 .glb models
+  assets/models/   37 .glb models
   src/             the source: ES modules
     core/      maths, events, shared scratch vectors
     planet/    the height model (shared by physics and the terrain workers), geography

@@ -173,7 +173,7 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
       if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos(keepOut / R)) { clear = false; break; }
     }
     if (!clear) continue;
-    const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.5)) : 0.09 + 0.36 * u * u;
+    const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.58)) : 0.09 + 0.36 * u * u;
     let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], FINEST);
     // sit it in the ground: a little always, and on a slope by enough that its downhill side is not left in the air
     let sink = size * (0.10 + 0.16 * v);
