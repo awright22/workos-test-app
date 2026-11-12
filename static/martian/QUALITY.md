@@ -36,16 +36,16 @@ the local time and the weather, step the simulation without drawing, and place a
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
-| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 4: NEARLY. Reads as Mars with hard shadows; the midday sky is flat khaki and the frame bleaches toward the sun (V8) |
-| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 4: **MET** |
-| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 4: NEARLY. Open-plain night is right; the base is still over-lit and the greenhouse whites out (V6) |
-| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 4: NEARLY. Visibility collapses and the sun is a disc; the dust has no mass (V9) |
-| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 4: NOT MET. No artefact at the pole; the ice reads as cracked plaster (V4) |
-| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 4: NEARLY. A recognisable Mars; the atmosphere is a thick cream outline (V12) |
+| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 5: **MET**, narrowly. Reads as Mars at a glance; `hab-noon` is dull and the frame still washes out toward the sun (X11) |
+| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 5: **MET** |
+| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 5: NEARLY. Open-plain night, the rover's lamps and twilight are right; the Hab's dome is evenly pale and the greenhouse has a white glare (X10) |
+| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 5: NEARLY. Visibility collapses and the sun is a disc; the dust has no mass and nothing streams (X9) |
+| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 5: NEARLY in the north (no artefacts), NOT MET at the outcrop and the south pole. The ice reads as cracked plaster (X5) |
+| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 5: NEARLY. A convincing globe with a thin rim; on the title screen itself it is nearly black (X4); no launch picture |
 | Models | Every object is a purpose-built model; nothing reads as a primitive | 37 models. Lander and prop pass after the review: Perseverance has its own model, solar cells are consistent, the wreck, airbags, parachute, soil heap, ice and uplink dish are rebuilt, the greenhouse has a door. Second review owed |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Twelve clips blended. Idle rebuilt as a relaxed stand (8 s); he takes his helmet off where there is air. Not yet reviewed in motion; feet dip up to 4 cm in cross-fades |
-| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Second independent review: NEARLY. The cold open, the staged buttons and the premise card work; the objective order contradicts the premise, the bars are not explained, and several numbers disagree (W7–W10) |
-| Interface | Every screen is legible and unclipped at 1280x720 through 2560x1440 and at phone sizes under the notch and status bar; touch has a pause button | Second independent review: desktop NEARLY, phone NOT MET (overlaps on the phone HUD, 9 px labels, targets of 34–42 px, half of Settings hidden; W1–W20 below). 96/96 automated checks pass: they test overlap between the things they know about and safe areas, not legibility |
+| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Third independent review: NEARLY. The spine works (breach, Hab, two machines, the numbers, the farm, buttons one at a time); a new player still hesitates at the points in Y19, and nothing says to sleep (Y13) |
+| Interface | Every screen is legible and unclipped at 1280x720 through 2560x1440 and at phone sizes under the notch and status bar; touch has a pause button | Third independent review: desktop not judged (owed), phone NOT MET (no visible Begin on the smallest phone, a suit timer that does not follow the gauge, the waypoint's tag over other things, 7–9 px text, targets of 30–40 px; Y1–Y19 below). 96/96 automated checks pass: they test overlap between the things they know about and safe areas, not legibility |
 | Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Synthesised in the browser, no audio files. Measured offline: peaks under -1.4 dBFS with everything at once, calm day about -34 LUFS, storm -18. **Nobody has listened to it**: timbre and musicality are judged only from spectrograms. Calm beds are mostly below 300 Hz and will be faint on a phone speaker |
 | Feel | Walking, jumping and driving have weight; the camera never clips through walls or ground | New controllers in. The camera treats the Hab, its airlock and greenhouse domes as rooms from inside and as obstacles from outside. Not yet reviewed in motion |
 | Depth | "On par with Stardew Valley or Animal Crossing": many systems that feed each other, and always something worth doing | Survival, five crops with a pantry and cooked dinners, morale, field science with 17 materials and NASA grants, equipment wear, crafting and ten upgrades, four deployables, seven survey tasks, fourteen landers to salvage, dust storms and dust devils, mail from Earth and the Hermes, nine comforts to make for the Hab, photo mode, nineteen achievements. Still thin: things to do with a second greenhouse, anything to do with other people's hardware beyond salvage |
@@ -148,6 +148,37 @@ What round 4 added or sharpened (V-numbers), most damaging first:
 | V13 | Smaller: a pale hard-edged oval on the ground (`debris-a`); pale smears on the sand (`pod`, `pod-open`, `dawn-light`); Phobos at night an over-exposed blob with a halo; wheel tracks lighter than dark ground at night; a hard arc at the edge of the headlight pool; a glint star on the dome; polygonal shadows from round solar panels; the Schiaparelli wreck as brown as the soil | mostly done: Phobos no longer blooms; marks and stains are never paler than the ground at night; pods' pads ease back to the land; the wreck carries less dust. The headlight pool's edge, the dome's glint and polygonal panel shadows still open |
 | V14 | Every plain looks the same: one ripple pattern, one rock set, one sky at eleven landing sites | part done: the land's own colour now says what it is made of. Dark regions (basalt sand) ripple strongly and are strewn with gravel; bright ones (deep dust) lie smooth. Landmarks particular to a site (Gale's mountain, Jezero's delta) still open |
 
+**Round 5** (62 pictures, after the work on V1–V14): **day MET (narrowly), dawn and dusk MET**;
+night, storm, orbit, terrain, models, astronaut and interiors NEARLY; poles NEARLY in the north and
+NOT MET at the outcrop and in the south; **landmarks and overall NOT MET.** "About a third of these
+frames could pass for a polished stylised indie release; none of the landmark, polar or storm
+frames could. The man-made models and the dawn, dusk and night lighting carry the game. The two
+named landmarks, the ice, the rocks and the character lighting let it down." Found fixed from
+round 4: the seam, stair-steps, corduroy and ripples on steep ground (V2), the olive midday sky
+(V8), the globe's thick rim (V12), the pale oval, and the dish and rover lit at night far from any
+lamp. Best: `rtg`, `canyon-floor`, `dawn`, `hab-morning`, `rover-night`. Worst: `canyon-wall`,
+`olympus`, `canyon`, `ice`, `title`.
+
+What round 5 added or sharpened (X-numbers), most damaging first:
+
+| # | Finding (pictures) | State |
+| --- | --- | --- |
+| X1 | Olympus Mons is still not a volcano: a smooth red slope, a brown hump with one gully, eroded badlands for a caldera. Wants a flat, dark, cracked floor inside a continuous hazed cliff ring, and overlapping tongue flows with raised edges and rough dark rock (`olympus`, `olympus-flows`, `olympus-caldera`) | open |
+| X2 | Valles Marineris has no scale or rock from the rim and at the wall: pinstriped rounded hills, strata smeared to watercolour, a wall that is a blurred agate lump; the camera crops the player to a helmet (`canyon`, `canyon-rim`, `canyon-wall`). Bug: in `canyon` the astronaut is buried to the knees beside a hard crease | open |
+| X3 | The astronaut is lit the same whatever the sun does: with the sun ahead of him his back is bright cream while rocks in the frame are dark on the camera side (`day-sun`, `dawn`, `dusk`, `walk-plain`) | open |
+| X4 | The title screen's globe is nearly black (`title`; fine in `title-globe`) | open |
+| X5 | Ice is still plaster: matte white with an embossed crack net, tan chips littering the cap, an outcrop of foam cuboids; no ice shows in `south-pole` (`ice`, `pole-90`, `north-pole`, `south-pole`) | open |
+| X6 | Rocks are three repeated shapes: charcoal flat buns with no dust on top, flat tan chips, large faceted wedges. Bug: a rock floats above its shadow and a slab hovers (`walk-plain`, `rover-drive`, `rtg`, `astronaut-side`, `debris-b`, `canyon-rim`, `yard`, `debris-c`) | open |
+| X7 | One blast stamp is used under every lander, rovers and airbag landers included, tens of metres wide, and reads as a palm tree's shadow; no scorch under the MAV; the ground is pristine to the airlock; rover tracks are separate rectangles with no tread | open |
+| X8 | A row of evenly spaced pale smudges across the mid-ground (`pod`, `pod-open`) | open |
+| X9 | The storm has no mass: uniform brown air, a few hairlines, the astronaut the crispest thing in the frame (`storm`, `storm-sun`) | open |
+| X10 | Night at the base: the dome evenly pale on both sides with nothing to light it; a white glare ball over a third of the greenhouse; a clipped white disc high in `twilight` that reads as a second sun (`hab-night`, `greenhouse-night`, `twilight`) | open |
+| X11 | Looking toward the sun washes the frame: a white halo and pale beige ground (`day-sun`, `pole-90`) | open |
+| X12 | The ground at the feet on flat plains is a blur of soft blotches (`hab-noon`, `pile`, `astronaut-front`, `astronaut-side`, `lander-beagle-2`); ripple ground holds up | open |
+| X13 | Shadow faults: a lit strip between the tank and its shadow (`debris-c`); the astronaut's long shadow starts short of his boots, with coloured fringes (`pole-90`); his noon shadow is a ragged blot (`hab-noon`) | open |
+| X14 | Interiors are flat: even light, no pools under the fittings, blank monitors and tablet, empty trays, more toy-like than outdoors (`inside-*`) | open |
+| X15 | Smaller: the astronaut leans as a rigid plank in `debris-a`; Mars 3's petals are see-through; the Schiaparelli wreck is cardboard shards in soil browns; ruler-straight horizons at four landers; unexplained dark patches (`lander-perseverance`, `pile`, `hab-noon`); a white dot in the day sky (`olympus-flows`); pale patches in a night track (`rover-night`); `astronaut-back` shows his front | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -210,6 +241,35 @@ overlaps and the 9 px text."
 | W18 | Journal: the sixth tab is off the edge at 667 wide; thirteen "not yet found" sample cards; reward chips look like cost chips; a sentence sliced by the screen bottom | part fixed: the materials still to find are one list of leads, not thirteen cards; journal objectives say why and how far. The tab row at 667 and chip styles still open |
 | W19 | Wording: "him", "I" and "you"; "math" beside "colour"; "soil" and "regolith" in one prompt; "locked" against "not yet"; HOLD on some prompts only | mostly fixed: the premise card says "you"; "the numbers", not "the math"; regolith is regolith; "Locked" throughout |
 | W20 | Desktop dead space (colony, comms, statistics), a focus ring on the wrong tab, no route from the rescue screen to the title, three stacked toasts | part fixed: the selected tab has the focus ring; the rescue screen's button says where it goes. Dead space on desktop screens still open |
+
+**Third interface review** (after the work on W1–W20; 51 states at 844 wide, 26 at 667, a 28-step
+phone walk-through; only four desktop pictures could be read): **desktop not judged, phone NOT
+MET, first ten minutes NEARLY.** Found fixed: suit air leading the mission list, the prompt's
+place, keyboard wording, labelled buttons, km/h, the sample leads, toast truncation and the phone
+map. "The safe areas are respected on every picture, and the menus look like one product." A
+desktop-only review is owed.
+
+| # | Finding | State |
+| --- | --- | --- |
+| Y1 | No start control on the small phone: at 667 wide the difficulty cards are cut by the footer and no Begin shows; at 844 Begin is 30 px tall | open |
+| Y2 | The suit's time left does not follow the gauge: "2:25 left" at a full sealed suit; the same figure ten seconds apart; a 150 tank reading less than a 100 | open |
+| Y3 | The waypoint's distance tag lands on the rover's speed digits, on the prompt's HOLD tag and on the astronaut | open |
+| Y4 | Distances disagree on one screen (arrow 56 m, mission 29 m, compass 16 and 139; the mission line lags; 74 against 75) | open |
+| Y5 | Text of 7–9 px: bar labels, top-right button captions, new-game rows, statistics labels, sleep labels, crop stat lines, the map hint, title footers | open |
+| Y6 | The small-phone HUD is crowded: bars drawn as underlines under their names; the NEXT card repeats the first mission line | open |
+| Y7 | Targets under 44 px: modal buttons 40, journal and colony tabs 37, quality segments 36, the touch/keyboard toggle 37 | open |
+| Y8 | Settings hides Sound at 667 wide with no cue; no switch for the colour-blind set is visible on a phone | open |
+| Y9 | Journal task titles run into their reasons ("seal itThe Hab is losing its air") | open |
+| Y10 | Truncation at 667: the map hint, the Statistics tab clipped and Log off-screen, a lander's label dropped; the cold-open log shows "Suit O2 at 4" mid-typing | open |
+| Y11 | Banners sit 2 px from the bars panel | open |
+| Y12 | The idle action button reads "— HOLD"; a status readout carries a padlock; HOLD is missing on some prompts | open |
+| Y13 | Night: nothing says to sleep; the summary is headed "Sol 1" after sleeping; morale and food drop on waking with no word | open |
+| Y14 | Toast captures: no achievement shown in two; "Not dead yet: reach the dawn of Sol 2" on Sol 1 (may be the script) | open |
+| Y15 | Numbers that read as bugs: "24 more sols" on Sol 12 of 25; a Houston line signed JPL; region names that differ between Continue and the map; soybeans "6 to plant" against 4; "Scrap Metal 9/2"; a storm banner with power rising; "Go 13% sooner"; "O2 tank 300" with no unit; the log is this session only | open |
+| Y16 | Map: "Here too" lists Debris three times; PHOENIX clipped under the header; on desktop icon-only buttons, a legend over the corner, "+6" unexplained, and a bearing that reads S 180 where the phone reads N 0 | open |
+| Y17 | Rescue screen: one size offers only "Back to the title", the other only "Play again"; one statistic has three names (food grown, potatoes harvested, potatoes grown) | open |
+| Y18 | Smaller: the Hab icon over the compass N; blank lower halves on installed cards; the same photograph sentence on every lander card; VIEW against CAMERA; the candle button says only "O2"; "my", "He", "fueled" beside "colour" | open |
+| Y19 | First ten minutes, where a new player hesitates: hint chips that never leave and cover the airlock prompt; six bars, a card and a button arriving at once; "soil" against "regolith" with no marker for the heaps; the Journal introduced as NASA's tasks before any contact; the lead task flips to solar panels after one bed with power at 75% and rising; "Missing 2 Scrap Metal" with no hint where scrap comes from; why burn hydrazine now and what "carefully" risks | open |
 
 ## Open items
 
