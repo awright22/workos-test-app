@@ -14,6 +14,7 @@ import { localSunEl, sleepToDawn } from './sim.js';
 import { closeScreens, toggleScreen } from '../ui/screens.js';
 import { enterRover, exitRover, roverF } from './rover.js';
 import { ITEM_NAMES, gainLoot } from './inventory.js';
+import { bagSoilHere } from './fieldwork.js';
 import { R } from '../planet/constants.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
 export function syncPlot(pl) {
@@ -197,7 +198,7 @@ addI({
   pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
   visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
   label: () => 'Dig regolith here (+1, slow)',
-  use: () => { S.inv.regolith++; Snd.play('dig'); },
+  use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); },
 });
 // hydrazine rig
 addI({

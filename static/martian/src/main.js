@@ -13,10 +13,11 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
+import { MATERIALS, analyseAll, catalogue, identify, scienceSummary, takeSample } from './game/science.js';
 import { updateAudio } from './audio/driver.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
-import { RockField } from './world/rocks.js';
+import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
@@ -201,6 +202,8 @@ function installDebug() {
     llToVec, surfaceAt, groundDist,
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
+    science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
+    rockColliders,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
