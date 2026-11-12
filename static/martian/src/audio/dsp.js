@@ -102,14 +102,17 @@ export function makeImpulse(sr, o, rand) {
     let lp = 0, hp = 0, prev = 0;
     const hk = 1 - (o.lowCut || 120) / sr * Math.PI * 2;
     const onset = Math.max(1, Math.floor(sr * (o.onset || 0.004)));
+    // the decay and the closing filter are both exponentials in time, so they are stepped by
+    // multiplication (the filter coefficient every 64 samples): no transcendental per sample
+    const fall = Math.exp(-6.91 / (o.rt60 * sr)), shut = Math.pow(o.dark / o.bright, 64 / (o.seconds * sr));
+    let env = 1, fc = o.bright, a = 1 - Math.exp(-2 * Math.PI * fc / sr);
     for (let i = pre; i < n; i++) {
-      const t = (i - pre) / sr;
-      const fc = o.bright * Math.pow(o.dark / o.bright, Math.min(1, t / o.seconds));
-      const a = 1 - Math.exp(-2 * Math.PI * fc / sr);
+      if (((i - pre) & 63) === 63) { fc *= shut; a = 1 - Math.exp(-2 * Math.PI * fc / sr); }
       lp += a * ((rand() * 2 - 1) - lp);
       hp = hk * (hp + lp - prev); prev = lp;
-      const fadeIn = Math.min(1, (i - pre) / onset);
-      x[i] = hp * Math.exp(-6.91 * t / o.rt60) * fadeIn;
+      const k = i - pre;
+      x[i] = k < onset ? hp * env * (k / onset) : hp * env;
+      env *= fall;
     }
     for (const [ms, g] of (o.early || [])) {
       const i = pre + Math.floor(sr * (ms + c * 1.7 + rand() * 1.2) / 1000);

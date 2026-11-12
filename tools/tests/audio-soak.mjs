@@ -6,7 +6,8 @@
 //
 //   node tools/tests/audio-soak.mjs [seconds]      default 150
 //
-// Checks: live nodes and voices stay bounded and return to where they started, the audio
+// Checks: live nodes and voices stay bounded and the idle graph (standing still outside, score
+// off) is the same size at the end as at the start, the audio
 // update stays cheap, the audio clock keeps pace with the wall clock, no errors.
 import { openGame, sleep } from './lib.mjs';
 
@@ -37,7 +38,8 @@ const began = await g.eval((G) => {
   const press = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
   // the script: [from second, what to do once]
   const steps = [
-    [0, 'walk outside', () => { key('w', true); }],
+    [0, 'standing still, score off (the idle graph)', () => { Snd.setVolume('music', 0); }],
+    [5, 'walk outside', () => { Snd.setVolume('music', 0.8); key('w', true); }],
     [8, 'sprint', () => { key('shift', true); }],
     [14, 'jump', () => { key(' ', true); }], [14.3, '', () => { key(' ', false); }],
     [17, 'jump', () => { key(' ', true); }], [17.3, '', () => { key(' ', false); }],
@@ -57,7 +59,8 @@ const began = await g.eval((G) => {
     [114, 'low oxygen outside', () => { G.tpLocal(0, 40); G.S.suit = 9; }], [116, '', () => { G.S.suit = 9; }], [120, '', () => { G.S.suit = 4; }],
     [124, 'recovered, discoveries', () => { G.S.suit = 100; Snd.discovery(); }], [126, '', () => Snd.play('achievement')],
     [128, 'disco in the Hab', () => { G.tpLocal(0, 3); G.S.disco = true; Snd.disco(true); }],
-    [138, 'calm night outside', () => { G.S.disco = false; Snd.disco(false); key('w', false); G.tpLocal(0, 40); G.setLocalTime(1); }],
+    [136, 'calm night outside', () => { G.S.disco = false; Snd.disco(false); key('w', false); G.tpLocal(0, 40); G.setLocalTime(1); }],
+    [141, 'standing still, score off (the idle graph again)', () => { Snd.setVolume('music', 0); }],
   ];
   let next = 0;
   T.timer = setInterval(() => {
@@ -88,10 +91,10 @@ const r = await g.eval((G) => {
 console.log('\n   t   nodes voices  made   score     doing');
 for (const s of r.samples) console.log(`${String(s.t).padStart(6)} ${String(s.live).padStart(6)} ${String(s.voices).padStart(5)} ${String(s.made).padStart(6)}   ${String(s.music).padEnd(8)}  ${s.what}`);
 const live = r.samples.map((s) => s.live), voices = r.samples.map((s) => s.voices);
-const last = r.samples.slice(-3).map((s) => s.live);
+const first = r.samples.filter((s) => s.t > 2 && s.t < 5.5).map((s) => s.live), last = r.samples.slice(-2).map((s) => s.live);
 const avg = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
 console.log(`\nwall ${r.wall.toFixed(1)} s, audio clock ${r.audio.toFixed(1)} s, simulated ${r.sim.toFixed(1)} s; ${r.updN} audio updates, ${r.plays} one-shots requested, ${r.stats.made} nodes created in all`);
-console.log(`live nodes: min ${Math.min(...live)}, max ${Math.max(...live)}, standing still at the end ${avg(last).toFixed(0)}; voices max ${Math.max(...voices)}`);
+console.log(`live nodes: min ${Math.min(...live)}, max ${Math.max(...live)}; idle at the start ${avg(first).toFixed(0)}, idle at the end ${avg(last).toFixed(0)}; voices max ${Math.max(...voices)}`);
 console.log(`audio update on the main thread: median ${(r.updMed * 1000).toFixed(0)} us, mean ${(r.updAvg * 1000).toFixed(0)} us, 95th percentile ${(r.upd95 * 1000).toFixed(0)} us, worst ${r.updMax.toFixed(1)} ms (headless Chromium; the worst case includes being descheduled on a busy machine)`);
 if (r.load.length) {
   const a = avg(r.load.map((l) => l[0])), p = Math.max(...r.load.map((l) => l[1])), u = Math.max(...r.load.map((l) => l[2]));
@@ -101,7 +104,7 @@ if (r.load.length) {
 const fails = [];
 const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (d !== undefined ? '  ' + d : '')); if (!ok) fails.push(name); };
 check('live nodes stay bounded', Math.max(...live) < 420, 'max ' + Math.max(...live));
-check('nodes return to the idle level (no leak)', avg(last) < Math.min(...live) + 45 && avg(last) < 130, `idle ${Math.min(...live)}, end ${avg(last).toFixed(0)}`);
+check('nodes return to the idle level (no leak)', first.length > 0 && Math.abs(avg(last) - avg(first)) <= 10, `${avg(first).toFixed(0)} at the start, ${avg(last).toFixed(0)} at the end`);
 check('voices stay limited', Math.max(...voices) <= 36, 'max ' + Math.max(...voices));
 check('the audio update is cheap', r.updMed < 0.4 && r.upd95 < 4, `median ${(r.updMed * 1000).toFixed(0)} us, p95 ${(r.upd95 * 1000).toFixed(0)} us`);
 check('the audio clock keeps pace', r.audio > r.wall * 0.97, `${r.audio.toFixed(1)} of ${r.wall.toFixed(1)} s`);

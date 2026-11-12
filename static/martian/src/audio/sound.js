@@ -53,7 +53,7 @@ export const DEFAULT_PARAMS = {
   holdKind: null,       // dig | wipe | tool | soft | null
   launch: null,         // { burning, alt } during the ascent
   space: 0,             // derived: 0 on the ground .. 1 in vacuum
-  disco: false, alarm: false, rumble: 0,
+  alarm: false, rumble: 0,   // set by Snd.alarm() and Snd.rumble()
 };
 
 class AudioSystem {
@@ -173,7 +173,7 @@ function makeSnd() {
         this.ctx = ctx;
         this.sys = new AudioSystem(ctx, { ...opts, offline });
         for (const k in this.vol) this.sys.E.setVolume(k, this.vol[k]);
-        if (this._disco) { this.sys.disco.set(true); this.sys.p.disco = true; }
+        if (this._disco) this.sys.disco.set(true);
         if (this._alarm) this.sys.p.alarm = true;
         this.sys.E.fadeTo(1, offline ? 0.01 : 0.5);
         if (!offline) this._watchPage();
@@ -252,7 +252,7 @@ function makeSnd() {
     bad() { this.play('bad'); },
     boom() { this.play('boom'); },
     alarm(on) { if (this.sys) this.sys.p.alarm = !!on; this._alarm = !!on; },
-    disco(on) { this._disco = !!on; if (this.sys) { this.sys.disco.set(on); this.sys.p.disco = !!on; } },
+    disco(on) { this._disco = !!on; if (this.sys) this.sys.disco.set(on); },
   };
 }
 

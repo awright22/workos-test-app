@@ -141,6 +141,7 @@ if (!words.length) {
   expect(bed < fxMedian - 8, 'ambience sits well under the effects', (fxMedian - bed).toFixed(1) + ' LU');
   expect(score < bed, 'the score sits under the ambience', (bed - score).toFixed(1) + ' LU');
   expect(uiMean < fxMedian, 'the interface is quieter than the effects');
+  if (has('disco_full')) expect(g('disco_full').centroid > 250 && g('disco_full').below400 < 0.9, 'the disco has a top end, not just kick and bass', `${Math.round(g('disco_full').centroid)} Hz, ${(g('disco_full').below400 * 100).toFixed(0)}% below 400 Hz`);
   expect(g('mix_worst_case').peak < 0.99, 'everything at once still does not clip', g('mix_worst_case').peakDb.toFixed(2) + ' dBFS');
   // the score rests: over seven minutes it must be silent some of the time and sounding some of the time
   const w = R.music_sections.windows, quiet = w.filter((d) => d < -70).length, sounding = w.filter((d) => d > -55).length;

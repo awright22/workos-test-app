@@ -92,7 +92,7 @@ export class Engine {
   _buildTables() {
     const c = this.ctx, sr = this.sr;
     this.buf = {};
-    for (const [kind, seconds] of [['white', 3], ['pink', 5], ['brown', 6], ['grit', 4]]) {
+    for (const [kind, seconds] of [['white', 2], ['pink', 4], ['brown', 5], ['grit', 3]]) {
       const b = c.createBuffer(1, Math.floor(sr * seconds), sr);
       b.getChannelData(0).set(makeNoise(kind, sr, seconds, this.rand));
       this.buf[kind] = b;
@@ -136,12 +136,15 @@ export class Engine {
     const roomRet = this.gain(K, 0.9), hallRet = this.gain(K, 0.8);
     this.room.connect(roomRet); roomRet.connect(this.sum);
     this.hall.connect(hallRet); hallRet.connect(this.sum);
-    const fill = () => {
+    const fillRoom = () => {
       this.room.buffer = this._impulse({ seconds: 0.55, rt60: 0.42, predelay: 0.004, bright: 9000, dark: 1800, lowCut: 180,
         early: [[7, 0.9], [13, 0.7], [19, 0.55], [29, 0.4], [41, 0.3]] });
+    };
+    const fillHall = () => {
       this.hall.buffer = this._impulse({ seconds: 3.4, rt60: 3.0, predelay: 0.022, bright: 6500, dark: 900, lowCut: 200, onset: 0.03 });
     };
-    if (this.offline || typeof setTimeout !== 'function') fill(); else setTimeout(fill, 0);
+    // live: build the impulses just after the gesture that started audio, in two short pieces
+    if (this.offline || typeof setTimeout !== 'function') { fillRoom(); fillHall(); } else { setTimeout(fillRoom, 0); setTimeout(fillHall, 40); }
 
     // buses, each with its own faders into the two reverbs so a volume slider also moves the wet part
     this.bus = {}; this.send = {}; this.busCtl = {};

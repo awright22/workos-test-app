@@ -21,7 +21,7 @@ import { screenOpen } from '../ui/screens.js';
 const P = {};                         // reused every frame
 const launch = { burning: false, alt: 0 };
 let prevSol = -1, prevSleeping = false, prevUi = null, prevStarted = false;
-let rough = 0, prevH = 0, prevVs = 0, habDist = 1e6, habDistAt = -1, frame = 0, warned = false;
+let rough = 0, prevH = 0, habDist = 1e6, habDistAt = -1, frame = 0, warned = false, dawnOwed = false;
 
 /** What kind of work a held action sounds like, from the words of its prompt. */
 const HOLD_KINDS = [
@@ -85,12 +85,13 @@ export function updateAudio(dt) {
     }
     P.throttle = thr;
     if (rover && World.rover && dt > 1e-4) {
-      // roughness: how hard the ground under the wheels is changing slope (vertical acceleration)
-      const h = World.rover.group.position.length(), vs = (h - prevH) / dt;
-      const acc = prevH ? Math.abs(vs - prevVs) / dt : 0;
-      prevH = h; prevVs = vs;
-      rough += (clamp(acc / 9, 0, 1) - rough) * (1 - Math.exp(-dt / 0.35));
-    } else if (!rover) { prevH = 0; prevVs = 0; rough = 0; }
+      // Roughness: how steeply the ground under the wheels rises and falls, as metres of height
+      // per metre driven. Measured on the real terrain this is about 0.08 on the plains and 0.4
+      // on a canyon rim or a crater wall, which maps to roughly 0.1 and 0.9 here.
+      const h = World.rover.group.position.length(), run = Math.abs(roverF.speed) * dt;
+      if (prevH && run > 0.01) rough += (clamp((Math.abs(h - prevH) / run - 0.04) / 0.38, 0, 1) - rough) * (1 - Math.exp(-dt / 0.6));
+      prevH = h;
+    } else if (!rover) { prevH = 0; rough = 0; }
     P.rough = rough;
     // the launch
     if (S.mode === 'cutscene' && World.mavRocket) {
@@ -98,15 +99,15 @@ export function updateAudio(dt) {
       launch.alt = Math.max(0, World.mavRocket.position.y);
       P.launch = launch;
     } else P.launch = null;
-    P.disco = !!S.disco;
 
     // moments nobody else announces
     if (started && prevStarted && playing) {
-      if (S.sol === prevSol + 1) Snd.play('solChange');
+      // a sol that turns during sleep is announced on waking, with the dawn
+      if (S.sol === prevSol + 1) { if (S.sleeping) dawnOwed = true; else Snd.play('solChange'); }
       if (S.sleeping && !prevSleeping) Snd.play('sleep');
-      else if (!S.sleeping && prevSleeping) Snd.play('wake');
+      else if (!S.sleeping && prevSleeping) { Snd.play(dawnOwed ? 'solChange' : 'wake'); dawnOwed = false; }
     }
-    if (prevUi !== null && ui !== prevUi && (playing || scene === 'title')) Snd.play(ui ? 'uiOpen' : 'uiClose');
+    if (prevUi !== null && ui !== prevUi && !S.sleeping && !prevSleeping && (playing || scene === 'title')) Snd.play(ui ? 'uiOpen' : 'uiClose');
     prevSol = S.sol; prevSleeping = S.sleeping; prevUi = ui; prevStarted = started;
 
     Snd.update(P);

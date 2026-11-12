@@ -149,7 +149,7 @@ export class Music {
     const target = this.playing && !st.mute ? 1 : 0;
     const k = (tc) => 1 - Math.exp(-dt / tc);
     this.presence += (target - this.presence) * k(target > this.presence ? (st.dark ? 1.4 : 4.5) : 6);
-    this.duck += ((p.disco ? 0 : p.sleeping ? 0.35 : 1) - this.duck) * k(0.8);
+    this.duck += ((this.sys.disco.on ? 0 : p.sleeping ? 0.35 : 1) - this.duck) * k(0.8);   // the playlist replaces the score
     const level = this.presence * this.duck;
 
     // ---- pad and bass ----
