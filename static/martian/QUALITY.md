@@ -15,7 +15,8 @@ node tests/audio.mjs        # 129 offline audio renders measured for loudness an
 node tests/perf.mjs         # draw calls and triangles per frame against the budgets below
 node tests/shots.mjs        # screenshot matrix -> tools/tests/.cache/shots/
 node serve.mjs              # play at http://127.0.0.1:8765/  (?q=low|medium|high|ultra)
-node publish.mjs            # build, lint, test, then publish static/martian to gh-pages
+node publish.mjs "what changed"            # build, lint, test, then publish to gh-pages
+node publish.mjs --to next "what changed"  # ... into gh-pages/next/, beside the live game
 ```
 
 The debug hook `window.__MG` (see `src/main.js`) can start a game at any site, teleport, set
@@ -62,9 +63,9 @@ the local time and the weather, step the simulation without drawing, and place a
 | 7 | Title screen composition; loading screen | with the interface redesign |
 | 8 | Onboarding for the first ten minutes | open |
 | 9 | Interaction targets for the new Hab layout (fabricator bench moved; extra furniture colliders) | to verify in game |
-| 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | blocked on hardware |
+| 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | blocked on hardware. The diagnostics panel (`?diag`, F3, or four taps top-left) reports it with a COPY button |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |
-| 12 | Publish to `gh-pages` once items 1–3 are done and the tests pass | open |
+| 12 | Publish to `gh-pages` | **Preview published** to `gh-pages/next/` (the first game is still at the root). Replace the root once the interface is merged, the review findings are acted on, and the preview has been seen running on the owner's phone |
 | 13 | Shadow cost at the base: the rover (45k triangles) and Hab are drawn into both cascades | open (a simplified shadow model would halve it) |
 | 14 | Asset tooling: fold the helpers the model scripts each copied into `tools/assets/lib.py`; add front-face-only and part controls to `preview.mjs` | open |
 
