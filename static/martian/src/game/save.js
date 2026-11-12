@@ -23,6 +23,7 @@ export function serializeState() {
     flags: { ...S.flags }, stats: { ...S.stats },
     science: S.science ? JSON.parse(JSON.stringify(S.science)) : null,
     machines: S.machines ? { ...S.machines } : null,
+    mail: { ...(S.mail || {}) },
     breach: { ...S.breach }, pf: { ...S.pf },
     stormCells: S.storm.cells.map(c => ({ ...c })),
     plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered })),
@@ -51,6 +52,7 @@ export function applyState(d) {
   S.breach = { ...d.breach }; S.pf = { ...d.pf };
   if (d.science) S.science = JSON.parse(JSON.stringify(d.science)); else initScience();
   if (d.machines) { S.machines = { ...d.machines }; S.machineWarn = {}; } else initMachines();
+  S.mail = { ...(d.mail || {}) };
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore

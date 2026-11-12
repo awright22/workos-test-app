@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
 import { dawnFaults, wearMachines } from './machines.js';
+import { bindWorld, deliverMail } from './mail.js';
 import { ctx } from './ctx.js';
 import { _du, _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { clamp, hash3, lerp, smoothstep } from '../core/math.js';
@@ -241,6 +242,7 @@ export function advanceTime(dt) {
   }
 }
 
+bindWorld(World);
 export function newSol() {
   S.sol++;
   if (S.potatoes > 0) S.potatoes--;
@@ -259,6 +261,7 @@ export function newSol() {
   }
   if (S.sol >= S.rescueSol && !S.flags.mavRevealed) revealMav();
   dawnFaults();
+  deliverMail();
   // storm forecast (uplink gives you weather service; easy mode always has it)
   if (S.pf.connected || S.diff === 'story') {
     for (const c of S.storm.cells) {

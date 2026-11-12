@@ -100,6 +100,17 @@ s = await ev((G) => {
 });
 check('sealing a Hab breach at the comms desk', /breach/i.test(s.label || '') && !s.active && s.done, s);
 
+// mail: with the uplink up, each dawn brings the next exchange whose moment has come
+s = await ev((G) => {
+  const first = G.mail.nextMail();
+  const sent = G.mail.deliverMail(0);
+  const second = G.mail.nextMail();
+  // every message's condition must at least run without throwing
+  const broken = G.mail.MAIL.filter((m) => { try { m.when(); return false; } catch (e) { return true; } }).map((m) => m.id);
+  return { first: first && first.id, sent, second: second && second.id, read: Object.keys(G.S.mail), broken, total: G.mail.MAIL.length };
+});
+check('mail arrives once Pathfinder is connected, each message once', s.first === 'welcome' && s.sent === 'welcome' && s.second && s.second !== 'welcome' && s.broken.length === 0, s);
+
 s = await ev((G) => {
   G.S.inv.kitBeacon = 1;
   G.tpLocal(0, 30);
