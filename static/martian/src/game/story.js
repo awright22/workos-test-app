@@ -209,6 +209,7 @@ export function startLaunch() {
     ctx.world.add(hermes);
   }
   hermes.position.copy(mavUp).multiplyScalar(R * 1.85).addScaledVector(_pe, -R * 0.8);
+  hermes.visible = false;
   const liftT = 5.2;
   let t = 0, alt = 0;
   World.launchAnim = (dt) => {
@@ -239,6 +240,7 @@ export function startLaunch() {
       camLookAt(k > 0.6 ? hermes.position : rocketWorld, mavUp);
       Snd.rumble(clamp(1 - k, 0.1, 0.85));
     }
+    hermes.visible = alt > 2200;        // (from the ground she is a speck above the dust, not a shape in the sky)
     if (alt > 8000) hermes.position.lerp(_v2.copy(mavUp).multiplyScalar(R * 1.85), 1 - Math.pow(0.3, dt));
     if (alt > 15500 && !S.won) winGame();
   };

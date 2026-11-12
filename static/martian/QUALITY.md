@@ -275,20 +275,20 @@ desktop-only review is owed.
 
 | # | Item | State |
 | --- | --- | --- |
-| 3 | Act on the round-2 picture findings (R1–R17 above), bugs first; then a third review | in progress |
-| 18 | Act on the interface and onboarding review (U1–U17, O1–O7 above), the pause screen and the phone HUD first | next |
-| 12 | Publish to `gh-pages` | **Preview refreshed** at `gh-pages/next/` after the second review round (the first game is still at the root). Replace the root once the preview has been seen running on the owner's phone |
+| 21 | Act on the fifth picture review (X1–X15 above) | in progress: landmarks, lighting, storm, ice, blast marks and the camera are acted on and wait for a sixth review; the rocks pass (X6) and the outcrop and wreck models are in hand; interior light pools, paths worn into the ground and region-specific landmarks are open |
+| 22 | Act on the third interface review (Y1–Y19 above) | in hand |
+| 23 | A desktop-only interface review (the third review could read only four desktop pictures) | owed, after 22 |
+| 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | blocked on hardware |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |
 | 15 | Listen to the audio on real speakers and a phone; retune by ear | blocked on a listener |
-| 8 | Play the first ten minutes as a new player at phone size; fix what confuses | open |
-| 17 | More depth: uses for a second greenhouse; visiting landers could do more than salvage | part done: **sights**, eleven things to stop and watch (Phobos, Phobos going out in the planet's shadow, Deimos, the Earth in the evening, a blue sunset, sunrise, the Milky Way, a dust devil close to, the inside of a storm, the midnight sun, the sky above the weather on a volcano's summit). Each is logged once after a couple of seconds' looking, earns science credit and morale, and is listed in the journal with a hint until seen. Landers and the second greenhouse still open |
-| 13 | Shadow cost at the base: the rover (45k triangles) and Hab are drawn into both cascades; "low" is on its call budget there | open (simplified shadow models would halve it) |
-| 5 | Sky from orbit: thinner limb haze; Phobos and Deimos | part done: both moons are in the sky on their real periods (Phobos rises in the west and crosses twice a sol; Deimos drifts the other way over days), lit by the sun so they show a phase, put out by Mars's shadow, and seen from where you stand. Drawn four times their true size, or they are a star and less than a star on a screen. Limb haze still open |
-| 6 | More variety between regions (dark basalt plains, bright dust, dune fields) | open |
-| 19 | Astronaut: feet dip up to 4 cm when clips cross-fade; JumpStart, Land, Wave and Collapse still start from the old bent-knee stance, and WorkStand has the same bent knees and an 11 degree forward lean; going from standing to kneeling the left hand passes through the knee pad for under a tenth of a second (the fade is shortened to 0.18 s; a short kneel-down clip is the proper fix); the face is plain under a metre | open |
-| 20 | Wreck blast patch still reads as a smooth mound at its rim; Pathfinder's airbags are faceted up close | open |
+| 17 | More depth: uses for a second greenhouse; visiting landers could do more than salvage | part done: sights (eleven things to stop and watch) and photographs of the landers for NASA's archive. The second greenhouse still open |
+| 13 | Shadow cost at the base: the rover (45k triangles) and Hab are drawn into both cascades; "low" is on its call budget there (180 of 180) | open (simplified shadow models would halve it) |
+| 6 | More variety between regions: landmarks particular to a site (Gale's mountain, Jezero's delta); something beyond a flat plain's ruler-straight horizon | open |
+| 19 | Astronaut: the face is plain under a metre; the visor is flat; boot prints are laid level, so on a slope they are half buried (wheel tracks now follow the ground) | open |
+| 20 | Elysium Mons and Hecates Tholus have no caldera (theirs are a texel or two across in the elevation data) | open |
 | 14 | Asset tooling: fold the helpers the model scripts each copied into `tools/assets/lib.py` | open |
+| 24 | The interface tests are sensitive to how busy the machine is: a long test lets the suit drain and the log fill, and two layout checks then fail on overlaps that a short test does not reach. The overlaps are real (fix in hand); the tests should also set their own state instead of inheriting elapsed time | open |
 
 ## Decisions worth knowing
 

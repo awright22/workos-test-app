@@ -172,7 +172,9 @@ export class Sky {
           // Both can be seen by day, palely.
           float moonVis = (1.0 - uDust * 0.95) * mix(0.25, 1.0, max(night, airless)) * smoothstep(-0.01, 0.05, dot(v, uUp) + airless);
           // (kept under what the bloom picks up: a moon is lit rock, not a lamp)
-          col += (moon(v, uPhobos, 0.0075, 1.0) * 0.85 + moon(v, uDeimos, 0.0030, 0.5) * 1.3) * moonVis;
+          // (dark rock, a fifteenth as bright as the sand it shines on: at 0.85 the disc clipped to white in the wide-open
+          // exposure of twilight and read as a second sun)
+          col += (moon(v, uPhobos, 0.0075, 1.0) * 0.42 + moon(v, uDeimos, 0.0030, 0.5) * 0.8) * moonVis;
           // the Earth: the brightest star in the evening sky, and blue-white. It shows as soon as the sun is down.
           float earthVis = (1.0 - uDust) * max(1.0 - smoothstep(-0.12, -0.02, sunE), airless) * smoothstep(0.0, 0.10, dot(v, uUp) + airless);
           col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.999975, 0.999996, dot(v, uEarth)) * 3.2 * earthVis);

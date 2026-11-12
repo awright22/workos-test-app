@@ -353,10 +353,12 @@ export class Vfx {
   }
 
   /** Press a mark into the ground. `forward` is the direction of travel (world). */
-  mark(kind, pos, forward) {
+  /** Press a mark into the ground at `pos`, heading `forward`. `up` is the ground's own normal there, when the
+   *  caller knows it: a mark laid level on a slope or across a ripple is half buried, and a track shows as dashes. */
+  mark(kind, pos, forward, up) {
     const set = kind === 'boot' ? this.boots : this.tyres;
     const k = set.i; set.i = (set.i + 1) % this.markN; set.used = Math.min(this.markN, set.used + 1);
-    _n.copy(pos).normalize();
+    if (up) _n.copy(up); else _n.copy(pos).normalize();
     _q.setFromUnitVectors(_y, _n);
     // heading within the tangent plane
     _e.copy(forward).addScaledVector(_n, -forward.dot(_n)).normalize();

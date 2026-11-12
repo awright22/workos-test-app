@@ -70,7 +70,47 @@ const stainTextures = {};
  * kind 'blast': what a descent engine leaves: the bright dust blown off, darker soil laid bare in a ragged patch
  * with short streaks at its edge, darkest in a ring where the plumes struck (seen from orbit under Phoenix and InSight).
  * kind 'scorch': the same under a big rocket, burnt black in the middle.
+ * kind 'trodden': the soft patch, walked and driven over for weeks: boot prints by the hundred, thickest in the
+ * middle, and the ruts of a rover's comings and goings.
  */
+/** The soft patch `base` (a 128-pixel canvas) drawn large, with boot prints and wheel ruts pressed into it. */
+function trodden(base) {
+  const N = 512, c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(base, 0, 0, N, N);
+  g.globalCompositeOperation = 'lighter';
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  // ruts: pairs of lines a rover's track apart, curving out from the middle
+  g.lineWidth = 3.2; g.lineCap = 'round';
+  for (let k = 0; k < 7; k++) {
+    const a0 = rnd() * 6.283, bend = (rnd() - 0.5) * 1.6, len = N * (0.26 + rnd() * 0.2);
+    for (const side of [-10.5, 10.5]) {
+      g.strokeStyle = `rgba(255,255,255,${0.16 + rnd() * 0.1})`;
+      g.beginPath();
+      for (let t = 0; t <= 1.001; t += 0.05) {
+        const a = a0 + bend * t, r = 18 + len * t, x = N / 2 + Math.cos(a) * r - Math.sin(a) * side, y = N / 2 + Math.sin(a) * r + Math.cos(a) * side;
+        if (t === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+  }
+  // prints: in pairs, left and right, each a short oval
+  for (let k = 0; k < 1300; k++) {
+    const a = rnd() * 6.283, r = N * 0.44 * Math.pow(rnd(), 0.8), h = rnd() * 6.283;
+    const x = N / 2 + Math.cos(a) * r, y = N / 2 + Math.sin(a) * r;
+    g.fillStyle = `rgba(255,255,255,${0.10 + rnd() * 0.16})`;
+    for (const side of [-2.2, 2.2]) {
+      g.beginPath();
+      g.ellipse(x - Math.sin(h) * side + Math.cos(h) * side * 1.4, y + Math.cos(h) * side + Math.sin(h) * side * 1.4, 2.9, 1.3, h, 0, 6.283);
+      g.fill();
+    }
+  }
+  return c;
+}
+
 export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'soft') {
   if (!stainTextures[kind]) {
     const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -94,7 +134,8 @@ export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'so
       img.data[(j * 128 + i) * 4 + 3] = 255;
     }
     g.putImageData(img, 0, 0);
-    stainTextures[kind] = new THREE.CanvasTexture(c);
+    if (kind === 'trodden') stainTextures[kind] = new THREE.CanvasTexture(trodden(c));
+    else stainTextures[kind] = new THREE.CanvasTexture(c);
     stainTextures[kind].colorSpace = THREE.NoColorSpace;
   }
   const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
@@ -143,7 +184,7 @@ export function buildHabColony(spawn) {
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
-  groundStain(World.hab, 15, 0x24120a, 0.46, HAB_FLOOR + 0.03).position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
+  groundStain(World.hab, 15, 0x24120a, 0.5, HAB_FLOOR + 0.03, 'trodden').position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
   groundStain(World.hab, 13.5, 0x1e0f08, 0.55, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);

@@ -14,6 +14,7 @@ const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3
 let trackDist = 0, plumeT = 0, launchT = 0;
 
 function onGround(pos) { return pos.normalize().multiplyScalar(surfaceAt(pos)); }
+const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tn = new THREE.Vector3();
 
 export function initEffects() {
   on('footstep', (e) => {
@@ -51,7 +52,11 @@ export function updateEffects(dt) {
         laid++;
         for (const side of [-1.22, 1.22]) {
           _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, (-1.9 - trackDist) * dir);
-          ctx.vfx.mark('tyre', onGround(_p), _f);
+          // each mark lies along the ground from its back end to its front end (right × along = the ground's normal)
+          onGround(_ta.copy(_p).addScaledVector(_f, 0.46)); onGround(_tb.copy(_p).addScaledVector(_f, -0.46));
+          _tn.subVectors(_ta, _tb).normalize();
+          _tn.crossVectors(_r, _tn).normalize();
+          ctx.vfx.mark('tyre', _p.addVectors(_ta, _tb).multiplyScalar(0.5), _f, _tn);
         }
       }
       if (laid >= 12) trackDist = 0;
