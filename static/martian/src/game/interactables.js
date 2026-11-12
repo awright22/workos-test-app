@@ -437,7 +437,9 @@ addI({
 // breach patch
 addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2, _v2),
-  r: 3.2, hold: 3.0, mode: 'walk', pose: 'stand',
+  // an emergency outranks the desk in front of it (the comms prompts used to win on distance,
+  // which left the breach impossible to seal once Pathfinder was connected)
+  r: 3.6, hold: 3.0, mode: 'walk', pose: 'stand', priority: -1,
   visible: () => S.breach.active && S.inside,
   label: () => 'Seal the breach (canvas, tape, prayer)',
   use: () => {

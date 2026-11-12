@@ -89,6 +89,17 @@ await g.page.keyboard.press('c');
 s = await ev((G) => ({ candle: G.S.inv.candle, scrap: G.S.inv.scrap, crafted: G.S.stats.crafted }));
 check('fabricating an O2 candle at the bench', s.candle === 1 && s.scrap === 8 && s.crafted === 1, s);
 
+// a breach must be sealable from in front of the comms desk even with Pathfinder connected
+// (the desk's own prompts are nearer than the hole in the wall behind it)
+s = await ev((G) => {
+  G.S.breach.active = true; G.S.breach.done = false; G.S.breach.timer = 0;
+  G.tpLocal(0.4, -5.4); G.tick(0.05, 2);
+  const label = G.interaction.active && G.interaction.active.label();
+  G.hold(3.3);
+  return { label, active: G.S.breach.active, done: G.S.breach.done, o2: Math.round(G.S.o2) };
+});
+check('sealing a Hab breach at the comms desk', /breach/i.test(s.label || '') && !s.active && s.done, s);
+
 s = await ev((G) => {
   G.S.inv.kitBeacon = 1;
   G.tpLocal(0, 30);
