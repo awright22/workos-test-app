@@ -43,7 +43,7 @@
 .row .fl { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--ink); transform-origin: left center;
   transition: transform .35s linear, background .3s; }
 .row .val { font: 600 .8125rem/1 var(--f-cond); letter-spacing: .03em; text-align: right; white-space: nowrap; }
-.row .val small { font-size: .82em; font-weight: 500; color: var(--ink-3); margin-left: .12em; letter-spacing: .06em; }
+.row .val small { font-size: .82em; font-weight: 500; color: var(--ink-2); margin-left: .12em; letter-spacing: .06em; }
 .row .tr { width: 0; height: 0; border-left: .21875rem solid transparent; border-right: .21875rem solid transparent; opacity: .85; }
 .row .tr.up { border-bottom: .3125rem solid var(--ok); }
 .row .tr.dn { border-top: .3125rem solid var(--ink-3); }
@@ -61,9 +61,7 @@
 
 /* ---------------------------------------------------------------- compass (top centre) */
 #mg-compass { --cw: min(30rem, calc(100vw - 50rem)); position: absolute; left: 50%; top: calc(var(--m) - .375rem + var(--sat)); width: var(--cw); margin-left: calc(var(--cw) / -2); height: 3.875rem; }
-#mg-compass::before { content: ""; position: absolute; left: 12%; right: 12%; top: 2.5rem; height: 3.5rem; pointer-events: none;
-  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(8, 6, 5, .4), rgba(8, 6, 5, .18) 60%, rgba(8, 6, 5, 0) 100%); }
-#mg-compass .strip { position: relative; height: 2.75rem; overflow: hidden; background: rgba(14, 12, 11, .46); border-radius: .25rem;
+#mg-compass .strip { position: relative; height: 2.75rem; overflow: hidden; background: rgba(14, 12, 11, .62); border-radius: .25rem;
   -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent); }
 #mg-compass .tape { position: absolute; left: 0; right: 0; bottom: .25rem; height: .5rem; border-bottom: 1px solid var(--ink-3);
@@ -86,22 +84,21 @@
 #mg-compass .caret { position: absolute; left: 50%; top: 2.75rem; width: 0; height: 0; margin-left: -.3125rem;
   border-left: .3125rem solid transparent; border-right: .3125rem solid transparent; border-bottom: .375rem solid var(--accent);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .7)); }
-#mg-compass .dists { position: absolute; left: 0; right: 0; top: 3.1875rem; height: 1rem; }
-#mg-compass .dists span { position: absolute; left: 0; top: 0; transform: translateX(-50%); white-space: nowrap;
-  font: 600 .6875rem/1 var(--f-cond); letter-spacing: .08em; color: var(--ink-2); text-shadow: var(--shadow-text); text-transform: uppercase; }
-#mg-compass .dists span.focus { color: var(--ink); font-size: .75rem; letter-spacing: .12em; }
+#mg-compass .dists { position: absolute; left: 0; right: 0; top: 3.125rem; height: 1.125rem; }
+#mg-compass .dists span { position: absolute; left: 0; top: 0; transform: translateX(-50%); white-space: nowrap; padding: .1875rem .375rem; border-radius: .125rem;
+  background: rgba(14, 12, 11, .6); font: 600 .6875rem/1 var(--f-cond); letter-spacing: .08em; color: var(--ink-2); text-transform: uppercase; }
+#mg-compass .dists span.focus { color: var(--ink); letter-spacing: .12em; }
 #mg-compass .dists span.main { color: var(--accent); }
 #mg-compass .dists span.quest { color: var(--cold); }
 #mg-compass .dists span.danger { color: var(--danger); }
 
-#mg-region { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 4.125rem); transform: translateX(-50%); white-space: nowrap;
-  font: 600 .75rem/1 var(--f-cond); letter-spacing: .34em; text-indent: .34em; text-transform: uppercase; color: var(--ink);
-  text-shadow: var(--shadow-text); opacity: .9; }
+#mg-region { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 4.25rem); transform: translateX(-50%); white-space: nowrap; padding: .25rem .625rem;
+  border-radius: .125rem; background: rgba(14, 12, 11, .6); font: 600 .6875rem/1 var(--f-cond); letter-spacing: .34em; text-indent: .34em; text-transform: uppercase; color: var(--ink); }
 #mg-region.enter { animation: mg-region-in 2.4s var(--ease); }
-@keyframes mg-region-in { 0% { opacity: 0; letter-spacing: .6em; color: var(--ink); } 30% { opacity: 1; color: var(--ink); } 100% { letter-spacing: .34em; } }
+@keyframes mg-region-in { 0% { opacity: 0; letter-spacing: .6em; text-indent: .6em; background: var(--accent-wash); } 30% { opacity: 1; } 100% { letter-spacing: .34em; text-indent: .34em; } }
 
 /* ---------------------------------------------------------------- alerts (under the compass) */
-#mg-alerts { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 5.75rem); transform: translateX(-50%);
+#mg-alerts { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 6.125rem); transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: .375rem; }
 .alert { display: flex; align-items: center; gap: .5rem; padding: .375rem .9375rem .375rem .6875rem; white-space: nowrap;
   background: var(--plate-strong); border: 1px solid var(--accent); border-radius: .1875rem; color: var(--accent);
@@ -197,7 +194,7 @@
 #mg-prompt .sub { font-size: .8125rem; line-height: 1.3; color: var(--ink-2); margin-top: .0625rem; }
 #mg-prompt.holding .trk { stroke: rgba(255, 180, 84, .3); }
 /* something you can always do here (dig), not something in front of you: keep it quiet */
-#mg-prompt.minor { bottom: 14%; padding: .1875rem .875rem .1875rem .1875rem; gap: .5rem; background: rgba(14, 12, 11, .42); border-color: transparent; }
+#mg-prompt.minor { bottom: 14%; padding: .1875rem .875rem .1875rem .1875rem; gap: .5rem; background: rgba(14, 12, 11, .56); border-color: transparent; }
 #mg-prompt.minor .pk { width: 1.875rem; height: 1.875rem; }
 #mg-prompt.minor .kc { font-size: .875rem; }
 #mg-prompt.minor .pl { font-size: .8125rem; font-weight: 400; color: var(--ink-2); }
@@ -205,22 +202,24 @@
 #mg-prompt.minor.holding { background: var(--plate); }
 
 /* ---------------------------------------------------------------- key hints (bottom right), crosshair */
-#mg-keys { position: absolute; right: calc(var(--m) + var(--sar)); bottom: calc(var(--m) + var(--sab)); display: flex; gap: 1rem;
-  font: 500 .75rem/1 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); text-shadow: var(--shadow-text); }
-#mg-keys span { display: inline-flex; align-items: center; gap: .375rem; }
-#mg-keys .mg-kbd { background: rgba(14, 12, 11, .55); font-size: .6875rem; }
+#mg-keys { position: absolute; right: calc(var(--m) + var(--sar)); bottom: calc(var(--m) + var(--sab)); display: flex; flex-direction: column; align-items: flex-end; gap: .3125rem;
+  font: 500 .75rem/1 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+#mg-keys span { display: inline-flex; align-items: center; gap: .25rem; padding: .1875rem .25rem .1875rem .5rem; border-radius: .1875rem; background: rgba(14, 12, 11, .56); }
+#mg-keys .mg-kbd { background: rgba(245, 240, 232, .1); font-size: .6875rem; letter-spacing: .04em; min-width: 1.75em; }
+#mg-keys .mg-kbd:first-of-type { margin-left: .375rem; }
 .mg-touch #mg-keys { display: none; }
-.mg-touch.is-cold #mg-keys { display: flex; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + .625rem); padding: .3125rem .75rem; background: var(--plate); border-radius: 1rem; text-shadow: none; }
+.mg-touch.is-cold #mg-keys { display: flex; flex-direction: row; gap: .375rem; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + .625rem); }
+.mg-touch.is-cold #mg-keys span { padding: .3125rem .625rem; border-radius: 1rem; }
 #mg-crosshair { position: absolute; left: 50%; top: 50%; width: .25rem; height: .25rem; margin: -.125rem 0 0 -.125rem; border-radius: 50%;
   background: var(--ink); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); opacity: 0; }
 .is-fp #mg-crosshair { opacity: .8; }
 
 /* ---------------------------------------------------------------- toasts */
-#mg-toast { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 8.25rem + var(--al2, 0) * 2.25rem); transform: translateX(-50%); z-index: 40; pointer-events: none;
+#mg-toast { position: absolute; left: 50%; top: calc(var(--m) + var(--sat) + 8.625rem + var(--al2, 0) * 2.25rem); transform: translateX(-50%); z-index: 40; pointer-events: none;
   display: none; }
 .is-playing #mg-toast { display: block; }
 .is-modal #mg-toast { display: none; }
-.toast { display: flex; align-items: flex-start; gap: .875rem; min-width: 19rem; max-width: 27rem; padding: .75rem 1.25rem .8125rem .9375rem;
+.toast { display: flex; align-items: flex-start; gap: .875rem; min-width: 19rem; max-width: min(27rem, calc(100vw - 40rem)); padding: .75rem 1.25rem .8125rem .9375rem;
   background: rgba(16, 14, 12, .9); border: 1px solid var(--line); border-top: 2px solid var(--cold); border-radius: .1875rem;
   box-shadow: 0 .75rem 2rem rgba(0, 0, 0, .35); animation: mg-toast-in .45s var(--ease); }
 .toast.out { opacity: 0; transform: translateY(-.5rem); transition: opacity .35s, transform .35s; }
@@ -263,9 +262,10 @@
 .mg-compact #mg-compass .marks .mk { width: 1.25rem; height: 1.25rem; margin-left: -.625rem; }
 .mg-compact #mg-compass .mk .ic { width: 1rem; height: 1rem; }
 .mg-compact #mg-compass .caret { top: 2.375rem; }
-.mg-compact #mg-compass .dists { top: 2.75rem; }
-.mg-compact #mg-region { top: calc(var(--sat) + 3.75rem); font-size: .625rem; letter-spacing: .26em; text-indent: .26em; }
-.mg-compact #mg-alerts { top: calc(var(--sat) + 4.875rem); }
+.mg-compact #mg-compass .dists { top: 2.625rem; }
+.mg-compact #mg-compass .dists span { padding: .125rem .3125rem; }
+.mg-compact #mg-region { top: calc(var(--sat) + 3.875rem); font-size: .625rem; letter-spacing: .26em; text-indent: .26em; padding: .1875rem .5rem; }
+.mg-compact #mg-alerts { top: calc(var(--sat) + 5.125rem); }
 .mg-compact .alert { font-size: .75rem; padding: .25rem .625rem .25rem .5rem; }
 .mg-compact .alert small { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */

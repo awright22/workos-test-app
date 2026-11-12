@@ -4,12 +4,12 @@
 #mg-overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; pointer-events: auto;
   background: rgba(7, 6, 5, .74); touch-action: none;
   padding: calc(var(--sat) + 1rem) calc(var(--sar) + 1.25rem) calc(var(--sab) + 1rem) calc(var(--sal) + 1.25rem); }
-#mg-panel { position: relative; max-width: 100%; max-height: 100%; }
+#mg-panel { position: relative; display: flex; flex-direction: column; max-width: 100%; max-height: 100%; min-height: 0; }
 
 /* ---------------------------------------------------------------- plain dialogs */
 .dlg, .sheet { position: relative; background: rgba(19, 17, 15, .97); border: 1px solid var(--line-2); border-top: 2px solid var(--accent);
   border-radius: .1875rem; box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .5); animation: mg-rise-in .3s var(--ease); }
-.dlg { width: 36rem; max-width: 100%; max-height: calc(100vh - var(--sat) - var(--sab) - 2rem); overflow-y: auto; padding: 1.75rem 2rem 1.75rem; }
+.dlg { width: 36rem; max-width: 100%; min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 1.75rem; }
 .dlg .t-kicker { margin-bottom: .625rem; }
 .dlg h1, .sheet h1 { font: 600 2.125rem/1.05 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; }
 .dlg h2 { font: 500 .875rem/1.35 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin-top: .5rem; }
@@ -49,7 +49,7 @@
 #mg-overlay.k-title.first::before { content: ""; position: absolute; inset: 0; background: #050403; pointer-events: none; animation: mg-reveal 1.6s ease-out .1s both; }
 @keyframes mg-reveal { to { opacity: 0; } }
 #mg-overlay.k-pause { background: linear-gradient(90deg, rgba(6, 5, 4, .93) 0%, rgba(6, 5, 4, .8) 38%, rgba(6, 5, 4, .55) 100%); align-items: stretch; justify-content: flex-start; }
-#mg-overlay.k-title #mg-panel, #mg-overlay.k-pause #mg-panel { width: 100%; display: flex; }
+#mg-overlay.k-title #mg-panel, #mg-overlay.k-pause #mg-panel { width: 100%; flex-direction: row; }
 .menu-col { display: flex; flex-direction: column; justify-content: center; width: 100%; padding: 1rem 0 1rem 3.25rem; }
 .menu-col > * { animation: mg-rise-in .5s var(--ease) both; }
 .menu-col > *:nth-child(2) { animation-delay: .06s; }
@@ -85,12 +85,12 @@
 /* ---------------------------------------------------------------- sheets: new game, settings, controls, credits */
 #mg-overlay.k-sheet { background: rgba(6, 5, 4, .8); }
 #mg-overlay.k-sheet.over-title { background: linear-gradient(0deg, rgba(5, 4, 3, .88), rgba(5, 4, 3, .66)); }
-.sheet { display: flex; flex-direction: column; width: 46rem; max-width: 100%; max-height: calc(100vh - var(--sat) - var(--sab) - 2rem); }
+.sheet { display: flex; flex-direction: column; width: 46rem; max-width: 100%; min-height: 0; }
 .sheet.wide { width: 62rem; }
 .sheet-hd { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 1.75rem 1.125rem; border-bottom: 1px solid var(--line-2); flex: none; }
 .sheet-hd h1 { font-size: 1.75rem; flex: 1; }
 .sheet-hd .t-kicker { display: block; margin-bottom: .3125rem; }
-.sheet-bd { padding: 1.25rem 1.75rem 1.5rem; flex: 1 1 auto; min-height: 0; }
+.sheet-bd { padding: 1.25rem 1.75rem 1.5rem; flex: 1 1 auto; min-height: 0; overflow-x: hidden; }
 .sheet-ft { display: flex; align-items: center; gap: .75rem; padding: .875rem 1.75rem; border-top: 1px solid var(--line-2); flex: none; }
 .sheet-ft .note { flex: 1; font-size: .8125rem; line-height: 1.4; color: var(--ink-3); }
 .sheet-ft .note.warn { color: var(--accent); }
@@ -122,7 +122,7 @@
 .diff .go .ic { width: .875rem; height: .875rem; }
 
 /* settings */
-.set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2.5rem; }
+.set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem 2.5rem; }
 .set-sec h3 { display: flex; align-items: center; gap: .5rem; padding-bottom: .5rem; margin-bottom: .25rem; border-bottom: 1px solid var(--line-2);
   font: 600 .75rem/1 var(--f-cond); letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
 .set-sec h3 .ic { width: 1rem; height: 1rem; }
@@ -139,14 +139,14 @@
 
 /* controls reference */
 .ctl-tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
-.ctl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 2.5rem; }
+.ctl-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 2.5rem; }
 .ctl-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.5rem; border-bottom: 1px solid rgba(245, 240, 232, .07); font-size: .9375rem; }
 .ctl-row span:first-child { color: var(--ink-2); }
 .ctl-row .keys { display: flex; align-items: center; gap: .25rem; font: 600 .875rem/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); text-align: right; }
 .ctl-row .keys .ic { width: 1.125rem; height: 1.125rem; }
 
 /* credits */
-.credits { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 2.5rem; }
+.credits { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem 2.5rem; }
 .credits section h3 { font: 600 .75rem/1 var(--f-cond); letter-spacing: .2em; text-transform: uppercase; color: var(--accent); margin-bottom: .5rem; }
 .credits section p { font-size: .875rem; line-height: 1.5; color: var(--ink-2); }
 .credits section p + p { margin-top: .375rem; }
@@ -174,7 +174,7 @@
 
 /* ---------------------------------------------------------------- the NASA uplink: a comms terminal */
 #mg-overlay.k-comms { background: rgba(4, 6, 9, .84); }
-.comms { display: flex; flex-direction: column; width: 46rem; max-width: 100%; height: 34rem; max-height: calc(100vh - var(--sat) - var(--sab) - 2rem);
+.comms { display: flex; flex-direction: column; width: 46rem; max-width: 100%; height: 34rem; flex: 0 1 auto; min-height: 0;
   background: #0c0f13; border: 1px solid rgba(143, 211, 255, .22); border-top: 2px solid var(--cold); border-radius: .1875rem; box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .55);
   animation: mg-rise-in .3s var(--ease); }
 .comms-hd { display: flex; align-items: center; gap: .875rem; padding: .875rem 1.25rem; border-bottom: 1px solid rgba(143, 211, 255, .16); flex: none; }
@@ -198,7 +198,7 @@
 
 /* ================================================================ phones in landscape */
 .mg-compact #mg-overlay { padding: calc(var(--sat) + .5rem) calc(var(--sar) + .75rem) calc(var(--sab) + .5rem) calc(var(--sal) + .75rem); }
-.mg-compact .dlg { padding: 1rem 1.25rem 1.125rem; width: 32rem; max-height: calc(100vh - var(--sat) - var(--sab) - 1rem); }
+.mg-compact .dlg { padding: 1rem 1.25rem 1.125rem; width: 32rem; }
 .mg-compact .dlg h1, .mg-compact .sheet h1 { font-size: 1.5rem; }
 .mg-compact .dlg h2 { font-size: .75rem; margin-top: .3125rem; }
 .mg-compact .dlg .bd { margin-top: .625rem; font-size: .875rem; line-height: 1.45; }
@@ -209,8 +209,11 @@
 .mg-compact .stat { padding: .4375rem .5rem; gap: .1875rem; }
 .mg-compact .stat b { font-size: 1.125rem; }
 .mg-compact .stat span { font-size: .5625rem; }
-.mg-compact #mg-overlay.k-win .dlg { width: 38rem; }
+.mg-compact #mg-overlay.k-win .dlg { width: 40rem; display: grid; grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; align-content: start; }
+.mg-compact #mg-overlay.k-win .dlg > * { grid-column: 1; }
+.mg-compact #mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 1 / span 6; margin-top: 0; align-self: center; }
 .mg-compact #mg-overlay.k-win .dlg h1 { font-size: 2rem; }
+.mg-compact #mg-overlay.k-win .dlg blockquote { font-size: .75rem; line-height: 1.4; }
 .mg-compact .mg-wordmark { font-size: 3.25rem; }
 .mg-compact .loading .mg-wordmark { font-size: 2.75rem; }
 .mg-compact .ld-bar { margin-top: 1.5rem; }
@@ -228,7 +231,6 @@
 .mg-compact .pause-side { width: 17rem; right: calc(var(--sar) + 1rem); padding: .75rem .875rem; }
 .mg-compact .pause-side p { font-size: .75rem; line-height: 1.4; }
 .mg-compact .pause-side .kv { font-size: .6875rem; margin-bottom: .625rem; padding-bottom: .625rem; gap: .25rem 1rem; }
-.mg-compact .sheet { max-height: calc(100vh - var(--sat) - var(--sab) - 1rem); }
 .mg-compact .sheet-hd { padding: .5rem 1rem; }
 .mg-compact .sheet-hd .t-kicker { display: none; }
 .mg-compact .sheet-bd { padding: .75rem 1rem; }
@@ -245,6 +247,10 @@
 .mg-compact .diff p { margin-top: .4375rem; font-size: .75rem; line-height: 1.35; }
 .mg-compact .diff .go { display: none; }
 .mg-compact .set-grid { gap: .75rem 1.5rem; }
+@media (max-width: 760px) {
+  .set-grid { grid-template-columns: minmax(0, 1fr); }
+  .set-sec { grid-column: 1 !important; }
+}
 .mg-compact .set-row { min-height: 2.75rem; padding: .1875rem 0; }
 .mg-compact .set-row label, .mg-compact .set-row .lbl { font-size: .8125rem; }
 .mg-compact .set-row .hint { font-size: .6875rem; }
@@ -260,8 +266,8 @@
 .mg-compact .sleep .delta { padding: .5rem .375rem; }
 .mg-compact .sleep .delta b { font-size: 1.125rem; }
 .mg-compact .sleep .notes { margin-top: .625rem; font-size: .8125rem; line-height: 1.4; }
-.mg-compact .comms { height: auto; min-height: 0; flex: 1; align-self: stretch; }
-.mg-compact #mg-overlay.k-comms #mg-panel { display: flex; height: 100%; }
+.mg-compact .comms { height: auto; flex: 1 1 auto; }
+.mg-compact #mg-overlay.k-comms #mg-panel { height: 100%; }
 .mg-compact .comms-hd { padding: .4375rem .875rem; }
 .mg-compact .comms-hd h1 { font-size: 1rem; }
 .mg-compact .comms-hd p { display: none; }

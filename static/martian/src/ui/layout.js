@@ -11,6 +11,7 @@ export const layout = {
   /** phone-sized landscape window: the HUD uses its compact arrangement */ compact: false,
   /** portrait phone: the game asks the player to rotate */ portrait: false,
   touch: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
+  /** the interface-size setting in effect, and the most this window has room for */ scale: 1, maxScale: 1.4,
   /** safe-area insets in px: [top, right, bottom, left] */ safe: [0, 0, 0, 0],
 };
 
@@ -37,6 +38,9 @@ const listeners = [];
 /** Call `fn(layout)` whenever the window size, orientation or interface settings change. */
 export function onLayout(fn) { listeners.push(fn); }
 
+// What the HUD needs to lay out without anything touching, in rem: [across, down].
+const NEED = { wide: [64, 36], compact: [37, 23] };
+
 let rootEl = null;
 export function applyLayout(root) {
   if (root) rootEl = root;
@@ -46,10 +50,15 @@ export function applyLayout(root) {
   let s;
   if (layout.portrait) s = 1;
   else if (layout.compact) s = Math.min(1, Math.max(0.92, h / 390));
-  else s = Math.min(2.4, Math.max(0.85, Math.pow(Math.min(w / 1280, h / 720), 0.8)));
-  layout.rem = +(16 * s * settings.hudScale).toFixed(2);
-  html.style.fontSize = layout.rem + 'px';
+  else s = Math.min(2.4, Math.max(layout.touch ? 1 : 0.85, Math.pow(Math.min(w / 1280, h / 720), 0.8)));     // fingers need full-size targets
   measureSafe();
+  // the player's interface size, held to what this window has room for (never below the default)
+  const [needW, needH] = layout.compact ? NEED.compact : NEED.wide;
+  const fit = Math.min((w - layout.safe[1] - layout.safe[3]) / (needW * 16 * s), (h - layout.safe[0] - layout.safe[2]) / (needH * 16 * s));
+  layout.maxScale = Math.min(1.4, Math.max(1, Math.floor(fit * 20 + 0.01) / 20));
+  layout.scale = layout.portrait ? 1 : Math.min(settings.hudScale, layout.maxScale);
+  layout.rem = +(16 * s * layout.scale).toFixed(2);
+  html.style.fontSize = layout.rem + 'px';
   if (rootEl) {
     const c = rootEl.classList;
     c.toggle('mg-compact', layout.compact);

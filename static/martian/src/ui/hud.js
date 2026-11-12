@@ -245,7 +245,7 @@ export function updateCompass() {
   // distance labels: the marker you face is named; the others show a distance where there is room
   const chW = layout.rem * 0.42;
   const tryLabel = (m, text, cls) => {
-    const w = text.length * chW + layout.rem * 0.6;
+    const w = text.length * chW + layout.rem * 1.3;          // the label's own plate and a little air
     const a = clamp(m.x, w / 2, cp.w - w / 2);
     for (const [l, r] of labels) if (a - w / 2 < r && a + w / 2 > l) return false;
     labels.push([a - w / 2, a + w / 2]);
@@ -296,8 +296,9 @@ function track(key, value, dt) {
   const inst = (value - prev) / dt;
   if (Math.abs(value - prev) > 6) return hud.rate[key] || 0;          // a refill, a meal, a save loaded: not a trend
   const old = hud.rate[key] || 0;
-  // a change of direction (stepping out of the airlock, the sun going down) shows at once; the rest is smoothed
-  hud.rate[key] = inst * old < 0 || Math.abs(inst) < Math.abs(old) * 0.5 ? inst : old + (inst - old) * (1 - Math.exp(-dt / 1.2));
+  // a real change (stepping out of the airlock, breaking into a run, the sun going down) shows at once; jitter is smoothed
+  const jump = inst * old <= 0 || Math.abs(inst) < Math.abs(old) * 0.5 || Math.abs(inst) > Math.abs(old) * 1.5;
+  hud.rate[key] = jump ? inst : old + (inst - old) * (1 - Math.exp(-dt / 1.2));
   return hud.rate[key];
 }
 function fmtLeft(sec) {
@@ -409,12 +410,12 @@ export function updateHud() {
   // the first minute teaches moving; after that, the screens
   const keys = S.flags.coldOpen
     ? (layout.touch ? ':Left thumb moves|:Drag to look' : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
-    : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.mode === 'rover' ? 'M:Map|Esc:Menu' : 'M:Map|C:Colony|J:Journal|Esc:Menu');
+    : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? 'M:Map|C:Colony|J:Journal|' : '') + 'Esc:Menu';
   if (keys !== hud.keys) {
     hud.keys = keys;
     UI.keys.innerHTML = keys.split('|').map((k) => {
       const [a, b] = k.split(':');
-      return `<span>${a.split(' ').filter(Boolean).map((x) => `<kbd class="mg-kbd">${x}</kbd>`).join('')}${b}</span>`;
+      return `<span>${b}${a.split(' ').filter(Boolean).map((x) => `<kbd class="mg-kbd">${x}</kbd>`).join('')}</span>`;
     }).join('');
     UI.tCandle.style.display = candles > 0 ? '' : 'none';
     UI.tCandle.querySelector('b').textContent = candles;

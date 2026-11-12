@@ -365,7 +365,7 @@ export function log(text, cls) {
 // ------------------------------------------------------------------------------------------
 // The interaction prompt (and the touch action button, which shows the same verb)
 // ------------------------------------------------------------------------------------------
-const pr = { on: false, label: null, sub: null, state: null, pct: -1, minor: false };
+const pr = { on: false, label: null, sub: null, state: null, pct: -1, minor: false, verb: null };
 function verbOf(label) {
   const w = label.replace(/\[[^\]]*\]/g, ' ').replace(/[^A-Za-z' ]/g, ' ').trim().split(/\s+/);
   let v = w[0] || 'USE';
@@ -380,7 +380,7 @@ function verbOf(label) {
 export function setPrompt(p) {
   if (!p) {
     if (pr.on) {
-      pr.on = false; pr.label = null; pr.state = null; pr.pct = -1;
+      pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null;
       UI.prompt.classList.remove('on');
       UI.tE.classList.remove('ready', 'no', 'holding');
       UI.tEVerb.textContent = 'USE';
@@ -394,9 +394,10 @@ export function setPrompt(p) {
   if (label !== pr.label) {
     pr.label = label;
     UI.promptLabel.innerHTML = chem(esc(label));
-    UI.tEVerb.textContent = p.disabled ? '—' : verbOf(p.label);
   }
-  if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; UI.prompt.classList.toggle('minor', pr.minor); }
+  const verb = p.disabled ? '—' : verbOf(p.label);
+  if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
+  if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
   const sub = p.sub || '';
   if (sub !== pr.sub) { pr.sub = sub; UI.promptSub.innerHTML = chem(esc(sub)); UI.promptSub.style.display = sub ? '' : 'none'; }
   if (state !== pr.state) {
@@ -404,7 +405,7 @@ export function setPrompt(p) {
     UI.prompt.classList.toggle('no', state === 'no');
     UI.prompt.classList.toggle('hold', state === 'hold');
     UI.tE.classList.toggle('no', state === 'no');
-    UI.tE.classList.toggle('ready', state !== 'no');
+    UI.tE.classList.toggle('ready', state !== 'no' && !pr.minor);          // lit only for something actually in reach
   }
   const pct = p.disabled ? 0 : Math.round(Math.min(1, Math.max(0, p.progress || 0)) * 100);
   if (pct !== pr.pct) {

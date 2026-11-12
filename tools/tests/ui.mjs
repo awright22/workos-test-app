@@ -50,7 +50,7 @@ let errors = 0;
   check('new game: arrows move between the cards', (await focused()) === 'iron', await focused());
   await key('ArrowLeft');
   await key('Enter');
-  await page.waitForFunction(() => window.__MG.S.started, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__MG.S.started && document.getElementById('mg-root').classList.contains('is-playing'), null, { timeout: 30000 });
   let s = await g.eval((G) => ({ diff: G.S.diff, ui: G.S.uiOpen, hud: getComputedStyle(document.getElementById('mg-hud')).visibility }));
   check('new game: Enter starts the run and shows the HUD', s.diff === 'survival' && !s.ui && s.hud === 'visible', s);
   await g.eval(async (G) => { await G.settle(); G.paused = true; G.skipIntro(); G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
@@ -106,6 +106,7 @@ let errors = 0;
 const SIZES = [
   { name: '1280x720', w: 1280, h: 720 }, { name: '1920x1080', w: 1920, h: 1080 }, { name: '2560x1440', w: 2560, h: 1440 }, { name: '1024x768', w: 1024, h: 768 },
   { name: 'phone 844x390', w: 844, h: 390, touch: true, safe: [0, 47, 21, 47] }, { name: 'phone 667x375', w: 667, h: 375, touch: true, safe: [0, 47, 21, 47] },
+  { name: 'tablet 1024x768', w: 1024, h: 768, touch: true, safe: [24, 0, 20, 0] },
 ];
 const HUD = ['#mg-vitals', '#mg-compass .strip', '#mg-region', '#mg-tr', '#mg-log', '#mg-prompt', '#mg-keys', '#mg-rover', '#mg-alerts', '#mg-toast .toast',
   '#mg-joy', '#mg-tE', '#mg-tJump', '#mg-tExit', '#mg-tSprint', '#mg-tCam', '#mg-tCandle', '#mg-trow'];
@@ -133,7 +134,8 @@ function layoutProblems(list, size) {
         const d = Math.hypot((a.l + a.r - b.l - b.r) / 2, (a.t + a.b - b.t - b.b) / 2);
         if (d >= (a.r - a.l + b.r - b.l) / 2) continue;
       }
-      bad.push(`${a.sel} overlaps ${b.sel}`);
+      const box = (q) => `[${Math.round(q.l)},${Math.round(q.t)} ${Math.round(q.r)},${Math.round(q.b)}]`;
+      bad.push(`${a.sel} ${box(a)} overlaps ${b.sel} ${box(b)}`);
     }
   }
   return bad;
@@ -148,21 +150,26 @@ for (const size of SIZES) {
   await sleep(700);
   let bad = layoutProblems(await rects(page), size);
   check(`${size.name}: first minute, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
-  // a busy moment on foot: every gauge, two alerts, log lines, a prompt, a candle to hand
-  await g.eval((G) => {
-    G.skipIntro(); G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };
-    G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
-  });
-  await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
-    U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'); });
-  await sleep(1300);
-  await g.eval((G) => { G.tick(0.05, 2); });
-  bad = layoutProblems(await rects(page), size);
-  check(`${size.name}: on foot with alerts, log and prompt, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
-  // driving
-  await g.eval((G) => { G.setStorm(0); G.S.storm.i = 0; G.S.suit = 100; G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 40); G.input.keys['w'] = false; G.tick(0.05, 80); });
-  await sleep(300);
-  bad = layoutProblems(await rects(page), size);
+  // a busy moment on foot: every gauge, two alerts, log lines, a toast, a prompt, a candle to hand
+  const busy = async () => {
+    await g.eval((G) => {
+      G.skipIntro(); G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };
+      G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
+    });
+    await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
+      U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'); });
+    await sleep(1300);
+    await g.eval((G) => { G.tick(0.05, 2); });
+    return layoutProblems(await rects(page), size);
+  };
+  const driving = async () => {
+    await g.eval((G) => { G.setStorm(0); G.S.storm.i = 0; G.S.suit = 100; G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 40); G.input.keys['w'] = false; G.tick(0.05, 80); });
+    await sleep(300);
+    return layoutProblems(await rects(page), size);
+  };
+  bad = await busy();
+  check(`${size.name}: on foot with alerts, log, toast and prompt, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
+  bad = await driving();
   check(`${size.name}: in the rover, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
   if (size.touch) {
     await page.locator('#mg-tPause').tap();
@@ -186,6 +193,12 @@ for (const size of SIZES) {
     const verb = await page.locator('#mg-tE .vb').innerText();
     check(`${size.name}: the action button shows the verb`, /drive/i.test(verb), verb);
   }
+  // the largest interface size the player can ask for is held to what this window has room for
+  await sleep(6500);                                              // let the toast from the busy moment go
+  await g.eval((G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); } });
+  const cap = await page.evaluate(() => { window.__UI.setSetting('hudScale', 1.4); return { scale: window.__UI.layout.scale, max: window.__UI.layout.maxScale }; });
+  const badBusy = await busy(), badDrive = await driving();
+  check(`${size.name}: at the largest interface size (${Math.round(cap.scale * 100)}% here), still nothing overlaps`, cap.scale <= cap.max && badBusy.length === 0 && badDrive.length === 0, { cap, badBusy, badDrive });
   errors += g.errors.length;
   if (g.errors.length) console.log(JSON.stringify(g.errors.slice(0, 4)).slice(0, 800));
   await g.close();

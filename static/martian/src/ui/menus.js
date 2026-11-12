@@ -193,7 +193,8 @@ export function showSettings(back, overTitle) {
     `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div></section>` +
     // interface
     `<section class="set-sec" style="grid-column:1/-1"><h3>${icon('eye')}Interface</h3>` +
-    `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct)}</div></div>` +
+    `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct)}</div>` +
+    '<p class="hint" id="set-scale-hint"></p></div>' +
     `<div class="set-row"><span class="lbl">Reduce motion</span><div class="ctl">${sw('reducedMotion', 'Reduce motion', reducedMotion())}</div>` +
     '<p class="hint">Stills the interface\'s animations and softens screen flashes.</p></div>' +
     `<div class="set-row"><span class="lbl">Colour-blind-safe colours</span><div class="ctl">${sw('colorBlind', 'Colour-blind-safe colours', settings.colorBlind)}</div>` +
@@ -215,6 +216,14 @@ export function showSettings(back, overTitle) {
     reload.hidden = !pending;
   };
   qNote();
+  const scaleHint = p.querySelector('#set-scale-hint');
+  const scaleNote = () => {
+    const capped = settings.hudScale > layout.maxScale + 0.001;
+    scaleHint.textContent = capped ? `This screen has room for up to ${pct(layout.maxScale)}; larger sizes apply on a bigger window.` : '';
+    scaleHint.hidden = !capped;
+    scaleHint.classList.toggle('warn', capped);
+  };
+  scaleNote();
   // option groups: click, or left/right when focused
   p.querySelectorAll('[data-seg]').forEach((g) => {
     const pick = (btn) => {
@@ -242,7 +251,7 @@ export function showSettings(back, overTitle) {
     };
     // the interface size re-lays-out the slider itself, so it is applied when the slider is released
     r.addEventListener('input', () => { show(); if (key !== 'hudScale') setSetting(key, +r.value); });
-    r.addEventListener('change', () => { show(); setSetting(key, +r.value); if (key === 'volume') Snd.click(); });
+    r.addEventListener('change', () => { show(); setSetting(key, +r.value); if (key === 'volume') Snd.click(); if (key === 'hudScale') scaleNote(); });
   });
   p.querySelectorAll('[data-switch]').forEach((b) => {
     b.addEventListener('click', () => {

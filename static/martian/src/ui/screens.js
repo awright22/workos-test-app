@@ -272,7 +272,7 @@ function tasksHtml() {
 function discoveriesHtml() {
   const landers = World.landers, known = landers.filter((r) => S.discovered[r.data.name]).length;
   let h = `<div class="pane-hd">Landers <span>${known} of ${landers.length} found</span></div><div class="jr-grid">`;
-  for (const rec of landers) {
+  for (const rec of landers.slice().sort((x, y) => !!S.discovered[y.data.name] - !!S.discovered[x.data.name] || x.data.year - y.data.year)) {
     const k = S.discovered[rec.data.name];
     h += k
       ? `<article class="card got"><div class="card-hd">${icon('lander')}<h4>${esc(rec.data.name)}<small>${rec.data.year}</small></h4>` +
@@ -282,7 +282,7 @@ function discoveriesHtml() {
   const places = FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
   const pk = places.filter((f) => S.discovered[f.name]).length;
   h += `</div><div class="pane-hd">Places <span>${pk} of ${places.length} visited</span></div><div class="jr-grid">`;
-  for (const f of places) {
+  for (const f of places.slice().sort((x, y) => !!S.discovered[y.name] - !!S.discovered[x.name])) {
     const k = S.discovered[f.name];
     h += k
       ? `<article class="card got"><div class="card-hd">${icon('pin')}<h4>${esc(f.name)}<small>${FEATURE_KIND[f.type] || ''}</small></h4></div><p>${esc(f.note)}</p></article>`

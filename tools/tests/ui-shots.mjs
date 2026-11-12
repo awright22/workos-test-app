@@ -37,8 +37,8 @@ async function run(size) {
   let n = 0;
   const shot = async (name, wait = 500) => {
     n++;
+    await sleep(wait);                                              // waited even when the state is filtered out: later steps rely on the timing
     if (only && !only.some((o) => name.includes(o))) return;
-    await sleep(wait);
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.screenshot({ path: path.join(dir, `${String(n).padStart(2, '0')}-${name}.png`), timeout: 120000 });
     total++;
@@ -126,6 +126,9 @@ async function run(size) {
   await shot('hud-oxygen-low');
   await ev((G) => { G.S.suit = 8; G.S.health = 34; G.tick(0.05, 40); });
   await shot('hud-oxygen-critical');
+  await ui((U, G) => { U.setSetting('colorBlind', true); G.S.water = 9; G.S.power = 18; G.tick(0.05, 3); });
+  await shot('hud-colour-blind-safe', 300);
+  await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; });
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.tick(0.05, 40); });
 
   // toasts

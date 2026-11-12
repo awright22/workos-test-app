@@ -94,6 +94,8 @@ export function initInput() {
   document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement === canvas;
     lockChangedAt = perf();
+    // a lock that arrives after a menu or screen has opened is given straight back
+    if (pointerLocked && (S.uiOpen || screenOpen())) { try { document.exitPointerLock(); } catch (e) { /* already free */ } return; }
     if (pointerLocked) dragMode = false;
     if (!pointerLocked && S.started && !S.uiOpen && !screenOpen() && !S.over && S.mode !== 'cutscene') showPause();
   });
