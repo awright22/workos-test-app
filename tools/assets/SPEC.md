@@ -1,0 +1,239 @@
+# Stranded II — 3D asset specification
+
+Every model in the game is authored by a Python script that drives Blender headlessly
+(`bpy` 5.x as a Python module) and exports a compressed `.glb`. This file is the contract between
+the asset scripts and the game code. If a requirement here is wrong or impossible, say so in your
+report rather than quietly changing it.
+
+## Pipeline
+
+| What | Where |
+| --- | --- |
+| Shared helpers (primitives, palette, part/anchor nodes, AO bake, export) | `tools/assets/lib.py` |
+| Worked example | `tools/assets/example_crate.py` |
+| One script per asset family | `tools/assets/<family>.py` |
+| Review images (six views, optional animation strips) | `node tools/assets/preview.mjs <name> [--clips]` → `tools/assets/.cache/preview/` |
+| Output, committed | `static/martian/assets/models/<name>.glb` |
+
+Run a script with `/home/user/blender-venv/bin/python tools/assets/<family>.py`. If that
+interpreter is missing, create it: `python3.11 -m venv /home/user/blender-venv &&
+/home/user/blender-venv/bin/pip install bpy numpy pillow`. `tools/node_modules` must exist
+(`cd tools && npm ci`).
+
+Each family script exposes one `build_<name>()` function per model and a `__main__` block that
+builds all of them (accept model names as command-line arguments to build a subset).
+Do not edit `lib.py`; put family-specific helpers in your own file and report anything the
+library should gain.
+
+## Conventions
+
+- Units are metres. Blender axes: Z up, **front of the model faces −Y**, X to the model's right
+  is +X when you look at its front... in short, author it the way Blender's front view shows it.
+  The origin is on the ground under the model's centre (z = 0 is the ground).
+- A **part** (`part(name, ...)`) is a node the game finds by name and moves; its origin is its
+  pivot. Helper meshes parented under a part are joined into it on export, one mesh per material.
+  Name parts exactly as listed below. Extra parts are fine if they are worth animating.
+- An **anchor** (`anchor(name, parent, loc, **extras)`) is an empty that gives the game a
+  position: lights, seats, attach points, colliders. Colliders are anchors named `col_*` with
+  `radius=<metres>`; the game keeps the player and rover outside that circle.
+- Materials come from `PALETTE` in `lib.py` (flat PBR values, no image textures, no UVs). Add a
+  one-off with `mat('name', color=..., metallic=..., roughness=...)` when the palette lacks it.
+  The game finds some materials by name to drive them: `solar_cell` (gets dust), `screen`,
+  `light_*` (switched and blinked), `glass_clear` (alpha-blended). Baked ambient occlusion is
+  stored per vertex and multiplied into the colour; dust and weathering are added by the game's
+  shader, so model clean hardware.
+- Detail comes from geometry: bevelled edges, panel seams, fasteners, handrails, cable runs,
+  tanks, hinges, tread. Nothing in a finished model should read as a bare cube, cylinder or
+  sphere. A surface wider than about half a metre needs something breaking it up.
+- Smooth shading with sharp edges by angle is automatic (`smooth_angle`, default 38°).
+- Scale reference: the astronaut is 1.86 m tall in the suit. Hardware is real-world size.
+
+## Art direction
+
+Near-future NASA hardware, the day after tomorrow rather than science fiction: white and
+light-grey thermal fabric and painted aluminium, bare aluminium and titanium structure, gold
+multi-layer insulation foil, black carbon and rubber, dark blue solar cells, orange and yellow
+high-visibility accents and labels. Functional, modular, slightly improvised. Believable
+engineering: things that move have hinges and actuators, things that carry load have struts,
+things that hold pressure are round. The film *The Martian* is the mood reference; do not copy a
+specific copyrighted design, logo or mission patch.
+
+## How a model is judged (look at your own preview sheets)
+
+1. The silhouette reads at a glance, both at 30 m and at 3 m, and from behind and above (the
+   game camera sits behind and above the astronaut and the rover most of the time).
+2. Proportions are believable beside a 1.86 m person.
+3. No bare primitives, no razor edges, no large blank surfaces, no parts floating or
+   intersecting untidily, no inside-out faces, no z-fighting between coincident faces.
+4. Colour blocking is deliberate: a dominant neutral, one accent, dark functional parts.
+5. Parts pivot correctly (rotate each in the preview or in Blender and check).
+6. Triangle budget and node names match this file. Report triangles and file size per model.
+
+Iterate until the sheet would not look out of place in a commercial game's art book.
+
+---
+
+## Family A — astronaut (`astronaut.py`)
+
+`astronaut.glb`: one skinned mesh on one armature, ≤ 24,000 triangles.
+
+A Mars surface EVA suit: hard upper torso, soft-goods arms and legs with visible joint bearings
+and convolutes, bubble helmet with a gold visor, a life-support backpack with an antenna and
+hoses to the torso, chest control unit with a display, helmet lamps (`light_white`), knee and
+elbow pads, treaded boots, gloves with separated thumb and mitten-style fingers. Mostly
+`suit_white` with `suit_orange` shoulder, forearm and thigh panels and `suit_grey` joints.
+Height 1.86 m standing. Rest pose: arms about 30° out from the body, feet 0.22 m apart.
+
+Bones (exact names; a `_L`/`_R` pair for each sided bone; no dots in names):
+`hips` → `spine` → `chest` → `neck` → `head`; `chest` → `shoulder_L` → `upper_arm_L` →
+`forearm_L` → `hand_L`; `hips` → `thigh_L` → `shin_L` → `foot_L` → `toe_L`. Rigid pieces
+(helmet, backpack, chest unit, boots) are weighted to exactly one bone. Limb weights blend
+smoothly across each joint so elbows, knees, shoulders and hips bend without collapsing or
+tearing. Assign weights by code from the geometry (distance along the limb), not bone heat.
+
+Anchors parented to bones: `lamp_L`, `lamp_R` (helmet lamps, pointing forward),
+`hand_grip_R` (palm of the right hand), `eye` (inside the visor, looking forward).
+
+Animation clips (glTF animations, exact names, in place — no forward translation; hips may
+bob vertically; loops must match first and last frame):
+
+| Clip | Length | Notes |
+| --- | --- | --- |
+| `Idle` | 4.0 s loop | weight shifts, breathing, small head turns |
+| `Walk` | 0.9 s loop | Mars lope: long low-gravity strides of about 2.3 m, a short float between steps, arms counter-swing, torso leans a little into it. Covers 5.1 m/s |
+| `Run` | 0.72 s loop | bounding sprint, about 3.3 m per stride, clear flight phase, strong arm drive. Covers 9.2 m/s |
+| `JumpStart` | 0.25 s | crouch and push off |
+| `Air` | 1.0 s loop | airborne, knees slightly tucked, arms out for balance |
+| `Land` | 0.35 s | absorb and recover to standing |
+| `WorkKneel` | 2.0 s loop | on one knee, both hands working at ground level in front (digging, planting, salvage) |
+| `WorkStand` | 2.0 s loop | standing, hands working at chest height in front (consoles, wiping a panel, patching a wall) |
+| `Drive` | 3.0 s loop | seated, hands on a yoke, small steering motion |
+| `Stagger` | 1.4 s loop | hurt or out of air: hunched, uneven, one hand to the chest unit |
+| `Collapse` | 2.2 s once | falls to the knees and then forward; ends lying still |
+| `Wave` | 2.0 s once | one arm raised in a big slow wave |
+
+Review each clip with `preview.mjs astronaut --clips` (six frames per clip) and fix feet that
+slide through the ground, limbs that pass through the torso or backpack, and joints that fold
+flat.
+
+## Family B — vehicles (`vehicles.py`)
+
+`rover.glb`, ≤ 48,000 triangles. A pressurised six-wheel exploration rover. About 5.6 m long,
+3.0 m wide over the wheels, 2.9 m to the roof, 0.55 m ground clearance. A faceted cab forward
+with a wrap-around windscreen in `glass_clear` so the driver can be seen, two seats and a
+dashboard with a `screen` inside, a pressurised rear compartment with a side hatch and
+steps, a roof rack with rails and tie-downs, roof solar panels (`solar_cell`), radiator panels,
+a light bar, mesh wheels with chevron grousers on rocker suspension arms, a high-gain dish and a
+whip antenna, grab handles, external stowage boxes, tanks and conduit.
+Parts: `wheel_FL`, `wheel_ML`, `wheel_RL`, `wheel_FR`, `wheel_MR`, `wheel_RR` (origin at the
+wheel centre, wheel radius 0.62 m, spin about local X; front axle near y = −1.9, middle 0,
+rear +1.9); `steer_FL`, `steer_FR`, `steer_RL`, `steer_RR` (parents of those four wheels, yaw
+about Z); `dish` (yaws about Z). Anchors: `headlight_L`, `headlight_R` (at lamps made of
+`light_white`), `taillight` (`light_red`), `seat` (driver's hips), `door` (on the ground beside
+the hatch, where a person stands to board), `cargo` (centre of the roof rack, about
+(0, 1.1, 2.15)), `col_body` with `radius=2.6`.
+
+`mav.glb`, ≤ 40,000 triangles. The Mars Ascent Vehicle: a two-stage rocket standing on a
+four-legged descent stage, about 15.5 m tall, 4.2 m body diameter, legs spanning about 9 m.
+Tank domes, an interstage band in `painted_orange`, RCS quads, a crew capsule under a
+removable nose fairing, an access ladder and hatch platform, engine bells, footpads, umbilical
+panels, gold foil on the descent stage. Parts: `ascent` (everything that lifts off; origin on
+the vehicle axis at the base of the ascent stage), inside it `nose` (the removable fairing),
+`strobe` (`light_red`) and `nozzle`. Anchors: `flame` (under the ascent engine, child of
+`ascent`), `hatch` (on the ground at the foot of the ladder), `col_body` with `radius=3.4`.
+
+`hermes.glb`, ≤ 30,000 triangles. The interplanetary ship that collects you, seen only at
+distance in the finale: a long truss spine about 60 m, a rotating crew ring (part `ring`, spins
+about the spine axis, which runs along Y), large solar arrays, radiators, a docking node at the
+front (−Y), a reactor and ion engine cluster at the back (`light_blue` glow).
+
+## Family C — the Hab (`hab.py`)
+
+All in the Hab's own frame: origin at the centre of the floor, the door faces −Y.
+
+`hab.glb`, ≤ 95,000 triangles in total. The crew habitat: an inflatable dome on a rigid base
+ring with an airlock module. The pressure wall is a circle of radius 8.4 m (the game collides
+with that circle; keep the inner surface there and the wall no thicker than 0.5 m). Interior
+clear height at least 3 m at the wall, rising to the middle.
+
+- Exterior: fabric panels between ribs or cables, a base ring with anchors and tie-downs, a few
+  small round windows (material `window_glow`, defined by you as a dim warm emissive), external
+  tanks and a cable tray leaving toward −X, a mast on the apex with a `beacon` part
+  (`light_green`), work lights.
+- Airlock: a rigid box attached at the door, floor level with the Hab floor, a clear passage
+  2.2 m wide and 2.4 m high from y = −8.4 out to about y = −11.6, with a short ramp to the
+  ground. Two pairs of sliding door leaves that the game opens by moving each leaf 1.05 m
+  sideways: `door_outer_L`, `door_outer_R` (at the outside end) and `door_inner_L`,
+  `door_inner_R` (at the Hab wall). Model them closed. Suit lockers and a bench are welcome
+  inside the airlock as long as the passage stays clear.
+- Interior shell: floor panels with cable trenches, the wall with equipment racks and conduit,
+  roof ribs, light fixtures (`light_white`) with anchors `light_0` … `light_3`, a ring of
+  ventilation ducting.
+- Stations at fixed places (x, y) on the floor; the player stands within about 2.4 m to use
+  each one, so leave their fronts reachable from the middle of the room:
+  oxygenator (5.6, 3.6): a tall machine with tanks, a fan grille and a status light that is a
+  part named `status_oxy` (`light_green`);
+  water reclaimer (5.9, 0.4): tanks, pumps, piping;
+  hydrazine rig (5.5, −2.6): an improvised still made from a fuel tank, tubing, a tray and a
+  chimney, with a part `hydrazine_flame` (`flame`, modelled lit; the game hides it);
+  comms desk (0, 6.6): a desk against the back wall with a main display that is a part named
+  `comms_screen` (`screen`), keyboard, laptop, chair;
+  bunk (−5.0, 4.9): a crew bunk with mattress, blanket and a privacy shelf;
+  food shelf (4.2, −4.8): racking with ration packs and crates;
+  fabricator bench (−4.6, −3.9): a workbench with a 3D printer, vice, tools and a parts bin.
+  Each station needs an anchor `col_<name>` with its `radius` (about 0.9–1.2 m).
+- Six farm plot positions must stay empty (the plots are a separate model): x = −5.2 and −3.2,
+  y = 3.2, 0.8 and −1.6.
+- The breach: in the back wall at (0, 8.4, z = 1.7), a part `breach_hole` (a torn opening about
+  1.5 m across with ragged fabric, dark behind) and a part `breach_patch` (a tarp taped over it
+  in a cross of tape). The game shows one or neither.
+- Group everything that is only visible from inside under a part named `interior`, so the game
+  can hide it when the player is far away.
+- Set dressing in the free floor (a table with chairs, storage lockers, a suit rack) is
+  welcome, each with a `col_*` anchor, as long as a person can walk from the door to every
+  station and plot.
+
+`farm_plot.glb`, ≤ 7,000 triangles. A raised grow tray, footprint 1.6 × 1.9 m, 0.34 m high, on
+short legs, with an irrigation line. Parts: `soil` (the soil surface, shown once filled),
+`plants` (a full crop of bushy potato plants with compound leaves, modelled at full size; the
+game scales it from 0.25 up as it grows), `plants_dead` (the same crop withered and collapsed,
+in dry brown). 
+
+`solar_panel.glb`, ≤ 2,500 triangles. One ground-mounted panel of the Hab's array: a 3.4 × 2.2 m
+panel of `solar_cell` in an aluminium frame, tilted about 24° toward −Y, centre about 1.15 m up,
+on a braced post with a junction box and a cable. Part `panel` (the tilting assembly).
+Anchor `col_post` with `radius=1.0`.
+
+`uplink_dish.glb`, ≤ 4,000 triangles. A 1.8 m communications dish on a 1.3 m tripod mast with a
+feed horn, an elevation actuator and an electronics box. Part `dish`. Anchor `col_post`
+(`radius=0.8`).
+
+## Family D — historic landers (`landers.py`)
+
+Real spacecraft at real size, as they would look after decades of dust (the game adds the
+dust). Each ≤ 14,000 triangles, each with an anchor `col_body` carrying a suitable `radius`.
+`pathfinder.glb` (three open petals with solar cells, the camera mast, antennas, deflated
+airbags around the base, ramps; the Sojourner rover is a part `sojourner` beside it),
+`viking.glb`, `mars3.glb` (the Soviet lander with four open petals; also used for Mars 6),
+`beagle2.glb` (lid open, only two of the four solar petals deployed), `mer.glb` (Spirit and
+Opportunity; part `mast`), `phoenix.glb`, `insight.glb` (with the domed seismometer and the
+heat probe on the ground beside it), `msl.glb` (Curiosity and Perseverance; parts `mast` and
+`arm`), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site: a shattered
+descent module, scorched fragments and a torn parachute over about 6 m).
+
+## Family E — deployables and props (`props.py`)
+
+`greenhouse.glb` (≤ 14,000): a geodesic dome of radius 4.0 m with `glass_clear` panels in an
+aluminium frame, a base ring, a doorway facing −Y, a floor, grow lights; leave four plot
+positions clear at (±1.1, ±1.2). Anchor `col_body` is not wanted (the player walks in).
+`solar_kit.glb` (≤ 3,000): a folding field solar panel, about 2.0 × 1.2 m, on a tripod.
+`beacon.glb` (≤ 3,000): a 2.2 m navigation beacon with a lamp part `lamp` (`light_blue`), a
+small solar cell and a whip antenna, on a weighted base.
+`o2_cache.glb` (≤ 4,000): a field rack holding three oxygen bottles, parts `tank_0`, `tank_1`,
+`tank_2` (the game hides the used ones), with a regulator and a hose.
+`supply_pod.glb` (≤ 6,000): an air-dropped supply capsule about 1.4 m across, landed, petals
+open, deflated airbags, a part `lid`, a strobe (`light_amber`).
+`rtg.glb` (≤ 4,000): a radioisotope generator: a finned cylinder about 1.1 m long with end
+caps, lifting lugs and warning bands.
+`debris_a.glb`, `debris_b.glb`, `debris_c.glb` (≤ 2,500 each): wreckage from the descent
+vehicle: a torn hull panel, a bent truss section, a ruptured tank.
