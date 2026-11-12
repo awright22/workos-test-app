@@ -372,7 +372,7 @@ export function buildRover(group) {
   const wheels = ['wheel_FL', 'wheel_ML', 'wheel_RL', 'wheel_FR', 'wheel_MR', 'wheel_RR'].map((n) => m.part(n)).filter(Boolean);
   const steer = { FL: m.part('steer_FL'), FR: m.part('steer_FR'), RL: m.part('steer_RL'), RR: m.part('steer_RR') };
   // one spotlight between the two headlamps, aimed down the road (the model's front is its +Z)
-  const hl = new THREE.SpotLight(0xfff2d8, 0, 110, 0.6, 0.55, 1.5);
+  const hl = new THREE.SpotLight(0xfff2d8, 0, 110, 0.6, 0.9, 1.5);           // (a wide soft edge: the pool ended on a hard arc)
   const a = m.part('headlight_L'), b = m.part('headlight_R');
   const at = new THREE.Vector3(0, 1.4, 2.6);
   if (a && b) { m.inner.updateWorldMatrix(true, true); at.copy(a.getWorldPosition(new THREE.Vector3())).add(b.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5); m.inner.worldToLocal(at); }

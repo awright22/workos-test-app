@@ -61,7 +61,9 @@ const scenes = {
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   // from forty-five metres up, looking along the flank: the lava tongues are a pattern no one sees from eye height
   'olympus-flows': async () => { await ev(async (G) => { await G.tp(16.6, 227.9, 2.4); G.tick(0.05, 5); }); return model((G) => G.player.pos.clone(), 110, 315, 8.5, { stand: [4, 100], height: 45, aim: 0.9 }); },
+  '-camera-back-1': async () => ev((G) => { G.photo(null); }),          // (the raised camera must not stay on for the scenes that follow)
   'olympus-caldera': async () => ev(async (G) => { await G.tp(17.76, 226.9, 0); G.setLocalTime(16); G.look(-0.25); G.tick(0.05, 40); await G.settle(); }),
+  'south-pole': async () => ev(async (G) => { await G.tp(-86.5, 200, 0.6); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 1.9); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   // every built model, seen by a free camera with the astronaut beside it for scale
   'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [3.6, 200], height: 2.4 }),
@@ -98,6 +100,10 @@ const scenes = {
   'astronaut-front': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tpHab(30, 70, 2.2); G.setLocalTime(9.5); G.look(-0.1); G.tick(0.05, 40); await G.settle();
     const P = G.photoMode; P.enterPhoto(); P.photo.yaw += Math.PI; P.photo.dist = 3.1; P.photo.pitch = 0.04; P.photo.rise = 0.15; P.photo.fov = 40; }),
   'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
+  // the figure himself, close, from the side and from behind (he stands at the spot and the camera goes round him)
+  'astronaut-side': async () => ev(async (G) => { const p = G.player.pos.clone(); G.tpAround(p, 0.01, 0); G.setLocalTime(9.5); G.tick(0.05, 40); G.photo(G.player.pos.clone(), 3.4, 90, 1.25, 0.95); await G.settle(); }),
+  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 200, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
+  '-camera-back-2': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
   'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
   'dawn-light': async () => ev(async (G) => { G.tpHab(8, -40, 0); G.setLocalTime(6.9); G.look(-0.03); G.tick(0.05, 40); await G.settle(); }),
@@ -106,7 +112,9 @@ const scenes = {
   'night-plain': async () => ev(async (G) => { G.setLocalTime(23); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
 };
 for (const [name, setup] of Object.entries(scenes)) {
-  if (!want(name) || name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off') { if (name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off') await setup(); continue; }
+  // scenes that only set something up (their name starts with '-', or is one of the old three) run always and take no picture
+  const silent = name.startsWith('-') || name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off';
+  if (!want(name) || silent) { if (silent) await setup(); continue; }
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });   // nobody suffocates mid-shoot
   await setup();
   await ev((G) => { G.paused = false; });

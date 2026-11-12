@@ -74,7 +74,7 @@ addI({
   label: () => {
     const pl = nearestPlot(); if (!pl) return '';
     switch (pl.state) {
-      case 'empty': return 'Fill bed with regolith';
+      case 'empty': return `Fill bed with regolith (1 of your ${S.inv.regolith || 0})`;
       case 'soil': {
         const can = plantable();
         if (can.length > 1) return 'Plant this bed…';
