@@ -15,7 +15,7 @@ import { makeTerrainMaterial } from './render/terrain-material.js';
 import { llToVec, groundDist } from './planet/geo.js';
 import { surfaceAt } from './planet/surface.js';
 import { R } from './planet/constants.js';
-import { clamp, perf } from './core/math.js';
+import { clamp, perf, smoothstep } from './core/math.js';
 import { _v1, _v2, _v3 } from './core/scratch.js';
 import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
@@ -142,7 +142,12 @@ function draw(dt, focus) {
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
-  if (ctx.terrainUniforms) { ctx.terrainUniforms.uDust.value = S.started ? S.storm.i : 0; ctx.terrainUniforms.uDay.value = e.sky.day; }
+  if (ctx.terrainUniforms) {
+    const tu = ctx.terrainUniforms, high = e.camera.position.length() - R;
+    tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;
+    tu.uSpace.value = smoothstep(1500, 9000, high);
+    tu.uRelief.value = 1 - 0.68 * smoothstep(2500, 12000, high);
+  }
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;

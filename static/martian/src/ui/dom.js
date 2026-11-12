@@ -335,6 +335,11 @@ function nextToast() {
 export function toast(kicker, title, note) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
   if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
+  // a phone's card holds two short lines of note: give it whole sentences that fit, not a line cut mid-word
+  if (layout.compact && note && note.length > 92) {
+    const cut = note.slice(0, 93), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+    note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
+  }
   toastQueue.push({ kicker, title, note });
   if (!toastBusy) nextToast();
 }

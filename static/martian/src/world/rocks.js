@@ -113,8 +113,9 @@ function rockMaterial(albedoCube) {
         float gl = dot(ground, vec3(0.3, 0.55, 0.15));
         // diffuseColor carries the rock's own tone (instance colour): how dark, how grey
         // basalt: darker and greyer than the dust that settles on it, which lies on what faces up
-        vec3 stone = mix(mix(vec3(gl), ground, 0.42) * 0.84, vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
-        float dust = clamp(vRockMix.x * 1.1 - 0.1 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
+        vec3 stone = mix(mix(vec3(gl), ground, 0.55) * 0.9, vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
+        // (dust lies thick on whatever faces the sky: a rock is the ground's colour on top and its own below)
+        float dust = clamp(vRockMix.x * 1.45 + 0.02 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
         diffuseColor.rgb = mix(stone, ground * 0.92, dust) * vRockMix.y * (1.0 + (rg1.a - 0.5) * 0.7 + (rg2.a - 0.5) * 0.45);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         {
@@ -124,7 +125,7 @@ function rockMaterial(albedoCube) {
           normal = normalize(normal - vRockRot * g);
         }`);
   };
-  mat.customProgramCacheKey = () => 'rock5';
+  mat.customProgramCacheKey = () => 'rock6';
   return mat;
 }
 
@@ -156,10 +157,16 @@ export class RockField {
     };
     // boulders close by get the detailed shapes and a shadow; the rest are cheap
     // (blocky, not slabs: a third review found every rock a flat-topped plate)
-    this.near = [rockGeometry(3, 1.7, 0.94, 7, 0.5), rockGeometry(3, 5.3, 0.8, 8, 0.5)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
-    this.far = [rockGeometry(1, 9.2, 0.78, 5, 0.6), rockGeometry(1, 4.4, 0.92, 5, 0.6)].map((g) => mk(g, Math.round(700 * this.density), false));
+    // Two families at every distance: broken basalt, cut along flat faces, and boulders the wind has rounded
+    // (a fourth review found every rock the same chip). Shape 0 is the broken one, shape 1 the rounded.
+    this.near = [rockGeometry(3, 1.7, 0.94, 7, 0.5), rockGeometry(3, 5.3, 0.84, 2, 1.25)].map((g) => mk(g, Math.round(44 * this.density), this.shadowRange > 0));
+    // between the two: whatever is big on the screen but not underfoot gets a shape with enough faces not to show
+    // them (a three-metre boulder at sixty metres was eighty triangles). Not on the lowest quality, which is at its
+    // budget of draw calls.
+    this.mid = this.density >= 0.7 ? [rockGeometry(2, 3.1, 0.9, 6, 0.55), rockGeometry(2, 7.7, 0.82, 2, 1.25)].map((g) => mk(g, Math.round(150 * this.density), false)) : null;
+    this.far = [rockGeometry(1, 9.2, 0.78, 5, 0.6), rockGeometry(1, 4.4, 0.88, 1, 1.25)].map((g) => mk(g, Math.round(700 * this.density), false));
     // stones: a rounder shape underfoot, the simplest one beyond
-    this.smallNear = mk(rockGeometry(2, 2.6, 0.8, 5, 0.55), Math.round(260 * this.density), this.shadowRange > 0);
+    this.smallNear = mk(rockGeometry(2, 2.6, 0.8, 2, 1.1), Math.round(260 * this.density), this.shadowRange > 0);
     this.small = mk(rockGeometry(0, 6.1, 0.62, 2, 0.5), Math.round(3600 * this.density), false);
     this.gravel = new GravelField(parent, terrain.planet, mat, { reach: this.density < 0.7 ? 9 : 14, cap: Math.round(2600 * Math.min(1, this.density)) });
     this.smallCap = this.small.instanceMatrix.count;
@@ -176,9 +183,9 @@ export class RockField {
     this.lastCam.copy(camPos);
     // instance matrices are stored relative to an anchor near the camera, to stay float32-exact
     this.anchor.copy(camPos);
-    for (const m of [...this.near, ...this.far, this.smallNear, this.small]) m.position.copy(this.anchor);
+    for (const m of [...this.near, ...(this.mid || []), ...this.far, this.smallNear, this.small]) m.position.copy(this.anchor);
     let nSmall = 0, nSmallNear = 0;
-    const nNear = [0, 0], nFar = [0, 0];
+    const nNear = [0, 0], nMid = [0, 0], nFar = [0, 0];
     rockColliders.length = 0;
     const frame = this.terrain.frame;
     for (const [node, set] of this.sets) {
@@ -199,18 +206,22 @@ export class RockField {
         _q2.setFromAxisAngle(_y, rnd * 6.283).premultiply(_q);
         _ax.set(Math.sin(rnd * 40), 0, Math.cos(rnd * 40));
         _q2.multiply(_q.setFromAxisAngle(_ax, (rnd - 0.5) * 0.7));
-        _s.set(size * (0.75 + ((rnd * 7) % 1) * 0.6), size * (0.6 + ((rnd * 13) % 1) * 0.7), size * (0.75 + ((rnd * 29) % 1) * 0.6));
+        // (never much taller than it is wide: a shard standing on end reads as floating)
+        _s.set(size * (0.8 + ((rnd * 7) % 1) * 0.55), size * (0.6 + ((rnd * 13) % 1) * 0.5), size * (0.8 + ((rnd * 29) % 1) * 0.55));
         _m.compose(_p.set(x - this.anchor.x, y - this.anchor.y, z - this.anchor.z), _q2, _s);
         // tone of the bare stone: weathered brown through to dark basalt (dust is added on top by the shape's own tint)
         const dark = (rnd * 3.7) % 1, pale = (rnd * 11.3) % 1 > 0.86 ? 0.25 : 0;     // most are dark basalt; a few are pale and dusty
-        _c.setRGB(0.56 - dark * 0.34 + pale, 0.54 - dark * 0.33 + pale, 0.55 - dark * 0.31 + pale);
+        // (none near black: under this sky even dark basalt is a dusty brown-grey)
+        _c.setRGB(0.66 - dark * 0.26 + pale, 0.64 - dark * 0.25 + pale, 0.64 - dark * 0.23 + pale);
         if (big) {
-          const close = dist < 40 && size > 0.5;            // the detailed, shadow-casting shapes: only where the detail can be seen
-          const nv = rnd < 0.5 ? 0 : 1;
+          const close = dist < 28 && size > 0.5;            // the detailed, shadow-casting shapes: only where the detail can be seen
+          const nv = (rnd * 5.3) % 1 < 0.55 ? 0 : 1;        // which family
           if (close && nNear[nv] < this.near[nv].instanceMatrix.count) {
             this.near[nv].setMatrixAt(nNear[nv], _m); this.near[nv].setColorAt(nNear[nv], _c); nNear[nv]++;
+          } else if (this.mid && (dist < 70 || size / dist > 0.028) && nMid[nv] < this.mid[nv].instanceMatrix.count) {
+            this.mid[nv].setMatrixAt(nMid[nv], _m); this.mid[nv].setColorAt(nMid[nv], _c); nMid[nv]++;
           } else {
-            const v = rnd < 0.5 ? 0 : 1, mesh = this.far[v];
+            const v = nv, mesh = this.far[v];
             if (nFar[v] >= mesh.instanceMatrix.count) continue;
             mesh.setMatrixAt(nFar[v], _m); mesh.setColorAt(nFar[v], _c); nFar[v]++;
           }
@@ -229,8 +240,9 @@ export class RockField {
     }
     const flush = (m, n) => { m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; };
     flush(this.near[0], nNear[0]); flush(this.near[1], nNear[1]); flush(this.far[0], nFar[0]); flush(this.far[1], nFar[1]);
+    if (this.mid) { flush(this.mid[0], nMid[0]); flush(this.mid[1], nMid[1]); }
     flush(this.smallNear, nSmallNear); flush(this.small, nSmall);
-    this.counts = { big: nNear[0] + nNear[1] + nFar[0] + nFar[1], near: nNear[0] + nNear[1], small: nSmall + nSmallNear, colliders: rockColliders.length };
+    this.counts = { big: nNear[0] + nNear[1] + nMid[0] + nMid[1] + nFar[0] + nFar[1], near: nNear[0] + nNear[1], small: nSmall + nSmallNear, colliders: rockColliders.length };
   }
 }
 

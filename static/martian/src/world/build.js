@@ -453,7 +453,7 @@ export function buildStorySites() {
 export function addSupplyPod(g, loot, label) {
   {
     const u = _aw.copy(g.position).normalize();
-    const pad = ctx.planet.addPad(u.x, u.y, u.z, 3.4, 3.2);
+    const pad = ctx.planet.addPad(u.x, u.y, u.z, 2.6, 6.5);          // (a long ease back to the land: a small flat disc on a slope reads as a sticker)
     ctx.terrain.syncPads([pad]);
     g.position.copy(u).multiplyScalar(surfaceAt(u));
   }

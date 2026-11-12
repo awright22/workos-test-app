@@ -5,6 +5,7 @@
 import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
+import { OBJECTIVES } from './hud.js';
 import { layout } from './layout.js';
 import { DIFFICULTIES } from '../game/state.js';
 import { ctx } from '../game/ctx.js';
@@ -377,11 +378,15 @@ export function showSleepSummary(d, onDone) {
   if (!box) return;
   const deltas = d.deltas.map((x) => {
     const v = x.whole ? Math.round(x.to) - Math.round(x.from) : x.to - x.from;
-    return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${x.whole ? Math.abs(v) : Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span></div>`;
+    // (the change overnight, and under it what that leaves)
+    return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${x.whole ? Math.abs(v) : Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${x.unit}</i></div>`;
   }).join('');
+  // the first thing still to do, as the mission list has it
+  const todo = OBJECTIVES.filter((o) => o.shown() && !o.done()).sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0))[0];
+  const today = todo ? todo.text() : '';
   box.querySelector('.sum').innerHTML =
     `<div class="solbig"><span>SOL</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
-    `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>` +
+    `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${esc(today)}</div>` : ''}</div>` +
     (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
   box.classList.add('done');
   const b = box.querySelector('.wake');

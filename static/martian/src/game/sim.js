@@ -384,6 +384,10 @@ export function sleepToDawn(inRover) {
   const notes = S.sol > before.sol ? [`Breakfast: ${S.diet.breakfast}`] : [];
   notes.push(`Morale ${Math.round(S.morale)} (${S.morale >= before.morale ? '+' : '−'}${Math.abs(Math.round(S.morale - before.morale))}): ${MORALE_WORD[moraleBand()].toLowerCase()}`);
   if (growing + ready > 0) notes.push(`Farm: ${growing} growing, ${ready} ready`);
+  // what the numbers mean for the days ahead: he eats one thing a sol, and the rescue is a fixed date
+  { const meals = foodTotal(), wait = Math.max(0, S.rescueSol - S.sol);
+    notes.push(meals >= wait ? `Food for ${meals} sols; the rescue is in ${wait}` : `Food for ${meals} sols; the rescue is in ${wait}. ${wait - meals} short`); }
+  if (comfortCheer() > 0) notes.push(`Home comforts: +${comfortCheer()} morale each dawn`);
   if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
   const summary = {
     sol: S.sol, notes,

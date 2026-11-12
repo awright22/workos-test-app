@@ -17,7 +17,7 @@
  * face's coordinates run another way. Bright colourless ground near the poles is ice.
  */
 import * as THREE from 'three';
-import { DETAIL_FRAME } from '../planet/constants.js';
+import { DETAIL_FRAME, R } from '../planet/constants.js';
 import { LAVA_FIELDS } from '../planet/volcanoes.js';
 import { detailTextures } from './noise3d.js';
 import { groundTextures } from './detail2d.js';
@@ -73,6 +73,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     uField: { value: flat.field },
     uDust: { value: 0 },                       // storm dusting 0..1 (brightens and flattens)
     uDay: { value: 1 },                        // 0 at night .. 1 by day (what glows by daylight must not glow in the dark)
+    uSpace: { value: 0 },                      // 0 on the ground .. 1 from orbit: the air seen edge-on hazes the planet's rim
+    uRelief: { value: 1 },                     // how much of the (exaggerated) relief is drawn: all of it on the ground, a third from orbit
   };
   mat.defines = mat.defines || {};
   if (o.fine !== false) mat.defines.TERRAIN_FINE = '';
@@ -83,6 +85,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         attribute vec3 aTex;
         attribute vec3 aUv;
         attribute vec4 aGeo;
+        uniform float uRelief;
         varying vec3 vTex;
         varying vec3 vUv3;
         varying vec4 vGeo;
@@ -93,6 +96,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vUv3 = aUv;
         vGeo = aGeo;
         vPlanetPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        // From orbit the relief is drawn nearer its true height: at four times life size the volcanoes
+        // notch the planet's edge. (A chunk's matrix is a translation and nothing else.)
+        if (uRelief < 0.999) {
+          float pr = length(vPlanetPos);
+          vPlanetPos *= (${F(R)} + (pr - ${F(R)}) * uRelief) / pr;
+          transformed = vPlanetPos - modelMatrix[3].xyz;
+        }
         vGeoNormal = normalize(normal);`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
@@ -103,6 +113,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform sampler2D uField;
         uniform float uDust;
         uniform float uDay;
+        uniform float uSpace;
         varying vec3 vTex;
         varying vec3 vUv3;
         varying vec4 vGeo;
@@ -243,6 +254,11 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         col = mix(col, iceCol, ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
+        // seen from space the air lies thickest along the planet's edge: a soft pale rim that fades inward
+        if (uSpace > 0.001) {
+          float graze = 1.0 - max(dot(pDir, normalize(cameraPosition - vPlanetPos)), 0.0);
+          col = mix(col, vec3(0.62, 0.50, 0.40), uSpace * 0.7 * pow(graze, 3.5));
+        }
         diffuseColor.rgb = col;
         float terrainRough = mix(0.98, 0.90, max(max(rock, stone), basalt)) - ice * 0.70;
         // light that has passed through ice comes back blue: it fills the shadows the warm sky would leave tan
@@ -273,6 +289,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain11' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain12' + (o.fine !== false ? 'F' : '');
   return mat;
 }

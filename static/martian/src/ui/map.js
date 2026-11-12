@@ -368,10 +368,13 @@ function showInfo(s) {
   const pos = s.pos || llToVec(s.lat, s.lon).multiplyScalar(R);
   const dist = groundDist(from, pos);
   const ll = { lat: s.lat, lon: s.lon };
+  const grp = s.group || (s.under && s.under.group);
   info.innerHTML = `<div class="mi-hd">${icon(s.icon || 'pin')}<div><h2>${esc(s.title)}</h2><div class="ty">${esc(s.type || '')}</div></div>` +
     `<button type="button" class="x" aria-label="Close details">${icon('close')}</button></div>` +
     `<dl><dt>Distance</dt><dd class="t-num">${fmtDist(dist)}</dd><dt>Bearing</dt><dd>${dist > 5 ? bearingText(absBearing(from, pos)) : '—'}</dd>` +
-    `<dt>Position</dt><dd class="t-mono">${fmtLL(ll)}</dd></dl>${s.note ? `<p>${esc(s.note)}</p>` : ''}`;
+    `<dt>Position</dt><dd class="t-mono">${fmtLL(ll)}</dd></dl>${s.note ? `<p>${esc(s.note)}</p>` : ''}` +
+    // a marker standing for several says what the others are
+    (grp && grp.length > 1 ? `<p class="grp"><b>Here too</b> ${grp.filter((m) => m !== s).map((m) => esc(m.label || m.title)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
   info.hidden = false;
   info.querySelector('.x').addEventListener('click', () => showInfo(null));
   request();
@@ -426,7 +429,7 @@ export function initMap(body) {
   scaleEl = status.querySelector('.map-scale i'); scaleLbl = status.querySelector('.map-scale span');
   statusHint.textContent = layout.touch ? 'Drag to pan · pinch to zoom · tap for details' : 'Drag to pan · wheel to zoom · click for details';
   const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); };
-  setLegend(!layout.compact);
+  setLegend(false);                     // (closed until asked for: open, it covered a corner of the map)
 
   tools.addEventListener('click', (ev) => {
     const b = ev.target.closest('button');

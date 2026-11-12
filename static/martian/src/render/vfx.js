@@ -33,13 +33,26 @@ function markTexture(kind) {
   g.fillStyle = '#000';
   g.fillRect(0, 0, 64, 128);
   if (kind === 'boot') {
-    // a lugged sole: a soft outline with heel block and forefoot bars pressed deeper
-    g.fillStyle = '#555';
-    g.beginPath(); g.ellipse(32, 44, 19, 36, 0, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.ellipse(32, 104, 15, 19, 0, 0, Math.PI * 2); g.fill();
+    // A boot's sole: broad at the ball, narrow at the arch, a separate heel, with the lugs pressed deeper.
+    // (An oval with bars across its whole width read as a rectangular stamp.)
+    const sole = () => {
+      g.beginPath();
+      g.moveTo(32, 5);
+      g.bezierCurveTo(49, 5, 53, 26, 51, 44); g.bezierCurveTo(50, 58, 44, 66, 42, 78);        // outer edge, toe to arch
+      g.lineTo(23, 78);
+      g.bezierCurveTo(21, 66, 14, 58, 13, 44); g.bezierCurveTo(11, 24, 17, 5, 32, 5);          // inner edge back to the toe
+      g.closePath();
+    };
+    const heel = () => { g.beginPath(); g.moveTo(22, 88); g.lineTo(43, 88); g.bezierCurveTo(47, 104, 44, 123, 32, 123); g.bezierCurveTo(20, 123, 18, 104, 22, 88); g.closePath(); };
+    g.fillStyle = '#4a4a4a';
+    sole(); g.fill(); heel(); g.fill();
     g.fillStyle = '#fff';
-    for (let y = 16; y < 76; y += 11) g.fillRect(17, y, 30, 5);
-    g.fillRect(20, 94, 24, 6); g.fillRect(20, 106, 24, 6);
+    g.save(); sole(); g.clip();
+    for (let y = 12; y < 78; y += 11) g.fillRect(8, y, 48, 5);
+    g.restore();
+    g.save(); heel(); g.clip();
+    g.fillRect(8, 94, 48, 6); g.fillRect(8, 107, 48, 6);
+    g.restore();
   } else {
     // a tyre: a pressed rut, unbroken from one mark to the next, with the grousers' chevrons faint inside it
     // (strong chevrons on a faint band read as a row of separate stamps)
@@ -404,6 +417,8 @@ export class Vfx {
     const st = this.streakU;
     this.streaks.visible = this.air.visible && p.storm > 0.25;
     st.uFall.value = this.fall; st.uCam.value.copy(camera.position); st.uUp.value.copy(up); st.uWind.value.copy(_s); st.uStorm.value = p.storm;
+    // marks in the ground are as dark as the light lets them be: at night an unlit mark was paler than the ground round it
+    { const k = Math.min(1, 0.05 + (p.sunIntensity || 0) / 2.6 + (p.ambient ? p.ambient.r : 0) * 0.9); for (const mk of [this.boots, this.tyres]) mk.mesh.material.color.setRGB(0.11 * k, 0.051 * k, 0.024 * k); }
     st.uLight.value.copy(a.uLight.value); st.uLight.value.r *= 0.74; st.uLight.value.g *= 0.60; st.uLight.value.b *= 0.46;      // dust-coloured, never white
     const sh = this.sheetU;
     this.sheets.visible = this.air.visible && p.storm > 0.32;

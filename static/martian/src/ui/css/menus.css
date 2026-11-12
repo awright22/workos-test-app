@@ -358,3 +358,9 @@
 .mg-compact .guide li b { font-size: .6875rem; }
 .mg-compact .guide-n { margin-top: .375rem; font-size: .6875rem; }
 .mg-compact .pause-side .side-btn { margin-top: .5rem; }
+
+/* the night's account: what each number stands at now, and what today is for */
+.sleep .delta i { font: 500 .75rem/1 var(--f-cond); font-style: normal; letter-spacing: .08em; color: var(--ink-3); }
+.sleep .notes .today { margin-top: .5rem; color: var(--ink); }
+.sleep .notes .today b { font: 600 .75rem/1 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-right: .5rem; }
+.mg-compact .sleep .delta i { font-size: .6875rem; }

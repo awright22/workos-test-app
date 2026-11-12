@@ -75,8 +75,10 @@ const GLSL_SKY = /* glsl */`
     // sun reaches that part of the planet
     vec3 nearest = normalize(uUp * camR - v * (camR * mu));
     float limbLit = smoothstep(-0.12, 0.30, dot(nearest, uSun));
-    float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.30).toFixed(1)});
-    vec3 fromSpace = vec3(0.78, 0.52, 0.34) * limb * limbLit * 0.95;
+    // (thin: a line of haze, tan against the planet and bluer where it thins into space)
+    float above = max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.16).toFixed(1)};
+    float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-above);
+    vec3 fromSpace = mix(vec3(0.70, 0.48, 0.33), vec3(0.36, 0.46, 0.66), smoothstep(0.3, 2.2, above)) * limb * limbLit * 0.75;
     // lower down, the day sky thins toward the zenith before it gives way to black
     fromSpace = max(fromSpace, col * exp(-max(uAlt, 0.0) / ${(ATMO_H * 2.0).toFixed(1)}) * h);
     col = mix(col, fromSpace, space);
