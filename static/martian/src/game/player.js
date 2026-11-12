@@ -296,7 +296,7 @@ const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI
 // ------------------------------------------------------------------------------------------
 // Walking
 // ------------------------------------------------------------------------------------------
-const cam = { init: false, pivot: new THREE.Vector3(), dist: 5.6, fov: 60, land: 0 };
+const cam = { init: false, pivot: new THREE.Vector3(), dist: 5.6, fov: 60, land: 0, turn: 0 };
 const _down = new THREE.Vector3(), _p = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3();
 const _cq = new THREE.Quaternion();     // the camera's own scratch: helpers called below reuse the shared ones
 
@@ -516,6 +516,10 @@ function updateWalkCamera(dt, running) {
         if (c.position.length() >= surfaceAt(c.position) + 0.35 && cameraClear(c.position, room)) break;
         dist *= 0.72;
       }
+    } else if (!jumped && cam.keep !== undefined && (cam.turn = (cam.turn + 1) % 3) !== 0) {
+      // (the search samples the ground a dozen times, or some hundreds with his back to a cliff: every third frame is
+      // enough, the easing between hides the rest, and a phone has better things to do)
+      dist = wantDist * cam.keep; swing = cam.keepSwing;
     } else {
       // In order: the smallest swing, up to twenty degrees, that shows his boots; the smallest that is clear at all;
       // then boom and swing give way together, a shorter boom being allowed a steeper look down.
@@ -525,13 +529,14 @@ function updateWalkCamera(dt, running) {
       search: for (let i = 0; i < 6; i++, dist *= 0.72) {
         for (let k = i ? 4 : 0, top = 8 + i; k < top; k++) {
           swing = (k < 4 ? k : k - 4) * 0.12;
-          if (swing > most * (1 + 0.25 * i)) break;
+          if (swing > most * (1 + 0.25 * i)) { if (k < 4) { k = 3; continue; } break; }      // (no more swing allowed: on to "clear at all")
           _q2.setFromAxisAngle(X_AXIS, -swing);
           c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_q1.copy(_cq).multiply(_q2)));
           if (cameraSees(c.position, k < 4) && cameraClear(c.position, null)) break search;
         }
         swing = 0;
       }
+      cam.keep = dist / wantDist; cam.keepSwing = swing; cam.turn = 0;
     }
     cam.dist = dist < cam.dist ? dist : lerp(cam.dist, dist, damp(0.25, dt));
     cam.swing = room ? 0 : jumped ? swing : lerp(cam.swing || 0, swing, damp(swing > (cam.swing || 0) ? 0.3 : 0.05, dt));
