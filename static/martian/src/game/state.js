@@ -53,6 +53,12 @@ export const BAL = {
   suitWalk: 0.28, suitRun: 0.44, suitRest: 0.155, suitIndoors: 0.14,
   roverO2Cap: 300, roverPowerCap: 100, roverDrainPerMin: 5, roverChargeAtHab: 25,
 };
+/** How well a machine works at its condition: full above 60%, falling to half at 20%, to nothing at 0. */
+export function machineEff(id) {
+  const c = S.machines ? S.machines[id] : 100;
+  if (c === undefined || c >= 60) return 1;
+  return c >= 20 ? 0.55 + 0.45 * (c - 20) / 40 : 0.55 * c / 20;
+}
 export function suitCap() { return S.upgrades.tank2 ? 200 : S.upgrades.tank1 ? 150 : BAL.suitCap; }
-export function roverTopSpeed() { return S.upgrades.drive2 ? 55 : S.upgrades.drive1 ? 45 : 35; }
+export function roverTopSpeed() { return (S.upgrades.drive2 ? 55 : S.upgrades.drive1 ? 45 : 35) * (0.62 + 0.38 * machineEff('rover')); }
 export function roverPowerCap() { return S.upgrades.roverBattery ? 160 : BAL.roverPowerCap; }

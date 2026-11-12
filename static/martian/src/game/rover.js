@@ -11,7 +11,8 @@ import { X_AXIS, _pv, _q1, _q2, _v1, _v2, _v3 } from '../core/scratch.js';
 import { surfaceAt, groundSlope } from '../planet/surface.js';
 import { R } from '../planet/constants.js';
 import { WHEEL_RADIUS, World } from '../world/build.js';
-import { S, BAL, roverTopSpeed, roverPowerCap } from './state.js';
+import { BAL, S, machineEff, roverPowerCap, roverTopSpeed } from './state.js';
+import { wearRover } from './machines.js';
 import { input } from './input.js';
 import { player, frameMove, frameYaw, collideUnit, syncPlayerPos, camLookAt } from './player.js';
 import { Snd } from '../audio/sound.js';
@@ -157,7 +158,8 @@ export function updateRover(dt) {
   const sunEl = roverUp(_v1).dot(ctx.engine.sunDir);
   const night = sunEl < 0.05;
   if (Math.abs(RV.speed) > 0.5) {
-    let drain = (BAL.roverDrainPerMin / 60) * (0.5 + Math.abs(RV.speed) / roverTopSpeed()) * (1 + Math.max(0, grade) * 1.5);
+    let drain = (BAL.roverDrainPerMin / 60) * (0.5 + Math.abs(RV.speed) / roverTopSpeed()) * (1 + Math.max(0, grade) * 1.5) * (1 + (1 - machineEff('rover')) * 0.7);
+    wearRover(Math.abs(RV.speed) * dt);
     if (night) drain *= S.upgrades.roverBattery ? 1.5 : 2;
     S.roverPower = clamp(S.roverPower - drain * dt, 0, roverPowerCap());
   } else if (!night) {

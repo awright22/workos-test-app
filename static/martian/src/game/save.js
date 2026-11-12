@@ -7,6 +7,7 @@ import { roverF, syncRoverVisual } from './rover.js';
 import { Snd } from '../audio/sound.js';
 import { UI, hideOverlay, log } from '../ui/dom.js';
 import { initScience } from './science.js';
+import { initMachines } from './machines.js';
 import { syncAllVisuals } from './visuals.js';
 // Checkpoints and the saved game.
 export function serializeState() {
@@ -21,6 +22,7 @@ export function serializeState() {
     achieved: { ...S.achieved }, checkedSystems: { ...S.checkedSystems },
     flags: { ...S.flags }, stats: { ...S.stats },
     science: S.science ? JSON.parse(JSON.stringify(S.science)) : null,
+    machines: S.machines ? { ...S.machines } : null,
     breach: { ...S.breach }, pf: { ...S.pf },
     stormCells: S.storm.cells.map(c => ({ ...c })),
     plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered })),
@@ -48,6 +50,7 @@ export function applyState(d) {
   S.flags = { ...d.flags }; S.stats = { ...d.stats };
   S.breach = { ...d.breach }; S.pf = { ...d.pf };
   if (d.science) S.science = JSON.parse(JSON.stringify(d.science)); else initScience();
+  if (d.machines) { S.machines = { ...d.machines }; S.machineWarn = {}; } else initMachines();
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore

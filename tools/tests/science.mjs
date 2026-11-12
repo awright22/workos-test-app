@@ -85,7 +85,7 @@ s = await ev((G) => {
   const before = G.science.scienceSummary();
   G.S.science.points = 24;                        // one analysis away from the first grant
   const pods0 = G.World.pods.length;
-  G.tpLocal(1.9, 0.4); G.tick(0.05, 4);
+  G.tpLocal(1.75, -0.7); G.tick(0.05, 4);          // at the work table
   const label = G.interaction.active && G.interaction.active.label();
   G.hold(2.6);
   return { before, label, pods0 };

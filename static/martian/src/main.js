@@ -16,6 +16,8 @@ import { Snd } from './audio/sound.js';
 import { MATERIALS, analyseAll, catalogue, identify, scienceSummary, takeSample } from './game/science.js';
 import { updateAudio } from './audio/driver.js';
 import { devils, spawnDevil, updateDevils } from './game/devils.js';
+import { MACHINES, dawnFaults, service, serviceCost, wearMachines, wearRover } from './game/machines.js';
+import { machineEff } from './game/state.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
 import { RockField, rockColliders } from './world/rocks.js';
@@ -205,7 +207,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    rockColliders, devils, spawnDevil,
+    rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },

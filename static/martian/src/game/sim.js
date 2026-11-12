@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { BAL, S, roverPowerCap, suitCap } from './state.js';
+import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
+import { dawnFaults, wearMachines } from './machines.js';
 import { ctx } from './ctx.js';
 import { _du, _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { clamp, hash3, lerp, smoothstep } from '../core/math.js';
@@ -80,7 +81,7 @@ export function applyRates(dt, sleeping) {
   for (const p of World.panels) p.dust = clamp(p.dust + dr, 0, 1);
   // --- hab O2 ---
   let o2d = -(BAL.o2Drain / SL) * m;
-  if (powered) o2d += BAL.o2Gen / SL;
+  if (powered) o2d += (BAL.o2Gen / SL) * machineEff('oxygenator');
   if (S.breach.active) o2d -= BAL.o2BreachDrain / SL;
   S.o2 = clamp(S.o2 + o2d * dt, 0, 100);
   // --- suit O2 & rover tank ---
@@ -100,6 +101,7 @@ export function applyRates(dt, sleeping) {
       let rate = moving ? (sprinting() ? BAL.suitRun : BAL.suitWalk) : BAL.suitRest;
       if (S.inside) rate = BAL.suitIndoors;
       if (S.upgrades.recycler) rate *= 0.75;
+      rate *= 1 + (1 - machineEff('suit')) * 0.9;                   // a spent scrubber wastes air
       if (S.flags.coldOpen) rate *= 1.9;
       const t = localTempC(playerUnit(), playerSunEl);
       if (t < -85) rate *= 1.25;                                     // suit heater sips O2 reserve
@@ -114,9 +116,11 @@ export function applyRates(dt, sleeping) {
   } else {
     S.suit = suitCap();
   }
+  // --- wear on the machines ---
+  wearMachines(dt / SL * (sleeping ? 0.5 : 1), stormAtHab, !sleeping && S.mode === 'walk' && !S.inside ? dt : 0);
   // --- water ---
   let wd = -(BAL.waterDrain / SL) * m;
-  if (powered) wd += (BAL.waterRecl / SL) * (S.upgrades.recycler ? 1 : 1);
+  if (powered) wd += (BAL.waterRecl / SL) * machineEff('reclaimer');
   S.water = clamp(S.water + wd * dt, 0, BAL.waterMax);
   // --- crops (greenhouse plots pause in a local storm? no — they're sealed domes) ---
   const dtSol = dt / SL;
@@ -254,6 +258,7 @@ export function newSol() {
     }
   }
   if (S.sol >= S.rescueSol && !S.flags.mavRevealed) revealMav();
+  dawnFaults();
   // storm forecast (uplink gives you weather service; easy mode always has it)
   if (S.pf.connected || S.diff === 'story') {
     for (const c of S.storm.cells) {

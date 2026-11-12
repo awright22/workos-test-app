@@ -63,7 +63,7 @@ export function bagSoilHere() {
 const BLUEPRINT_ORDER = ['drill', 'recycler', 'tank2', 'drive2'];
 // the analyser on the work table in the middle of the Hab
 addI({
-  pos: () => siteLocalToWorld(World.hab, 0, 0, 0, _table), r: 2.5, hold: 2.4, mode: 'walk', pose: 'stand',
+  pos: () => siteLocalToWorld(World.hab, 1.75, 0, -2.35, _table), r: 2.5, hold: 2.4, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && scienceSummary().bagged > 0,
   enabled: () => (S.power > 1 ? true : 'The analyser needs Hab power'),
   label: () => `Analyse samples (${scienceSummary().bagged})`,
