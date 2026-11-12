@@ -3055,6 +3055,10 @@ def build_solar_panel():
 # uplink_dish.glb
 # ----------------------------------------------------------------------------------------------
 def build_uplink_dish():
+    """The uplink dish: a 1.8 m reflector of twelve white panels in an aluminium rim, on a white
+    and aluminium az-el mount on a 1.3 m tripod mast. Panel seams, back ribs and a ring beam, a
+    feed horn on four struts with its cable run down a strut to the electronics box and away
+    across the ground. Part `dish` (the whole head) turns about the mast."""
     ensure_mats()
     root = part('uplink_dish')
     K = Kit('mast', root)
@@ -3070,33 +3074,38 @@ def build_uplink_dish():
         K.tube('aluminium', [pol(0.06, a, 0.26), pol(0.5, a, 0.33)], 0.014, seg=5)
         K.cyl('steel', 0.10, 0.025, foot - Vector((0, 0, 0.018)), seg=10)
         K.tube('steel', [foot, foot - Vector((0, 0, 0.3))], 0.012, seg=4)
-        K.box('canvas', (0.36, 0.22, 0.11), Vector(pol(0.6, a, 0.075)), rot=(0, 0, a), bevel=0.04, seg=2)
-        add_box(K.bm('canvas_dark', 0.0), (0.03, 0.225, 0.115), Vector(pol(0.6, a, 0.075)), rot=(0, 0, a))
-    # electronics box on the mast, foil wrapped, with a radiator face, a lamp and a label
-    K.box('gold_foil', (0.34, 0.24, 0.40), (0, 0.19, 0.74), bevel=0.02)
-    K.box('painted_white', (0.36, 0.26, 0.03), (0, 0.19, 0.955), bevel=0.008)
+        K.box('canvas', (0.36, 0.22, 0.11), Vector(pol(0.6, a, 0.075)), rot=(0, 0, a), bevel=0.035, seg=1)
+        add_box(K.bm('painted_grey', 0.0), (0.03, 0.225, 0.115), Vector(pol(0.6, a, 0.075)), rot=(0, 0, a))
+    # electronics box on the mast: white, with a finned aluminium radiator, a lamp and a label
+    K.box('painted_white', (0.34, 0.24, 0.40), (0, 0.19, 0.74), bevel=0.02)
+    K.box('aluminium', (0.36, 0.26, 0.03), (0, 0.19, 0.955), bevel=0.008)
     K.box('painted_grey', (0.36, 0.26, 0.03), (0, 0.19, 0.53), bevel=0.008)
     for i in range(5):
-        add_box(K.bm('painted_white', 0.0), (0.012, 0.03, 0.34), (-0.12 + i * 0.06, 0.325, 0.74))
-    K.box('painted_yellow', (0.012, 0.14, 0.09), (0.176, 0.19, 0.80), bevel=0.0)
+        add_box(K.bm('aluminium', 0.0), (0.012, 0.03, 0.34), (-0.12 + i * 0.06, 0.325, 0.74))
+    K.box('painted_orange', (0.012, 0.14, 0.09), (0.176, 0.19, 0.80), bevel=0.0)
+    K.box('painted_orange', (0.30, 0.012, 0.05), (0.0, 0.066, 0.88), bevel=0.0)
     add_box(K.bm('light_green', 0.0), (0.012, 0.03, 0.03), (0.176, 0.13, 0.66))
     for z in (0.62, 0.86):
         add_box(K.bm('steel', 0.0), (0.12, 0.12, 0.03), (0, 0.06, z))
+    # the cable away to the Hab: out of the box, down the leg, pegged along the ground
     K.pipe('plastic_black', [(0.1, 0.19, 0.52), (0.1, 0.19, 0.3), (0.3, 0.5, 0.04), (0.9, 0.95, 0.02), (1.25, 1.0, -0.1)], 0.016, seg=5, bend=0.1)
-    K.hose('plastic_black', [(-0.08, 0.19, 0.97), (-0.1, 0.12, 1.1), (-0.06, 0.04, MZ - 0.1)], 0.012, seg=4, n=3)
+    for (x, y) in ((0.46, 0.63), (0.9, 0.95)):
+        K.tube('steel', [(x - 0.035, y + 0.03, -0.02), (x - 0.035, y + 0.03, 0.04), (x + 0.035, y - 0.03, 0.04), (x + 0.035, y - 0.03, -0.02)], 0.005, seg=3)
     # azimuth bearing on top of the mast
-    K.cyl('painted_grey', 0.10, 0.07, (0, 0, MZ - 0.045), seg=12)
-    K.cyl('steel', 0.115, 0.018, (0, 0, MZ - 0.085), seg=12)
+    K.cyl('painted_white', 0.10, 0.07, (0, 0, MZ - 0.045), seg=12)
+    K.cyl('aluminium', 0.115, 0.018, (0, 0, MZ - 0.085), seg=12)
     K.anchor('col_post', (0, 0, 0), radius=0.8)
     K.finish()
 
-    # the head: yoke, elevation axis and actuator, reflector, feed. Pivot on the mast axis.
+    # the head: turntable, yoke, elevation axis and actuator, reflector, feed. Pivot on the mast axis.
     D = Kit('dish', part('dish', parent=root, loc=(0, 0, MZ)))
-    D.cyl('painted_grey', 0.09, 0.05, (0, 0, 0.025), seg=12)
+    D.cyl('painted_white', 0.10, 0.05, (0, 0, 0.025), seg=12)
+    D.cyl('aluminium', 0.105, 0.012, (0, 0, 0.056), seg=12)
     for sx in (-1, 1):
-        D.box('painted_grey', (0.035, 0.12, 0.34), (sx * 0.16, 0, 0.2), bevel=0.01)
-        D.cyl('steel', 0.045, 0.03, (sx * 0.185, 0, 0.30), seg=8, axis='X')
-    D.box('painted_grey', (0.36, 0.12, 0.035), (0, 0, 0.05), bevel=0.008)
+        D.prism('painted_white', [(-0.075, 0.05), (0.075, 0.05), (0.05, 0.33), (0.0, 0.375), (-0.05, 0.33)], 0.035, loc=(sx * 0.16, 0, 0), axis='X', rot=None, bevel=0.006)
+        D.cyl('aluminium', 0.05, 0.022, (sx * 0.19, 0, 0.30), seg=10, axis='X')
+        D.bolts('steel', [(sx * 0.203, 0.03 * math.cos(q), 0.30 + 0.03 * math.sin(q)) for q in (0.5, 2.6, 4.7)], 0.007, 0.006, axis='X', seg=5)
+    D.box('painted_white', (0.36, 0.15, 0.04), (0, 0, 0.07), bevel=0.008)
     EL = rad(38)                                  # boresight elevation; the dish looks toward -Y and up
     piv = Vector((0, 0, 0.30))
     rot = Matrix.Rotation(-(math.pi / 2 - EL), 4, 'X')    # dish axis +Z -> (0, -cos EL, sin EL)
@@ -3104,42 +3113,97 @@ def build_uplink_dish():
     def T(p):
         return piv + rot @ Vector(p)
     erot = (-(math.pi / 2 - EL), 0, 0)
-    R, depth = 0.9, 0.26
-    prof = [(R * t, depth * t * t) for t in (0.12, 0.3, 0.5, 0.7, 0.86, 1.0)]
-    bm = D.bm('painted_white', 0.0, 1, 40.0)
-    v0 = len(bm.verts)
-    add_lathe(bm, [(0.0, 0.0)] + prof + [(R + 0.012, depth + 0.012), (R + 0.012, depth - 0.016)] + [(r, z - 0.02) for r, z in reversed(prof)] + [(0.0, -0.02)], seg=24)
-    bm.verts.ensure_lookup_table()
-    xform(bm, bm.verts[v0:], loc=T((0, 0, 0.16)) - rot @ Vector((0, 0, 0)), rot=erot)
+    R, depth, TH = 0.9, 0.26, 0.02
     zb = 0.16                                     # dish vertex sits this far along the axis from the pivot
-    # back structure: hub drum and eight ribs
-    D.cyl('painted_grey', 0.16, 0.16, T((0, 0, zb - 0.09)), seg=12, rot=erot)
-    for i in range(8):
-        a = TAU * i / 8 + 0.2
-        p0 = T((0.15 * math.cos(a), 0.15 * math.sin(a), zb - 0.14))
-        p1 = T((0.78 * math.cos(a), 0.78 * math.sin(a), zb + depth * 0.75 - 0.03))
-        D.tube('aluminium', [p0, p1], 0.012, seg=4)
-    D.torus('aluminium', 0.5, 0.012, T((0, 0, zb + depth * 0.31 - 0.035)), seg=16, ring_seg=3, rot=erot)
-    D.cyl('steel', 0.03, 0.3, piv, seg=8, axis='X')
-    # feed: three struts to a horn at the focus, with a waveguide down one strut
-    fz = zb + R * R / (4 * depth) * 0.82
-    for i in range(3):
-        a = TAU * i / 3 + math.pi / 2
-        D.tube('aluminium', [T((R * 0.96 * math.cos(a), R * 0.96 * math.sin(a), zb + depth * 0.93)), T((0.06 * math.cos(a), 0.06 * math.sin(a), fz + 0.02))], 0.011, seg=4)
-    D.lathe('painted_grey', [(0.0, 0.0), (0.05, 0.0), (0.05, 0.10), (0.095, 0.22), (0.085, 0.22), (0.04, 0.10)], loc=T((0, 0, fz + 0.1)), seg=10,
-            rot=(erot[0] + math.pi, 0, 0), cap_end=False)
-    D.cyl('gold_foil', 0.06, 0.09, T((0, 0, fz + 0.14)), seg=8, rot=erot)
-    a = math.pi / 2
-    D.tube('copper', [T((0.04, 0.03, fz + 0.14)), T((R * 0.5 * math.cos(a) + 0.03, R * 0.5 * math.sin(a), zb + (fz - zb) * 0.52)),
-                      T((R * 0.93 * math.cos(a) + 0.03, R * 0.93 * math.sin(a), zb + depth * 0.9)), T((0.1, 0.5, zb - 0.02)), T((0.1, 0.14, zb - 0.12))], 0.008, seg=4)
-    # elevation actuator: a linear screw jack from the yoke foot to the back of the dish
-    j0, j1 = Vector((0, 0.12, 0.06)), T((0, 0.42, zb + 0.02))
+    ts = (0.12, 0.3, 0.5, 0.7, 0.86, 1.0)
+
+    def surf(r, a, lift=0.0, back=False):
+        """A point on the reflector (r from the axis, angle a), lifted off the front or the back."""
+        z = zb + depth * (r / R) ** 2
+        return T((r * math.cos(a), r * math.sin(a), z - TH - lift if back else z + lift))
+
+    # the reflector: white on its face and edge, grey composite behind (a white back takes the colour of the
+    # ground it looks down on and the dish vanishes against it)
+    face_bm, back_bm = D.open('painted_white', 40.0), D.open('painted_grey', 40.0)
+    NS = 24
+    for back, bmr in ((False, face_bm), (True, back_bm)):
+        cv = bmr.verts.new(surf(0.0, 0.0, 0.0, back))
+        rings = [[bmr.verts.new(surf(R * t if t < 1 else R + 0.004, TAU * i / NS, 0.0, back)) for i in range(NS)] for t in ts]
+        for i in range(NS):
+            i2 = (i + 1) % NS
+            tri = (cv, rings[0][i], rings[0][i2])
+            bmr.faces.new(tri[::-1] if back else tri)
+            for a_, b_ in zip(rings, rings[1:]):
+                q = (a_[i], b_[i], b_[i2], a_[i2])
+                bmr.faces.new(q[::-1] if back else q)
+        if not back:
+            edge = [bmr.verts.new(surf(R + 0.004, TAU * i / NS, 0.0, True)) for i in range(NS)]
+            for i in range(NS):
+                i2 = (i + 1) % NS
+                bmr.faces.new((rings[-1][i], edge[i], edge[i2], rings[-1][i2]))
+    # the rim: a rolled aluminium edge
+    D.torus('aluminium', R + 0.004, 0.017, T((0, 0, zb + depth - TH / 2)), seg=24, ring_seg=5, rot=erot)
+    # panel lines: twelve radial seams and a ring seam, on the face and on the back
+    seam = D.open('painted_grey')
+    for k in range(12):
+        a = TAU * k / 12
+        for back in (False, True):
+            for t0, t1 in zip(ts[1:], ts[2:]):
+                w0, w1 = 0.0065 / (R * t0), 0.0065 / (R * t1)
+                q = [surf(R * t0, a - w0, 0.003, back), surf(R * t1 * 0.995, a - w1, 0.003, back), surf(R * t1 * 0.995, a + w1, 0.003, back),
+                     surf(R * t0, a + w0, 0.003, back)]
+                add_quad(seam, *(q[::-1] if back else q))
+    for i in range(24):
+        a0, a1 = TAU * i / 24, TAU * (i + 1) / 24
+        for back in (False, True):
+            for rr in ((R * 0.3,) if back else (R * 0.3, R * 0.7)):
+                q = [surf(rr - 0.007, a0, 0.003, back), surf(rr + 0.007, a0, 0.003, back), surf(rr + 0.007, a1, 0.003, back), surf(rr - 0.007, a1, 0.003, back)]
+                add_quad(seam, *(q[::-1] if back else q))
+    # back structure: a hub drum, twelve tapered ribs along the seams, a ring beam
+    D.cyl('painted_grey', 0.17, 0.15, T((0, 0, zb - TH - 0.075)), seg=12, rot=erot)
+    D.cyl('aluminium', 0.185, 0.02, T((0, 0, zb - TH - 0.012)), seg=12, rot=erot)
+    rib = D.bm('aluminium', 0.0, 1, 30.0)
+    rs = (0.165, R * 0.3, R * 0.5, R * 0.7, R * 0.9)
+    for k in range(12):
+        a = TAU * k / 12
+        for j, (r0, r1) in enumerate(zip(rs, rs[1:])):
+            d0 = 0.115 - 0.095 * (r0 - rs[0]) / (rs[-1] - rs[0])          # how deep the rib stands off the shell
+            d1 = 0.115 - 0.095 * (r1 - rs[0]) / (rs[-1] - rs[0])
+            c = []
+            for sgn in (-1, 1):
+                w0, w1 = sgn * 0.006 / r0, sgn * 0.006 / r1
+                c.append((surf(r0, a + w0, -0.002, True), surf(r1, a + w1, -0.002, True), surf(r1, a + w1, d1, True), surf(r0, a + w0, d0, True)))
+            add_quad(rib, *c[0])                                           # the two cheeks and the edge that faces aft
+            add_quad(rib, *c[1][::-1])
+            add_quad(rib, c[0][3], c[0][2], c[1][2], c[1][3])
+            if j == len(rs) - 2:
+                add_quad(rib, c[0][2], c[0][1], c[1][1], c[1][2])
+    D.torus('aluminium', R * 0.62, 0.014, T((0, 0, zb + depth * 0.62 ** 2 - TH - 0.06)), seg=24, ring_seg=4, rot=erot)
+    D.cyl('steel', 0.03, 0.34, piv, seg=8, axis='X')                # elevation axle
+    # feed: a horn at the focus on four struts, its electronics box behind it
+    fz = zb + R * R / (4 * depth) * 0.84
+    for i in range(4):
+        a = TAU * i / 4 + math.pi / 4
+        D.tube('aluminium', [surf(R * 0.985, a, 0.0), T((0.075 * math.cos(a), 0.075 * math.sin(a), fz + 0.06))], 0.011, seg=4)
+    D.torus('aluminium', 0.075, 0.012, T((0, 0, fz + 0.06)), seg=8, ring_seg=3, rot=erot)
+    D.lathe('painted_grey', [(0.0, 0.0), (0.045, 0.0), (0.045, 0.09), (0.105, 0.21), (0.096, 0.21), (0.036, 0.09), (0.036, 0.012), (0.0, 0.012)],
+            loc=T((0, 0, fz + 0.10)), seg=12, rot=(erot[0] + math.pi, 0, 0))
+    D.cyl('painted_white', 0.062, 0.11, T((0, 0, fz + 0.155)), seg=10, rot=erot)
+    D.cyl('aluminium', 0.068, 0.014, T((0, 0, fz + 0.105)), seg=10, rot=erot)
+    # the feed cable: from the box down a strut, round the rim, along a rib to the hub and down to the mast
+    a = math.pi / 4 + math.pi / 2
+    D.hose('plastic_black', [T((0.03, 0.05, fz + 0.19)), T((0.085 * math.cos(a) + 0.02, 0.085 * math.sin(a) + 0.02, fz + 0.10)),
+                             surf(R * 0.6, a + 0.03, 0.26 * 0.42), surf(R * 0.99, a + 0.02, 0.02), surf(R * 1.0, a + 0.02, 0.03, True),
+                             surf(R * 0.62, a + 0.03, 0.10, True), surf(0.20, a + 0.1, 0.13, True), T((0.06, 0.16, zb - 0.22)), (0.06, 0.11, 0.10),
+                             (0.05, 0.10, 0.0)], 0.009, seg=4, n=2)
+    # elevation actuator: a screw jack from the foot of the yoke to the hub
+    j0, j1 = Vector((0, 0.13, 0.07)), T((0, 0.30, zb - 0.10))
     mid = j0.lerp(j1, 0.55)
     D.tube('painted_grey', [j0, mid], 0.028, seg=8)
     D.tube('steel', [mid, j1], 0.014, seg=6)
-    D.box('painted_dark', (0.07, 0.09, 0.10), j0 + Vector((0, 0.03, -0.02)), bevel=0.01)
+    D.box('painted_grey', (0.07, 0.09, 0.10), j0 + Vector((0, 0.03, -0.02)), bevel=0.01)
     D.box('steel', (0.05, 0.05, 0.05), j1, bevel=0.006)
-    D.box('painted_orange', (0.36, 0.02, 0.035), T((0, -0.0, zb - 0.175)), rot=erot, bevel=0.0)
+    D.box('painted_orange', (0.24, 0.02, 0.03), T((0, 0.0, zb - 0.172)), rot=erot, bevel=0.0)
     D.finish()
     tally(root, 'uplink_dish')
     return finish(root, 'uplink_dish', samples=32, distance=0.6)

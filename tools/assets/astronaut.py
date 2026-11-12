@@ -1,7 +1,7 @@
 """
 Family A — the astronaut: one skinned mesh on one armature, with twelve animation clips.
 
-Run:   /home/user/blender-venv/bin/python tools/assets/astronaut.py [astronaut] [--anim-only] [--fast]
+Run:   /home/user/blender-venv/bin/python tools/assets/astronaut.py [astronaut] [--anim-only] [--fast] [--out FILE.glb]
 Then:  node tools/assets/preview.mjs astronaut --clips
 
 How it is put together
@@ -19,6 +19,12 @@ How it is put together
              feet do not slide, hands stay out of the torso / chest unit / backpack / helmet, loops
              close exactly.
 
+The game shows one of two groups above the neck ring, by material name: the helmet (materials
+helmet_white, helmet_dark, helmet_metal, helmet_light and visor_gold: shell, visor, rim, ear hubs,
+lamps, base ring and the neck bellows) or the bare head (head_skin, head_cap, head_dark). Every
+other surface belongs to the suit and is always drawn.
+
+--out writes the finished file somewhere else (for trying things without touching the game's copy).
 --anim-only reuses the cached mesh (tools/assets/.cache/raw/astronaut_mesh.glb) and only rebuilds
 the clips, which takes a couple of seconds. --fast bakes a rough ambient occlusion. --debug adds
 a six-second 'Test' clip of extreme poses (deep squat, arms overhead, elbows at 120 degrees,
@@ -40,7 +46,7 @@ NAME = 'astronaut'
 MESH_RAW = os.path.join(RAW_DIR, NAME + '_mesh.glb')      # Blender export: mesh + skeleton, no clips
 SKIN_NPZ = os.path.join(RAW_DIR, NAME + '_skin.npz')      # rest verts + weights for the clip linter
 FULL_RAW = os.path.join(RAW_DIR, NAME + '.glb')           # with clips, before gltfpack
-TRI_BUDGET = 24000
+TRI_BUDGET = 26000
 
 
 # ==============================================================================================
@@ -413,9 +419,13 @@ class Model:
         self.pieces = []
 
     def add(self, name, bm, material, weight, mirror=False, bevel=0.0, bevel_seg=1, bevel_angle=30.0,
-            smooth=40.0, tint=(1.0, 1.0, 1.0)):
+            smooth=40.0, tint=(1.0, 1.0, 1.0), normal=None, soft_ao=0.0):
         """Register a finished piece. `weight` is a bone name (rigid) or a function of the rest
-        position returning {bone: weight}. `mirror` adds the X-mirrored twin with _L/_R swapped."""
+        position returning {bone: weight}. `mirror` adds the X-mirrored twin with _L/_R swapped.
+        `tint` is a colour or a function of the rest position (the baked colour is AO times it).
+        `normal` is an optional function of the rest position giving the exact surface normal
+        (used for the visor, so that a mirror material reflects without faceting). `soft_ao`
+        (0..1) lightens and evens out the baked occlusion on the piece: skin shows every blotch."""
         bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
         if bevel:
             edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > rad(bevel_angle)]
@@ -423,14 +433,16 @@ class Model:
                 bmesh.ops.bevel(bm, geom=edges, offset=bevel, offset_type='OFFSET', segments=bevel_seg,
                                 profile=0.5, affect='EDGES', clamp_overlap=True)
         wfn = (lambda p, _b=weight: {_b: 1.0}) if isinstance(weight, str) else weight
-        self.pieces.append(dict(name=name, bm=bm, material=material, weight=wfn, smooth=smooth, tint=tint))
+        self.pieces.append(dict(name=name, bm=bm, material=material, weight=wfn, smooth=smooth, tint=tint, normal=normal, soft_ao=soft_ao))
         if mirror:
             b2 = bm.copy()
             bmesh.ops.transform(b2, matrix=Matrix.Diagonal((-1, 1, 1, 1)), verts=b2.verts[:])
             bmesh.ops.reverse_faces(b2, faces=b2.faces[:])
             w2 = lambda p, _w=wfn: {_swap_side(k): v for k, v in _w(Vector((-p.x, p.y, p.z))).items()}  # noqa: E731
+            t2 = (lambda p, _t=tint: _t(Vector((-p.x, p.y, p.z)))) if callable(tint) else tint
+            n2 = (lambda p, _n=normal: _mx(_n(Vector((-p.x, p.y, p.z))))) if normal else None
             nm = name.replace('_L', '_R') if '_L' in name else name + '_R'
-            self.pieces.append(dict(name=nm, bm=b2, material=material, weight=w2, smooth=smooth, tint=tint))
+            self.pieces.append(dict(name=nm, bm=b2, material=material, weight=w2, smooth=smooth, tint=t2, normal=n2, soft_ao=soft_ao))
 
     def report(self):
         grp = {}
@@ -443,10 +455,10 @@ class Model:
 
     def join(self, obj_name):
         """One mesh object with materials, sharp edges, vertex groups. Returns (object, tints,
-        piece ids per vertex)."""
+        piece ids per vertex, exact normals per vertex or (0, 0, 0) where Blender's own are used)."""
         bm = bmesh.new()
         dl = bm.verts.layers.deform.verify()
-        mats, tints, pids = [], [], []
+        mats, tints, pids, normals = [], [], [], []
         for pi, p in enumerate(self.pieces):
             src = p['bm']
             if p['material'] not in mats:
@@ -462,7 +474,8 @@ class Model:
                 for k, x in w.items():
                     nv[dl][BONE_INDEX[k]] = x / tot
                 vmap.append(nv)
-                tints.append(p['tint'])
+                tints.append(tuple(p['tint'](v.co)) if callable(p['tint']) else p['tint'])
+                normals.append(tuple(p['normal'](v.co)) if p['normal'] else (0.0, 0.0, 0.0))
                 pids.append(pi)
             for f in src.faces:
                 try:
@@ -486,7 +499,7 @@ class Model:
         obj = bpy.data.objects.new(obj_name, me)
         for n in BONE_NAMES:
             obj.vertex_groups.new(name=n)
-        return obj, tints, pids
+        return obj, tints, pids, normals
 
 
 # ==============================================================================================
@@ -575,6 +588,15 @@ def build_torso(M):
     for sx in (-1, 1):
         add_box(bm, (0.022, 0.018, 0.02), (sx * 0.143, 0.004, 1.502))
     M.add('neck_latch', bm, 'plastic_black', 'chest', bevel=0.004)
+    # padded collar inside the neck ring: it closes the opening round the wearer's neck, so the
+    # suit looks finished from above with the helmet off (with the helmet on it is inside the bellows)
+    bm = bm_new()
+    rows = []
+    for cy, r, z in ((0.004, 0.1262, 1.5140), (0.004, 0.1215, 1.5185), (0.0065, 0.1110, 1.5235), (0.012, 0.0930, 1.5210),
+                     (0.018, 0.0700, 1.5075), (0.019, 0.0640, 1.4990)):
+        rows.append([Vector((r * math.cos(TAU * j / 14), cy + r * math.sin(TAU * j / 14), z)) for j in range(14)])
+    grid(bm, rows, close_u=True, out_from=(0, 0.01, 1.40))
+    M.add('collar_pad', bm, 'suit_grey', 'chest', smooth=60, tint=BELLOWS)
 
     # ---- shoulder (scye) housings on the HUT and the bearing rings the arms turn in
     bm = bm_new()
@@ -801,77 +823,518 @@ def build_backpack(M):
         M.add('hose_fittings_' + nm, bm, 'aluminium', 'chest', smooth=50)
 
 
+def group_materials():
+    """Materials of the two groups the game shows one at a time above the neck ring. The helmet's
+    are copies of the palette materials those pieces always used, under names the game can find
+    (helmet_*, visor*); the head's are its own (head_*). Call after reset_scene()."""
+    def alias(new, old):
+        spec = PALETTE[old]
+        kw = dict(color=spec[0], metallic=spec[1], roughness=spec[2])
+        if len(spec) > 3 and spec[3]:
+            kw.update(emissive=spec[3], strength=spec[4])
+        mat(new, **kw)
+    alias('helmet_white', 'painted_white')     # shell, ear hubs, vent, visor frame; tinted for the stripe and the neck bellows
+    alias('helmet_dark', 'plastic_black')      # lamp pods, camera pod, vent slots, visor gasket
+    alias('helmet_metal', 'aluminium')         # base ring, hub bolts, lamp bezels, camera lens
+    alias('helmet_light', 'light_white')       # lamp lenses (emissive)
+    mat('head_skin', color=SKIN, metallic=0.0, roughness=0.62)
+    mat('head_cap', color=(0.80, 0.79, 0.76), metallic=0.0, roughness=0.88)       # cap fabric, undershirt collar, eye whites
+    mat('head_dark', color=(0.060, 0.056, 0.052), metallic=0.0, roughness=0.60)   # hair, brows, eyes, ear pieces, strap, microphone
+
+
+SKIN = (0.62, 0.37, 0.26)
+STRIPE_TINT = tuple(o / w for o, w in zip(PALETTE['suit_orange'][0], PALETTE['painted_white'][0]))     # orange paint on the white shell
+DAM_TINT = tuple(g / w * b for g, w, b in zip(PALETTE['suit_grey'][0], PALETTE['painted_white'][0], BELLOWS))
+
+
 def build_helmet(M):
+    """Everything that comes off with the helmet (materials helmet_* and visor_gold)."""
     c = HELMET_C
     PHI_TOP, PHI_CHIN = 36 * D2R, -50 * D2R
     psis = [(20 + 140 * j / 14) * D2R for j in range(15)]
-    # gold bubble visor (front)
+    # gold bubble visor: a true spherical cap (radius R_VISOR about the helmet centre) in cells of
+    # about 6 degrees, with exact radial normals, set 12 mm back from the face of its frame. Its
+    # edges run under the frame above and below and under the ear hubs at the sides, and the
+    # poles of its grid lie under the hubs.
     bm = bm_new()
-    sphere_patch(bm, lambda i, j: R_VISOR, frange(PHI_CHIN - 9 * D2R, PHI_TOP + 9 * D2R, 9), [(14 + 152 * j / 14) * D2R for j in range(15)])
-    M.add('visor', bm, 'visor_gold', 'head', smooth=180)
+    sphere_patch(bm, lambda i, j: R_VISOR, frange(PHI_CHIN - 2.4 * D2R, PHI_TOP + 2.4 * D2R, VISOR_ROWS),
+                 [(22 + 136 * j / VISOR_COLS) * D2R for j in range(VISOR_COLS + 1)])
+    M.add('visor', bm, 'visor_gold', 'head', smooth=180, normal=lambda p: (Vector(p) - c).normalized())
     # white protective shell: over the top and back, and the chin band; cut flat at the neck
     bm = bm_new()
     sphere_patch(bm, lambda i, j: R_SHELL, frange(PHI_TOP, (360 + PHI_CHIN / D2R) * D2R, 24), psis)
     bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 1.562), plane_no=(0, 0, -1), clear_outer=True)
-    M.add('helmet_shell', bm, 'painted_white', 'head', smooth=180)
-    # visor rim seal
-    bm = bm_new()
-    add_tube(bm, [sph(R_SHELL + 0.001, PHI_TOP, ps) for ps in psis], 0.0065, seg=4)
-    add_tube(bm, [sph(R_SHELL + 0.001, PHI_CHIN, ps) for ps in psis], 0.0065, seg=4)
-    M.add('visor_rim', bm, 'rubber', 'head', smooth=100)
+    M.add('helmet_shell', bm, 'helmet_white', 'head', smooth=180)
+    # visor frame: a raised white band on the shell along the top and bottom of the opening, and
+    # inside it a black gasket whose wall drops to the visor (the ear hubs close the sides)
+    for nm, phi0, sg in (('top', PHI_TOP, 1.0), ('chin', PHI_CHIN, -1.0)):
+        frame = [(5.3, R_SHELL - 0.0018), (4.7, R_SHELL + 0.0044), (1.5, R_SHELL + 0.0046)]
+        gasket = [(1.5, R_SHELL + 0.0046), (0.4, R_SHELL + 0.0044), (-0.2, R_SHELL + 0.0012), (-0.9, R_VISOR - 0.0014)]
+        for piece, rows, material, tint in (('visor_frame_', frame, 'helmet_white', (0.9, 0.9, 0.9)), ('visor_gasket_', gasket, 'helmet_dark', (1.0, 1.0, 1.0))):
+            bm = bm_new()
+            sphere_patch(bm, lambda i, j, _r=rows: _r[i][1], [phi0 + sg * d * D2R for d, _ in rows], psis)
+            M.add(piece + nm, bm, material, 'head', smooth=50, tint=tint)
     # ear hubs (the visor pivots) and lamp pods
     bm = bm_new()
     add_lathe(bm, [(0.064, -0.012), (0.064, 0.004), (0.056, 0.012), (0.034, 0.014), (0.034, 0.008), (0.0, 0.008)], seg=16,
               loc=(c.x + 0.163, c.y, c.z), axis='X')
-    M.add('ear_hub_L', bm, 'painted_white', 'head', mirror=True, smooth=45, tint=(0.86, 0.86, 0.86))
+    M.add('ear_hub_L', bm, 'helmet_white', 'head', mirror=True, smooth=45, tint=(0.86, 0.86, 0.86))
     bm = bm_new()
     add_lathe(bm, [(0.03, 0.0), (0.03, 0.012), (0.024, 0.016), (0.0, 0.016)], seg=10, loc=(c.x + 0.171, c.y, c.z), axis='X', cap_start=False)
     add_lathe(bm, [(0.0215, 0.0), (0.0215, 0.007), (0.018, 0.007)], seg=12, loc=LAMP_C + Vector((0, -0.039, 0)), rot=(rad(90), 0, 0), cap_end=False, cap_start=False)
-    M.add('ear_bolt_L', bm, 'aluminium', 'head', mirror=True, smooth=45)
+    M.add('ear_bolt_L', bm, 'helmet_metal', 'head', mirror=True, smooth=45)
     bm = bm_new()
     add_box(bm, (0.05, 0.078, 0.05), LAMP_C)
     add_box(bm, (0.026, 0.05, 0.05), LAMP_C + Vector((-0.012, 0.03, -0.045)))    # bracket down to the hub
-    M.add('lamp_body_L', bm, 'plastic_black', 'head', mirror=True, bevel=0.007)
+    M.add('lamp_body_L', bm, 'helmet_dark', 'head', mirror=True, bevel=0.007)
     bm = bm_new()
     add_lathe(bm, [(0.018, 0.0), (0.015, 0.0045), (0.0, 0.006)], seg=12, loc=LAMP_C + Vector((0, -0.042, 0)), rot=(rad(90), 0, 0), cap_start=False)
-    M.add('lamp_lens_L', bm, 'light_white', 'head', mirror=True, smooth=60)
-    # orange identification stripe over the crown, front to back
+    M.add('lamp_lens_L', bm, 'helmet_light', 'head', mirror=True, smooth=60)
+    # orange identification stripe over the crown, front to back (paint on the shell)
     bm = bm_new()
     ps = [80 * D2R, 80.4 * D2R, 90 * D2R, 99.6 * D2R, 100 * D2R]
     rr = [R_SHELL - 0.002, R_SHELL + 0.0035, R_SHELL + 0.0035, R_SHELL + 0.0035, R_SHELL - 0.002]
-    sphere_patch(bm, lambda i, j: rr[j] - 0.001 if 0 < i < 15 else R_SHELL - 0.002, [(PHI_TOP + 5 * D2R)] + frange(PHI_TOP + 5.4 * D2R, 195.6 * D2R, 13) + [196 * D2R], ps)
-    M.add('helmet_stripe', bm, 'suit_orange', 'head', smooth=60)
+    sphere_patch(bm, lambda i, j: rr[j] - 0.001 if 0 < i < 15 else R_SHELL - 0.002, [(PHI_TOP + 7 * D2R)] + frange(PHI_TOP + 7.4 * D2R, 195.6 * D2R, 13) + [196 * D2R], ps)
+    M.add('helmet_stripe', bm, 'helmet_white', 'head', smooth=60, tint=STRIPE_TINT)
     # forehead camera pod and rear ventilation housing
     bm = bm_new()
-    pc = sph(R_SHELL + 0.012, PHI_TOP + 13 * D2R, 90 * D2R)
+    pc = sph(R_SHELL + 0.012, PHI_TOP + 14.5 * D2R, 90 * D2R)
     add_box(bm, (0.06, 0.05, 0.034), pc, rot=(rad(-40), 0, 0))
-    M.add('cam_pod', bm, 'plastic_black', 'head', bevel=0.006)
+    M.add('cam_pod', bm, 'helmet_dark', 'head', bevel=0.006)
     bm = bm_new()
     add_lathe(bm, [(0.012, 0.0), (0.012, 0.006), (0.009, 0.008), (0.0, 0.007)], seg=8, loc=pc + Euler((rad(-40), 0, 0)).to_matrix() @ Vector((0.012, -0.025, 0.0)),
               rot=(rad(90 - 40), 0, 0), cap_start=False)
-    M.add('cam_lens', bm, 'aluminium', 'head', smooth=50)
+    M.add('cam_lens', bm, 'helmet_metal', 'head', smooth=50)
     bm = bm_new()
     rv = lambda i, j: R_SHELL + (-0.002 if i in (0, 5) or j in (0, 7) else 0.012)  # noqa: E731
     sphere_patch(bm, rv, [204 * D2R, 204.6 * D2R, 211 * D2R, 220 * D2R, 228.4 * D2R, 229 * D2R],
                  [x * D2R for x in (56, 56.6, 70, 83, 97, 110, 123.4, 124)])
-    M.add('helmet_vent', bm, 'painted_white', 'head', smooth=40, tint=(0.84, 0.84, 0.84))
+    M.add('helmet_vent', bm, 'helmet_white', 'head', smooth=40, tint=(0.84, 0.84, 0.84))
     bm = bm_new()
     for k in range(3):
         add_tube(bm, [sph(R_SHELL + 0.0135, (210.5 + k * 5.5) * D2R, pz * D2R) for pz in (68, 79, 90, 101, 112)], 0.003, seg=4)
-    M.add('helmet_vent_slots', bm, 'plastic_black', 'head', smooth=100)
-    # helmet base ring (turns with the head) and the flexible neck dam under it
+    M.add('helmet_vent_slots', bm, 'helmet_dark', 'head', smooth=100)
+    # helmet base ring (turns with the head) and the flexible neck bellows under it, which
+    # lifts off the suit's neck ring with the helmet
     bm = bm_new()
     add_lathe(bm, [(0.118, -0.016), (0.129, -0.016), (0.134, -0.009), (0.134, 0.004), (0.127, 0.012), (0.12, 0.012)], seg=24,
               loc=(0, -0.008, 1.562), cap_start=False, cap_end=False)
-    M.add('helmet_base', bm, 'aluminium', 'head', smooth=50)
+    M.add('helmet_base', bm, 'helmet_metal', 'head', smooth=50)
     neck = Tube(TORSO_FRAME, stations=[(1.49, 0.122, 0.122, 0, 0.002, 2.0), (1.56, 0.120, 0.120, 0, -0.006, 2.0)],
                 mod=ribs(1.495, 0.02, 0.005))
     bm = bm_new()
     neck.loft(bm, frange(1.495, 1.555, 6), seg=16)
-    M.add('neck_dam', bm, 'suit_grey', w_neck, smooth=80, tint=BELLOWS)
+    M.add('neck_dam', bm, 'helmet_white', w_neck, smooth=80, tint=DAM_TINT)
 
+
+VISOR_ROWS, VISOR_COLS = 12, 22          # cells across the visor (pitch, ear to ear)
 
 LAMP_C = Vector((HELMET_C.x + 0.172, HELMET_C.y - 0.052, HELMET_C.z + 0.088))
+
+
+# ==============================================================================================
+# The bare head (materials head_*): the game shows it in place of the helmet indoors.
+#
+# A man in his thirties in a communications cap: a white centre panel from forehead to nape,
+# dark side panels carrying the earphone cups, a chin strap and a boom microphone; short dark
+# hair shows at the forehead, the temples and the nape. Forms are clean and slightly simplified,
+# to sit with the suit and to read from three metres. The skin is a grid whose columns and rows
+# are placed on the features (nose, lips, eye sockets, brow), shaped by a midline profile and a
+# few bumps, and shaded a little by hand in its vertex colours. Cap and hair are shells over the
+# skull whose edges turn in and end under the surface below, so no back face is ever exposed
+# (the game draws front faces only). The head stays inside the helmet with room to spare.
+# ==============================================================================================
+HEAD_CY = 0.004                        # y of the widest part of the skull
+Z_DOME, Z_CROWN = 1.715, 1.798         # above Z_DOME the skull is half an ellipsoid
+Z_CHIN, Z_FTOP = 1.574, 1.746          # chin point; top row of the face grid (under the hair)
+Z_MOUTH = 1.6145
+EYE_X, EYE_Z, EYE_Y, EYE_SLOPE = 0.032, 1.679, -0.0815, 0.20      # the flat floor of the eye socket
+HEAD_A = Curve([(1.574, 0.0470), (1.590, 0.0515), (1.604, 0.0555), (1.615, 0.0590), (1.630, 0.0640), (1.655, 0.0695), (1.680, 0.0730), (1.700, 0.0762), (1.715, 0.0775)])
+HEAD_YB = Curve([(1.590, 0.0720), (1.600, 0.0750), (1.610, 0.0790), (1.630, 0.0880), (1.660, 0.0960), (1.690, 0.0995), (1.715, 0.1000)])
+HEAD_YF = Curve([  # the face beside the nose: height, y of the front of the cross-section
+    (1.574, -0.0835), (1.580, -0.0880), (1.588, -0.0905), (1.598, -0.0905), (1.607, -0.0930), (1.6145, -0.0940), (1.623, -0.0952), (1.634, -0.0960),
+    (1.645, -0.0965), (1.655, -0.0960), (1.665, -0.0945), (1.674, -0.0930), (1.680, -0.0930), (1.688, -0.0965), (1.695, -0.1000), (1.705, -0.1005), (1.715, -0.1000)])
+HEAD_YM = Curve([  # the profile on the midline: chin, lips, nose, brow
+    (1.574, -0.0835), (1.580, -0.0905), (1.587, -0.0940), (1.594, -0.0925), (1.600, -0.0900), (1.6055, -0.0975), (1.610, -0.0990), (1.6145, -0.0945),
+    (1.6185, -0.1000), (1.623, -0.1010), (1.630, -0.0988), (1.634, -0.1010), (1.6375, -0.1175), (1.6415, -0.1228), (1.646, -0.1210), (1.655, -0.1148),
+    (1.665, -0.1075), (1.674, -0.1005), (1.680, -0.0975), (1.688, -0.0992), (1.695, -0.1020), (1.705, -0.1010), (1.715, -0.1000)])
+FACE_W = Curve([  # half-width of whatever stands out on the midline at each height
+    (1.574, 0.018), (1.587, 0.019), (1.600, 0.022), (1.6055, 0.024), (1.6145, 0.027), (1.623, 0.024), (1.630, 0.012), (1.634, 0.0150), (1.637, 0.0170),
+    (1.641, 0.0150), (1.646, 0.0135), (1.655, 0.0125), (1.665, 0.0115), (1.674, 0.0110), (1.680, 0.0115), (1.688, 0.014), (1.695, 0.018), (1.715, 0.020)])
+FACE_ZS = [1.579, 1.588, 1.597, 1.6045, 1.6100, Z_MOUTH, 1.6190, 1.6245, 1.631, 1.6345, 1.638, 1.643, 1.652, 1.662, 1.6725, 1.679, 1.6855, 1.694, 1.706, 1.724, Z_FTOP]
+FACE_XS = [0.0, 0.0065, 0.0135, 0.0205, 0.0285, 0.0365, 0.0445, 0.054, 0.0645]       # columns on the face (x at eye level)
+FACE_TH = [math.asin((x / 0.0730) ** 1.4) for x in FACE_XS] + [76 * D2R, 90 * D2R]
+BACK_TH = [84 * D2R, 99 * D2R, 112 * D2R, 126 * D2R, 142 * D2R, 160 * D2R, 180 * D2R]
+CAP_C = Vector((0.0, 0.006, 1.676))      # between the ears: the cap's panels are laid out round this axis
+CAP_PSI = [24, 28, 35, 45, 60, 75, 90, 105, 120, 135, 145, 152, 156]     # columns, degrees from the left ear
+CAP_PF = Curve([(0, 38), (15, 37), (30, 34), (45, 27), (55, 10), (62, -20), (66, -45)])        # front edge: pitch against degrees off the midline
+CAP_PB = Curve([(0, 211), (15, 213), (30, 218), (45, 228), (55, 238), (62, 247), (66, 256)])   # back edge
+CAP_ROWS = 10
+CAP_T = 0.0055                           # thickness of the cap over the skull
+HAIR_F = Curve([(0, 0.0175), (15, 0.0150), (30, 0.0125), (45, 0.0160), (55, 0.0170), (62, 0.0120), (66, 0.0040)])    # hair showing in front of the cap
+HAIR_B = Curve([(0, 0.0230), (15, 0.0230), (30, 0.0215), (45, 0.0170), (55, 0.0100), (62, 0.0030), (66, 0.0010)])    # and below it at the nape
+HAIR_TINT = (0.62, 0.42, 0.30)           # dark brown, out of the warm grey of head_dark
+FLAP_TINT = (0.52, 0.52, 0.56)           # charcoal side panels, cups, strap and microphone
+
+
+def head_sec(z):
+    """Cross-section of the bare skull at height z: half-width, front y, back y, squareness.
+    The face is flatter across the front than the jaw or the cranium."""
+    if z >= Z_DOME:
+        k = math.sqrt(max(1.0 - ((z - Z_DOME) / (Z_CROWN - Z_DOME)) ** 2, 0.0))
+        return 0.0775 * k, HEAD_CY - 0.104 * k, HEAD_CY + 0.096 * k, 2.2
+    zz = max(z, Z_CHIN)
+    n = 2.2 + 0.6 * smooth01((z - 1.595) / 0.04) * (1.0 - smooth01((z - 1.685) / 0.03))
+    return float(HEAD_A(zz)[0]), float(HEAD_YF(zz)[0]), float(HEAD_YB(max(z, 1.59))[0]), n
+
+
+def head_base(th, z):
+    """Point on the skull. th = 0 is the front (-Y), +90 degrees his left (+X)."""
+    a, yf, yb, n = head_sec(z)
+    c, s, e = math.cos(th), math.sin(th), 2.0 / n
+    return Vector((a * spow(s, e), HEAD_CY - spow(c, e) * ((HEAD_CY - yf) if c >= 0 else (yb - HEAD_CY)), z))
+
+
+def head_normal(th, z):
+    d = 1e-3
+    pt = head_base(th + d, z) - head_base(th - d, z)
+    pz = head_base(th, min(z + d, Z_CROWN - 1e-5)) - head_base(th, z - d)
+    n = pt.cross(pz)
+    return n.normalized() if n.length > 1e-12 else Vector((0, 0, 1))
+
+
+def skull_frame(phi, psi):
+    """The skull seen from the point between the ears: where the ray at pitch phi (from forward
+    towards up) and angle psi from the left ear leaves it, the outward normal there, and the
+    direction along the surface in which phi grows."""
+    def hit(ph, ps):
+        d = Vector((math.cos(ps), -math.sin(ps) * math.cos(ph), math.sin(ps) * math.sin(ph)))
+        lo, hi = 0.02, 0.16
+        for _ in range(34):
+            mid = (lo + hi) / 2
+            p = CAP_C + d * mid
+            a, yf, yb, n = head_sec(p.z)
+            b = (HEAD_CY - yf) if p.y < HEAD_CY else (yb - HEAD_CY)
+            inside = p.z < Z_CROWN and a > 1e-6 and abs(p.x / a) ** n + abs((p.y - HEAD_CY) / b) ** n < 1.0
+            lo, hi = (mid, hi) if inside else (lo, mid)
+        return CAP_C + d * lo
+    e = 0.012
+    p = hit(phi, psi)
+    dphi = hit(phi + e, psi) - hit(phi - e, psi)
+    n = dphi.cross(hit(phi, psi + e) - hit(phi, psi - e)).normalized()
+    return p, (n if n.dot(p - CAP_C) > 0 else -n), dphi.normalized()
+
+
+def head_seam_normal(p):
+    """Exact skull normal for the skin either side of the seam under each ear (the edge of the
+    face lies over the band round the back there), so the two shade as one surface. Elsewhere
+    (0, 0, 0): Blender's own normal."""
+    a, yf, yb, n = head_sec(p.z)
+    b = (HEAD_CY - yf) if p.y < HEAD_CY else (yb - HEAD_CY)
+    th = math.atan2(spow(p.x / a, n / 2), spow((HEAD_CY - p.y) / b, n / 2))
+    if abs(th) < 83 * D2R or abs(th) > 100 * D2R or p.z < jaw_z(th) + 0.006:
+        return Vector((0.0, 0.0, 0.0))
+    return head_normal(th, p.z)
+
+
+def jaw_z(th):
+    """Height of the jawline: the chin in front, rising to the angle of the jaw under the ear,
+    then dropping a little to the nape."""
+    a = abs(th)
+    if a <= math.pi / 2:
+        return Z_CHIN + 0.030 * math.sin(a) ** 1.5
+    return Z_CHIN + 0.030 - 0.008 * smooth01((a - 105 * D2R) / (50 * D2R))
+
+
+def face_row_z(th, zf):
+    """Rows are level on the midline and close up towards the sides, where the jaw is higher."""
+    zj = jaw_z(th)
+    return zj + (zf - Z_CHIN) / (Z_FTOP - Z_CHIN) * (Z_FTOP - zj)
+
+
+def eye_floor(ax, z):
+    """1 on the flat floor of the eye socket, 0 outside it."""
+    wx = smooth01((ax - 0.0140) / 0.0055) * (1.0 - smooth01((ax - 0.0460) / 0.0070))
+    wz = smooth01((z - 1.6630) / 0.0085) * (1.0 - smooth01((z - 1.6865) / 0.0065))
+    return wx * wz
+
+
+def face_point(th, z):
+    """The skin: the skull plus nose, lips, chin, brow, cheekbones and eye sockets."""
+    p = head_base(th, z)
+    ax = abs(p.x)
+    fwd = 0.0
+    u = ax / float(FACE_W(z)[0])
+    if u < 1.0 and z < Z_DOME:
+        fwd += float(HEAD_YF(max(z, Z_CHIN))[0] - HEAD_YM(max(z, Z_CHIN))[0]) * (1.0 - u * u) ** 1.5
+    fwd += 0.0065 * math.exp(-((ax - 0.0135) / 0.0055) ** 2 - ((z - 1.6385) / 0.0045) ** 2)                     # wings of the nose
+    fwd += 0.0040 * math.exp(-((z - 1.6955) / 0.0060) ** 2) * smooth01((ax - 0.004) / 0.012) * (1.0 - smooth01((ax - 0.050) / 0.02))   # brow ridge
+    fwd += 0.0028 * math.exp(-((ax - 0.046) / 0.014) ** 2 - ((z - 1.650) / 0.011) ** 2)                         # cheekbones
+    fwd -= 0.0015 * math.exp(-((ax - 0.028) / 0.006) ** 2 - ((z - Z_MOUTH - 0.001) / 0.007) ** 2)               # corners of the mouth
+    y = p.y - fwd
+    w = eye_floor(ax, z)
+    if w > 0.0:
+        y = lerp(y, EYE_Y + (ax - EYE_X) * EYE_SLOPE, w)
+    return Vector((p.x, y, p.z))
+
+
+def head_jaw(th):
+    """The jawline, eased in a little so the edge of the jaw is rounded."""
+    p = face_point(th, jaw_z(th))
+    d = Vector((p.x, p.y - 0.012, 0.0))
+    return p - d.normalized() * 0.0025
+
+
+def head_ledge(th):
+    """Under the jaw: inwards from the jawline to a loop that ends inside the neck."""
+    j = head_jaw(th)
+    return Vector((j.x * 0.55, 0.014 + (j.y - 0.014) * 0.55, j.z + 0.004))
+
+
+NECK = Curve([(1.492, 0.0200, 0.0610, 0.0630), (1.516, 0.0185, 0.0590, 0.0615), (1.540, 0.0165, 0.0570, 0.0600), (1.565, 0.0150, 0.0560, 0.0590),
+              (1.592, 0.0140, 0.0530, 0.0580), (1.620, 0.0130, 0.0470, 0.0540)])
+
+
+def neck_pt(th, z, d=0.0):
+    cy, rx, ry = NECK(z)
+    c, s = math.cos(th), math.sin(th)
+    return Vector((rx * s, cy - ry * c, z)) + Vector((s / rx, -c / ry, 0.0)).normalized() * d
+
+
+def w_headneck(p):
+    """Neck skin and undershirt collar: chest at the collar, the neck bone, the head at the jaw."""
+    a = smooth01((p.z - 1.498) / 0.030)
+    b = smooth01((p.z - 1.545) / 0.045)
+    return {'chest': 1 - a, 'neck': a * (1 - b), 'head': a * b}
+
+
+def skin_tint(p):
+    """Hand shading in the vertex colours: lips and the line between them, the shadow under the
+    brow and the nose, a shaved jaw, a little colour in the cheeks."""
+    ax, z = abs(p.x), p.z
+    if p.y > -0.055:
+        return (1.0, 1.0, 1.0)
+
+    def g(cx, cz, sx, sz):
+        return math.exp(-((ax - cx) / sx) ** 2 - ((z - cz) / sz) ** 2)
+    col = Vector((1.0, 1.0, 1.0))
+    line = 1.628 + 0.034 * smooth01((ax - 0.028) / 0.036)
+    nose = (1.0 - smooth01((ax - 0.012) / 0.008)) * smooth01((z - 1.631) / 0.004)
+    lip = (1.0 - smooth01((ax - 0.014) / 0.012)) * smooth01((z - 1.6045) / 0.005) * (1.0 - smooth01((z - 1.6190) / 0.0055))
+    col = col.lerp(Vector((0.80, 0.84, 0.88)), 0.55 * (1.0 - smooth01((z - line) / 0.012)) * (1.0 - lip) * (1.0 - nose))    # shaved jaw
+    col = col.lerp(Vector((1.00, 0.88, 0.86)), 0.6 * g(0.044, 1.640, 0.018, 0.013))                                         # cheeks
+    col = col.lerp(Vector((0.80, 0.72, 0.72)), 0.9 * g(0.030, 1.6845, 0.017, 0.0055))                                       # under the brow
+    col = col.lerp(Vector((0.82, 0.74, 0.74)), 0.8 * g(0.0135, 1.660, 0.0045, 0.013))                                       # sides of the nose
+    col = col.lerp(Vector((0.50, 0.36, 0.35)), g(0.0080, 1.6355, 0.0050, 0.0028))                                           # nostrils
+    col = col.lerp(Vector((0.86, 0.62, 0.61)), lip)
+    return tuple(col)
+
+
+def ribbon(bm, pts, nrms, hw, lift, sink=0.0015, flat=0.55, out_from=None):
+    """A strap lying on a surface, through stations `pts` with surface normals `nrms`: half-width
+    hw and height `lift` (numbers or one per station); both edges end `sink` under the surface."""
+    n = len(pts)
+    hws = hw if isinstance(hw, (list, tuple)) else [hw] * n
+    lifts = lift if isinstance(lift, (list, tuple)) else [lift] * n
+    rows = []
+    for i in range(n):
+        t = (Vector(pts[min(i + 1, n - 1)]) - Vector(pts[max(i - 1, 0)])).normalized()
+        nn = Vector(nrms[i]).normalized()
+        ac = t.cross(nn).normalized()
+        p = Vector(pts[i])
+        rows.append([p - ac * hws[i] - nn * sink, p - ac * hws[i] * flat + nn * lifts[i], p + ac * hws[i] * flat + nn * lifts[i], p + ac * hws[i] - nn * sink])
+    return grid(bm, rows, cap_first=True, cap_last=True, out_from=out_from)
+
+
+def grid_cells(bm, P, cells, out_from=None):
+    """Quads for some cells (row, column) of a grid of points P, so one grid can be shared out
+    between pieces of different colours with a clean line between them."""
+    made, faces = {}, []
+
+    def vert(r, c):
+        if (r, c) not in made:
+            made[(r, c)] = bm.verts.new(P[r][c])
+        return made[(r, c)]
+    for r, c in cells:
+        try:
+            faces.append(bm.faces.new((vert(r, c), vert(r, c + 1), vert(r + 1, c + 1), vert(r + 1, c))))
+        except ValueError:
+            pass
+    if out_from is not None and faces:
+        tot = 0.0
+        for f in faces:
+            f.normal_update()
+            tot += f.normal.dot(f.calc_center_median() - Vector(out_from)) * f.calc_area()
+        if tot < 0:
+            bmesh.ops.reverse_faces(bm, faces=faces)
+
+
+def build_head(M):
+    C0 = Vector((0.0, HEAD_CY, 1.67))                     # a point inside the head, for winding
+
+    # ---- skin: the face down to the jawline and under it; a low band round the back for the
+    # cap and the hair to end on (its first column lies just under the edge of the face); the
+    # neck is a separate tube that runs up inside the jaw
+    ths = [-t for t in reversed(FACE_TH[1:])] + FACE_TH
+    rows = [[head_ledge(th) for th in ths], [head_jaw(th) for th in ths]] + [[face_point(th, face_row_z(th, zf)) for th in ths] for zf in FACE_ZS]
+    bm = bm_new()
+    grid(bm, rows, out_from=C0)
+    M.add('head_face', bm, 'head_skin', 'head', smooth=58, tint=skin_tint, soft_ao=0.35, normal=head_seam_normal)
+    ths = BACK_TH + [-t for t in reversed(BACK_TH[:-1])]
+
+    def band_pt(th, dz):
+        p = head_base(th, jaw_z(th) + dz)
+        if abs(abs(th) - BACK_TH[0]) < 1e-6:
+            p -= head_normal(th, jaw_z(th) + dz) * 0.0012
+        return p
+    rows = [[head_ledge(th) for th in ths], [head_jaw(th) for th in ths]] + [[band_pt(th, dz) for th in ths] for dz in (0.010, 0.026, 0.050)]
+    bm = bm_new()
+    grid(bm, rows, out_from=C0)
+    M.add('head_nape', bm, 'head_skin', 'head', smooth=180, soft_ao=0.35, normal=head_seam_normal)
+    bm = bm_new()
+    ths = [TAU * j / 12 for j in range(12)]
+    grid(bm, [[neck_pt(th, z) for th in ths] for z in (1.492, 1.516, 1.540, 1.565, 1.592, 1.620)], close_u=True, out_from=(0, 0.015, 1.55))
+    M.add('head_neck', bm, 'head_skin', w_headneck, smooth=180, soft_ao=0.35)
+    # collar of the cooling undershirt round the base of the neck
+    bm = bm_new()
+    grid(bm, [[neck_pt(th, z, d) for th in ths] for z, d in ((1.498, 0.0110), (1.530, 0.0105), (1.5385, 0.0055), (1.531, -0.0020))],
+         close_u=True, out_from=(0, 0.018, 1.52))
+    M.add('head_collar', bm, 'head_cap', w_headneck, smooth=60, tint=(0.9, 0.9, 0.9))
+
+    # ---- eyes: a shallow lens on the flat floor of each socket; the white ring and the iris
+    # share an outline, the rim of the lens ends under the skin, and a dark line marks the upper lid
+    n_e = Vector((EYE_SLOPE, -1.0, 0.0)).normalized()
+    u_e = Vector((1.0, EYE_SLOPE, 0.0)).normalized()
+    o_e = Vector((EYE_X, EYE_Y, EYE_Z))
+    A, HT, HB = 0.0155, 0.0061, 0.0052
+
+    def eye_pt(u, v, h):
+        return o_e + u_e * u + Vector((0, 0, 1)) * v + n_e * h
+    us = [1.0, 0.62, 0.0, -0.62, -1.0]
+    rim = [(A * 1.12 * k, HT * 1.25 * (1 - k * k)) for k in us] + [(A * 1.12 * k, -HB * 1.3 * (1 - k * k)) for k in us[-2:0:-1]]      # 8 points, anticlockwise from the outer corner
+    ir, icv = 0.0054, 0.0006
+    iris = []
+    for k in range(8):
+        a = TAU * k / 8
+        u, v = ir * math.cos(a), icv + ir * math.sin(a)
+        v = min(max(v, -HB * (1 - (u / A) ** 2) + 0.0002), HT * (1 - (u / A) ** 2) - 0.0002)       # the lids cut the iris off
+        iris.append((u, v))
+    bm = bm_new()
+    ring0 = [bm.verts.new(eye_pt(u, v, -0.0016)) for u, v in rim]
+    ring1 = [bm.verts.new(eye_pt(u, v, 0.0017)) for u, v in iris]
+    for k in range(8):
+        bm.faces.new((ring0[k], ring0[(k + 1) % 8], ring1[(k + 1) % 8], ring1[k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    if sum(f.normal.dot(n_e) for f in bm.faces) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+    M.add('eye_white_L', bm, 'head_cap', 'head', mirror=True, smooth=180, tint=(0.95, 0.93, 0.91))
+    bm = bm_new()
+    ring1 = [bm.verts.new(eye_pt(u, v, 0.0017)) for u, v in iris]
+    pupil = eye_pt(0.0, icv, 0.0021)
+    cv = bm.verts.new(pupil)
+    for k in range(8):
+        bm.faces.new((ring1[k], ring1[(k + 1) % 8], cv))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    if sum(f.normal.dot(n_e) for f in bm.faces) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+    M.add('eye_iris_L', bm, 'head_dark', 'head', mirror=True, smooth=180,
+          tint=lambda p, _c=pupil: (0.12, 0.12, 0.12) if (Vector(p) - _c).length < 1e-4 else (0.95, 0.62, 0.38))
+    bm = bm_new()
+    ks = (0.90, 0.5, 0.0, -0.55, -0.97)
+    ribbon(bm, [eye_pt(A * 0.99 * k, HT * 1.02 * (1 - k * k) - 0.0002, 0.0) for k in ks], [n_e] * 5, [0.0007, 0.0012, 0.0013, 0.0011, 0.0006], 0.0013,
+           sink=0.0012, out_from=o_e - n_e * 0.02)
+    M.add('eye_lid_L', bm, 'head_dark', 'head', mirror=True, smooth=60, tint=(0.45, 0.32, 0.26))
+    # the line between the lips: a thin dark strip in the crease, through the vertices of that row
+    ths = [-t for t in reversed(FACE_TH[1:4])] + FACE_TH[:4]
+    bm = bm_new()
+    ribbon(bm, [face_point(th, face_row_z(th, Z_MOUTH)) for th in ths], [Vector((0, -1, 0))] * 7, [0.0006, 0.0010, 0.0012, 0.0013, 0.0012, 0.0010, 0.0006], 0.0007,
+           sink=0.0012, out_from=C0)
+    M.add('mouth_line', bm, 'head_dark', 'head', smooth=60, tint=(0.62, 0.30, 0.26))
+    # nostrils: two small dark ovals under the tip of the nose, lying on that row of the grid
+    bm = bm_new()
+    for sgn in (1, -1):
+        th = sgn * FACE_TH[1]
+        a, b = face_point(th, face_row_z(th, FACE_ZS[9])), face_point(th, face_row_z(th, FACE_ZS[10]))
+        n = (b - a).cross(Vector((sgn, 0, 0))).normalized()
+        n = -n if n.z > 0 else n
+        side = Vector((sgn * 0.0012, 0, 0))
+        ribbon(bm, [a.lerp(b, 0.12) + side, a.lerp(b, 0.48) + side * 1.6, a.lerp(b, 0.80) + side], [n] * 3, [0.0010, 0.0021, 0.0012], 0.0004, sink=0.0010, out_from=C0)
+    M.add('nostrils', bm, 'head_dark', 'head', smooth=60, tint=(0.50, 0.26, 0.22))
+    # eyebrows: low dark ridges on the brow
+    bm = bm_new()
+    pts, nrm = [], []
+    for k, x in enumerate((0.0105, 0.021, 0.033, 0.044, 0.052)):
+        z = 1.6965 + 0.0032 * math.sin(math.pi * k / 4.7) - 0.0010 * (k == 4)
+        a, _, _, n = head_sec(z)
+        th = math.asin(min(1.0, (x / a) ** (n / 2)))
+        pts.append(face_point(th, z))
+        nrm.append(head_normal(th, z))
+    ribbon(bm, pts, nrm, [0.0030, 0.0033, 0.0030, 0.0023, 0.0014], 0.0015, sink=0.0022, out_from=C0)
+    M.add('brow_L', bm, 'head_dark', 'head', mirror=True, smooth=60, tint=HAIR_TINT)
+
+    # ---- the cap: a shell over the skull laid out round the axis through the ears, from its
+    # front edge over the top to its back edge, with a rolled hem along both that ends under
+    # the hair or the skin. Its ends lie under the earphone cups. The cells of the two side
+    # panels are pieces of their own in the dark material, so the seams are clean lines.
+    nc = len(CAP_PSI)
+    off = [abs(ps - 90.0) for ps in CAP_PSI]
+    fr = [[skull_frame(lerp(float(CAP_PF(o)[0]), float(CAP_PB(o)[0]), i / CAP_ROWS) * D2R, ps * D2R) for ps, o in zip(CAP_PSI, off)] for i in range(CAP_ROWS + 1)]
+
+    def edge(row, sgn):
+        """Edge points, normals and the direction along the skull away from the cap."""
+        E = [f[0] for f in row]
+        N = [f[1] for f in row]
+        D = []
+        for j in range(nc):
+            d = (E[min(j + 1, nc - 1)] - E[max(j - 1, 0)]).normalized().cross(N[j]).normalized()
+            D.append(d if d.dot(row[j][2]) * sgn > 0 else -d)
+        return E, N, D
+    Ef, Nf, Df = edge(fr[0], -1.0)
+    Eb, Nb, Db = edge(fr[-1], 1.0)
+    P = [[Ef[j] + Df[j] * 0.0024 - Nf[j] * 0.0016 for j in range(nc)], [Ef[j] + Df[j] * 0.0030 + Nf[j] * 0.0034 for j in range(nc)]]
+    P += [[f[0] + f[1] * CAP_T for f in row] for row in fr]
+    P += [[Eb[j] + Db[j] * 0.0030 + Nb[j] * 0.0034 for j in range(nc)], [Eb[j] + Db[j] * 0.0024 - Nb[j] * 0.0016 for j in range(nc)]]
+    side = [j for j in range(nc - 1) if max(off[j], off[j + 1]) > 30.5]
+    for nm, cols, material, tint in (('cap_crown', [j for j in range(nc - 1) if j not in side], 'head_cap', (1.0, 1.0, 1.0)),
+                                     ('cap_side_L', [j for j in side if CAP_PSI[j] < 90], 'head_dark', FLAP_TINT),
+                                     ('cap_side_R', [j for j in side if CAP_PSI[j] > 90], 'head_dark', FLAP_TINT)):
+        bm = bm_new()
+        grid_cells(bm, P, [(r, j) for r in range(len(P) - 1) for j in cols], out_from=C0)
+        M.add(nm, bm, material, 'head', smooth=70, tint=tint)
+    # short hair showing beyond the cap: bands that start under the hem and end in the skin
+    for nm, (E, N, D), width in (('hair_front', (Ef, Nf, Df), HAIR_F), ('hair_nape', (Eb, Nb, Db), HAIR_B)):
+        wd = [float(width(o)[0]) for o in off]
+        bm = bm_new()
+        grid(bm, [[E[j] - D[j] * 0.0060 + N[j] * 0.0020 for j in range(nc)],
+                  [E[j] + D[j] * max(wd[j] - 0.0028, 0.0004) + N[j] * 0.0036 for j in range(nc)],
+                  [E[j] + D[j] * max(wd[j], 0.0008) - N[j] * 0.0024 for j in range(nc)]], out_from=C0)
+        M.add(nm, bm, 'head_dark', 'head', smooth=70, tint=HAIR_TINT)
+    # earphone cups over the ears, at the ends of the cap
+    p = skull_frame(0.0, 0.0)[0]
+    n = sum((skull_frame(TAU * k / 3, 8 * D2R)[1] for k in range(3)), Vector()).normalized()
+    bm = bm_new()
+    v = add_lathe(bm, [(0.034, -0.0085), (0.034, 0.0065), (0.026, 0.0125), (0.0, 0.0140)], seg=12, cap_start=False)
+    bmesh.ops.transform(bm, matrix=Matrix.Diagonal((1.12, 1.0, 1.0, 1.0)), verts=v)
+    oriented(bm, v, p + n * (CAP_T - 0.0005), n, x_hint=(0, 0, 1))
+    if sum(f.normal.dot(f.calc_center_median() - p) for f in bm.faces if not f.normal_update()) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+    M.add('ear_cup_L', bm, 'head_dark', 'head', mirror=True, smooth=50, tint=FLAP_TINT)
+    # chin strap: from under each cup down the jaw and under the chin
+    pts, nrm = [], []
+    for a in (86, 78, 66, 52, 38, 20, 0, -20, -38, -52, -66, -78, -86):
+        th = a * D2R
+        k = smooth01((62 - abs(a)) / 28.0)                 # 0 on the side of the jaw, 1 underneath
+        up = lerp(0.044, 0.004, smooth01((86 - abs(a)) / 26.0))
+        pts.append(face_point(th, jaw_z(th) + up).lerp(head_jaw(th).lerp(head_ledge(th), 0.30), k))
+        nrm.append(head_normal(th, jaw_z(th) + up).lerp(Vector((0, 0, -1)), k).normalized())
+    bm = bm_new()
+    ribbon(bm, pts, nrm, 0.0058, 0.0020, sink=0.0030, out_from=C0)
+    M.add('chin_strap', bm, 'head_dark', 'head', smooth=60, tint=FLAP_TINT)
+    # boom microphone from the left cup to the corner of the mouth
+    bm = bm_new()
+    add_tube(bm, path_points([(0.086, -0.010, 1.652), (0.091, -0.034, 1.638), (0.083, -0.066, 1.624), (0.062, -0.094, 1.616), (0.037, -0.110, 1.613)], 6), 0.0026, seg=4)
+    add_ico(bm, 0.0072, (0.034, -0.1115, 1.613), subdiv=1, scale=(1.25, 0.9, 0.9))
+    M.add('mic_boom', bm, 'head_dark', 'head', smooth=80, tint=FLAP_TINT)
 
 
 def hinge(M, name, centre, axis, radius, up_dir, bar_len, bar_w, bones, off):
@@ -1180,6 +1643,7 @@ def build_model():
     build_chest_unit(M, hut)
     build_backpack(M)
     build_helmet(M)
+    build_head(M)
     arm, glove = build_arm(M)
     build_wrist_computer(M, arm)
     build_leg(M)
@@ -1220,11 +1684,15 @@ def build_mesh(fast=False):
     """Build the suit in Blender and export mesh + skeleton + anchors (no clips yet)."""
     t0 = time.time()
     reset_scene()
+    group_materials()
     M = build_model()
     M.report()
     arm = build_rig()
     names = [p['name'] for p in M.pieces]
-    obj, tints, pids = M.join(NAME + '_body')
+    M_soft = [p['soft_ao'] for p in M.pieces]
+    obj, tints, pids, normals = M.join(NAME + '_body')
+    if any(n != (0.0, 0.0, 0.0) for n in normals):
+        obj.data.normals_split_custom_set_from_vertices(normals)      # zero vectors keep Blender's own normals
     link(obj, arm)
     md = obj.modifiers.new('armature', 'ARMATURE')
     md.object = arm
@@ -1240,8 +1708,21 @@ def build_mesh(fast=False):
     bake_ao(arm, samples=8 if fast else 32, distance=0.45, strength=0.85)
     me = obj.data
     col = me.color_attributes['Col']
+    ao = np.array([col.data[i].color[0] for i in range(len(tints))])
+    soft = np.array([M_soft[p] for p in pids])
+    if soft.any():                                    # skin: average the occlusion with its neighbours, then lighten it
+        ed = np.array([e.vertices[:] for e in me.edges])
+        ed = ed[(soft[ed[:, 0]] > 0) & (soft[ed[:, 1]] > 0)]
+        for _ in range(2):
+            acc, cnt = ao.copy(), np.ones(len(ao))
+            np.add.at(acc, ed[:, 0], ao[ed[:, 1]])
+            np.add.at(acc, ed[:, 1], ao[ed[:, 0]])
+            np.add.at(cnt, ed[:, 0], 1.0)
+            np.add.at(cnt, ed[:, 1], 1.0)
+            ao = np.where(soft > 0, acc / cnt, ao)
+        ao = ao + (1.0 - ao) * soft
     for i, t in enumerate(tints):
-        a = 0.22 + 0.78 * col.data[i].color[0]        # keep creases readable without going black
+        a = 0.22 + 0.78 * ao[i]                       # keep creases readable without going black
         col.data[i].color = (a * t[0], a * t[1], a * t[2], 1.0)
     # rest data for the clip linter
     n = len(me.vertices)
@@ -1315,9 +1796,11 @@ def _add_accessor(gltf, blob, arr, type_, minmax=False):
 
 
 def pack(src, dst):
-    """Compress with gltfpack. -af 0 keeps our own keyframe times, so clip lengths stay exact."""
+    """Compress with gltfpack. -af 0 keeps our own keyframe times, so clip lengths stay exact.
+    Normals keep 12 bits (the other models use 10): the visor is a mirror in the game, and at
+    10 bits its normals wander by 0.2 degrees, at 12 by 0.06."""
     cmd = ['node', os.path.join(TOOLS, 'node_modules', 'gltfpack', 'cli.js'), '-i', src, '-o', dst,
-           '-cc', '-kn', '-km', '-ke', '-vp', '15', '-vn', '10', '-vc', '8', '-af', '0']
+           '-cc', '-kn', '-km', '-ke', '-vp', '15', '-vn', '12', '-vc', '8', '-af', '0']
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         print(res.stdout, res.stderr)
@@ -1526,25 +2009,51 @@ def stand_pose(crouch=0.0, lean=0.0, shift=0.0, heel=0.0, back=0.0, arms=True):
     return p
 
 
-def clip_idle(t):
-    w = TAU / 4.0
-    sway = math.sin(w * t)
-    br = math.sin(w * t - 0.9)
-    look = 15 * math.sin(w * t - 0.6) + 5 * math.sin(2 * w * t + 1.3)
+IDLE_T = 8.0
+
+
+def hang_arm(p, side, fwd, out, bend, twist, flex=8.0, roll=0.0):
+    """An arm hanging under its own weight: angles as for Pose.arm_fk but measured from the
+    vertical, not from the chest, so the arm stays plumb while the torso tilts and breathes.
+    flex curls the wrist towards the palm, roll turns the hand at the wrist bearing."""
+    sx = 1 if side == 'L' else -1
+    hand = Quaternion(REST_DIR['forearm_' + side], rad(sx * roll)) @ Quaternion(Y_AX, rad(sx * flex))
+    p.arm_fk(side, fwd=fwd, out=out, bend=bend, twist=twist, hand_local=hand, rel=None)
+
+
+def idle_pose(t=0.0):
+    """Standing at rest, the way a person does and a rig does not: the weight on the right leg
+    with that hip high, the left knee eased and that foot a little forward and turned out, the
+    shoulders tilted the other way, the arms hanging close with soft elbows, the head off centre.
+    Over eight seconds: two breaths, a slow drift of the weight, and one look to the right.
+    (The left foot and hand lead because WorkKneel plants the left foot forward: the blend into
+    it then has less far to go.)"""
+    sup, free, m = 'R', 'L', -1.0                         # supporting side, eased side, mirror sign
+    w = TAU / IDLE_T
+    ph = 2 * w * t - 0.6
+    br = math.sin(ph + 0.4 * math.sin(ph))                # breathing in is quicker than breathing out
+    late = math.sin(ph - 0.9 + 0.4 * math.sin(ph - 0.9))  # the arms follow the chest a moment later
+    shift = math.sin(w * t + 0.4)
+    drift = math.sin(w * t + 2.3)
+    look = smooth01((t - 2.5) / 1.3) * (1.0 - smooth01((t - 5.1) / 1.6))
     p = Pose()
-    p.root = Vector((0.024 * sway, 0.012 + 0.005 * math.sin(w * t + 1.9), -0.014 - 0.005 * math.cos(2 * w * t)))
-    p.q['hips'] = Q(x=1.5, y=2.0 * sway, z=1.6 * math.sin(w * t + 0.8))
-    p.q['spine'] = Q(x=1.5 + 0.6 * br, y=-1.3 * sway)
-    p.q['chest'] = Q(x=1.0 + 1.2 * br, y=-0.7 * sway, z=-1.4 * math.sin(w * t + 0.8))
-    p.q['neck'] = Q(x=-1.5, z=0.35 * look)
-    p.q['head'] = Q(x=-2.0 + 2.0 * math.sin(2 * w * t + 0.4), y=1.0 * math.sin(w * t + 2.0), z=0.65 * look)
-    for side, sx in SIDES:
-        p.shrug(side, up=1.8 * br)
-        p.plant(side, sx * STANCE_X, 0.0, yaw=sx * TOE_OUT)
-    for side, sx in SIDES:
-        p.arm_fk(side, fwd=3 + 2.0 * math.sin(w * t + 0.5 + sx), out=11 + 0.8 * br - 0.8 * sx * sway,
-                 bend=20 + 3 * math.sin(w * t + 1.5 + sx), twist=8)
+    p.root = Vector((m * (0.040 + 0.009 * shift + 0.003 * look), 0.012 + 0.003 * drift, -0.016 + 0.0020 * br - 0.0020 * shift))
+    p.q['hips'] = Q(x=1.5, y=m * (-4.5 - 1.0 * shift), z=m * (5.0 + 0.8 * drift))
+    p.q['spine'] = Q(x=1.5 + 0.5 * br, y=m * (3.0 + 0.5 * shift), z=m * -2.0)
+    p.q['chest'] = Q(x=1.0 + 1.3 * br, y=m * (3.4 + 0.4 * shift), z=m * (-3.5 - 0.6 * drift + 2.0 * look))
+    p.q['neck'] = Q(x=-1.5 - 0.4 * br, y=m * -1.2, z=m * (-2.5 + 4.0 * look))
+    p.q['head'] = Q(x=-2.0 + 0.8 * math.sin(w * t + 0.4) - 1.5 * look, y=m * (-1.8 + 1.2 * look), z=m * (-5.0 + 8.0 * look))
+    p.shrug(sup, up=-1.2 + 1.6 * br, fwd=2.0)
+    p.shrug(free, up=1.0 + 1.6 * br, fwd=2.0)
+    p.plant(sup, m * 0.105, 0.0, yaw=m * 6.0)
+    p.plant(free, m * -0.135, -0.035, yaw=m * -14.0, pole=(m * -0.25, -1.0, 0.0))
+    hang_arm(p, sup, fwd=-5.0 + 0.8 * late, out=13.3 + 0.5 * late, bend=21.0 + 1.5 * late + 1.5 * look, twist=30.0, flex=9.0, roll=8.0)
+    hang_arm(p, free, fwd=7.0 + 0.8 * late - 1.5 * look, out=13.5 + 0.5 * late, bend=32.0 + 1.5 * late, twist=28.0, flex=12.0, roll=14.0)
     return p
+
+
+def clip_idle(t):
+    return idle_pose(t)
 
 
 WALK = dict(
@@ -1552,14 +2061,16 @@ WALK = dict(
     pelvis_yaw=9.0, chest_yaw=7.0, yaw_lag=0.02, list=2.0, pitch_osc=1.2, track=0.105, toe_out=4.0,
     strike=-11.0, roll_on=0.22, heel_rise=0.50, toe_off=58.0, drop=0.30, retract=0.7, swing_out=0.01,
     swing=lambda a0, a1: [(0.17, a0.y + 0.05, a0.z + 0.15, 52.0), (0.52, 0.14, 0.36, 24.0), (0.84, a1.y - 0.035, a1.z + 0.12, -16.0)],
-    arm_mid=4.0, arm_swing=27.0, elbow=30.0, elbow_swing=14.0, arm_out=13.0, arm_open=2.0, arm_twist=12.0, arm_lag=0.03, shrug=1.5,
+    arm_mid=4.0, arm_swing=27.0, elbow=30.0, elbow_swing=14.0, arm_out=12.5, arm_open=2.0, arm_twist=20.0, arm_lag=0.03, shrug=2.5,
+    wrist=10.0, asym=0.07,
 )
 RUN = dict(
     T=0.72, speed=9.2, duty=0.125, y_td=-0.25, hip_mid=0.875, bob=0.030, back=0.055, sway=0.008, lean=19.0,
     pelvis_yaw=13.0, chest_yaw=11.0, yaw_lag=0.02, list=2.5, pitch_osc=1.8, track=0.085, toe_out=2.0,
     strike=-5.0, roll_on=0.18, heel_rise=0.42, toe_off=62.0, drop=0.45, retract=0.5, swing_out=0.015,
     swing=lambda a0, a1: [(0.20, a0.y + 0.03, a0.z + 0.28, 80.0), (0.50, 0.02, 0.50, 40.0), (0.80, a1.y - 0.03, a1.z + 0.27, -10.0)],
-    arm_mid=14.0, arm_swing=40.0, elbow=86.0, elbow_swing=12.0, arm_out=20.0, arm_open=7.0, arm_twist=24.0, arm_lag=0.03, shrug=3.0,
+    arm_mid=14.0, arm_swing=40.0, elbow=86.0, elbow_swing=12.0, arm_out=17.0, arm_open=6.0, arm_twist=12.0, arm_lag=0.03, shrug=4.0,
+    wrist=12.0, asym=0.05,
 )
 
 
@@ -1610,10 +2121,14 @@ def gait(t, g):
             p.leg(side, Vector((x + sx * g['swing_out'] * math.sin(math.pi * u), y, z)), Q(x=pitch, z=yaw),
                   toe=-p0 * (1 - smooth01(u / 0.30)))
     for side, sx in SIDES:
-        sw = -sx * math.cos(TAU * (ph - g['arm_lag']))    # an arm is forward when the opposite foot lands
+        a = TAU * (ph - g['arm_lag'])
+        sw = -sx * math.cos(a)                            # an arm is forward when the opposite foot lands
+        coming = sx * math.sin(a)                         # > 0 while the arm is on its way forward
+        k = 1.0 - (g['asym'] if side == 'L' else 0.0)     # the two arms are not twins: the left, with the wrist computer, swings a little less
         p.shrug(side, up=g['shrug'] * 0.5 * (1 + c2), fwd=g['shrug'] * sw)
-        p.arm_fk(side, fwd=g['arm_mid'] + g['arm_swing'] * sw, out=g['arm_out'] - g['arm_open'] * sw,
-                 bend=g['elbow'] + g['elbow_swing'] * sw, twist=g['arm_twist'])
+        hand = Quaternion(X_AX, rad(g['wrist'] * coming)) @ Quaternion(Y_AX, rad(sx * 6.0))      # the hand trails the forearm
+        p.arm_fk(side, fwd=g['arm_mid'] + g['arm_swing'] * k * sw, out=g['arm_out'] + 0.5 * sx - g['arm_open'] * sw,
+                 bend=g['elbow'] + g['elbow_swing'] * sw, twist=g['arm_twist'], hand_local=hand)
     return p
 
 
@@ -1669,25 +2184,37 @@ def clip_land(t):
 
 
 def clip_work_stand(t):
+    """Standing at a console or a wall, leaning into it: the feet as in Idle (weight on the
+    right, left foot ahead), the right hand wiping a circle at chest height with that shoulder
+    following it, the left hand steadying itself and tapping, the head watching the work."""
     w = TAU / 2.0
-    p = stand_pose(crouch=0.025, lean=9.0, back=0.02, arms=False)
-    p.root.x += 0.008 * math.sin(w * t)
-    p.q['chest'] = p.q['chest'] @ Q(z=3 * math.sin(w * t + 0.4), x=1.0 * math.sin(2 * w * t))
-    p.q['head'] = Q(x=9 + 1.5 * math.sin(2 * w * t), z=-6 + 5 * math.sin(w * t + 0.4))
-    for side, sx in SIDES:
-        p.plant(side, sx * STANCE_X, 0.0, yaw=sx * TOE_OUT)
-        p.shrug(side, fwd=8, up=3)
+    s1 = math.sin(w * t)
+    circ = 2 * w * t                                       # the wiping hand goes round twice a loop
+    lean = 9.0
+    p = Pose()
+    p.root = Vector((-0.028 + 0.010 * s1, 0.030 + 0.004 * math.sin(circ + 0.6), -0.040 - 0.004 * math.sin(circ + 1.2)))
+    p.q['hips'] = Q(x=1.5 + lean * 0.38, y=3.2 + 0.8 * s1, z=-4.0)
+    p.q['spine'] = Q(x=1.5 + lean * 0.34, y=-2.0 - 0.5 * s1, z=2.0)
+    p.q['chest'] = Q(x=1.0 + lean * 0.28 + 1.0 * math.sin(circ), y=-2.6 + 1.6 * math.sin(circ + 0.5), z=5.0 + 3.0 * math.sin(w * t + 0.4))
+    p.q['neck'] = Q(x=-1.5 - lean * 0.25, y=1.0, z=-3.0)
+    p.q['head'] = Q(x=9 + 1.5 * math.sin(circ), y=1.5, z=-7 + 5 * math.sin(w * t + 0.4))
+    p.plant('R', -0.108, 0.010, yaw=-7.0)
+    p.plant('L', 0.135, -0.060, yaw=12.0, pole=(0.22, -1.0, 0.0))
+    p.shrug('R', fwd=10, up=4.0 + 2.5 * math.sin(circ + 0.3))
+    p.shrug('L', fwd=7, up=1.0 + 0.8 * s1)
     # right hand wipes a circle on a panel in front; left hand steadies itself and taps
-    r = Vector((-0.15 + 0.07 * math.cos(2 * w * t), -0.50, 1.27 + 0.06 * math.sin(2 * w * t)))
-    p.arm('R', r - Vector((0, -0.02, 0.085)), pole=(-0.7, 0.3, -0.65), hand=hand_q('R', (0.1, -0.25, 1), (0, -1, -0.2)))
-    tap = max(0.0, math.sin(2 * w * t + 2.2)) ** 2
-    l = Vector((0.15 + 0.01 * math.sin(w * t), -0.46 + 0.02 * tap, 1.14 + 0.012 * math.sin(w * t + 1)))
-    p.arm('L', l, pole=(0.7, 0.3, -0.65), hand=hand_q('L', (-0.2, -1, 0.15), (0, 0.1 - 0.5 * tap, -1)))
+    r = Vector((-0.15 + 0.07 * math.cos(circ), -0.50, 1.27 + 0.06 * math.sin(circ)))
+    p.arm('R', r - Vector((0, -0.02, 0.085)), pole=(-0.85, 0.25, -0.45), hand=hand_q('R', (0.1, -0.25, 1), (0, -1, -0.2)))
+    tap = max(0.0, math.sin(circ + 2.2)) ** 2
+    l = Vector((0.15 + 0.01 * s1, -0.46 + 0.02 * tap, 1.14 + 0.012 * math.sin(w * t + 1)))
+    p.arm('L', l, pole=(0.5, 0.35, -0.8), hand=hand_q('L', (-0.2, -1, 0.15), (0, 0.1 - 0.5 * tap, -1)))
     return p
 
 
 KNEEL_FOOT = 50.0          # heel-up angle of a foot resting on its toes behind a grounded knee
 KNEE_DOWN = 0.113          # height of the knee joint when the knee pad rests on the ground
+KNEEL_KNEE_L = (1.0, -1, 0.25)                                   # where the raised left knee points: wide enough for the arm inside it
+KNEEL_ELBOW = {'L': (1.0, 0.4, 0.6), 'R': (-0.8, 0.5, 0.3)}      # where the elbows point (the left one clear of that knee)
 
 
 def clip_work_kneel(t):
@@ -1706,13 +2233,13 @@ def clip_work_kneel(t):
     a = rad(24)
     p.pin('thigh_R', BONE_HEAD['thigh_R'], knee + Vector((0, math.sin(a), math.cos(a))) * L_THIGH)
     p.leg('R', ank, fq, pole=(0, -1, -0.4), toe=-KNEEL_FOOT)
-    p.plant('L', 0.33, -0.25, yaw=24, pole=(0.55, -1, 0.3))
+    p.plant('L', 0.33, -0.25, yaw=24, pole=KNEEL_KNEE_L)
     for side, sx in SIDES:
         p.shrug(side, fwd=12, up=-4)
         ph = 2 * w * t + (0 if side == 'R' else math.pi)
         c = Vector((sx * 0.105 - 0.075, -0.40, 0.262))
         wr = c + Vector((0.015 * math.sin(ph), -0.05 * math.cos(ph), 0.04 * math.sin(ph)))
-        p.arm(side, wr, pole=(sx * 0.8, 0.5, 0.3), hand=hand_q(side, (-sx * 0.12, -0.35 - 0.2 * math.cos(ph), -1), (0, 1, -0.3)))
+        p.arm(side, wr, pole=KNEEL_ELBOW[side], hand=hand_q(side, (-sx * 0.12, -0.35 - 0.2 * math.cos(ph), -1), (0, 1, -0.3)))
     return p
 
 
@@ -1891,6 +2418,14 @@ def clip_test(t):
 
 
 # Notes for whoever plays these clips in the game:
+#   * Idle is eight seconds and stands on the right leg with the left foot 35 mm ahead (see
+#     idle_pose). WorkStand keeps nearly the same feet. JumpStart, Land, Wave and Collapse still
+#     begin or end in the square stance of stand_pose(): the cross-fade to or from Idle moves the
+#     feet about 4 cm, which reads as settling.
+#   * Above the neck ring there are two groups, told apart by material name, and the game shows
+#     one: the helmet (helmet_white, helmet_dark, helmet_metal, helmet_light, visor_gold) and the
+#     bare head (head_skin, head_cap, head_dark). Each fits inside the other's space, so nothing
+#     has to move when they are swapped.
 #   * Walk and Run are in place. The planted foot moves back at exactly TREADMILL[name] m/s, so
 #     the clip matches the ground when the body is moved at that speed and the clip plays at 1x.
 #   * Drive is seated with the feet on the model's ground plane: the hips bone sits 0.52 m above
@@ -1901,7 +2436,7 @@ def clip_test(t):
 #   * Anchors (lamp_L, lamp_R, eye on the head; hand_grip_R on the right hand): in the rest pose
 #     their axes equal the model's axes, so an anchor's local +Z is the astronaut's forward.
 CLIPS = [  # name, seconds, samples, loop, function
-    ('Idle', 4.0, 96, True, clip_idle),
+    ('Idle', IDLE_T, 96, True, clip_idle),
     ('Walk', 0.9, 54, True, clip_walk),
     ('Run', 0.72, 54, True, clip_run),
     ('JumpStart', 0.25, 15, False, clip_jump_start),
@@ -2096,7 +2631,7 @@ def inject_clips(gltf, blob, rest, clips):
         gltf['animations'].append({'name': name, 'samplers': samplers, 'channels': channels})
 
 
-def build_astronaut(anim_only=False, fast=False, debug=False):
+def build_astronaut(anim_only=False, fast=False, debug=False, out=None):
     t0 = time.time()
     if not (anim_only and os.path.exists(MESH_RAW) and os.path.exists(SKIN_NPZ)):
         build_mesh(fast=fast)
@@ -2113,7 +2648,7 @@ def build_astronaut(anim_only=False, fast=False, debug=False):
     inject_clips(gltf, blob, rest, clips)
     write_glb(FULL_RAW, gltf, blob)
     os.makedirs(OUT_DIR, exist_ok=True)
-    out = os.path.join(OUT_DIR, NAME + '.glb')
+    out = out or os.path.join(OUT_DIR, NAME + '.glb')
     kb = pack(FULL_RAW, out)
     info = {'name': NAME, 'triangles': skin.tris, 'raw_kb': round(os.path.getsize(FULL_RAW) / 1024, 1), 'kb': kb,
             'clips': len(clips), 'lint_problems': problems, 'seconds': round(time.time() - t0, 1)}
@@ -2125,6 +2660,7 @@ def build_astronaut(anim_only=False, fast=False, debug=False):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
+    out_file = args.pop(args.index('--out') + 1) if '--out' in args else None
     names = [a for a in args if not a.startswith('--')]
     if not names or NAME in names:
-        build_astronaut(anim_only='--anim-only' in args, fast='--fast' in args, debug='--debug' in args)
+        build_astronaut(anim_only='--anim-only' in args, fast='--fast' in args, debug='--debug' in args, out=out_file)

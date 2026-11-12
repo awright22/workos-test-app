@@ -1,3 +1,4 @@
+import { foodTotal } from '../game/farm.js';
 import { BAL, S, suitCap, roverPowerCap } from '../game/state.js';
 import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
@@ -30,7 +31,8 @@ export const OBJECTIVES = [
   { id: 'pf', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
     dist: () => groundDist(player.pos, S.pf.loaded ? World.uplink.position : World.pathfinder.position),
     shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
-  { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 },
+  { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
+  { id: 'dinner', text: () => 'Cook a dinner at the food shelf — a potato and two different vegetables', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   { id: 'breach', text: () => 'Seal the breach', shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
   { id: 'mav', text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
@@ -337,20 +339,21 @@ export function updateHud() {
   setText('suitSt', UI.suitState, st);
 
   // --- the colony's reserves ---
-  const food = S.food + S.potatoes;
+  const food = foodTotal();
   const rows = [
     ['o2', S.o2 / 100, `${Math.round(S.o2)}<small>%</small>`, S.o2],
     ['water', S.water / BAL.waterMax, `${Math.round(S.water)}<small>L</small>`, S.water],
     ['food', food / 16, String(food), null],
     ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small>%</small>`, S.power],
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small>%</small>`, S.health],
+    ['morale', S.morale / 100, String(Math.round(S.morale)), null],
   ];
   for (const [k, frac, txt, raw] of rows) {
     const b = UI.bars[k];
     const f = clamp(frac, 0, 1).toFixed(3);
     if (hud.text[k + 'f'] !== f) { hud.text[k + 'f'] = f; b.fill.style.transform = `scaleX(${f})`; }
     setText(k, b.val, txt);
-    setLevel(k, b.wrap, frac, 0.22, 0.1);
+    setLevel(k, b.wrap, frac, k === 'morale' ? 0.3 : 0.22, k === 'morale' ? 0.12 : 0.1);
     if (raw !== null) {
       const r = track(k, raw, dt);
       const tr = r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
@@ -424,5 +427,4 @@ export function updateHud() {
     UI.tCandle.style.display = candles > 0 ? '' : 'none';
     UI.tCandle.querySelector('b').textContent = candles;
   }
-  if (S.disco) S.stats.discoTime += 1 / 60;
 }

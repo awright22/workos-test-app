@@ -103,10 +103,13 @@ function rockMaterial(albedoCube) {
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec4 rg1 = texture(uGrain, vRockPos * 0.55 + 0.37);
         vec4 rg2 = texture(uGrain, vRockPos * 4.1);
-        vec3 ground = groundGrade(textureCube(uAlbedo, uHere).rgb);
+        vec3 rawGround = textureCube(uAlbedo, uHere).rgb;
+        float rawLum = dot(rawGround, vec3(0.3, 0.55, 0.15));
+        float icy = smoothstep(0.19, 0.30, rawLum) * smoothstep(0.50, 0.78, min(rawGround.g, rawGround.b) / max(rawGround.r, 0.001)) * smoothstep(0.88, 0.95, abs(uHere.y));
+        vec3 ground = mix(groundGrade(rawGround), vec3(0.56, 0.62, 0.70), icy);
         float gl = dot(ground, vec3(0.3, 0.55, 0.15));
         // diffuseColor carries the rock's own tone (instance colour): how dark, how grey
-        vec3 stone = mix(vec3(gl), ground, 0.55) * diffuseColor.rgb;
+        vec3 stone = mix(mix(vec3(gl), ground, 0.55), vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
         float dust = clamp(vRockMix.x * 1.25 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
         diffuseColor.rgb = mix(stone, ground * 0.92, dust) * vRockMix.y * (1.0 + (rg1.a - 0.5) * 0.7 + (rg2.a - 0.5) * 0.45);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>

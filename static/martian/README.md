@@ -29,9 +29,16 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 
 ## The game
 
-- **Survival**: suit oxygen, Hab oxygen, water, food, power and health; potato farming;
-  burning hydrazine for water; solar panels that gather dust; roaming dust storms; a Hab
-  breach; the cold of the night. A sol lasts eight minutes.
+- **Survival**: suit oxygen, Hab oxygen, water, food, power and health; burning hydrazine for
+  water; solar panels that gather dust; roaming dust storms; a Hab breach; the cold of the
+  night. A sol lasts eight minutes.
+- **The farm**: potatoes are the staple, and the botany kit holds seed packets for radishes,
+  lettuce, soybeans and tomatoes, each with its own pace, thirst and yield. A bed of soil asks
+  what to plant. Harvests go to the pantry: a side at breakfast, or a cooked dinner at the food
+  shelf (a staple and two different vegetables).
+- **Morale**: a man alone on a planet runs on more than calories. It sinks a little each sol
+  and with every bad day, and rises with variety on the plate, a hot dinner, mail, music, a
+  harvest, a discovery. In good spirits he works and mends faster; worn down, slower.
 - **Upkeep**: the oxygenator, the water reclaimer, the rover and the suit's scrubber wear and
   need servicing. Done in time it costs nothing; left to fail it costs parts.
 - **Field science**: chip samples off boulders and bag soil wherever you dig. What a sample
@@ -40,10 +47,11 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   in the Hab catalogues them; science credit earns NASA grants.
 - **Weather**: dust storms that close visibility to tens of metres, and dust devils that wander
   the plains on warm afternoons and sometimes sweep the solar array clean.
-- **Exploration**: a six-wheeled rover with its own power and air; a journal of landmarks and
-  landers; achievements; an orbital map drawn from the same data as the ground.
+- **Exploration**: a six-wheeled rover with its own power and air; a journal of landmarks,
+  landers and catalogued samples; achievements; an orbital map drawn from the same data as the
+  ground. He wears his helmet outside and takes it off wherever there is air.
 - **Making things**: scrap and circuits from salvage become oxygen candles, a folding solar
-  array, a greenhouse dome you can farm in anywhere, navigation beacons, oxygen caches and nine
+  array, a greenhouse dome you can farm in anywhere, navigation beacons, oxygen caches and ten
   permanent upgrades. Some need blueprints that NASA sends for survey work.
 - **Quests**: once Pathfinder is connected, NASA radios survey tasks that take you across the
   planet and pays in supply drops and blueprints.
@@ -95,7 +103,7 @@ static/martian/
   index.html, manifest.webmanifest, icons         the page and the app manifest
   game.js, terrain-worker.js, game.css, sw.js     build products (committed; do not edit)
   assets/mars/     height.bin (MOLA), color.jpg (Viking), map.jpg
-  assets/models/   31 .glb models
+  assets/models/   36 .glb models
   src/             the source: ES modules
     core/      maths, events, shared scratch vectors
     planet/    the height model (shared by physics and the terrain workers), geography
@@ -110,7 +118,7 @@ tools/
   build.mjs          bundle src/ (esbuild) and write the service worker
   serve.mjs          static server for development
   lint.mjs           undefined names and bad imports
-  tests/             smoke, scripted story arc, save migration, scene cost, screenshots
+  tests/             smoke, interface, story arc, saves, science, machines, farm, audio, scene cost, screenshots
   publish.mjs        build, check and publish to gh-pages
   build_mars_data.py NASA data -> assets/mars/
   assets/            the models, authored in Blender from Python (see assets/SPEC.md)

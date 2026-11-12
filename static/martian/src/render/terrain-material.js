@@ -33,6 +33,15 @@ export const GLSL_GROUND_GRADE = /* glsl */`
     float lum = max(dot(alb, vec3(0.3, 0.55, 0.15)), 0.004);
     vec3 hue = mix(vec3(1.0), alb / lum, 0.74) * vec3(1.20, 0.97, 0.76);
     return hue * (0.40 * pow(lum, 0.55));
+  }
+  // polar ice: in the orbital map it is the only ground that is both bright and nearly colourless
+  float groundIce(vec3 alb, vec3 dir) {
+    float lum = dot(alb, vec3(0.3, 0.55, 0.15));
+    return smoothstep(0.19, 0.30, lum) * smoothstep(0.50, 0.78, min(alb.g, alb.b) / max(alb.r, 0.001)) * smoothstep(0.88, 0.95, abs(dir.y));
+  }
+  /** The colour of the ground at a place, for things that must match it (dust on hardware, a heap of soil). */
+  vec3 groundColour(vec3 alb, vec3 dir) {
+    return mix(groundGrade(alb), vec3(0.56, 0.62, 0.70), groundIce(alb, dir));
   }`;
 /** GLSL mat3 whose product with a texture-space vector gives the world-space vector. */
 export const GLSL_DETAIL_T = `mat3(${DETAIL_FRAME.map(F).join(', ')})`;
@@ -92,8 +101,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // ---- real colour of this spot, graded from orbital imagery toward surface colour ----
         vec3 alb = textureCube(uAlbedo, pDir).rgb;
         float albLum = dot(alb, vec3(0.3, 0.55, 0.15));
-        // polar ice: in the orbital map it is the only ground that is both bright and nearly colourless
-        float ice = smoothstep(0.19, 0.30, albLum) * smoothstep(0.50, 0.78, min(alb.g, alb.b) / max(alb.r, 0.001)) * smoothstep(0.88, 0.95, abs(pDir.y));
+        float ice = groundIce(alb, pDir);
         alb = groundGrade(alb);
 
         // ---- how much of this fragment is level ground (2D layers) and how much slope (3D) ----

@@ -1,3 +1,4 @@
+import { workRate } from './farm.js';
 import { S } from './state.js';
 import { screenOpen } from '../ui/screens.js';
 import { setPrompt } from '../ui/dom.js';
@@ -37,7 +38,7 @@ export function updateInteract(dt) {
     return;
   }
   if (input.eHeld) {
-    S.holdT += dt;
+    S.holdT += dt * workRate();                          // in good spirits the hands are quicker
     if (S.holdT >= best.hold) {
       S.holdT = 0; input.eHeld = false;
       setPrompt({ label: best.label(), sub, hold: best.hold, progress: 0, minor: best.priority >= 9 });

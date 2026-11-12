@@ -62,10 +62,10 @@ export function connectPathfinder() {
 export const QUEST_DEFS = [
   { id: 'viking1', name: 'Viking Funeral', target: 'Viking 1',
     desc: 'Salvage Viking 1 (1976) in Chryse Planitia. NASA wants a photo. And the descent-stage hydrazine.',
-    ev: ['salvage', 'Viking 1'], loot: { scrap: 4, rations: 2, hydrazine: 1 } },
+    ev: ['salvage', 'Viking 1'], loot: { scrap: 4, rations: 2, hydrazine: 1, seedTomato: 1 } },
   { id: 'spirit', name: 'Wake the Dead', target: 'Spirit',
     desc: 'Recover Spirit\'s memory boards at Gusev crater. She earned a proper goodbye.',
-    ev: ['salvage', 'Spirit'], loot: { rations: 3, candle: 1 }, bp: 'recycler' },
+    ev: ['salvage', 'Spirit'], loot: { rations: 3, candle: 1, seedSoy: 1 }, bp: 'recycler' },
   { id: 'oppy', name: 'Oppy\'s Last Message', target: 'Opportunity',
     desc: 'Find Opportunity in Meridiani Planum and wipe her panels. Yes, it matters. To everyone.',
     ev: ['salvage', 'Opportunity'], loot: { rations: 4, circuit: 1 }, bp: 'drive2' },
@@ -77,7 +77,7 @@ export const QUEST_DEFS = [
     ev: ['salvage', 'Phoenix'], loot: { rations: 4, hydrazine: 2 }, bp: 'tank2' },
   { id: 'mars3', name: 'Sirens of Mars', target: 'Mars 3',
     desc: 'Find Mars 3, silent since 1971, and recover its film canister. The first one deserves a visitor.',
-    ev: ['salvage', 'Mars 3'], loot: { scrap: 5, rations: 5, circuit: 1 } },
+    ev: ['salvage', 'Mars 3'], loot: { scrap: 5, rations: 5, circuit: 1, seedTomato: 1, seedLettuce: 1 } },
   { id: 'breadcrumbs', name: 'Breadcrumbs', target: null,
     desc: 'Pre-position the escape: deploy an O2 Cache and a Nav Beacon at least 2 km from the Hab, toward Schiaparelli.',
     ev: ['deploy', null], loot: { rations: 3, candle: 2 } },
@@ -95,7 +95,7 @@ export function offerQuests() {
   for (const name of Object.keys(S.salvaged)) onQuestEvent('salvage', name);
   log('NASA uploaded survey tasks — old landers with parts worth saving. Check the journal [J]. They pay in supply pods.', 'nasa');
   // the care package: ice drill blueprint arrives with the first pod
-  dropSupplyPod({ scrap: 3, rations: 3, candle: 1 }, 'Open NASA care package').blueprint = 'drill';
+  dropSupplyPod({ scrap: 3, rations: 3, candle: 1, seedSoy: 2 }, 'Open NASA care package').blueprint = 'drill';   // Botany sent beans
 }
 export function onQuestEvent(type, name) {
   for (const q of QUEST_DEFS) {

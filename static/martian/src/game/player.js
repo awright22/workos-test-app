@@ -145,7 +145,8 @@ export function collideUnit(q, radius) {
 // The astronaut model and its animation
 // ------------------------------------------------------------------------------------------
 export let astro = null;
-const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0 };
+const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
+  helmet: [], head: [], bare: false, airT: 0 };
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
 
 export function buildAstronaut() {
@@ -169,7 +170,13 @@ export function buildAstronaut() {
   at.add(lamp, tgt);
   lamp.target = tgt;
   anim.lamp = lamp;
-  m.inner.traverse((o) => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; for (const x of mats) if (x.name === 'light_white') anim.lampMats.push(x); } });
+  // the helmet and the head under it are separate meshes: he takes the helmet off where there is air
+  m.inner.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = (Array.isArray(o.material) ? o.material[0] : o.material).name || '';
+    if (n === 'helmet_light') anim.lampMats.push(o.material);
+    if (o.name === 'helmet' || /^(helmet_|visor)/.test(n)) anim.helmet.push(o); else if (o.name === 'head' || /^head_/.test(n)) { anim.head.push(o); o.visible = false; }
+  });
   ctx.world.add(astro);
   play('Idle', 0);
 }
@@ -206,6 +213,16 @@ export function updateAstronaut(dt) {
     else { ctx.world.add(astro); anim.inner.rotation.y = Math.PI; }
   }
   astro.visible = driving ? !!(World.rover && World.rover.seat) : (!S.firstPerson && !S.sleeping && !(cam.init && cam.dist < 1.0)) || S.over;
+  // helmet: on the instant the air is in doubt, off a moment after he is somewhere he can breathe
+  const air = driving ? S.roverO2 > 6 : S.inside && S.o2 > 6 && !S.breach.active;
+  anim.airT = air ? anim.airT + dt : 0;
+  const bare = anim.head.length > 0 && anim.airT > 1.1 && !S.dead;
+  if (bare !== anim.bare) {
+    anim.bare = bare;
+    for (const o of anim.helmet) o.visible = !bare;
+    for (const o of anim.head) o.visible = bare;
+  }
+  player.bare = bare;
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
   if (S.over && S.dead) play('Collapse', 0.25);
@@ -389,7 +406,8 @@ const _habRoom = { group: null, inside: (x, z) => Math.hypot(x, z) < HAB_R - 0.4
 const _lockRoom = { group: null, inside: (x) => Math.abs(x) < 0.95, ceiling: () => 2.2 };
 const _domeRoom = {
   group: null,
-  inside: (x, z) => Math.hypot(x, z) < GREENHOUSE.wall - 0.4 || (Math.abs(x) < GREENHOUSE.doorHalf - 0.2 && z > 0 && z < GREENHOUSE.portalEnd + 3),
+  inDoorway: false,
+  inside(x, z) { return Math.hypot(x, z) < GREENHOUSE.wall - 0.4 || (this.inDoorway && Math.abs(x) < GREENHOUSE.doorHalf - 0.2 && z > 0 && z < GREENHOUSE.portalEnd + 3); },
   // under the glazing (a 4 m dome on a low wall), or under the flat roof of the doorway
   ceiling: (x, z) => (Math.abs(x) < GREENHOUSE.doorHalf && z > GREENHOUSE.wall - 0.6 ? 2.05 : 0.3 + Math.sqrt(Math.max(0.2, 16 - x * x - z * z))),
 };
@@ -399,7 +417,12 @@ function cameraRoom() {
     if (Math.hypot(_v3.x, _v3.z) < AIRLOCK_END + 1) { const r = S.inAirlock ? _lockRoom : _habRoom; r.group = World.hab; return r; }
   }
   if (S.inside) for (const b of World.builtMeshes) {
-    if (b.kind === 'greenhouse' && groundDist(player.pos, b.group.position) < 4.2) { _domeRoom.group = b.group; return _domeRoom; }
+    if (b.kind === 'greenhouse' && groundDist(player.pos, b.group.position) < 4.2) {
+      _domeRoom.group = b.group;
+      siteWorldToLocal(b.group, player.pos, _v3);
+      _domeRoom.inDoorway = Math.hypot(_v3.x, _v3.z) > GREENHOUSE.wall - 0.7;      // otherwise the door posts fill the picture
+      return _domeRoom;
+    }
   }
   return null;
 }

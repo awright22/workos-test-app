@@ -6,6 +6,7 @@ import { groundDist } from '../planet/geo.js';
 import { player } from './player.js';
 import { screenOpen } from '../ui/screens.js';
 import { log } from '../ui/dom.js';
+import { CROPS, farm } from './farm.js';
 // Items, recipes, upgrades and loot.
 export const ITEM_NAMES = {
   scrap: 'Scrap Metal', circuit: 'Circuit Board', regolith: 'Regolith', ice: 'Ice Chunk',
@@ -45,12 +46,15 @@ export function costStr(cost) {
   const parts = Object.keys(cost).map(k => `${cost[k]} ${ITEM_NAMES[k] || k}`);
   return parts.length ? parts.join(' + ') : 'free';
 }
+/** Loot keys that are seed packets for the farm. */
+const SEED_LOOT = { seedRadish: 'radish', seedLettuce: 'lettuce', seedSoy: 'soy', seedTomato: 'tomato' };
 export function gainLoot(loot) {
   const got = [];
   for (const k in loot) {
     if (k === 'rations') { S.food += loot[k]; got.push(`${loot[k]} rations`); }
     else if (k === 'water') { S.water = clamp(S.water + loot[k], 0, BAL.waterMax); got.push(`${loot[k]}L water`); }
     else if (k === 'hydrazine') { S.hydrazine += loot[k]; got.push(`${loot[k]} hydrazine`); }
+    else if (SEED_LOOT[k]) { farm().seeds[SEED_LOOT[k]] += loot[k]; got.push(`${loot[k]} ${CROPS[SEED_LOOT[k]].one} seed packet${loot[k] > 1 ? 's' : ''}`); }
     else { S.inv[k] = (S.inv[k] || 0) + loot[k]; got.push(`${loot[k]} ${ITEM_NAMES[k] || k}`); }
   }
   Snd.pickup();

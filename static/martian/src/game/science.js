@@ -107,7 +107,7 @@ const BY_ID = Object.fromEntries(MATERIALS.map((m) => [m.id, m]));
 
 /** NASA grants: at each total of science credit, a supply drop. Blueprints are added while any are left. */
 export const GRANTS = [
-  { at: 25, loot: { circuit: 2, scrap: 2 }, say: 'JPL geology is "weeping openly". They sent parts.' },
+  { at: 25, loot: { circuit: 2, scrap: 2, seedTomato: 2 }, say: 'JPL geology is "weeping openly". They sent parts. Botany slipped tomato seeds into the pod.' },
   { at: 60, loot: { scrap: 4, candle: 1 }, blueprint: true, say: 'The science team traded Engineering a favour. Schematics attached.' },
   { at: 110, loot: { circuit: 2, kitBeacon: 1 }, say: 'Three papers are already in review with your name on them. Posthumous authorship has been ruled out, so stay alive.' },
   { at: 170, loot: { scrap: 5, circuit: 1 }, blueprint: true, say: 'A crater has been proposed in your name. More schematics, with thanks.' },

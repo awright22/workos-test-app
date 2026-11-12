@@ -382,6 +382,32 @@ export function showComms(o) {
   p.querySelector('.comms-ft button').addEventListener('click', (ev) => { ev.stopPropagation(); clearInterval(commsTimer); o.onNext(); });
 }
 
+// ------------------------------------------------------------------------------------------
+// A choice: one of a few things, each with a line of detail
+// ------------------------------------------------------------------------------------------
+/**
+ * o: { kicker, title, note, items: [{ label, sub, note, count, fn }], onCancel() }
+ * Picking an item closes the dialog and calls its fn; Escape or Cancel closes it.
+ */
+export function showChoice(o) {
+  const cancel = () => { hideOverlay(); if (o.onCancel) o.onCancel(); };
+  const rows = o.items.map((it, i) =>
+    `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${esc(it.label)}</span>` +
+    `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
+    `${it.note ? `<span class="ch-t">${esc(it.note)}</span>` : ''}</button>`).join('');
+  const p = openOverlay('dialog',
+    `<div class="dlg pick">${o.kicker ? `<div class="t-kicker">${esc(o.kicker)}</div>` : ''}<h1 id="mg-dlg-title">${esc(o.title)}</h1>` +
+    `<div class="choices">${rows}</div>` +
+    `<div class="btns">${o.note ? `<span class="pick-note">${esc(o.note)}</span>` : ''}<button type="button" class="mg-btn" data-act="cancel">Cancel</button></div></div>`,
+    { label: o.title, onEscape: cancel, guard: true });
+  p.querySelectorAll('.choice').forEach((b) => b.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    hideOverlay();
+    o.items[+b.dataset.i].fn();
+  }));
+  p.querySelector('[data-act="cancel"]').addEventListener('click', (ev) => { ev.stopPropagation(); cancel(); });
+}
+
 // test and debug handle (tools/tests/ui-shots.mjs drives every view through this)
-window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings, showControls, showCredits, showSleep, showSleepSummary, showComms,
+window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings, showControls, showCredits, showSleep, showSleepSummary, showComms, showChoice,
   showOverlay, hideOverlay, toast, log, settings, setSetting, resetSettings, layout };

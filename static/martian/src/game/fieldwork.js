@@ -16,6 +16,7 @@ import { log, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { analyseAll, canSample, scienceSummary, takeSample } from './science.js';
 import { checkAchievements } from './story.js';
+import { cheer } from './farm.js';
 
 const _rock = new THREE.Vector3(), _u = new THREE.Vector3(), _table = new THREE.Vector3();
 
@@ -75,6 +76,7 @@ addI({
       const m = r.material;
       setTimeout(() => {
         if (r.first) {
+          cheer(3);
           const s = scienceSummary();
           Snd.play('discovery');
           toast('NEW MATERIAL', m.name, `${s.kinds} of ${s.of} catalogued · +${r.credit} science`);

@@ -19,6 +19,19 @@ s = await ev((G) => { G.tpLocal(4.0, -3.0); G.hold(1.0); G.tpLocal(4.3, -0.4); G
 check('inspecting systems and running the numbers', s.checked.oxy && s.checked.rec && s.math && s.inside, s);
 
 s = await ev((G) => {
+  const parts = () => { let helmet = 0, head = 0; G.player && G.ctx.world.traverse((o) => { if (o.isSkinnedMesh && o.visible) { if (o.name === 'helmet') helmet++; if (o.name === 'head') head++; } }); return { helmet, head }; };
+  G.tpLocal(0, 3); G.tick(0.05, 40);                       // two seconds in the Hab's air
+  const indoors = { bare: G.player.bare, ...parts() };
+  G.tpLocal(0, 30); G.tick(0.05, 2);                       // outside: on at once
+  const outdoors = { bare: G.player.bare, ...parts() };
+  G.tpLocal(0, 3); G.tick(0.05, 40); G.S.breach.active = true; G.tick(0.05, 2);
+  const breach = G.player.bare; G.S.breach.active = false;
+  return { indoors, outdoors, breach };
+});
+check('the helmet comes off in the Hab\'s air and is on the instant he is outside or the Hab is breached',
+  s.indoors.bare === true && s.indoors.head === 1 && s.indoors.helmet === 0 && s.outdoors.bare === false && s.outdoors.helmet === 1 && s.outdoors.head === 0 && s.breach === false, s);
+
+s = await ev((G) => {
   const T = G.ctx.engine.camera.position.constructor;
   for (let i = 0; i < 3; i++) {
     const p = G.World.panels[i];
@@ -37,13 +50,16 @@ s = await ev((G) => {
   G.tpLocal(-6.7, -3.2);            // west of the first tray, between it and the wall
   G.hold(1.5); out.afterFill = G.World.plots[0].state;
   const w0 = G.S.water;
-  G.hold(1.5); out.afterPlant = G.World.plots[0].state; out.waterUsed = +(w0 - G.S.water).toFixed(1);
+  G.hold(1.5);                      // with seed packets in the kit this asks what to plant: potatoes are first
+  out.asked = [...document.querySelectorAll('#mg-panel .choice .ch-l')].map((n) => n.textContent);
+  if (out.asked.length) document.querySelector('#mg-panel .choice').click();
+  out.afterPlant = G.World.plots[0].state; out.waterUsed = +(w0 - G.S.water).toFixed(1);
   G.World.plots[0].growth = 0.45; G.hold(1.5); out.watered = G.World.plots[0].watered;
   G.World.plots[0].growth = 0.995; G.tick(0.05, 400); out.ripe = G.World.plots[0].state;
   G.hold(1.5); out.potatoes = G.S.potatoes; out.afterHarvest = G.World.plots[0].state;
   return out;
 });
-check('farming: fill, plant, water, grow, harvest', s.afterFill === 'soil' && s.afterPlant === 'growing' && s.watered === 2 && s.ripe === 'ready' && s.potatoes === 4 && s.afterHarvest === 'soil', s);
+check('farming: fill, choose potatoes, plant, water, grow, harvest', s.afterFill === 'soil' && s.asked.join() === 'Potatoes,Radishes,Lettuce' && s.afterPlant === 'growing' && s.watered === 2 && s.ripe === 'ready' && s.potatoes === 4 && s.afterHarvest === 'soil', s);
 
 s = await ev((G) => { const w0 = G.S.water; G.tpLocal(4.2, 2.6); G.hold(2.2); return { hydrazine: G.S.hydrazine, gained: +(G.S.water - w0).toFixed(1) }; });
 check('burning hydrazine makes water', s.hydrazine === 2 && s.gained > 27, s);

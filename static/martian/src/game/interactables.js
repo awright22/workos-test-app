@@ -1,9 +1,9 @@
-import { HAB_R, World, buildDeployable, setSiteShown, siteLocalToWorld } from '../world/build.js';
+import { HAB_R, World, buildDeployable, plotPlants, setSiteShown, siteLocalToWorld } from '../world/build.js';
 import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
 import { BAL, S, roverPowerCap, suitCap } from './state.js';
-import { flashScreen, log, showOverlay } from '../ui/dom.js';
+import { flashScreen, log, showOverlay, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
 import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
@@ -15,28 +15,23 @@ import { closeScreens, toggleScreen } from '../ui/screens.js';
 import { enterRover, exitRover, roverF } from './rover.js';
 import { ITEM_NAMES, gainLoot } from './inventory.js';
 import { bagSoilHere } from './fieldwork.js';
+import { CROPS, MORALE_WORD, cookDinner, dinnerPlan, foodTotal, harvest, moraleBand, plantable, seedStock, snack, takeSeed } from './farm.js';
+import { showChoice } from '../ui/menus.js';
 import { R } from '../planet/constants.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
 export function syncPlot(pl) {
   pl.soilMesh.visible = pl.state !== 'empty';
-  const s = 0.25 + pl.growth * 1.05;
-  if (pl.plantsDead) {
-    // modelled plots carry a healthy crop (scaled as it grows) and a withered one
-    pl.plants.visible = pl.state === 'growing' || pl.state === 'ready';
-    pl.plantsDead.visible = pl.state === 'dead';
-    const k = Math.min(1, 0.25 + pl.growth * 0.75);
-    pl.plants.scale.set(k, k, k);
-    return;
+  // a bed shows the plants of the crop it holds: alive and scaled as they grow, or withered
+  const shown = plotPlants(pl, pl.crop);
+  for (const set of [{ plants: pl.plants, dead: pl.plantsDead }, ...Object.values(pl.crops)]) {
+    if (set === shown || (set.plants === shown.plants)) continue;
+    set.plants.visible = false;
+    if (set.dead) set.dead.visible = false;
   }
-  pl.plants.visible = pl.state === 'growing' || pl.state === 'ready' || pl.state === 'dead';
-  pl.plants.scale.set(s, s, s);
-  pl.plants.traverse((o) => {
-    if (o.material) {
-      if (pl.state === 'dead') o.material.color.set(0x5a4a30);
-      else if (pl.state === 'ready') o.material.color.set(o.geometry.type === 'SphereGeometry' ? 0x76c04a : 0x4e8a3a);
-      else o.material.color.set(o.geometry.type === 'SphereGeometry' ? 0x4e9a3a : 0x3f7a2f);
-    }
-  });
+  shown.plants.visible = pl.state === 'growing' || pl.state === 'ready';
+  if (shown.dead) shown.dead.visible = pl.state === 'dead';
+  const k = Math.min(1, 0.25 + pl.growth * 0.75);
+  shown.plants.scale.set(k, k, k);
 }
 export function plantedPlots() { return World.plots.filter(p => p.state === 'growing' || p.state === 'ready').length; }
 export function nearestPlot() {
@@ -48,6 +43,18 @@ export function nearestPlot() {
   }
   return best;
 }
+/** Put a crop in a bed of soil. */
+function plant(pl, crop) {
+  if (pl.state !== 'soil' || seedStock(crop) <= 0 || S.water < BAL.waterPerDose) return;
+  takeSeed(crop);
+  S.water -= BAL.waterPerDose;
+  pl.crop = crop; pl.state = 'growing'; pl.growth = 0.04; pl.watered = 1;
+  if (plantedPlots() === 1) log('Planted. Grow, little guy. No pressure, but you\'re the food supply.');
+  else if (crop !== 'potato' && !S.flags.plantedOther) { S.flags.plantedOther = true; log(`${CROPS[crop].name} in. The botany kit finally earns its launch mass.`); }
+  Snd.play('plant');
+  syncPlot(pl);
+}
+const cropOf = (pl) => CROPS[pl.crop] || CROPS.potato;
 addI({
   pos: () => { const pl = nearestPlot(); return pl ? pl.worldPos : null; },
   r: 2.2, hold: 1.3, mode: 'walk',
@@ -56,10 +63,10 @@ addI({
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
       case 'empty': return S.inv.regolith > 0 ? true : 'Needs soil — dig regolith outside';
-      case 'soil': return (S.food + S.potatoes) > 0 ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)') : 'No seed potato left';
+      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)') : 'Nothing left to plant';
       case 'growing':
-        if (pl.watered < BAL.waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)';
-        return `Growing — ${Math.round(pl.growth * 100)}%`;
+        if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)';
+        return `${cropOf(pl).name} — ${Math.round(pl.growth * 100)}%`;
       case 'ready': case 'dead': return true;
     }
     return false;
@@ -68,9 +75,13 @@ addI({
     const pl = nearestPlot(); if (!pl) return '';
     switch (pl.state) {
       case 'empty': return 'Fill bed with regolith';
-      case 'soil': return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5L water)`;
-      case 'growing': return 'Water the plants (5L)';
-      case 'ready': return 'Harvest potatoes';
+      case 'soil': {
+        const can = plantable();
+        if (can.length > 1) return 'Plant this bed…';
+        return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5L water)`;
+      }
+      case 'growing': return `Water the ${cropOf(pl).name.toLowerCase()} (5L)`;
+      case 'ready': return `Harvest ${cropOf(pl).name.toLowerCase()}`;
       case 'dead': return 'Clear out the dead crop';
     }
     return '';
@@ -82,25 +93,39 @@ addI({
         S.inv.regolith--; pl.state = 'soil';
         Snd.play('fillBed');
         break;
-      case 'soil':
-        if (S.potatoes > 0) S.potatoes--; else S.food--;
-        S.water -= BAL.waterPerDose;
-        pl.state = 'growing'; pl.growth = 0.04; pl.watered = 1;
-        if (plantedPlots() === 1) log('Planted. Grow, little guy. No pressure, but you\'re the food supply.');
-        Snd.play('plant');
+      case 'soil': {
+        const can = plantable();
+        if (can.length > 1) {
+          // more than one thing to plant: ask
+          showChoice({
+            kicker: 'Farm', title: 'What goes in this bed?', note: 'Each bed takes 5 L of water to plant.',
+            items: can.map((id) => {
+              const c = CROPS[id], n = seedStock(id);
+              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · ${c.yield} a bed`,
+                note: c.note, count: id === 'potato' ? `${n} left` : `${n} to plant`, fn: () => plant(pl, id) };
+            }),
+          });
+        } else plant(pl, can[0] || 'potato');
         break;
+      }
       case 'growing':
         S.water -= BAL.waterPerDose; pl.watered++;
         Snd.play('water');
         break;
-      case 'ready':
+      case 'ready': {
+        const crop = CROPS[pl.crop] ? pl.crop : 'potato';
+        const first = crop === 'potato' ? S.stats.potatoes === 0 : !(S.stats.produce > 0);
         pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
-        S.potatoes += BAL.potatoYield;
-        S.stats.potatoes += BAL.potatoYield;
+        const n = harvest(crop);
         Snd.play('harvest'); Snd.jingle();
-        if (S.stats.potatoes === BAL.potatoYield) log('First harvest. I am the greatest botanist on this planet. Fear me.');
+        if (crop === 'potato') { if (first) log('First harvest. I am the greatest botanist on this planet. Fear me.'); }
+        else {
+          toast('HARVEST', `${n} ${CROPS[crop].name.toLowerCase()}`, 'In the pantry: on the plate at breakfast, or cook a dinner at the food shelf');
+          if (first) log('Something that is not a potato. I may cry. I am not going to cry. I am going to eat it.');
+        }
         checkAchievements();
         break;
+      }
       case 'dead':
         pl.state = 'soil'; pl.growth = 0; pl.watered = 0;
         Snd.play('clearBed');
@@ -245,17 +270,34 @@ addI({
   label: () => 'Sleep until dawn',
   use: () => sleepToDawn(false),
 });
-// shelf
+// the food shelf: eat something now, or cook a proper dinner when the pantry allows one
+const SNACK = { potato: 'potato. Again.', ration: 'ration', soy: 'bowl of soybeans', radish: 'radish', lettuce: 'handful of lettuce', tomato: 'tomato' };
+const nextSnack = () => (S.potatoes > 0 ? 'potato' : ['soy', 'radish', 'lettuce', 'tomato'].find((id) => S.pantry && S.pantry[id] > 0) || (S.food > 0 ? 'ration' : null));
 addI({
   pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
   r: 2.2, hold: 0.8, mode: 'walk', pose: 'stand',
-  visible: () => !S.flags.coldOpen && S.inside,
-  enabled: () => S.health > 92 ? 'Not hungry right now' : (S.potatoes > 0 || S.food > 0) ? true : 'The shelf is bare',
-  label: () => `Eat a ${S.potatoes > 0 ? 'potato. Again.' : 'ration'} (+12 vitals)`,
+  visible: () => !S.flags.coldOpen && S.inside && !dinnerPlan().ok,
+  enabled: () => S.health > 92 ? 'Not hungry right now' : foodTotal() > 0 ? true : 'The shelf is bare',
+  label: () => `Eat a ${SNACK[nextSnack()] || 'ration'} (+12 vitals)`,
   use: () => {
-    if (S.potatoes > 0) S.potatoes--; else S.food--;
+    if (!snack()) return;
     S.health = clamp(S.health + 12, 0, BAL.healthMax);
     Snd.play('eat');
+  },
+});
+addI({
+  pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
+  r: 2.2, hold: 2.4, mode: 'walk', pose: 'stand', priority: -1,
+  visible: () => !S.flags.coldOpen && S.inside && dinnerPlan().ok,
+  label: () => { const p = dinnerPlan(); return `Cook dinner: ${p.staple === 'soy' ? 'soybeans' : 'potato'}, ${p.sides.map((id) => CROPS[id].name.toLowerCase()).join(' and ')}`; },
+  sub: () => '+25 vitals, lifts morale',
+  use: () => {
+    const line = cookDinner();
+    if (!line) return;
+    Snd.play('eat'); Snd.jingle();
+    toast('DINNER', 'A cooked meal', `Morale ${Math.round(S.morale)} · ${MORALE_WORD[moraleBand()]}`);
+    log(line);
+    checkAchievements();
   },
 });
 // comms desk: the math, NASA chatter, disco

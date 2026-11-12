@@ -227,3 +227,7 @@
 .mg-compact .stat-grid .stat { padding: .5rem .625rem; }
 .mg-compact .stat-grid .stat b { font-size: 1.25rem; }
 .mg-compact .jlog .mg-line { grid-template-columns: 4.5rem 1fr; }
+
+.jr-note { margin: -.25rem 0 .75rem; font-size: .875rem; color: var(--accent); }
+.inv-row.mach.warn .ct, .inv-row.mach.warn .ic { color: var(--accent); }
+.inv-row.mach.crit .ct, .inv-row.mach.crit .ic { color: var(--danger); }

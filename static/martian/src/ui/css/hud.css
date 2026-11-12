@@ -255,7 +255,7 @@
 .mg-compact .suit .st { display: none; }
 .mg-compact .ring .trk { stroke-width: 4; }
 .mg-compact .ring .arc { stroke-width: 4.5; }
-.mg-compact .res { gap: .1875rem; padding-left: .5rem; }
+.mg-compact .res { gap: .125rem; padding-left: .5rem; }
 .mg-compact .res .row { grid-template-columns: .8125rem 2.75rem 2.125rem .375rem; column-gap: .3125rem; height: .6875rem; }
 .mg-compact .res .row .lb { display: none; }
 .mg-compact .res .row .ic { width: .8125rem; height: .8125rem; }
@@ -279,7 +279,7 @@
 .mg-compact .alert { font-size: .75rem; padding: .25rem .625rem .25rem .5rem; }
 .mg-compact .alert small { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */
-.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + 5.5rem); }
+.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + 5.875rem); }
 .mg-compact.has-toast #mg-log { visibility: hidden; }
 .mg-compact .toast { min-width: 0; max-width: none; width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); padding: .4375rem .625rem .5rem; }
 .mg-compact .toast .ti { display: none; }

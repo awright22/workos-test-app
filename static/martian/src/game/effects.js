@@ -41,10 +41,10 @@ export function updateEffects(dt) {
       const G = World.rover.group;
       _f.set(0, 0, -1).applyQuaternion(roverF.q);
       _r.set(1, 0, 0).applyQuaternion(roverF.q);
-      // tyre tracks: a pair of marks every 0.85 m
+      // tyre tracks: a pair of marks laid end to end (each is 0.9 m long), so the ruts are unbroken
       trackDist += v * dt;
-      if (trackDist > 0.85) {
-        trackDist = 0;
+      if (trackDist >= 0.88) {
+        trackDist -= 0.88;
         for (const side of [-1.22, 1.22]) {
           _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -1.9 * Math.sign(roverF.speed));
           ctx.vfx.mark('tyre', onGround(_p), _f);

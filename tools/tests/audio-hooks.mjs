@@ -79,6 +79,8 @@ check('digging regolith', has(r, 'dig', 'work_dig'), r.h);
 r = await act(async (G) => {
   G.S.inv.regolith = 2; G.tpLocal(-6.7, -3.2);          // beside the first farm tray, clear of the gap between trays
   await window.__run(1.5, true); await window.__run(1.5, true);
+  const pick = document.querySelector('#mg-panel .choice');         // the kit has seed packets, so the bed asks what to plant
+  if (pick) pick.click();
   G.World.plots[0].growth = 0.45; await window.__run(1.5, true);
   G.World.plots[0].growth = 0.999; await window.__run(1.0); await window.__run(1.5, true);
 });

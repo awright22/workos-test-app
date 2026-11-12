@@ -18,9 +18,10 @@ const g = await openGame({ quality, width: W, height: H, touch });
 const ev = (fn, a) => g.eval(fn, a);
 const snap = async (name) => { await sleep(900); await g.page.screenshot({ path: path.join(dir, `${name}.png`), timeout: 180000 }); console.log('  shot', name); };
 const want = (n) => !only.length || only.includes(n);
-const hud = (on) => g.page.addStyleTag({ content: `.mg-hud, #mg-touch { visibility: ${on ? 'visible' : 'hidden'} !important; }` });
+// pictures of the world: everything of the interface is hidden (the interface has its own screenshot set, tests/ui-shots.mjs)
+const hud = (on) => g.page.addStyleTag({ content: `#mg-root > *:not(canvas) { opacity: ${on ? 1 : 0} !important; }` });
 
-if (want('title')) await snap('title');
+if (want('title')) { await snap('title'); await hud(false); await snap('title-globe'); await hud(true); }
 await ev(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.paused = true; G.S.storm.cells.forEach((c) => { c.peak = 0; }); G.setStorm(0); });   // the opening storm has blown out
 await hud(false);
 
@@ -39,7 +40,7 @@ const model = (where, dist, bearing, hours, o = {}) => g.page.evaluate(`(async (
 const scenes = {
   'hab-morning': async () => ev(async (G) => { G.S.firstPerson = false; G.tpLocal(7, 24, 0); G.setLocalTime(8.2); G.look(-0.06); G.tick(0.05, 40); await G.settle(); }),
   'hab-noon': async () => ev(async (G) => { G.tpLocal(-14, 20, 0.6); G.setLocalTime(12.3); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
-  'hab-dusk': async () => ev(async (G) => { G.tpLocal(10, 26, -0.4); G.setLocalTime(17.9); G.look(-0.02); G.tick(0.05, 40); await G.settle(); }),
+  'hab-dusk': async () => ev(async (G) => { G.tpLocal(10, 26, -0.4); G.setLocalTime(17.6); G.look(-0.02); G.tick(0.05, 40); await G.settle(); }),
   'hab-night': async () => ev(async (G) => { G.tpLocal(6, 22, 0); G.setLocalTime(22); G.look(-0.05); G.tick(0.05, 30); await G.settle(); }),
   'inside-game-cam': async () => ev(async (G) => { G.setLocalTime(10); G.tpLocal(0, 4.5, 0); G.look(-0.2); G.tick(0.05, 30); await G.settle(); }),
   'inside-farm': async () => ev(async (G) => { G.tpLocal(-1.5, 0.5, 1.9); G.look(-0.25); G.tick(0.05, 30); await G.settle(); }),
@@ -47,15 +48,17 @@ const scenes = {
   'walk-plain': async () => ev(async (G) => { G.setLocalTime(9.5); G.tpLocal(40, 120, 0.4); G.look(-0.08); G.input.keys['w'] = true; G.tick(0.05, 26); G.input.keys['w'] = false; await G.settle(); }),
   'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 7); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); G.input.keys['w'] = false; await G.settle(); }),
-  'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 30); G.setStorm(1); await G.settle(); }),
+  'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.tick(0.05, 30); await G.settle(); }),
+  'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
+  'storm-sun': async () => ev(async (G) => { G.setLocalTime(15.5); G.faceSun(); G.look(0.28); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
   'mav': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
-  'canyon': async () => ev(async (G) => { await G.tp(-10.82, 293, -1.75); G.setLocalTime(15.5); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
+  'canyon': async () => ev(async (G) => { await G.tp(-11.3, 293, 3.14); G.setLocalTime(11); G.look(0.15); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 0); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   // every built model, seen by a free camera with the astronaut beside it for scale
-  'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [4.5, 265], height: 2.4 }),
+  'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [3.6, 200], height: 2.4 }),
   'pile': () => model((G) => G.World.soilPiles[3].group.position, 5.5, 140, 15, { stand: [2.6, 230] }),
   'debris-a': () => model((G) => G.World.pods[0].group.position, 6.5, 120, 9.5, { stand: [3.2, 40] }),
   'debris-b': () => model((G) => G.World.pods[1].group.position, 6, 240, 9.5, { stand: [3.0, 160] }),
@@ -68,8 +71,8 @@ const scenes = {
       G.syncAllVisuals();
     }
     return G.World.builtMeshes[0].group.position;
-  }, 15, 40, 10, { stand: [6.5, 28], height: 2.6, aim: 1.6 }),
-  'greenhouse-inside': async () => ev(async (G) => { G.photo(null); G.tpAround(G.World.builtMeshes[0].group.position, 2.6, 30); G.setLocalTime(10); G.look(-0.2); G.tick(0.05, 40); await G.settle(); }),
+  }, 16, 55, 10, { stand: [7.5, 10], height: 2.6, aim: 1.6 }),
+  'greenhouse-inside': async () => ev(async (G) => { G.photo(null); G.tpAround(G.World.builtMeshes[0].group.position, 1.2, 210); G.setLocalTime(10); G.look(-0.2); G.tick(0.05, 40); await G.settle(); }),
   'greenhouse-door': async () => ev(async (G) => { G.tpAround(G.World.builtMeshes[0].group.position, 7.5, 28.6); G.setLocalTime(10); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'greenhouse-night': () => model((G) => G.World.builtMeshes[0].group.position, 14, 60, 21.5, { stand: [6, 80], height: 2.2, aim: 1.6 }),
   'solar-kit': () => model((G) => G.World.builtMeshes[1].group.position, 4.6, 150, 15.5, { stand: [2.2, 80] }),

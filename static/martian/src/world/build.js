@@ -58,6 +58,31 @@ export function pickSpawn(rng) {
   return { lat: 18, lon: 340, v: llToVec(18, 340) };                  // safe fallback
 }
 
+let stainTexture = null;
+/** A soft, ragged stain on level ground: scorch under the rocket, trodden soil round the Hab. */
+export function groundStain(parent, radius, color, opacity, y = 0.03) {
+  if (!stainTexture) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d'), img = g.createImageData(128, 128);
+    for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
+      const dx = (i - 63.5) / 64, dy = (j - 63.5) / 64, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      const ragged = 0.80 + 0.10 * Math.sin(a * 5 + 1.3) + 0.06 * Math.sin(a * 11 + 0.4) + 0.04 * Math.sin(a * 23);
+      const v = Math.max(0, Math.min(1, (ragged - d) / 0.42)) * (0.75 + 0.25 * hash3(i, j, 3));
+      img.data[(j * 128 + i) * 4] = img.data[(j * 128 + i) * 4 + 1] = img.data[(j * 128 + i) * 4 + 2] = Math.round(v * v * (3 - 2 * v) * 255);
+      img.data[(j * 128 + i) * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    stainTexture = new THREE.CanvasTexture(c);
+    stainTexture.colorSpace = THREE.NoColorSpace;
+  }
+  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
+  geo.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, alphaMap: stainTexture, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  m.position.y = y; m.renderOrder = 1;
+  parent.add(m);
+  return m;
+}
+
 export function buildHabColony(spawn) {
   World.hab = placeAt(spawn.lat, spawn.lon, 0);
   World.hab.position.addScaledVector(World.hab.userData.up, -HAB_FLOOR);     // the model's floor sits HAB_FLOOR above its origin
@@ -90,6 +115,9 @@ export function buildHabColony(spawn) {
     World.habShell.push(o);
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
+  // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
+  groundStain(World.hab, 13, 0x2a160c, 0.26, HAB_FLOOR + 0.03).position.set(1.5, HAB_FLOOR + 0.03, 15);
+  groundStain(World.hab, 8, 0x2a160c, 0.2, HAB_FLOOR + 0.035).position.set(14, HAB_FLOOR + 0.035, 15);
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
@@ -158,7 +186,7 @@ export function buildHabColony(spawn) {
   const up = placeOffset(World.hab, 11.5, 7.5, 0);
   up.add(model('uplink_dish').root);
   World.uplink = up;
-  colliders.push({ v: up.position.clone().normalize(), r: 0.8 });
+  colliders.push({ v: up.position.clone().normalize(), r: 1.3 });        // the dish's tripod is wider than its mast
   const ringG = placeOffset(World.hab, 7.0, 9.5, 0);
   const pad = addSiteModel(ringG, 'uplink_pad');
   World.padLampMats = ownMaterials(pad.root, /^light_/);
@@ -218,9 +246,28 @@ export function updateDoors(dt) {
     const e = d.k * d.k * (3 - 2 * d.k);
     d.node.position.x = d.x0 + d.dx * e;
   }
+  for (const b of World.builtMeshes) {
+    const d = b.door;
+    if (!d || !d.node || !b.group.visible) continue;
+    const p = siteWorldToLocal(b.group, pos, _pv);
+    const near = S.mode === 'walk' && Math.abs(p.x) < 2.4 && p.z > GREENHOUSE.wall - 2.6 && p.z < GREENHOUSE.portalEnd + 3.6;
+    const target = near ? 1 : 0;
+    if (d.k === target) continue;
+    d.k += Math.sign(target - d.k) * Math.min(Math.abs(target - d.k), dt * 2.4);
+    const e = d.k * d.k * (3 - 2 * d.k);
+    d.node.rotation.y = -1.83 * e;
+    setColliders(d.cols, d.k < 0.5);
+  }
 }
 
 /** Level the ground under everything that is built at a fixed place. Call before placing. */
+/** Where water ice breaks the surface: Korolev crater and fields across the northern lowlands. */
+export function iceSpots() {
+  const out = [[72.77, 164.58]];
+  for (let i = 0; i < 11; i++) out.push([42 + hash3(i, 7, 1) * 32, hash3(i, 3, 9) * 360]);
+  return out;
+}
+
 export function addSitePads(spawn) {
   const P = ctx.planet;
   const pad = (v, r, blend) => P.addPad(v.x, v.y, v.z, r, blend);
@@ -228,6 +275,7 @@ export function addSitePads(spawn) {
   pad(llToVec(19.13, 326.79), 7, 10);                     // Pathfinder
   pad(llToVec(-1.9, 15.9), 16, 18);                       // the MAV
   for (const L of LANDERS) if (L.name !== 'Pathfinder') pad(L.v, 6, 9);
+  for (const [la, lo] of iceSpots()) pad(llToVec(la, lo), 4.5, 7);        // an outcrop needs level ground or its blocks float
   ctx.terrain.syncPads(P.pads);
 }
 
@@ -255,9 +303,20 @@ export function addFarmPlot(parent, px, pz, collide, holder) {
   plants.visible = false;
   if (collide) addColliderAt(parent, px, pz, 0.85);
   const worldPos = new THREE.Vector3(px, 0, pz).applyQuaternion(parent.quaternion).add(parent.position);
-  World.plots.push({ group: plot, soilMesh: soil, plants, plantsDead: dead, worldPos,
+  World.plots.push({ group: plot, soilMesh: soil, plants, plantsDead: dead, worldPos, crops: {},
     state: 'empty', crop: 'potato', growth: 0, watered: 0 });
   return World.plots[World.plots.length - 1];
+}
+/** The living and the withered plants a bed shows for a crop. Potatoes are part of the bed's own model;
+ *  the others are models of their own, added the first time a bed grows them. */
+export function plotPlants(pl, crop) {
+  if (!crop || crop === 'potato') return { plants: pl.plants, dead: pl.plantsDead };
+  if (!pl.crops[crop]) {
+    const m = model('crop_' + crop);
+    pl.group.add(m.root);
+    pl.crops[crop] = { plants: m.part('plants'), dead: m.part('plants_dead') };
+  }
+  return pl.crops[crop];
 }
 
 // ============================================================
@@ -287,7 +346,7 @@ export function buildRover(group) {
 /** Which model stands at each historic landing site. */
 export const LANDER_MODEL = {
   'Mars 3': 'mars3', 'Mars 6': 'mars3', 'Viking 1': 'viking', 'Viking 2': 'viking', 'Beagle 2': 'beagle2',
-  'Spirit': 'mer', 'Opportunity': 'mer', 'Phoenix': 'phoenix', 'Curiosity': 'msl', 'Perseverance': 'msl',
+  'Spirit': 'mer', 'Opportunity': 'mer', 'Phoenix': 'phoenix', 'Curiosity': 'msl', 'Perseverance': 'm2020',
   'Schiaparelli EDM': 'schiaparelli_wreck', 'InSight': 'insight', 'Zhurong': 'zhurong',
 };
 const _aw = new THREE.Vector3();
@@ -338,6 +397,7 @@ export function buildStorySites() {
   (flameAt || World.mavRocket).add(flame);
   flame.visible = false;
   World.mavFlame = flame;
+  groundStain(mav, 9, 0x140a06, 0.5);                 // the descent engine's scorch, years old
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
@@ -352,15 +412,13 @@ export function buildStorySites() {
   }
 
   // ice deposits: Korolev + northern-lowland fields
-  const iceSpots = [[72.77, 164.58]];
-  for (let i = 0; i < 11; i++) iceSpots.push([42 + hash3(i, 7, 1) * 32, hash3(i, 3, 9) * 360]);
-  for (const [la, lo] of iceSpots) {
+  for (const [la, lo] of iceSpots()) {
     const g = placeAt(la, lo, hash3(la, lo, 4) * 6.28);
     const m = addSiteModel(g, 'ice_outcrop');
     const blocks = [];
     for (let i = 0; i < 6; i++) {
       const b = m.part('block_' + i);
-      if (b) blocks.push({ node: b, col: siteCollider(g, b.position.x, b.position.z, 0.6) });
+      if (b) blocks.push({ node: b, col: siteCollider(g, b.position.x, b.position.z, 0.95) });
     }
     World.iceSites.push({ group: g, left: 6, korolev: la > 70, blocks });
   }
@@ -381,9 +439,10 @@ export function addSupplyPod(g, loot, label) {
 // a panel) to that bearing, east of north.
 export const GREENHOUSE = { wall: 3.93, doorHalf: 0.75, portalOuter: 0.86, portalEnd: 4.62, floor: 0.06 };
 export function buildDeployable(kind, atVec, yaw = 0) {
-  if (kind === 'greenhouse') {                 // a dome needs level ground under it
+  {
+    // a dome needs level ground under it; the small things need a clear, level spot (no rock under a tripod)
     const u = _aw.copy(atVec).normalize();
-    const padRec = ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5);
+    const padRec = kind === 'greenhouse' ? ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5) : ctx.planet.addPad(u.x, u.y, u.z, 1.4, 2.2);
     ctx.terrain.syncPads([padRec]);
   }
   const g = placeAt(atVec, undefined, yaw);
@@ -398,6 +457,8 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 13, level: lit });
     addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 8, range: 9, level: lit });
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
+    // the door swings outward on its left jamb as someone walks up to it, from either side
+    b.door = { node: gm.part('door_leaf'), k: 0, cols: [siteCollider(g, 0, GREENHOUSE.portalEnd, 0.7)] };
   } else if (kind === 'beacon') {
     const m = addSiteModel(g, 'beacon');
     b.lamp = ownMaterials(m.part('lamp'), /^light_/);

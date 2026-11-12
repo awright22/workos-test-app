@@ -1,3 +1,4 @@
+import { CROPS, MORALE_WORD, breakfast, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
 import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
 import { dawnFaults, wearMachines } from './machines.js';
@@ -132,24 +133,25 @@ export function applyRates(dt, sleeping) {
   const dtSol = dt / SL;
   for (const pl of World.plots) {
     if (pl.state !== 'growing') continue;
-    if (pl.growth >= 0.5 && pl.watered < BAL.waterings) continue;
-    pl.growth += dtSol / BAL.growSols;
+    const crop = CROPS[pl.crop] || CROPS.potato;
+    if (pl.growth >= 0.5 && pl.watered < crop.waterings) continue;
+    pl.growth += dtSol / crop.growSols;
     if (pl.growth >= 1) {
       pl.growth = 1; pl.state = 'ready';
-      if (!sleeping) { Snd.ok(); log('A plot is ready. Potato o\'clock.', 'sys'); }
+      if (!sleeping) { Snd.ok(); log(crop === CROPS.potato ? 'A plot is ready. Potato o\'clock.' : `The ${crop.name.toLowerCase()} are ready.`, 'sys'); }
       syncPlot(pl);
     } else if (Math.random() < dt * 0.06) syncPlot(pl);
   }
   // --- vitals ---
   let hd = 0;
   if (S.water <= 0) hd += BAL.starveDrain / SL;
-  if (S.food + S.potatoes <= 0) hd += BAL.starveDrain / SL;
+  if (foodTotal() <= 0) hd += BAL.starveDrain / SL;
   const suffocating = S.suit <= 0 && !(S.inside && S.o2 > 3) && S.mode !== 'rover' && !sleeping;
   if (suffocating) hd += BAL.suffocateDrain;
   if (S.inside && S.o2 <= 0 && S.suit <= 0) hd += BAL.suffocateDrain;
   if (S.mode === 'rover' && S.roverO2 <= 0 && S.suit <= 0) hd += BAL.suffocateDrain;
   if (hd > 0) S.health = clamp(S.health - hd * D * dt, 0, BAL.healthMax);
-  else if (S.water > 5 && S.food + S.potatoes > 0) S.health = clamp(S.health + (BAL.healRegen / SL) * m * dt, 0, BAL.healthMax);
+  else if (S.water > 5 && foodTotal() > 0) S.health = clamp(S.health + (BAL.healRegen / SL) * m * healRate() * dt, 0, BAL.healthMax);
   if (!sleeping) {
     warnLow('suit', S.suit, suitCap() * 0.25, 'Suit O2 at 25%. Head for air. Now-ish.');
     warnLow('suit2', S.suit, suitCap() * 0.1, 'SUIT O2 CRITICAL. RUN.');
@@ -158,7 +160,7 @@ export function applyRates(dt, sleeping) {
     warnLow('power', S.power, 15, 'Hab battery low. Life support idles at zero. Wipe the panels.');
     warnLow('rpow', S.roverPower, 20, 'Rover battery low. It solar-trickles when parked in daylight.');
     warnLow('health', S.health, 40, 'Vitals degrading. Eat. Drink. Sleep. In any order.');
-    if (S.suit <= 12 || S.o2 <= 10) { if (!S.flags.closeCall) { S.flags.closeCall = true; S.stats.closeCalls++; } }
+    if (S.suit <= 12 || S.o2 <= 10) { if (!S.flags.closeCall) { S.flags.closeCall = true; S.stats.closeCalls++; cheer(-3); } }
     else S.flags.closeCall = false;
   }
   if (S.health <= 0 && !S.over) {
@@ -166,7 +168,7 @@ export function applyRates(dt, sleeping) {
     if (suffocating) cause = 'Asphyxiation, a long way from a door. Mars counts that as a win.';
     else if (S.inside && S.o2 <= 0) cause = 'The Hab ran out of air. The potatoes watched.';
     else if (S.water <= 0) cause = 'Dehydration. On a planet that used to have oceans. Rude.';
-    else if (S.food + S.potatoes <= 0) cause = 'Starvation. The botany project needed more time.';
+    else if (foodTotal() <= 0) cause = 'Starvation. The botany project needed more time.';
     die(cause);
   }
 }
@@ -221,14 +223,17 @@ export function advanceTime(dt) {
   advanceStorms(dtSol);
   if (dawn) newSol();
   // local storm intensity where the player is
-  const target = stormIntensityAt(S.mode === 'rover' ? World.rover.group.position : player.pos);
+  // (S.storm.hold, set through the debug hook, pins the weather for tests and pictures)
+  const target = typeof S.storm.hold === 'number' ? S.storm.hold : stormIntensityAt(S.mode === 'rover' ? World.rover.group.position : player.pos);
   S.storm.i = clamp(S.storm.i + Math.sign(target - S.storm.i) * dt * 0.12, 0, Math.max(target, S.storm.i - dt * 0.12));
   if (S.storm.i > 0.4 && !S.inside && S.mode === 'walk') S.stats.stormOut += dt;
+  if (S.disco) { S.stats.discoTime += dt; hearMusic(dt); }       // counted in game time (it was once per drawn frame)
   // breach event: waits for a sol >= BREACH_SOL when the player is near home
   if (S.sol >= 7 && colonyClock() > 0.08 && !S.breach.done && !S.breach.active &&
       groundDist(S.mode === 'rover' ? World.rover.group.position : player.pos, World.hab.position) < 800 &&
       !S.flags.coldOpen && S.mode !== 'cutscene') {
     S.breach.active = true;
+    cheer(-8);
     S.breach.timer = 0;
     S.shake = 1.4;
     flashScreen('rgba(255,255,255,0.5)', 200);
@@ -240,6 +245,7 @@ export function advanceTime(dt) {
     S.breach.timer += dt;
     if (S.breach.timer > 90 && !S.breach.cropsKilled) {
       S.breach.cropsKilled = true;
+      cheer(-6);
       let killed = 0;
       for (const pl of World.plots) if (pl.state === 'growing') { pl.state = 'dead'; killed++; syncPlot(pl); }
       if (killed) log('The cold got in. The growing crops are dead. Ready trays survived. Small mercies.', 'sys');
@@ -250,9 +256,15 @@ export function advanceTime(dt) {
 bindWorld(World);
 export function newSol() {
   S.sol++;
-  if (S.potatoes > 0) S.potatoes--;
-  else if (S.food > 0) S.food--;
-  else log('No breakfast. The stomach files a formal complaint.', 'sys');
+  const band = moraleBand();
+  if (breakfast() === 'skipped') log('No breakfast. The stomach files a formal complaint.', 'sys');
+  if (S.storm.i > 0.5) cheer(-2);                         // another morning with no sky
+  if (moraleBand() !== band) {
+    const now = moraleBand();
+    setTimeout(() => log(now === 'low' ? 'I am tired in a way sleep does not fix. A hot dinner, some music, a word from home: I need one of them.'
+      : now === 'high' ? 'Good morning, Mars. You are still trying to kill me, and today I do not mind.'
+        : band === 'high' ? 'The shine has gone off the morning. Back to merely surviving.' : 'Better. Not good. Better.', 'sys'), 9000);
+  }
   if (S.sol === S.rescueSol - 1) setTimeout(() => log(`Sol ${S.sol}. One more sol. Packing my potato. Singular. It's symbolic.`), 1200);
   else if (SOL_LOGS[S.sol]) setTimeout(() => log(SOL_LOGS[S.sol]), 1200);
   if (S.sol === 4 && !S.flags.pfRevealed) {
@@ -313,7 +325,7 @@ export function revealMav() {
 export function sleepToDawn(inRover) {
   if (S.sleeping) return;
   S.sleeping = true;
-  const before = { o2: S.o2, water: S.water, power: S.power, potatoes: S.potatoes, food: S.food };
+  const before = { o2: S.o2, water: S.water, power: S.power, sol: S.sol, morale: S.morale };
   showSleep();
   // advance until the LOCAL sun crosses the horizon rising (max 1.3 sols for polar nights)
   const u = _v1.copy(inRover ? World.rover.group.position : player.pos).normalize().clone();
@@ -338,7 +350,9 @@ export function sleepToDawn(inRover) {
   if (S.over) { S.sleeping = false; return; }
   const growing = World.plots.filter(p => p.state === 'growing').length;
   const ready = World.plots.filter(p => p.state === 'ready').length;
-  const notes = [`Breakfast: ${S.potatoes < before.potatoes ? 'potato. Again.' : (S.food < before.food ? 'one ration' : 'skipped')}`];
+  cheer(inRover ? -1 : 3);                                // a bunk is a bed; a driver's seat is not
+  const notes = S.sol > before.sol ? [`Breakfast: ${S.diet.breakfast}`] : [];
+  notes.push(`Morale ${Math.round(S.morale)} (${S.morale >= before.morale ? '+' : '−'}${Math.abs(Math.round(S.morale - before.morale))}): ${MORALE_WORD[moraleBand()].toLowerCase()}`);
   if (growing + ready > 0) notes.push(`Farm: ${growing} growing, ${ready} ready`);
   if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
   const summary = {

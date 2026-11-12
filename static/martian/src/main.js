@@ -1,4 +1,6 @@
 // Stranded II — entry point: load the planet, build the engine, run the game loop.
+import * as farmApi from './game/farm.js';
+import { gainLoot } from './game/inventory.js';
 import * as THREE from 'three';
 import { Engine } from './render/engine.js';
 import { loadPlanet, asset } from './planet/load.js';
@@ -22,7 +24,7 @@ import { initDiag } from './ui/diag.js';
 import { LampPool } from './world/lamps.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
-import { setGlow, preloadModels } from './world/models.js';
+import { dustUniforms, setGlow, preloadModels } from './world/models.js';
 import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
@@ -66,15 +68,16 @@ async function boot() {
     shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
+  dustUniforms.uDustAlbedo.value = data.albedoCube;
   ctx.lamps = new LampPool(engine.scene, engine.q.scale < 0.7 ? 3 : 5);
-  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 18 : 36 });
+  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 18 : 36, streaks: engine.q.scale < 0.7 ? 800 : 1800 });
   initEffects();
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
 
   await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish',
-    'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'ingenuity', 'zhurong', 'schiaparelli_wreck',
+    'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'm2020', 'ingenuity', 'crop_radish', 'crop_lettuce', 'crop_soy', 'crop_tomato', 'zhurong', 'schiaparelli_wreck',
     'greenhouse', 'solar_kit', 'beacon', 'o2_cache', 'supply_pod', 'rtg', 'debris_a', 'debris_b', 'debris_c', 'regolith_pile', 'ice_outcrop', 'uplink_pad'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
   buildAstronaut();
   initInput();
@@ -125,6 +128,7 @@ function draw(dt, focus) {
     roof: sealed ? _roof.copy(World.hab.position).addScaledVector(World.hab.userData.up, 2.8) : null });
   ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
+  dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
@@ -216,7 +220,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, gainLoot, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
@@ -318,7 +322,8 @@ function installDebug() {
       input.eHeld = false;
       lastFocus = tick(0.05);
     },
-    setStorm(i) { S.storm.i = i; S.storm.hold = i; },
+    /** Pin the storm strength where the astronaut is (0..1); setStorm(null) gives the weather back to the game. */
+    setStorm(i) { S.storm.hold = i; if (typeof i === 'number') S.storm.i = i; },
     look(pitch) { player.pitch = pitch; ctx.engine.snapLight = 3; },
     async settle() { ctx.engine.camera.updateMatrixWorld(); return ctx.terrain.settle(ctx.engine.camera.position, 20000); },
     info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats(), rocks: ctx.rocks.counts }; },

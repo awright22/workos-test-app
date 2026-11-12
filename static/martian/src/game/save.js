@@ -8,6 +8,7 @@ import { Snd } from '../audio/sound.js';
 import { hideOverlay, log } from '../ui/dom.js';
 import { initScience } from './science.js';
 import { initMachines } from './machines.js';
+import { farm } from './farm.js';
 import { syncAllVisuals } from './visuals.js';
 // Checkpoints and the saved game.
 export function serializeState() {
@@ -24,9 +25,10 @@ export function serializeState() {
     science: S.science ? JSON.parse(JSON.stringify(S.science)) : null,
     machines: S.machines ? { ...S.machines } : null,
     mail: { ...(S.mail || {}) },
+    pantry: { ...farm().pantry }, seeds: { ...S.seeds }, morale: S.morale, diet: { ...S.diet },
     breach: { ...S.breach }, pf: { ...S.pf },
     stormCells: S.storm.cells.map(c => ({ ...c })),
-    plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered })),
+    plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered, crop: p.crop || 'potato' })),
     panels: World.panels.map(p => p.dust),
     piles: World.soilPiles.map(p => p.left),
     pods: World.pods.map(p => p.taken),
@@ -53,6 +55,10 @@ export function applyState(d) {
   if (d.science) S.science = JSON.parse(JSON.stringify(d.science)); else initScience();
   if (d.machines) { S.machines = { ...d.machines }; S.machineWarn = {}; } else initMachines();
   S.mail = { ...(d.mail || {}) };
+  // the farm's pantry and morale came later than format 4's first saves: absent means a fresh start for them
+  S.pantry = d.pantry ? { ...d.pantry } : null; S.seeds = d.seeds ? { ...d.seeds } : null;
+  S.morale = typeof d.morale === 'number' ? d.morale : undefined; S.diet = d.diet ? { ...d.diet } : null;
+  farm();
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore
@@ -61,7 +67,7 @@ export function applyState(d) {
     const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon), b.yaw || 0);
     bb.charges = b.charges;
   }
-  d.plots.forEach((cp, i) => { if (World.plots[i]) Object.assign(World.plots[i], cp); });
+  d.plots.forEach((cp, i) => { if (World.plots[i]) Object.assign(World.plots[i], { crop: 'potato' }, cp); });
   d.panels.forEach((v, i) => { if (World.panels[i]) World.panels[i].dust = v; });
   d.piles.forEach((v, i) => { if (World.soilPiles[i]) World.soilPiles[i].left = v; });
   // rebuild dynamically dropped pods missing from the world (load path)

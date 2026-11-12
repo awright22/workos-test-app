@@ -5,6 +5,7 @@
  * scrap if it was left, for scrap and a circuit board if it was left until it failed.
  * (How well a machine works at a given condition is machineEff in state.js.)
  */
+import { cheer } from './farm.js';
 import * as THREE from 'three';
 import { addI } from './interact.js';
 import { S } from './state.js';
@@ -66,6 +67,7 @@ export function dawnFaults() {
     if (m[id] >= 55 || m[id] <= 8) continue;
     if (Math.random() < (55 - m[id]) / 110) {
       m[id] = Math.max(5, m[id] - 22);
+      cheer(-3);
       setTimeout(() => { log(`Something just went BANG in the ${MACHINES[id].name}. Condition: ${Math.round(m[id])}%. This is what I get for putting it off.`, 'sys'); Snd.bad(); }, 9000);
       break;                                        // one disaster per morning is plenty
     }

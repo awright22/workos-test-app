@@ -5,6 +5,7 @@
  * stops being quite so empty. Messages arrive in the log; nothing needs replying to.
  */
 import { S } from './state.js';
+import { cheer } from './farm.js';
 import { log } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 
@@ -107,6 +108,7 @@ export function deliverMail(delay = 14000) {
   const m = nextMail();
   if (!m) return null;
   S.mail[m.id] = 1;
+  cheer(4);                                              // word from home
   let t = delay;
   for (const [who, text] of m.lines) {
     setTimeout(() => {

@@ -67,8 +67,9 @@ export class Vfx {
     this.fall = 0;
     this._initAir(o.air === undefined ? 1400 : o.air);
     this._initSheets(o.sheets === undefined ? 36 : o.sheets);
+    this._initStreaks(o.streaks === undefined ? 1800 : o.streaks);
     this._initPuffs(o.puffs || 500);
-    this._initMarks(o.marks || 500);
+    this._initMarks(o.marks || 900);
   }
 
   // ---------------------------------------------------------------------------------------
@@ -100,10 +101,10 @@ export class Vfx {
           mv.w = 1.0;
           gl_Position = projectionMatrix * mv;
           float d = length(rel);
-          float size = mix(0.035, 0.22, uStorm) * (0.5 + aRnd);
+          float size = mix(0.035, 0.06, uStorm) * (0.5 + aRnd);
           gl_PointSize = clamp(size * uPx / max(-mv.z, 0.3), 1.0, 90.0);
           float show = step(aRnd, mix(0.42, 1.0, uStorm) * uAmount);
-          vA = show * smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(BOX * 0.32, BOX * 0.5, d)) * mix(0.16, 0.42, uStorm);
+          vA = show * smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(BOX * 0.32, BOX * 0.5, d)) * mix(0.16, 0.26, uStorm);
         }`,
       fragmentShader: /* glsl */`
         uniform sampler2D uMap; uniform vec3 uLight;
@@ -118,6 +119,62 @@ export class Vfx {
     this.air.frustumCulled = false;
     this.air.renderOrder = 20;
     this.scene.add(this.air);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Storm streaks: grit driven along the wind, each drawn as a thin line stretched the way it
+  // is going. This is what makes a storm look like wind and not like snow.
+  _initStreaks(n) {
+    const g = new THREE.InstancedBufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    const seeds = new Float32Array(n * 3), rnd = new Float32Array(n);
+    for (let i = 0; i < n; i++) { seeds[i * 3] = Math.random(); seeds[i * 3 + 1] = Math.random(); seeds[i * 3 + 2] = Math.random(); rnd[i] = Math.random(); }
+    g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 3));
+    g.setAttribute('aRnd', new THREE.InstancedBufferAttribute(rnd, 1));
+    g.instanceCount = n;
+    this.streakU = {
+      uDrift: { value: this.drift }, uFall: { value: 0 }, uCam: { value: new THREE.Vector3() }, uUp: { value: new THREE.Vector3(0, 1, 0) },
+      uWind: { value: new THREE.Vector3(1, 0, 0) }, uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.streakU, transparent: true, depthWrite: false, fog: false, blending: THREE.NormalBlending,
+      vertexShader: /* glsl */`
+        attribute vec3 aSeed; attribute float aRnd;
+        uniform float uStorm, uFall;
+        uniform vec3 uCam, uDrift, uUp, uWind;
+        varying float vA; varying vec2 vQ;
+        void main() {
+          const float BOX = 36.0;
+          float pace = (8.0 + floor(aRnd * 7.0)) * 0.1;
+          vec3 rel = mod(aSeed * BOX + uDrift * pace - uUp * (uFall * (pace - 0.3)) - uCam, BOX) - BOX * 0.5;
+          vec4 mv = viewMatrix * vec4(rel, 0.0);
+          // stretch along the wind as the camera sees it; a streak coming straight at the eye is a dot
+          vec2 w = (viewMatrix * vec4(uWind, 0.0)).xy;
+          float along = length(w);
+          vec2 dir = along > 1e-4 ? w / along : vec2(1.0, 0.0);
+          float len = (0.05 + 0.24 * uStorm) * (0.5 + aRnd) * max(along, 0.12), wide = 0.006 + 0.010 * aRnd;
+          mv.xy += dir * (position.x * len) + vec2(-dir.y, dir.x) * (position.y * wide);
+          mv.w = 1.0;
+          gl_Position = projectionMatrix * mv;
+          vQ = position.xy;
+          float d = length(rel);
+          vA = smoothstep(0.25, 1.0, uStorm) * 0.55 * smoothstep(0.5, 2.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uLight;
+        varying float vA; varying vec2 vQ;
+        void main() {
+          float a = vA * (1.0 - vQ.x * vQ.x) * (1.0 - vQ.y * vQ.y);
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(uLight, a);
+        }`,
+    });
+    this.streaks = new THREE.Mesh(g, mat);
+    this.streaks.frustumCulled = false;
+    this.streaks.renderOrder = 21;
+    this.streaks.visible = false;
+    this.scene.add(this.streaks);
   }
 
   // ---------------------------------------------------------------------------------------
@@ -157,7 +214,7 @@ export class Vfx {
           gl_Position = projectionMatrix * mv;
           vUv = position.xy * 0.5 + 0.5;
           float d = length(centre);
-          vA = uStorm * uStorm * 0.20 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
+          vA = uStorm * uStorm * 0.30 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
              * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
         }`,
       fragmentShader: /* glsl */`
@@ -273,8 +330,8 @@ export class Vfx {
       this.scene.add(m);
       return { mesh: m, i: 0, used: 0, world: new Float64Array(n * 3), quat: new Float32Array(n * 4), anchor: new THREE.Vector3() };
     };
-    this.boots = mk('boot', 0.16, 0.34);
-    this.tyres = mk('tyre', 0.46, 0.9);
+    this.boots = mk('boot', 0.17, 0.36);
+    this.tyres = mk('tyre', 0.50, 0.92);
   }
 
   /** Press a mark into the ground. `forward` is the direction of travel (world). */
@@ -339,6 +396,10 @@ export class Vfx {
     a.uAmount.value = p.inside ? 0 : Math.max(0, 1 - (camera.position.length() - R) / 900);
     a.uLight.value.setRGB(0.86 * lit + p.ambient.r * 0.4, 0.62 * lit + p.ambient.g * 0.4, 0.44 * lit + p.ambient.b * 0.4);
     this.air.visible = a.uAmount.value > 0.01;
+    const st = this.streakU;
+    this.streaks.visible = this.air.visible && p.storm > 0.25;
+    st.uFall.value = this.fall; st.uCam.value.copy(camera.position); st.uUp.value.copy(up); st.uWind.value.copy(_s); st.uStorm.value = p.storm;
+    st.uLight.value.copy(a.uLight.value).multiplyScalar(0.8);
     const sh = this.sheetU;
     this.sheets.visible = this.air.visible && p.storm > 0.08;
     sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm;

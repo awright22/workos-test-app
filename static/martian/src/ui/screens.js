@@ -1,3 +1,6 @@
+import { catalogue, scienceSummary } from '../game/science.js';
+import { MACHINES, serviceCost } from '../game/machines.js';
+import { CROPS, MORALE_WORD, PRODUCE, farm, moraleBand } from '../game/farm.js';
 import { UI, log, logHistory, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
 import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
@@ -78,7 +81,7 @@ function wire() {
 // ============================================================
 // COLONY: inventory / fabrication / upgrades
 // ============================================================
-const LOOT_NAMES = { rations: 'Rations', hydrazine: 'Hydrazine', water: 'L water' };
+const LOOT_NAMES = { rations: 'Rations', hydrazine: 'Hydrazine', water: 'L water', seedRadish: 'radish seeds', seedLettuce: 'lettuce seeds', seedSoy: 'soybean seeds', seedTomato: 'tomato seeds' };
 const itemName = (k) => ITEM_NAMES[k] || LOOT_NAMES[k] || k;
 const KIT_ICON = { kitSolar: 'solar', kitGreenhouse: 'dome', kitBeacon: 'beacon', kitCache: 'cache' };
 let colonyTab = 'craft';
@@ -108,6 +111,7 @@ function upgradeGate(u) {
   return null;
 }
 
+const MACH_ICON = { oxygenator: 'hab', reclaimer: 'water', rover: 'rover', suit: 'suit' };
 export function renderColony() {
   wire();
   const body = UI.colonyScreen.querySelector('.scr-body');
@@ -124,8 +128,22 @@ export function renderColony() {
   let inv = '<div class="pane-hd">Supplies</div>';
   inv += row('box', 'Rations', S.food, '', 'One a sol, when the potatoes run out');
   inv += row('food', 'Potatoes', S.potatoes, '', 'Eaten first; also seed for the farm');
+  farm();
+  for (const id of PRODUCE) {
+    const have = S.pantry[id], packets = S.seeds[id];
+    if (have + packets <= 0 && !(S.stats.produce > 0)) continue;                 // not met yet
+    inv += row('food', CROPS[id].name, have, '', packets > 0 ? `${packets} seed packet${packets > 1 ? 's' : ''} · ${CROPS[id].note}` : CROPS[id].note);
+  }
+  if (PRODUCE.every((id) => S.pantry[id] + S.seeds[id] <= 0) && !(S.stats.produce > 0)) inv += row('seed', 'Seed packets', 0, '', 'NASA sends seeds with pods and science grants');
+  inv += `<div class="inv-row has morale ${moraleBand()}">${icon('mood')}<span class="nm">Morale<small>${MORALE_WORD[moraleBand()]}. ${moraleBand() === 'high' ? 'Working and mending faster.' : moraleBand() === 'low' ? 'Everything takes longer. Cook, play music, hear from home.' : 'Variety on the plate and a cooked dinner lift it.'}</small></span><span class="ct t-num">${Math.round(S.morale)}</span></div>`;
   inv += row('water', 'Water', Math.round(S.water), 'L');
   inv += row('power', 'Hydrazine burns', S.hydrazine, '', 'Each makes water at the rig');
+  inv += '<div class="pane-hd">Equipment <span>Service each at the machine</span></div>';
+  for (const id of Object.keys(MACHINES)) {
+    const c = Math.round(S.machines ? S.machines[id] : 100), cost = serviceCost(id);
+    const state = c >= 85 ? 'In good order' : c >= 60 ? 'Worn: a service now is free' : c >= 50 ? 'Losing output: a service now is free' : c >= 20 ? 'Losing output: a service needs 1 scrap' : 'Failed: needs 1 scrap and 1 circuit board';
+    inv += `<div class="inv-row has mach ${c < 20 ? 'crit' : c < 60 ? 'warn' : ''}">${icon(MACH_ICON[id])}<span class="nm">${esc(MACHINES[id].name[0].toUpperCase() + MACHINES[id].name.slice(1))}<small>${state}${cost ? '' : ''}</small></span><span class="ct t-num">${c}<small>%</small></span></div>`;
+  }
   inv += '<div class="pane-hd">Materials</div>';
   const MAT_ICON = { scrap: 'colony', circuit: 'sliders', regolith: 'layers', ice: 'cold', candle: 'suit' };
   for (const k of ['scrap', 'circuit', 'regolith', 'ice', 'candle']) inv += row(MAT_ICON[k], ITEM_NAMES[k], S.inv[k] || 0, '');
@@ -326,14 +344,27 @@ function logHtml() {
   }
   return h + '</div>';
 }
-const JOURNAL_TABS = [['tasks', 'target', 'Tasks', tasksHtml], ['disc', 'pin', 'Discoveries', discoveriesHtml], ['ach', 'trophy', 'Achievements', achievementsHtml],
+function samplesHtml() {
+  const s = scienceSummary(), list = catalogue();
+  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science${s.nextGrant ? ` · next NASA grant at ${s.nextGrant}` : ''}</span></div>`;
+  if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder, or bag soil where you dig. The analyser on the Hab work table says what it is. What you find depends on where on Mars you are standing.</div>`;
+  else if (s.bagged) h += `<p class="jr-note">${s.bagged} of ${s.limit} sample bags are full and waiting for the analyser in the Hab.</p>`;
+  h += '<div class="jr-grid">';
+  for (const m of list.slice().sort((a, b) => (b.count > 0) - (a.count > 0) || b.value - a.value)) {
+    h += m.count
+      ? `<article class="card got"><div class="card-hd">${icon('layers')}<h4>${esc(m.name)}<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4><span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span></div><p>${chem(esc(m.text))}</p></article>`
+      : `<article class="card locked"><div class="card-hd">${icon('question')}<h4>Not yet found<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4></div><p>${chem(esc(m.text))}</p></article>`;
+  }
+  return h + '</div>';
+}
+const JOURNAL_TABS = [['tasks', 'target', 'Tasks', tasksHtml], ['disc', 'pin', 'Discoveries', discoveriesHtml], ['samples', 'layers', 'Samples', samplesHtml], ['ach', 'trophy', 'Achievements', achievementsHtml],
   ['stats', 'chart', 'Statistics', statsHtml], ['log', 'list', 'Log', logHtml]];
 export function renderJournal() {
   wire();
   const body = UI.journalScreen.querySelector('.scr-body');
   const counts = {
     tasks: QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length || '',
-    disc: S.stats.discoveries || '', ach: Object.keys(S.achieved).length || '',
+    disc: S.stats.discoveries || '', ach: Object.keys(S.achieved).length || '', samples: scienceSummary().bagged || '',
   };
   const cur = JOURNAL_TABS.find((t) => t[0] === journalTab) || JOURNAL_TABS[0];
   body.innerHTML = '<div class="journal"><div class="tabs" role="tablist">' +

@@ -5,7 +5,7 @@
  * a 3D texture goes soft exactly there, which is most of the picture. So flat ground is laid
  * with two generated 2D textures, addressed in metres across the cube face (see terrain/chunk.js):
  *
- *   sand   2 m across, 4 mm a texel: grains, grit, and scattered pebbles
+ *   sand   2 m across, 4 mm a texel: grains and grit
  *   field  16 m across, 3 cm a texel: lumps and hollows, wind ripples in places, cracked crust
  *          in others, and where the gravel lies
  *
@@ -81,9 +81,11 @@ function sandTexture(size, anisotropy) {
   }
   // pebbles: mostly small, a few as big as a fist; each a low dome pressed a little into the sand
   const px = size / SPAN;                                 // texels per metre
-  for (let n = 0; n < 230; n++) {
+  // Only grit is painted: anything bigger than a thumbnail reads as a flat disc at a low sun, and stones
+  // of that size are real geometry (world/rocks.js, the gravel field).
+  for (let n = 0; n < 420; n++) {
     const cx = rnd() * size, cy = rnd() * size;
-    const r = (0.005 + 0.062 * Math.pow(rnd(), 4.0)) * px;  // 5 mm to 6.7 cm radius, most of them small
+    const r = (0.004 + 0.013 * Math.pow(rnd(), 3.0)) * px;  // 4 mm to 1.7 cm radius, most of them small
     const tall = (r / px) * (0.45 + rnd() * 0.5), shade = 0.14 + rnd() * 0.22, sq = 0.7 + rnd() * 0.6, rot = rnd() * Math.PI;
     const ca = Math.cos(rot), sa = Math.sin(rot);
     const R2 = Math.ceil(r * 1.5);

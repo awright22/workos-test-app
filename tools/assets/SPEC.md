@@ -39,7 +39,10 @@ library should gain.
 - Materials come from `PALETTE` in `lib.py` (flat PBR values, no image textures, no UVs). Add a
   one-off with `mat('name', color=..., metallic=..., roughness=...)` when the palette lacks it.
   The game finds some materials by name to drive them: `solar_cell` (gets dust), `screen`,
-  `light_*` (switched and blinked), `glass_clear` (alpha-blended). Baked ambient occlusion is
+  `light_*` (switched and blinked), `glass_clear` (alpha-blended), `ground_dust` (soil that
+  belongs to the ground: a heap, a berm, a scorched patch. The game draws it in the colour of the
+  ground where the model stands, multiplied by the vertex tint, so tint it down to dug soil or
+  soot and bring the tint back to 1 at the hem). Baked ambient occlusion is
   stored per vertex and multiplied into the colour; dust and weathering are added by the game's
   shader, so model clean hardware.
 - Detail comes from geometry: bevelled edges, panel seams, fasteners, handrails, cable runs,
@@ -83,14 +86,21 @@ Iterate until the sheet would not look out of place in a commercial game's art b
 
 ## Family A — astronaut (`astronaut.py`)
 
-`astronaut.glb`: one skinned mesh on one armature, ≤ 24,000 triangles.
+`astronaut.glb`: one skinned mesh on one armature, ≤ 26,000 triangles.
 
 A Mars surface EVA suit: hard upper torso, soft-goods arms and legs with visible joint bearings
 and convolutes, bubble helmet with a gold visor, a life-support backpack with an antenna and
-hoses to the torso, chest control unit with a display, helmet lamps (`light_white`), knee and
+hoses to the torso, chest control unit with a display, helmet lamps (`helmet_light`), knee and
 elbow pads, treaded boots, gloves with separated thumb and mitten-style fingers. Mostly
 `suit_white` with `suit_orange` shoulder, forearm and thigh panels and `suit_grey` joints.
 Height 1.86 m standing. Rest pose: arms about 30° out from the body, feet 0.22 m apart.
+
+The helmet comes off. Everything that leaves with it uses a material named `helmet_*`
+(`helmet_white`, `helmet_dark`, `helmet_metal`, `helmet_light`) or `visor_gold`; the head under
+it (face, communications cap, collar) uses `head_*`. The game shows one group or the other: the
+helmet outdoors, the head wherever there is air. The suit's padded collar closes the neck ring
+and is always drawn. The visor is a true spherical cap with radial normals, because the game
+makes it a mirror and any kink in it shows.
 
 Bones (exact names; a `_L`/`_R` pair for each sided bone; no dots in names):
 `hips` → `spine` → `chest` → `neck` → `head`; `chest` → `shoulder_L` → `upper_arm_L` →
@@ -107,7 +117,7 @@ bob vertically; loops must match first and last frame):
 
 | Clip | Length | Notes |
 | --- | --- | --- |
-| `Idle` | 4.0 s loop | weight shifts, breathing, small head turns |
+| `Idle` | 8.0 s loop | a relaxed stand: weight on one leg, arms hanging close, two breaths, one slow look round |
 | `Walk` | 0.9 s loop | Mars lope: long low-gravity strides of about 2.3 m, a short float between steps, arms counter-swing, torso leans a little into it. Covers 5.1 m/s |
 | `Run` | 0.72 s loop | bounding sprint, about 3.3 m per stride, clear flight phase, strong arm drive. Covers 9.2 m/s |
 | `JumpStart` | 0.25 s | crouch and push off |
@@ -225,15 +235,21 @@ airbags around the base, ramps; the Sojourner rover is a part `sojourner` beside
 `viking.glb`, `mars3.glb` (the Soviet lander with four open petals; also used for Mars 6),
 `beagle2.glb` (lid open, only two of the four solar petals deployed), `mer.glb` (Spirit and
 Opportunity; part `mast`), `phoenix.glb`, `insight.glb` (with the domed seismometer and the
-heat probe on the ground beside it), `msl.glb` (Curiosity and Perseverance; parts `mast` and
-`arm`), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site: a shattered
-descent module, scorched fragments and a torn parachute over about 6 m).
+heat probe on the ground beside it), `msl.glb` (Curiosity; parts `mast` and `arm`), `m2020.glb`
+(Perseverance; the same parts and collider, with its own wheels, mast head, turret and sample
+housing), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site: a shattered
+descent module, scorched fragments and a torn parachute on a blast patch of `ground_dust` about
+7.6 m across).
+Lander builders start with `weathered()`, which roughens the palette metals: flat polished facets
+mirror the sun into the bloom. Solar cells on landers are matte and sit on a `cell_grid`.
 
 ## Family E — deployables and props (`props.py`)
 
 `greenhouse.glb` (≤ 14,000): a geodesic dome of radius 4.0 m with `glass_clear` panels in an
 aluminium frame, a base ring, a doorway facing −Y, a floor, grow lights; leave four plot
 positions clear at (±1.1, ±1.2). Anchor `col_body` is not wanted (the player walks in).
+Part `door_leaf` is the door, modelled closed, its origin on the hinge line (the left jamb seen
+from outside); the game swings it outward, `rotation.y` from 0 to −1.83.
 `solar_kit.glb` (≤ 3,000): a folding field solar panel, about 2.0 × 1.2 m, on a tripod.
 `beacon.glb` (≤ 3,000): a 2.2 m navigation beacon with a lamp part `lamp` (`light_blue`), a
 small solar cell and a whip antenna, on a weighted base.

@@ -55,6 +55,7 @@ export const BARS = [
   ['food', 'food', 'FOOD'],
   ['power', 'power', 'POWER'],
   ['health', 'vitals', 'VITALS'],
+  ['morale', 'mood', 'MORALE'],
 ];
 UI.res = el('div', null, 'res', UI.vitals);
 UI.bars = {};

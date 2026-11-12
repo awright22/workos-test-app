@@ -212,7 +212,9 @@ export class Engine {
     const alt = Math.max(0, cam.position.length() - 12000);
     const dust = p.dust || 0;
     // a full storm closes visibility to a few tens of metres
-    fog.density = (0.00085 + 0.006 * dust + 0.031 * dust * dust) * Math.exp(-alt / 500) + 0.0000015;
+    // ... and it comes in gusts: the murk thickens and thins every few seconds
+    const gust = 1 + dust * (0.22 * Math.sin(this.time * 0.9) + 0.14 * Math.sin(this.time * 2.3 + 1.7) + 0.08 * Math.sin(this.time * 5.1));
+    fog.density = (0.00085 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-alt / 500) + 0.0000015;
     // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
     // light at a low angle), wider still at night, and steady indoors
     // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one
