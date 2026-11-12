@@ -295,7 +295,7 @@ addI({
 });
 // workbench — opens the colony screen
 addI({
-  pos: () => siteLocalToWorld(World.hab, -4.6, 0, 3.9, _v2),
+  pos: () => siteLocalToWorld(World.hab, -4.75, 0, 4.2, _v2),          // at the fabricator bench
   r: 2.4, hold: 0.5, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   label: () => 'Use the fabricator [C]',

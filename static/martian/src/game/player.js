@@ -186,6 +186,7 @@ function play(name, fade = 0.22, restart = false) {
   next.play();
   anim.current = next;
   anim.name = name;
+  player.anim = name;                 // for tests and the debug hook
 }
 
 /** The pose an interaction uses: standing at a console, or kneeling at something on the ground. */
@@ -389,7 +390,8 @@ const _lockRoom = { group: null, inside: (x) => Math.abs(x) < 0.95, ceiling: () 
 const _domeRoom = {
   group: null,
   inside: (x, z) => Math.hypot(x, z) < GREENHOUSE.wall - 0.4 || (Math.abs(x) < GREENHOUSE.doorHalf - 0.2 && z > 0 && z < GREENHOUSE.portalEnd + 3),
-  ceiling: (x, z) => 0.3 + Math.sqrt(Math.max(0.2, 16 - x * x - z * z)),       // under the glazing: a 4 m dome on a low wall
+  // under the glazing (a 4 m dome on a low wall), or under the flat roof of the doorway
+  ceiling: (x, z) => (Math.abs(x) < GREENHOUSE.doorHalf && z > GREENHOUSE.wall - 0.6 ? 2.05 : 0.3 + Math.sqrt(Math.max(0.2, 16 - x * x - z * z))),
 };
 function cameraRoom() {
   if (World.hab && (S.inside || S.inAirlock)) {

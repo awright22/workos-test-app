@@ -50,12 +50,12 @@ const scenes = {
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 30); G.setStorm(1); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
   'mav': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
-  'canyon': async () => ev(async (G) => { await G.tp(-10.6, 293, 0); G.setLocalTime(15.5); G.look(-0.12); G.tick(0.05, 40); await G.settle(); }),
+  'canyon': async () => ev(async (G) => { await G.tp(-10.82, 293, -1.75); G.setLocalTime(15.5); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 0); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   // every built model, seen by a free camera with the astronaut beside it for scale
-  'yard': () => model((G) => G.World.uplinkRing.position, 9, 150, 10.5, { stand: [5.5, 60], height: 2.4 }),
+  'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [4.5, 265], height: 2.4 }),
   'pile': () => model((G) => G.World.soilPiles[3].group.position, 5.5, 140, 15, { stand: [2.6, 230] }),
   'debris-a': () => model((G) => G.World.pods[0].group.position, 6.5, 120, 9.5, { stand: [3.2, 40] }),
   'debris-b': () => model((G) => G.World.pods[1].group.position, 6, 240, 9.5, { stand: [3.0, 160] }),
@@ -92,6 +92,7 @@ const scenes = {
 };
 for (const [name, setup] of Object.entries(scenes)) {
   if (!want(name) || name === 'free-camera-off' || name === 'storm-over') { if (name === 'free-camera-off' || name === 'storm-over') await setup(); continue; }
+  await ev((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });   // nobody suffocates mid-shoot
   await setup();
   await ev((G) => { G.paused = false; });
   await sleep(700);

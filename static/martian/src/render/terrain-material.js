@@ -19,11 +19,17 @@ import { DETAIL_FRAME } from '../planet/constants.js';
 import { detailTextures } from './noise3d.js';
 
 const F = (x) => x.toFixed(6);
-/** GLSL: grade the orbital colour map toward what a camera on the ground sees (calmer, lighter, ochre). */
+/**
+ * GLSL: turn the orbital colour map into the colour of the ground. The mosaic is stretched for
+ * contrast (its bright dust is nearly white, its dark sand nearly black), so brightness is
+ * compressed into the range real Martian soil reflects, and the hue is calmed and warmed toward
+ * what cameras on the surface record. Bright and dark regions stay different, not extreme.
+ */
 export const GLSL_GROUND_GRADE = /* glsl */`
   vec3 groundGrade(vec3 alb) {
-    float lum = dot(alb, vec3(0.3, 0.55, 0.15));
-    return mix(vec3(lum), alb, 0.70) * vec3(1.44, 1.19, 0.90);
+    float lum = max(dot(alb, vec3(0.3, 0.55, 0.15)), 0.004);
+    vec3 hue = mix(vec3(1.0), alb / lum, 0.74) * vec3(1.20, 0.97, 0.76);
+    return hue * (0.40 * pow(lum, 0.55));
   }`;
 /** GLSL mat3 whose product with a texture-space vector gives the world-space vector. */
 export const GLSL_DETAIL_T = `mat3(${DETAIL_FRAME.map(F).join(', ')})`;
