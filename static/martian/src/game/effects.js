@@ -42,14 +42,19 @@ export function updateEffects(dt) {
       _f.set(0, 0, -1).applyQuaternion(roverF.q);
       _r.set(1, 0, 0).applyQuaternion(roverF.q);
       // tyre tracks: a pair of marks laid end to end (each is 0.9 m long), so the ruts are unbroken
+      // (at speed the rover covers several marks' length in a frame: lay each of them, back along the way it came)
       trackDist += v * dt;
-      if (trackDist >= 0.88) {
+      const dir = Math.sign(roverF.speed) || 1;
+      let laid = 0;
+      while (trackDist >= 0.88 && laid < 12) {
         trackDist -= 0.88;
+        laid++;
         for (const side of [-1.22, 1.22]) {
-          _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -1.9 * Math.sign(roverF.speed));
+          _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, (-1.9 - trackDist) * dir);
           ctx.vfx.mark('tyre', onGround(_p), _f);
         }
       }
+      if (laid >= 12) trackDist = 0;
       // dust plumes off the rear wheels, heavier with speed
       plumeT += dt * Math.min(40, 6 + v * 1.2);
       while (plumeT > 1) {

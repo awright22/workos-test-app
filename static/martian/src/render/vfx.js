@@ -41,12 +41,13 @@ function markTexture(kind) {
     for (let y = 16; y < 76; y += 11) g.fillRect(17, y, 30, 5);
     g.fillRect(20, 94, 24, 6); g.fillRect(20, 106, 24, 6);
   } else {
-    // a tyre: a faint band with chevron grousers, feathered at the edges
+    // a tyre: a pressed rut, unbroken from one mark to the next, with the grousers' chevrons faint inside it
+    // (strong chevrons on a faint band read as a row of separate stamps)
     const band = g.createLinearGradient(0, 0, 64, 0);
-    band.addColorStop(0, '#000'); band.addColorStop(0.18, '#3a3a3a'); band.addColorStop(0.82, '#3a3a3a'); band.addColorStop(1, '#000');
+    band.addColorStop(0, '#000'); band.addColorStop(0.2, '#8e8e8e'); band.addColorStop(0.5, '#a4a4a4'); band.addColorStop(0.8, '#8e8e8e'); band.addColorStop(1, '#000');
     g.fillStyle = band; g.fillRect(0, 0, 64, 128);
-    g.lineWidth = 6; g.strokeStyle = '#d0d0d0';
-    for (let y = -10; y < 140; y += 32) { g.beginPath(); g.moveTo(10, y + 16); g.lineTo(32, y); g.lineTo(54, y + 16); g.stroke(); }
+    g.lineWidth = 4; g.strokeStyle = '#dcdcdc';
+    for (let y = -8; y < 140; y += 16) { g.beginPath(); g.moveTo(12, y + 10); g.lineTo(32, y); g.lineTo(52, y + 10); g.stroke(); }
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.NoColorSpace;

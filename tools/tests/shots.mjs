@@ -87,6 +87,12 @@ const scenes = {
     () => model(new Function('G', `return G.World.landers.find((l) => l.data.name === ${JSON.stringify(name)}).group.position;`), dist, bearing, 10.2, { stand: [dist * 0.48, bearing + 75] }),
   ])),
   'free-camera-off': async () => ev((G) => { G.photo(null); }),
+  // gaps the second review named: the sun in a clear sky, the astronaut from the front, the pole itself
+  'day-sun': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tpHab(40, 120, 0); G.setLocalTime(15.6); G.faceSun(); G.look(0.34); G.tick(0.05, 40); await G.settle(); }),
+  'astronaut-front': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tpHab(30, 70, 2.2); G.setLocalTime(9.5); G.look(-0.1); G.tick(0.05, 40); await G.settle();
+    const P = G.photoMode; P.enterPhoto(); P.photo.yaw += Math.PI; P.photo.dist = 3.1; P.photo.pitch = 0.04; P.photo.rise = 0.15; P.photo.fov = 40; }),
+  'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
+  'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
   'dawn-light': async () => ev(async (G) => { G.tpHab(8, -40, 0); G.setLocalTime(6.9); G.look(-0.03); G.tick(0.05, 40); await G.settle(); }),
   'dusk': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(17.95); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
@@ -94,7 +100,7 @@ const scenes = {
   'night-plain': async () => ev(async (G) => { G.setLocalTime(23); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
 };
 for (const [name, setup] of Object.entries(scenes)) {
-  if (!want(name) || name === 'free-camera-off' || name === 'storm-over') { if (name === 'free-camera-off' || name === 'storm-over') await setup(); continue; }
+  if (!want(name) || name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off') { if (name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off') await setup(); continue; }
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });   // nobody suffocates mid-shoot
   await setup();
   await ev((G) => { G.paused = false; });

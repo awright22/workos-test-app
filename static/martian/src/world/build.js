@@ -117,8 +117,8 @@ export function buildHabColony(spawn) {
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
-  groundStain(World.hab, 13, 0x2a160c, 0.26, HAB_FLOOR + 0.03).position.set(1.5, HAB_FLOOR + 0.03, 15);
-  groundStain(World.hab, 8, 0x2a160c, 0.2, HAB_FLOOR + 0.035).position.set(14, HAB_FLOOR + 0.035, 15);
+  groundStain(World.hab, 15, 0x2a160c, 0.26, HAB_FLOOR + 0.03).position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
+  groundStain(World.hab, 12.5, 0x24130a, 0.3, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
@@ -386,6 +386,8 @@ export function addSiteModel(g, name, o = {}) {
   if (o.yaw) m.root.rotation.y = o.yaw;
   g.add(m.root);
   m.cols = [];
+  // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
+  if (o.stain) groundStain(g, o.stain, 0x24130a, o.stainOpacity || 0.26, 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -427,7 +429,7 @@ export function buildStorySites() {
   for (const L of LANDERS) {
     if (L.name === 'Pathfinder') { World.landers.push({ data: L, group: pf }); continue; }
     const g = placeAt(L.lat, L.lon, srand() * 6);
-    addSiteModel(g, LANDER_MODEL[L.name]);
+    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : 4.2 });
     if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }
@@ -447,7 +449,7 @@ export function buildStorySites() {
 
 /** A supply capsule (or route cache) standing in a placed group. */
 export function addSupplyPod(g, loot, label) {
-  const m = addSiteModel(g, 'supply_pod');
+  const m = addSiteModel(g, 'supply_pod', { stain: 2.6, stainOpacity: 0.3 });
   const pod = { group: g, kind: 'pod', taken: false, loot, label, cols: m.cols, lid: m.part('lid'),
     strobe: ownMaterials(m.part('strobe'), /^light_/) };
   World.pods.push(pod);
@@ -469,10 +471,10 @@ export function buildDeployable(kind, atVec, yaw = 0) {
   const g = placeAt(atVec, undefined, yaw);
   const b = { kind, group: g, v: g.position.clone().normalize(), yaw, charges: kind === 'cache' ? 3 : 0 };
   if (kind === 'solar') {
-    addSiteModel(g, 'solar_kit');
+    addSiteModel(g, 'solar_kit', { stain: 1.7, stainOpacity: 0.2 });
   } else if (kind === 'greenhouse') {
     g.position.addScaledVector(g.userData.up, -GREENHOUSE.floor);       // the deck is the ground you walk on
-    const gm = addSiteModel(g, 'greenhouse');
+    const gm = addSiteModel(g, 'greenhouse', { stain: 6.4, stainOpacity: 0.28 });
     // its lights: white from the apex, pink from the grow strips; they carry the dome at night
     const lit = () => 0.3 + 0.7 * (World.dark || 0);
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 20, range: 18, level: lit });
