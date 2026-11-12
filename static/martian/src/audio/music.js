@@ -156,7 +156,8 @@ export class Music {
     if (level > 0.004 && st.pad > 0) {
       const fresh = !this.pad.on, c = this.pad.use();
       const urge = st.dark ? 1 + 2 * this.danger * this.loud : 1;   // danger has to carry over a storm or a klaxon
-      c.out.to(0.2 * st.pad * level * urge, 0.6);
+      const swell = 0.82 + 0.18 * Math.sin(now * 0.13 + this.phase * 1.7);    // the pad breathes, slowly
+      c.out.to(0.2 * st.pad * level * urge * swell, 0.6);
       const bright = st.bright * (1 + 0.16 * Math.sin(now * 0.047 + this.phase));
       c.cut.to(480 + 1900 * bright, 1.8);
       if (fresh || now >= this.chordUntil) this.nextChord(now, fresh);

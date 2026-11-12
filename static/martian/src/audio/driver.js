@@ -20,7 +20,7 @@ import { screenOpen } from '../ui/screens.js';
 
 const P = {};                         // reused every frame
 const launch = { burning: false, alt: 0 };
-let prevSol = -1, prevSleeping = false, prevUi = null, prevStarted = false;
+let prevSol = -1, prevSleeping = false, prevUi = null, prevStarted = false, prevHeld = false;
 let rough = 0, prevH = 0, habDist = 1e6, habDistAt = -1, frame = 0, warned = false, dawnOwed = false;
 
 /** What kind of work a held action sounds like, from the words of its prompt. */
@@ -69,6 +69,9 @@ export function updateAudio(dt) {
     const it = interaction.active;
     P.hold = free && input.eHeld && it && S.holdT > 0 ? clamp(S.holdT / (it.hold || 1), 0, 1) : 0;
     P.holdKind = P.hold > 0 ? holdKind(it) : null;
+    // pressing the action button on something that cannot be done right now
+    if (input.eHeld && !prevHeld && free && it && it.enabled && it.enabled() !== true) Snd.play('uiError');
+    prevHeld = input.eHeld;
     // the Hab
     if (started && World.hab && (frame & 7) === 0) { habDist = groundDist(where, World.hab.position); habDistAt = frame; }
     P.habDist = habDistAt < 0 ? 1e6 : habDist;
@@ -165,6 +168,16 @@ function install() {
     return true;
   };
   if (!watchLog()) window.addEventListener('load', watchLog, { once: true });
+
+  // a toast that arrives without a stinger of its own gets a small chime
+  const toastEl = document.getElementById('mg-toast');
+  if (toastEl && typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => {
+      if (!Snd.sys || !toastEl.firstChild) return;
+      const E = Snd.sys.E, recent = (n) => E.lastPlay[n] !== undefined && E.now - E.lastPlay[n] < 0.4;
+      if (!recent('discovery') && !recent('achievement') && !recent('questDone')) Snd.play('uiToast');
+    }).observe(toastEl, { childList: true });
+  }
 
   // for the tests and the console
   const expose = () => { if (window.__MG) { window.__MG.Snd = Snd; window.__MG.audio = { setAudioVolume, getAudioVolumes }; return true; } return false; };

@@ -81,7 +81,7 @@ def('uiType',   { bus: 'ui', gap: 0.055, prio: 0, gain: 4 }, (E, v, t) => {
   E.burst(v, t, { hp: 2200, bp: E.rr(3000, 4200), q: 2, a: 0.0005, d: 0.009, g: 0.016 });
   E.tone(v, t, { f: E.rr(1500, 1900), a: 0.0008, d: 0.012, g: 0.006 });
 });
-def('uiToast',  { bus: 'ui', gap: 0.5, prio: 1, hall: 0.2 }, (E, v, t, o, K) => bells(E, v, t, K, [19, 26], 0.06, { g: 0.05, d: 0.7 }));
+def('uiToast',  { bus: 'ui', gap: 0.5, prio: 1, hall: 0.2 }, (E, v, t, o, K) => bells(E, v, t, K, [19, 26], 0.06, { g: 0.05, d: 0.5 }));
 def('click',    { bus: 'ui', gap: 0.06, prio: 1, hall: 0.05, gain: 2.8, group: 'uiPress' }, (E, v, t, o, K) => SFX.uiClick.fn(E, v, t, o, K));
 
 // ---- small confirmations in the world -----------------------------------------------------------
@@ -300,7 +300,7 @@ def('jump', { bus: 'world', gap: 0.2, prio: 1 }, (E, v, t) => {
   crunch(E, v, t, 0.22, 900, 0.14);
   E.thud(v, t, { f: 85, f1: 60, d: 0.08, g: 0.1 });
 });
-def('land', { bus: 'world', gap: 0.2 }, (E, v, t, o) => {
+def('land', { bus: 'world', gap: 0.2, gain: 0.75 }, (E, v, t, o) => {
   const g = 0.5 + (o.g === undefined ? 0.6 : o.g);
   E.thud(v, t, { f: 68, f1: 36, glide: 0.09, d: 0.2, g: 0.2 * g });
   if (o.hard) { E.tone(v, t, { f: 240, a: 0.001, d: 0.09, g: 0.14 * g }); E.burst(v, t, { table: 'pink', bp: 800, q: 1.2, a: 0.001, d: 0.14, g: 1.2 * g }); E.burst(v, t, { hp: 1500, bp: 3000, q: 1, a: 0.0006, d: 0.06, g: 0.45 * g }); }

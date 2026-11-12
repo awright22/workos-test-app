@@ -131,7 +131,7 @@ export class Ambience {
     else if (p.scene === 'title') scene = 0.55;
     else if (p.scene === 'cutscene' || p.scene === 'won') scene = 1 - clamp(p.space || 0, 0, 1);
     const calm = lerp(0.04, 0.17, p.day);
-    const w = clamp(calm + Math.pow(p.storm, 0.85) * 0.6, 0, 0.8) * this.gust;
+    const w = clamp(calm + Math.pow(p.storm, 0.85) * 0.52, 0, 0.8) * this.gust;
     if (scene * w > 0.002) {
       const c = this.wind.use(), h = this.hear;
       const st = smooth(0.3, 0.9, p.storm), g = this.gust;

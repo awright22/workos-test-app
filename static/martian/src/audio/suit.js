@@ -16,7 +16,8 @@ function buildSuit(E, L) {
   return { breath: gB.gain, breathF: bp.frequency, fan: E.ctl(gF.gain, 0), fanTone: E.ctl(gFt.gain, 0), level: E.ctl(out.gain, 1) };
 }
 function buildHeart(E, L) {
-  const o = E.osc(L, 'hollow', 56), g = E.gain(L, 0), lp = E.filter(L, 'lowpass', 300, 0.7), out = E.gain(L, 1);
+  // (the upper harmonics are let through so the beat survives on a speaker with no bass)
+  const o = E.osc(L, 'hollow', 56), g = E.gain(L, 0), lp = E.filter(L, 'lowpass', 520, 0.7), out = E.gain(L, 1);
   o.connect(g); g.connect(lp); lp.connect(out); out.connect(E.bus.ambience);
   return { f: o.frequency, g: g.gain };
 }

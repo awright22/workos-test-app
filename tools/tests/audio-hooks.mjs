@@ -103,6 +103,9 @@ const opened = has(r, 'click', 'uiOpen') && r.p.paused === true;
 r = await act(async (G) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })); await window.__run(0.3); });
 check('opening and closing a screen', opened && has(r, 'uiClose') && r.p.paused === false, r.h);
 
+r = await act(async (G) => { G.S.health = 100; G.tpLocal(3.2, 3.9); await window.__run(0.3); await window.__run(0.3, true); });
+check('trying something that cannot be done gives the error sound', has(r, 'uiError'), r.h);
+
 r = await act(async (G) => { G.S.inv.candle = 1; G.S.suit = 20; G.tpLocal(0, 40); await window.__run(0.3); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' })); await window.__run(0.2); });
 check('cracking an O2 candle', has(r, 'candle'), r.h);
 

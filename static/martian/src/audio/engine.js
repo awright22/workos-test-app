@@ -12,9 +12,15 @@
 // silent for a while. Both go through the same factories, so the engine always knows how many
 // nodes are alive. Nothing here reads the clock except the AudioContext's own, so the whole
 // engine renders identically in an OfflineAudioContext (see tools/tests/audio.mjs).
-import { clamp, makeNoise, makeImpulse, softClipCurve, compressorMakeup, rng, WAVES } from './dsp.js';
+import { clamp, dB, makeNoise, makeImpulse, softClipCurve, compressorMakeup, rng, WAVES } from './dsp.js';
 
 const LIMITER = { threshold: -4, knee: 4, ratio: 20, attack: 0.001, release: 0.09 };
+/**
+ * Make-up into the limiter, in decibels. The mix is balanced with the quiet of Mars at its
+ * centre, which on its own would leave a phone speaker with little to play; this lifts
+ * everything and lets the limiter hold the few loud events (explosions, the launch).
+ */
+export const OUTPUT_TRIM_DB = 3;
 const BUSES = ['ambience', 'sfx', 'ui', 'music'];
 /** How the world reaches the ears: thin air and a helmet outside, a pressurised room inside. */
 const PLACES = {
@@ -128,7 +134,7 @@ export class Engine {
     this.fade = this.gain(K, 0);
     this.sum.connect(this.master); this.master.connect(comp); comp.connect(trim); trim.connect(clip);
     clip.connect(this.fade); this.fade.connect(c.destination);
-    this.masterCtl = new Ctl(c, this.master.gain, 1);
+    this.masterCtl = new Ctl(c, this.master.gain, dB(OUTPUT_TRIM_DB));
 
     // reverbs: a small dead room (the Hab, the rover cabin) and a long soft hall (score, stingers)
     this.room = this._reg(K, c.createConvolver()); this.room.normalize = false;
@@ -178,7 +184,7 @@ export class Engine {
     v = clamp(+v || 0, 0, 1);
     this.volume[name] = v;
     const g = v * v;                                   // a slider reads better with a squared law
-    if (name === 'master') { this.masterCtl.to(g, 0.04); return; }
+    if (name === 'master') { this.masterCtl.to(g * dB(OUTPUT_TRIM_DB), 0.04); return; }
     for (const b of name === 'sfx' ? ['sfx', 'ui'] : [name]) {
       if (this.busCtl[b]) for (const c of this.busCtl[b]) c.to(g, 0.04);
     }
