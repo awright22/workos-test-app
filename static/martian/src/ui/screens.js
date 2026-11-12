@@ -107,6 +107,8 @@ function upgradeGate(u) {
   if (u.needs && !S.upgrades[u.needs]) return `Requires ${UPGRADES.find((x) => x.id === u.needs).name}`;
   if (u.bp && !S.blueprints[u.bp]) {
     const q = QUEST_DEFS.find((x) => x.bp === u.bp);
+    // once the task is done the blueprint is in its reward pod, which still has to be opened
+    if (q && S.quests[q.id] === 'done') return `Its blueprint is in the reward pod for “${q.name}”: open the pod`;
     return q ? `Needs a blueprint — NASA survey task “${q.name}”` : 'Needs a blueprint — it comes with NASA\'s first care package';
   }
   if (u.needsRtg && !S.flags.hasRtg) return 'Requires the buried RTG';

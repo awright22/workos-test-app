@@ -39,7 +39,7 @@ import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
 import { updateDiscoveries, checkAchievements } from './game/story.js';
-import { updateHud, updateCompass, updateObjectivesHud } from './ui/hud.js';
+import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
 import { showStart, newGame, continueGame } from './game/flow.js';
@@ -187,6 +187,7 @@ function tick(dt) {
   updateHud();
   updateCompass();
   updateObjectivesHud();
+  updateWaypoint(ctx.engine.camera);
   if (UI.mapScreen.style.display === 'block') {
     mapOpenTimer += dt;
     if (mapOpenTimer > 0.7) { mapOpenTimer = 0; renderMap(); }

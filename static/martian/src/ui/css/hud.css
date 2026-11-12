@@ -30,7 +30,9 @@
 .suit.warn .num, .suit.warn .st { color: var(--accent); }
 .suit.crit .arc { stroke: var(--danger); }
 .suit.crit .num, .suit.crit .st { color: var(--danger); }
-.suit.crit .dial { animation: mg-pulse 1s steps(2, jump-none) infinite; }
+/* the ring pulses; the number itself stays lit, or the one figure that matters goes dark half the time */
+.suit.crit .dial .ring { animation: mg-pulse 1s steps(2, jump-none) infinite; }
+.suit.crit .num { color: #ff8f84; }
 .suit.fill .arc { stroke: var(--ok); }
 .suit.fill .st { color: var(--ok); }
 
@@ -386,3 +388,21 @@
 .obj .why { grid-column: 2 / -1; font-size: .75rem; line-height: 1.3; color: var(--ink-3); font-weight: 400; }
 /* (no room for it in the phone's panel beside the touch buttons: there the reason arrives as a toast) */
 .mg-compact .obj .why { display: none !important; }
+
+/* ================================================================ waypoint: where the current objective is */
+#mg-way { position: absolute; left: 0; top: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: .1875rem; margin: -1.125rem 0 0 -1.5rem; width: 3rem;
+  pointer-events: none; will-change: transform; }
+#mg-way .wp { width: .75rem; height: .75rem; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 0 2px rgba(19, 17, 15, .7), 0 0 .625rem rgba(255, 180, 84, .6);
+  animation: mg-way-bob 1.6s ease-in-out infinite; }
+#mg-way b { font: 600 .6875rem/1 var(--f-cond); letter-spacing: .06em; color: var(--ink); padding: .125rem .3125rem; background: rgba(19, 17, 15, .72); border-radius: .125rem; white-space: nowrap; }
+#mg-way.urgent .wp { background: var(--danger); box-shadow: 0 0 0 2px rgba(19, 17, 15, .7), 0 0 .625rem rgba(255, 106, 92, .7); }
+/* out of view: an arrowhead at the edge, pointing the way */
+#mg-way.off .wp { width: 0; height: 0; background: none; box-shadow: none; animation: none; border-left: .4375rem solid transparent; border-right: .4375rem solid transparent; border-bottom: .8125rem solid var(--accent); }
+#mg-way.off.urgent .wp { border-bottom-color: var(--danger); }
+@keyframes mg-way-bob { 50% { margin-top: -.25rem; margin-bottom: .25rem; } }
+.mg-reduced #mg-way .wp { animation: none; }
+.is-modal #mg-way, .is-photo #mg-way, .is-cutscene #mg-way { display: none !important; }
+
+/* on a phone the log sits between the bars and the joystick: room for the newest message only
+   (the journal keeps them all) */
+.mg-compact #mg-log .mg-line:nth-last-child(n+2) { display: none; }

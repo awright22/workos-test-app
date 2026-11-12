@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { CROPS, foodTotal } from '../game/farm.js';
 import { BAL, S, suitCap, roverPowerCap } from '../game/state.js';
 import { plantedPlots } from '../game/interactables.js';
@@ -22,22 +23,25 @@ import { layout, onLayout } from './layout.js';
 // ============================================================
 const habDist = () => groundDist(player.pos, World.hab.position);
 export const OBJECTIVES = [
-  { id: 'reach', why: 'The suit is losing air. The airlock door will let you reseal it.',  text: () => 'Suit breach — get to the Hab', dist: habDist, shown: () => true, done: () => S.flags.suitSealed, urgent: true },
-  { id: 'systems', why: 'They make the air and the water. Know what keeps you alive.',  text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
-  { id: 'math', why: 'How long will the food last?',  text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
-  { id: 'panels', why: 'Dust on the panels starves the Hab of power.',  text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
-  { id: 'farm', why: 'Ten rations will not last until the rescue.',  text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
-  { id: 'water', why: 'A bed stalls at half grown until it is watered again.',  text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
-  { id: 'hydra', why: 'The farm drinks more than the reclaimer makes.',  text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
+  { id: 'reach', pos: () => habPoint(0, 1.3, 11.7),  why: 'The suit is losing air. The airlock door will let you reseal it.',  text: () => 'Suit breach — get to the Hab', dist: habDist, shown: () => true, done: () => S.flags.suitSealed, urgent: true },
+  { id: 'systems', pos: () => (S.checkedSystems.oxy ? habPoint(5.9, 1.4, -0.4) : habPoint(5.6, 1.4, -3.6)),  why: 'They make the air and the water. Know what keeps you alive.',  text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
+  { id: 'math', pos: () => habPoint(0, 1.3, -6.6),  why: 'How long will the food last?',  text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
+  { id: 'panels', pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? p.group.getWorldPosition(_way).addScaledVector(_wup.copy(World.hab.position).normalize(), 1.2) : null; },  why: 'Dust on the panels starves the Hab of power.',  text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
+  { id: 'farm', pos: () => { const p = World.plots.find((x) => x.state === 'empty' || x.state === 'soil'); return p ? _way.copy(p.worldPos).addScaledVector(_wup.copy(p.worldPos).normalize(), 0.9) : null; },  why: 'Ten rations will not last until the rescue.',  text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
+  { id: 'water', pos: () => { const p = World.plots.find((x) => x.state === 'growing' && x.growth >= 0.42 && x.watered < (CROPS[x.crop] || CROPS.potato).waterings); return p ? _way.copy(p.worldPos).addScaledVector(_wup.copy(p.worldPos).normalize(), 0.9) : null; },  why: 'A bed stalls at half grown until it is watered again.',  text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
+  { id: 'hydra', pos: () => habPoint(4.2, 1.3, 2.6),  why: 'The farm drinks more than the reclaimer makes.',  text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
   { id: 'pf', why: 'Its radio is the only way to tell Earth you are alive.',  text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
     dist: () => groundDist(player.pos, S.pf.loaded ? World.uplink.position : World.pathfinder.position),
     shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
   { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
-  { id: 'dinner', why: 'A cooked meal lifts morale, and in good spirits the work goes faster.',  text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
-  { id: 'breach', why: 'The Hab is losing its air through the far wall.',  text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
+  { id: 'dinner', pos: () => habPoint(4.2, 1.4, 4.8),  why: 'A cooked meal lifts morale, and in good spirits the work goes faster.',  text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
+  { id: 'breach', pos: () => habPoint(0, 1.6, -HAB_R + 0.5),  why: 'The Hab is losing its air through the far wall.',  text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
   { id: 'survive', why: 'The Hermes is coming back for you.',  text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
   { id: 'mav', why: 'It is the only rocket on the planet.',  text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
+const _way = new THREE.Vector3(), _wup = new THREE.Vector3(), _wv = new THREE.Vector3(), _wc = new THREE.Vector3();
+/** A point in the Hab, given in its own frame (metres; y above the floor). */
+function habPoint(x, y, z) { return siteLocalToWorld(World.hab, x, y, z, _way); }
 export const objDone = new Set();
 let objSeeded = false, objThrottle = 0, objHead = null, objLead = null;
 const objNodes = new Map();          // row key -> { el, tx, ds, text, dist, cls }
@@ -52,6 +56,47 @@ function objRow(key) {
   }
   return n;
 }
+// ============================================================
+// WAYPOINT: where the current objective is
+// ============================================================
+let wayEl = null, wayShown = false, wayKey = '';
+/**
+ * A marker over the place the first objective points at: on it when it is in view, at the edge of
+ * the screen with an arrow when it is not. Called every frame with the game camera.
+ */
+export function updateWaypoint(camera) {
+  if (!wayEl) wayEl = el('div', 'mg-way', null, UI.hud, '<i class="wp"></i><b class="t-num"></b>');
+  let target = null, urgent = false;
+  if (S.started && !S.over && !S.uiOpen && !S.photo && !S.sleeping && S.mode !== 'cutscene') {
+    const order = OBJECTIVES.filter((o) => o.shown() && !o.done());
+    order.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
+    const o = order[0];
+    const p = o && o.pos ? o.pos() : null;
+    if (p) { target = _wv.copy(p); urgent = !!o.urgent; }
+  }
+  const from = S.mode === 'rover' ? World.rover.group.position : player.pos;
+  const d = target ? target.distanceTo(from) : 0;
+  if (!target || d < 2.4) { if (wayShown) { wayShown = false; wayEl.style.display = 'none'; } return; }
+  // to the screen: in front of the camera it is where it projects; behind, it is pushed out to the edge
+  _wc.copy(target).applyMatrix4(camera.matrixWorldInverse);
+  const behind = _wc.z > -0.05;
+  _wv.copy(target).project(camera);
+  let x = _wv.x, y = _wv.y;
+  if (behind) { x = -x; y = -y; const m = Math.max(Math.abs(x), Math.abs(y), 1e-3); x /= m; y = Math.min(y / m, -0.2); }
+  const off = behind || Math.abs(x) > 0.86 || y > 0.62 || y < -0.7;
+  const cx = Math.max(-0.86, Math.min(0.86, x)), cy = Math.max(-0.7, Math.min(0.62, y));
+  const w = window.innerWidth, h = window.innerHeight;
+  const key = `${Math.round((cx * 0.5 + 0.5) * w)},${Math.round((-cy * 0.5 + 0.5) * h)},${off ? Math.round(Math.atan2(-(y - cy), x - cx) * 20) : 'on'},${Math.round(d)},${urgent}`;
+  if (!wayShown) { wayShown = true; wayEl.style.display = ''; }
+  if (key === wayKey) return;
+  wayKey = key;
+  wayEl.style.transform = `translate(${((cx * 0.5 + 0.5) * w).toFixed(0)}px, ${((-cy * 0.5 + 0.5) * h).toFixed(0)}px)`;
+  wayEl.classList.toggle('off', off);
+  wayEl.classList.toggle('urgent', urgent);
+  wayEl.firstChild.style.transform = off ? `rotate(${(Math.atan2(-(y - cy), x - cx) * 180 / Math.PI + 90).toFixed(0)}deg)` : '';
+  wayEl.lastChild.textContent = fmtDist(d);
+}
+
 export function updateObjectivesHud() {
   const now = perf();
   if (now - objThrottle < 0.3) return;

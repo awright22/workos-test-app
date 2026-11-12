@@ -315,10 +315,10 @@ addI({
     showOverlay({
       kicker: 'The numbers', title: 'Farm or starve',
       stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
+      // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
-        'The Hab has six farm beds. Fill them with soil from the heaps outside, plant them, water them, and eat what grows. Planting a potato bed takes one ration; the botany kit also holds seed packets.\n\n' +
-        'The six bars at the top left are what keeps him alive: Hab oxygen, water, food, power, vitals and morale. The mission list at the top right says what to do next, and why.',
-      quote: 'I\'m going to have to science the sh*t out of this.',
+        'The Hab has six farm beds: fill them with soil from the heaps outside, plant, water, and eat what grows. A potato bed costs one ration to plant.\n\n' +
+        'Top left, the six bars that keep him alive. Top right, what to do next and why.',
       buttons: [{ label: 'Get to work' }],
     });
   },
