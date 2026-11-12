@@ -97,9 +97,9 @@ What round 3 added or sharpened (T-numbers), most damaging first:
 
 | # | Finding (pictures) | State |
 | --- | --- | --- |
-| T1 | Landmarks do not read: Valles Marineris from above is a striped bank with no rim or drop in frame; Olympus is a rippled dune (`canyon`, `olympus`) | part done: the matrix now has a rim view and a wall view of the north wall of Valles Marineris at 296 E (a hundred metres of layered cliff); strata are uneven and wobble. Olympus still needs lava forms |
+| T1 | Landmarks do not read: Valles Marineris from above is a striped bank with no rim or drop in frame; Olympus is a rippled dune (`canyon`, `olympus`) | acted on: the matrix has a rim view and a wall view of the north wall of Valles Marineris at 296 E (a hundred metres of layered cliff). The seven shield volcanoes now carry lava: three sizes of flow lobe lying on one another, leveed channels, dark rubble and boulders along each flow's edge, no ripple fields. New scenes `olympus-caldera` (the summit caldera from its south rim) and `olympus-flows`. To re-review |
 | T2 | Polar ice is matte white cracked plaster with tan shadows; the outcrop is two smooth bars (`north-pole`, `pole-90`, `ice`) | acted on: bluer ice that is blue in its shadows; the outcrop rebuilt as six fractured, tilted blocks with rubble. To re-review |
-| T3 | Zigzag chevrons in rows on a far hillside (`lander-curiosity`); specks and a scalloped ledge on the canyon wall | acted on: band edges wobble at a scale finer than a far mesh's triangles and merge sooner with distance. To re-review |
+| T3 | Zigzag chevrons in rows on a far hillside (`lander-curiosity`); specks and a scalloped ledge on the canyon wall | acted on: band edges wobble at a scale finer than a far mesh's triangles and merge sooner with distance. The rows of teeth along cliff edges had a second cause, now fixed: every square of the terrain grid was cut into triangles the same way, so any crest crossing that cut came out jagged. Each square is now cut along the diagonal whose ends are nearer in height, and a ledge's riser is an S-curve at least three cells wide. To re-review |
 | T4 | At night the Hab, rover and astronaut look floodlit by ambient; porch and parked-rover lamps make no pool; the greenhouse is a white starburst | acted on: a ceiling on what reaches the bloom, less night fill, porch lamps that pool on the ground, gentler dome lamps, lower night exposure. To re-review |
 | T5 | Exposure and colour spread: pale peach at noon and toward the sun, deep rust elsewhere; `day-sun` is beige | acted on: the glow round the sun is about a third as strong, the bloom is weaker and starts higher, and the meter closes further at high sun. To re-review |
 | T6 | The nearest metres are a soft blur at high sun | acted on: the sand and near-grain textures carry more tone contrast, so ripples and grit hold when the sun is overhead. To re-review |
@@ -107,7 +107,7 @@ What round 3 added or sharpened (T-numbers), most damaging first:
 | T8 | The storm has no motion or threat; a straight band survives | acted on: 2,800 wind streaks (1,100 on low quality) that lengthen with the storm, fine and short near the eye so a still does not show bars; more dust sheets. Motion can only be judged on a real device. To re-review |
 | T9 | A row of pale soft discs across the mid-ground (`pod`, `pod-open`) | fixed: the storm's sheets are drawn only in a storm |
 | T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | acted on: the patches of packed soil are twice as strong and wider; soil aprons (the heap, the wreck's scorch, the ice berm) fade out where they meet the ground and have no sheen, so no edge shows. To re-review |
-| T11 | The astronaut is pitched forward with bent knees in side views; tilted in one picture | measured: the torso is within 3.5 degrees of upright; the look comes from bent knees and raised forearms in the idle clip. Open for an animation pass |
+| T11 | The astronaut is pitched forward with bent knees in side views; tilted in one picture | acted on: the idle clip is rewritten from knee angles (knees 5 and 7 degrees, were 13 and 26; elbows 10 and 12, were 22 and 32; hands beside the thighs; trunk 1.6 degrees forward), and the game's own torso correction, which tipped him back, is gone. To re-review |
 | T12 | Blown emitters: the nav beacon in daylight, a workbench lamp, glare blobs at the frame edge | acted on: the same ceiling before the bloom. To re-review |
 
 Capture mistakes it named: two interior pictures swapped against the manifest, no rim in
@@ -165,7 +165,7 @@ phone.
 | 13 | Shadow cost at the base: the rover (45k triangles) and Hab are drawn into both cascades; "low" is on its call budget there | open (simplified shadow models would halve it) |
 | 5 | Sky from orbit: thinner limb haze; Phobos and Deimos | open |
 | 6 | More variety between regions (dark basalt plains, bright dust, dune fields) | open |
-| 19 | Astronaut: feet dip up to 4 cm when clips cross-fade; JumpStart, Land, Wave and Collapse still start from the old square stance; the face is plain under a metre | open |
+| 19 | Astronaut: feet dip up to 4 cm when clips cross-fade; JumpStart, Land, Wave and Collapse still start from the old bent-knee stance, and WorkStand has the same bent knees and an 11 degree forward lean; going from standing to kneeling the left hand passes through the knee pad for under a tenth of a second (the fade is shortened to 0.18 s; a short kneel-down clip is the proper fix); the face is plain under a metre | open |
 | 20 | Wreck blast patch still reads as a smooth mound at its rim; Pathfinder's airbags are faceted up close | open |
 | 14 | Asset tooling: fold the helpers the model scripts each copied into `tools/assets/lib.py` | open |
 
@@ -187,6 +187,15 @@ phone.
 - **Rocks, dust and soil take their colour from the ground.** Bare stone is a darker, greyer
   version of the local orbital colour; the dust on hardware and any heap or apron of soil
   (`ground_dust` in a model) is the local ground colour itself, ice included.
+- **Each terrain square is cut along its own grain.** A grid cut into triangles all one way draws
+  any crest that crosses the cut as a row of teeth. Each chunk carries its own triangle list
+  (about 14 kB at grid 32), with every square cut along the diagonal whose ends are nearer in
+  height. Ledges and lava-flow edges are also never drawn narrower than two to three cells of the
+  mesh asking for them: with distance they widen and then melt into the slope.
+- **Volcanoes are flow on flow.** On the seven shields (`planet/volcanoes.js`) the height model
+  adds lava lobes and leveed channels in coordinates round the summit, so every tongue points
+  downhill; the worker hands the shader how near each vertex is to a flow's edge, which is where
+  the rubble and most of the boulders lie.
 - **Two shadow cascades.** three.js's `SunLight` with a split set by hand (10–18 m): a tight map
   around the camera so the astronaut's shadow is a figure, a wide one for the base. Sealed in
   the Hab, the same maps are used for the ceiling lights.

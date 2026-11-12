@@ -3,6 +3,7 @@
 import { llToVec, vecToLl, angDist } from './geo.js';
 import { MARS_KM, D2R } from './constants.js';
 import { elevationKm3 } from './surface.js';
+import { VOLCANOES } from './volcanoes.js';
 
 /*
  * Real Mars features. lat, lonE in degrees; r = footprint radius km; h = relief km (+up/-down).
@@ -12,21 +13,7 @@ import { elevationKm3 } from './surface.js';
 export const FEATURES = [
   // The Tharsis bulge — continent-sized volcanic rise
   { name: 'Tharsis Rise', lat: 2, lon: 247, r: 2600, h: 5.5, type: 'bulge' },
-  // Volcanoes
-  { name: 'Olympus Mons', lat: 18.65, lon: 226.2, r: 310, h: 21.9, type: 'volcano', cal: 0.09,
-    note: 'Tallest volcano in the solar system. The slopes are so gentle you could not see the summit from the base — the planet curves away first.' },
-  { name: 'Ascraeus Mons', lat: 11.92, lon: 255.92, r: 220, h: 14.9, type: 'volcano', cal: 0.1,
-    note: 'Northernmost of the Tharsis Montes. Its name means "rustic" — for a mountain twice the height of Everest.' },
-  { name: 'Pavonis Mons', lat: 1.48, lon: 247.04, r: 190, h: 8.4, type: 'volcano', cal: 0.12,
-    note: 'Sits almost exactly on the equator. A space elevator dream site, if Mars ever files the permits.' },
-  { name: 'Arsia Mons', lat: -8.35, lon: 239.91, r: 220, h: 11.7, type: 'volcano', cal: 0.16,
-    note: 'Has a caldera you could drop a small country into, and cave skylights along its flanks.' },
-  { name: 'Alba Mons', lat: 40.5, lon: 250.4, r: 600, h: 6.8, type: 'volcano', cal: 0.07,
-    note: 'The biggest volcano by area anywhere — a pancake 1000+ km across that you could drive over without noticing the summit.' },
-  { name: 'Elysium Mons', lat: 25.02, lon: 147.21, r: 210, h: 14.1, type: 'volcano', cal: 0.09,
-    note: 'The lonely giant of the eastern hemisphere, far from the Tharsis crowd.' },
-  { name: 'Hecates Tholus', lat: 32.12, lon: 150.24, r: 90, h: 4.8, type: 'volcano', cal: 0.12,
-    note: 'Small by Mars standards. Merely enormous by Earth standards.' },
+  ...VOLCANOES,
   // Impact basins
   { name: 'Hellas Planitia', lat: -42.4, lon: 70.5, r: 1050, h: -7.2, type: 'basin',
     note: 'Deepest hole on Mars — the air at the bottom is thick enough that liquid water could briefly survive. Briefly.' },

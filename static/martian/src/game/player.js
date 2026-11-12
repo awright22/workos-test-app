@@ -147,8 +147,6 @@ export function collideUnit(q, radius) {
 export let astro = null;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
-/** Tuning for the standing pose (exposed on the debug hook so it can be measured). */
-export const poseTune = { upright: -0.12 };      // radians, about the spine's own side-to-side axis
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
 
 export function buildAstronaut() {
@@ -162,7 +160,7 @@ export function buildAstronaut() {
     anim.actions[clip.name] = a;
   }
   for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
-  anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone(), spine: anim.bones.spine.quaternion.clone() };
+  anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
   // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
   const lamp = new THREE.SpotLight(0xfff4e0, 0, 50, 0.66, 1.0, 1.25);
@@ -234,22 +232,19 @@ export function updateAstronaut(dt) {
     if (player.airT < 0.12 && player.vy > 0 && anim.name !== 'Air') play('JumpStart', 0.08);
     else play('Air', 0.18);
   } else if (player.landT < 0.3 && player.speed < 2.5) play('Land', 0.06);
-  else if (working) play(workPose(), 0.25);
+  // (down to a knee and up again quickly: half-way between standing and kneeling is not a pose a man holds)
+  else if (working) play(workPose(), workPose() === 'WorkKneel' ? 0.18 : 0.25);
   else if (player.speed > 0.6) {
     const hurt = S.health < 35 || S.suit < 6;
     if (hurt && player.speed < 4) { play('Stagger', 0.3); ts = clamp(player.speed / 2.4, 0.6, 1.3); }
     else if (player.speed > 7.0) { play('Run', 0.2); ts = clamp(player.speed / RUN_SPEED, 0.7, 1.25); }
     else { play('Walk', 0.22); ts = clamp(player.speed / WALK_SPEED, 0.45, 1.3); }
-  } else play('Idle', 0.3);
+  } else play('Idle', anim.name === 'WorkKneel' ? 0.18 : 0.3);
   if (anim.current) anim.current.setEffectiveTimeScale(ts);
   // the look-at below is added on top of the clip each frame, so start from the rest pose
   anim.bones.chest.quaternion.copy(anim.rest.chest);
   anim.bones.head.quaternion.copy(anim.rest.head);
-  anim.bones.spine.quaternion.copy(anim.rest.spine);
   anim.mixer.update(dt);
-  // standing still he leans forward from the hips, as under a heavy pack: stand the torso up most of the way
-  anim.upright = lerp(anim.upright || 0, anim.name === 'Idle' ? 1 : 0, damp(0.25, dt));
-  if (anim.upright > 0.01) { anim.bones.spine.rotateX(poseTune.upright * anim.upright); anim.bones.chest.rotateX(poseTune.upright * 0.5 * anim.upright); }
   player.bones = anim.bones;
   if (!driving) {
     astro.position.copy(player.pos);

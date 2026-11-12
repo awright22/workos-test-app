@@ -59,6 +59,8 @@ const scenes = {
   'canyon-wall': async () => ev(async (G) => { await G.tp(-8.72, 296, 0); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
+  'olympus-flows': async () => ev(async (G) => { await G.tp(16.6, 227.9, 2.4); G.setLocalTime(8.5); G.look(-0.12); G.tick(0.05, 40); await G.settle(); }),
+  'olympus-caldera': async () => ev(async (G) => { await G.tp(17.76, 226.9, 0); G.setLocalTime(16); G.look(-0.25); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 1.9); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   // every built model, seen by a free camera with the astronaut beside it for scale
   'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [3.6, 200], height: 2.4 }),

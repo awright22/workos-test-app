@@ -18,6 +18,7 @@
  */
 import * as THREE from 'three';
 import { DETAIL_FRAME } from '../planet/constants.js';
+import { LAVA_FIELDS } from '../planet/volcanoes.js';
 import { detailTextures } from './noise3d.js';
 import { groundTextures } from './detail2d.js';
 
@@ -42,6 +43,15 @@ export const GLSL_GROUND_GRADE = /* glsl */`
   /** The colour of the ground at a place, for things that must match it (dust on hardware, a heap of soil). */
   vec3 groundColour(vec3 alb, vec3 dir) {
     return mix(groundGrade(alb), vec3(0.56, 0.62, 0.70), groundIce(alb, dir));
+  }`;
+/** GLSL: how much of the ground in a direction is a volcano's lava field (as Planet.lava in planet/height.js). */
+const GLSL_LAVA = /* glsl */`
+  const vec4 LAVA_FIELD[${LAVA_FIELDS.length}] = vec4[${LAVA_FIELDS.length}](${LAVA_FIELDS.map((v) => `vec4(${F(v.x)}, ${F(v.y)}, ${F(v.z)}, ${F(1 / (1 - v.cos))})`).join(', ')});
+  float groundLava(vec3 dir) {
+    float m = 0.0;
+    // (one less the share of the reach squared: 0 at the field's edge, 0.36 a fifth of the way in)
+    for (int i = 0; i < ${LAVA_FIELDS.length}; i++) m = max(m, 1.0 - (1.0 - dot(dir, LAVA_FIELD[i].xyz)) * LAVA_FIELD[i].w);
+    return smoothstep(0.0, 0.36, m);
   }`;
 /** GLSL mat3 whose product with a texture-space vector gives the world-space vector. */
 export const GLSL_DETAIL_T = `mat3(${DETAIL_FRAME.map(F).join(', ')})`;
@@ -71,9 +81,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
         attribute vec3 aTex;
-        attribute vec3 aUv;
+        attribute vec4 aUv;
         varying vec3 vTex;
-        varying vec3 vUv3;
+        varying vec4 vUv3;
         varying vec3 vPlanetPos;
         varying vec3 vGeoNormal;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -91,11 +101,12 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform float uDust;
         uniform float uDay;
         varying vec3 vTex;
-        varying vec3 vUv3;
+        varying vec4 vUv3;
         varying vec3 vPlanetPos;
         varying vec3 vGeoNormal;
         const mat3 DETAIL_T = ${GLSL_DETAIL_T};
-        ${GLSL_GROUND_GRADE}`)
+        ${GLSL_GROUND_GRADE}
+        ${GLSL_LAVA}`)
       .replace('#include <map_fragment>', /* glsl */`
         vec3 pDir = normalize(vPlanetPos);
         vec3 geoN = normalize(vGeoNormal);
@@ -107,6 +118,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float albLum = dot(alb, vec3(0.3, 0.55, 0.15));
         float ice = groundIce(alb, pDir);
         alb = groundGrade(alb);
+        float lava = groundLava(pDir);
 
         // ---- how much of this fragment is level ground (2D layers) and how much slope (3D) ----
         // (the 2D layers hold on to quite steep ground: laid from above they stretch down a slope,
@@ -134,9 +146,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           float fField = (1.0 - smoothstep(110.0, 420.0, viewDist)) * level;
           vec4 fld = texture2D(uField, uv / 16.0);
           // ripples belong to sand: ice has none
-          flatSlope += (fld.rg - 0.5) * (4.0 * fField * (1.0 - ice * 0.85));
+          flatSlope += (fld.rg - 0.5) * (4.0 * fField * (1.0 - ice * 0.85) * (1.0 - lava * 0.7));     // nor has a lava flow, beyond a skin of drift
           tone += (fld.b - 0.56) * 1.5 * fField * (1.0 - ice * 0.6);
-          gravelHere = fld.a * (1.0 - ice);
+          gravelHere = min(1.0, fld.a * (1.0 - ice) + lava * 0.3);      // clinker lies all over a flow
           // patterned ground: polygons cracked by frost, from the mid-latitudes to the poles, and on all ice
           float frosty = max(smoothstep(0.52, 0.76, abs(pDir.y)), ice);
           // (sampled everywhere, weighted here: a texture read inside a branch has no defined mip level)
@@ -168,7 +180,12 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float coarse = smoothstep(0.02, 0.22, -hMid * fMid - hFar * 0.6);
         col = mix(col, col * vec3(0.74, 0.71, 0.73), coarse * 0.4);
         // bedrock where it is too steep for dust to lie, in bands that follow the layering
-        float rock = smoothstep(0.15, 0.34, slope + hMid * 0.10 * fMid + hFar * 0.06);
+        // (a flow's edge is bare lava at a slope where a hillside would still hold its dust)
+        float rock = smoothstep(0.15, 0.34, slope * (1.0 + lava * 1.6) + hMid * 0.10 * fMid + hFar * 0.06);
+        // and along each flow's edge lies the rubble it shed: a dark band, broken up by the noise so it does not follow the mesh
+        float rubble = smoothstep(0.30, 0.66, vUv3.w + hMid * 0.5 * fMid + hFar * 0.3 + hLump * 0.4 * fLump);
+        rock = max(rock, rubble * 0.9);
+        grad += (nLump.rgb - 0.5) * (0.8 * (1.0 - smoothstep(24.0, 110.0, viewDist)) * rubble * level);
         // beds of uneven thickness with thin partings in them, undulating; far away they merge into one tone
         float alt = length(vPlanetPos);
         // (the wobble is finer than a distant mesh's triangles: without it each band's edge follows their
@@ -178,6 +195,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float beds = texture(uGrain, vec3(alt * 0.029 + hFar * 0.45 + wob * 0.3, 0.83, 0.21)).a;
         float bedTone = mix(0.5, smoothstep(0.30, 0.70, beds * 0.68 + band.a * 0.32), 1.0 - smoothstep(260.0, 1200.0, viewDist));
         vec3 rockCol = alb * mix(vec3(0.50, 0.45, 0.46), vec3(0.98, 0.88, 0.80), bedTone);
+        // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
+        rockCol = mix(rockCol, alb * vec3(0.44, 0.41, 0.44) * (0.78 + 0.44 * bedTone), lava * 0.85);
+        col = mix(col, col * vec3(0.72, 0.70, 0.74), lava * 0.55 * smoothstep(-0.02, 0.2, hMid * fMid + hFar * 0.5));
         col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5), rock * 0.9);
         grad += pDir * ((band.r - 0.5) * 2.4 * rock) * (1.0 - smoothstep(300.0, 1500.0, viewDist));
         // stones are basalt, not dust: darker and greyer than the sand they lie in
@@ -220,6 +240,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain7' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain9' + (o.fine !== false ? 'F' : '');
   return mat;
 }

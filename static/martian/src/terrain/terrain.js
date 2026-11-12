@@ -55,7 +55,8 @@ export class Terrain {
     this.shadowLevel = o.shadowLevel === undefined ? 7 : o.shadowLevel;
     /** which quadtree levels carry rocks: boulders on a coarser level (seen from afar), stones on the finest */
     this.rockLevels = { big: Math.min(7, this.maxLevel - 1), small: this.maxLevel };
-    this.index = new THREE.BufferAttribute(chunkIndices(this.G), 1);
+    /** how many indices a chunk has (for the statistics) */
+    this.indexCount = chunkIndices(this.G).length;
     this.roots = [];
     for (let f = 0; f < 6; f++) this.roots.push(new Node(f, 0, 0, 0, null));
     this.frame = 0;
@@ -146,8 +147,8 @@ export class Terrain {
     g.setAttribute('position', new THREE.BufferAttribute(c.pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(c.nor, 3, true));
     g.setAttribute('aTex', new THREE.BufferAttribute(c.tex, 3));
-    g.setAttribute('aUv', new THREE.BufferAttribute(c.uv, 3));
-    g.setIndex(this.index);
+    g.setAttribute('aUv', new THREE.BufferAttribute(c.uv, 4));
+    g.setIndex(new THREE.BufferAttribute(c.idx, 1));        // (each chunk cuts its own squares: see buildChunk)
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), c.radius);
     const mesh = new THREE.Mesh(g, this.material);
     mesh.position.set(c.origin[0], c.origin[1], c.origin[2]);
@@ -340,6 +341,6 @@ export class Terrain {
   stats() {
     const levels = {};
     for (const v of this.visible) levels[v.level] = (levels[v.level] || 0) + 1;
-    return { visible: this.visible.length, live: this.live, terrainTris: this.visible.length * this.index.count / 3, levels, queued: this.queue.length, pending: this.pending.size };
+    return { visible: this.visible.length, live: this.live, terrainTris: this.visible.length * this.indexCount / 3, levels, queued: this.queue.length, pending: this.pending.size };
   }
 }

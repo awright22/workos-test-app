@@ -18,7 +18,9 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 
 - **Real elevation.** The ground is NASA's MOLA laser altimetry of Mars; its colour is the
   Viking orbiter mosaic. Olympus Mons, Valles Marineris, Hellas, Gale and both ice caps are
-  where they really are. See `CREDITS.md`.
+  where they really are. See `CREDITS.md`. Below about 40 m the ground is generated to suit the
+  place: craters, layered cliffs with ledges, ripple fields, frost polygons toward the poles,
+  and on the seven shield volcanoes lava flows with rubble at their edges and leveed channels.
 - **A whole sphere**, 75 km around at this scale (1:282), with relief exaggerated four times so
   that volcanoes and canyons read at walking pace. You can walk or drive all the way round.
   Day and night depend on where you stand.

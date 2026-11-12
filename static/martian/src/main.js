@@ -35,7 +35,7 @@ import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
-import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt, poseTune } from './game/player.js';
+import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
@@ -234,7 +234,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, poseTune, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },

@@ -2021,13 +2021,53 @@ def hang_arm(p, side, fwd, out, bend, twist, flex=8.0, roll=0.0):
     p.arm_fk(side, fwd=fwd, out=out, bend=bend, twist=twist, hand_local=hand, rel=None)
 
 
+def knee_reach(flex):
+    """How far the ankle is from the hip joint when the knee is flexed by `flex` degrees."""
+    return math.sqrt(L_THIGH ** 2 + L_SHIN ** 2 + 2 * L_THIGH * L_SHIN * math.cos(rad(flex)))
+
+
+def stand_on(p, ankles, knees, pitch=0.0, turn=0.0):
+    """Stand the pelvis on two planted legs with each knee flexed by exactly the angle asked for.
+    `ankles` and `knees` are {side: ankle position} and {side: degrees}; p.root.x / .y and the
+    pelvis' pitch and turn are given, and its height and sideways tilt are solved for.
+    Why: a nearly straight leg has no slack. Lowering the hips 12 mm bends the knees 19 degrees,
+    and 2 mm of bob swings a 4 degree knee to 9, so a standing pose written as a hip height
+    either squats or pops. Written as knee angles it does neither."""
+    z, roll = p.root.z, 0.0
+
+    def miss(z, roll):
+        q = Q(x=pitch, y=roll, z=turn)
+        hips = BONE_HEAD['hips'] + Vector((p.root.x, p.root.y, z))
+        return [(hips + q @ (BONE_HEAD['thigh_' + s] - BONE_HEAD['hips']) - Vector(ankles[s])).length - knee_reach(knees[s]) for s in 'LR']
+    for _ in range(12):                                   # Newton on (height, tilt); converges in four or five steps
+        f = miss(z, roll)
+        a = [(u - v) / 1e-6 for u, v in zip(miss(z + 1e-6, roll), f)]
+        b = [(u - v) / 1e-4 for u, v in zip(miss(z, roll + 1e-4), f)]
+        det = a[0] * b[1] - a[1] * b[0]
+        z -= (f[0] * b[1] - f[1] * b[0]) / det
+        roll -= (a[0] * f[1] - a[1] * f[0]) / det
+    p.root.z = z
+    p.q['hips'] = Q(x=pitch, y=roll, z=turn)
+    return roll
+
+
 def idle_pose(t=0.0):
-    """Standing at rest, the way a person does and a rig does not: the weight on the right leg
-    with that hip high, the left knee eased and that foot a little forward and turned out, the
-    shoulders tilted the other way, the arms hanging close with soft elbows, the head off centre.
+    """Standing at rest, upright: the weight on the right leg, that knee all but straight and the
+    hip over the ankle; the left foot a little forward and turned out with its knee eased; the
+    pelvis pushed over the standing foot and the shoulders tilted the other way; the arms hanging
+    at his sides, hands beside the thighs; the head off centre and level.
     Over eight seconds: two breaths, a slow drift of the weight, and one look to the right.
-    (The left foot and hand lead because WorkKneel plants the left foot forward: the blend into
-    it then has less far to go.)"""
+    (The left foot leads because WorkKneel plants the left foot forward: the blend into it then
+    has less far to go.)
+    The stance is set by its knee angles (see stand_on), so the breath lives in the chest and
+    shoulders and never in the height of the hips. Seen from the side the trunk leans about a
+    degree and a half forward under the pack and the hips sit a centimetre ahead of the ankles:
+    it is meant to be played as it is, with no correction added to the spine.
+    The arms hang from the vertical with the elbows 10 and 12 degrees bent. They are kept this
+    far out (about 12 degrees) by the hoses on the flanks, which the inner elbow links pass at
+    15 mm, and the hands are turned thumb-forward because a thumb turned in reaches the thigh
+    pocket. Known cost: in the cross-fade to WorkKneel the left hand starts outside the left knee
+    and ends inside it, and passes through the knee pad on the way (see the notes above CLIPS)."""
     sup, free, m = 'R', 'L', -1.0                         # supporting side, eased side, mirror sign
     w = TAU / IDLE_T
     ph = 2 * w * t - 0.6
@@ -2035,20 +2075,26 @@ def idle_pose(t=0.0):
     late = math.sin(ph - 0.9 + 0.4 * math.sin(ph - 0.9))  # the arms follow the chest a moment later
     shift = math.sin(w * t + 0.4)
     drift = math.sin(w * t + 2.3)
+    settle = math.sin(w * t - 0.2)                        # the shoulders answer the hips a moment later
     look = smooth01((t - 2.5) / 1.3) * (1.0 - smooth01((t - 5.1) / 1.6))
     p = Pose()
-    p.root = Vector((m * (0.040 + 0.009 * shift + 0.003 * look), 0.012 + 0.003 * drift, -0.016 + 0.0020 * br - 0.0020 * shift))
-    p.q['hips'] = Q(x=1.5, y=m * (-4.5 - 1.0 * shift), z=m * (5.0 + 0.8 * drift))
-    p.q['spine'] = Q(x=1.5 + 0.5 * br, y=m * (3.0 + 0.5 * shift), z=m * -2.0)
-    p.q['chest'] = Q(x=1.0 + 1.3 * br, y=m * (3.4 + 0.4 * shift), z=m * (-3.5 - 0.6 * drift + 2.0 * look))
-    p.q['neck'] = Q(x=-1.5 - 0.4 * br, y=m * -1.2, z=m * (-2.5 + 4.0 * look))
-    p.q['head'] = Q(x=-2.0 + 0.8 * math.sin(w * t + 0.4) - 1.5 * look, y=m * (-1.8 + 1.2 * look), z=m * (-5.0 + 8.0 * look))
-    p.shrug(sup, up=-1.2 + 1.6 * br, fwd=2.0)
-    p.shrug(free, up=1.0 + 1.6 * br, fwd=2.0)
-    p.plant(sup, m * 0.105, 0.0, yaw=m * 6.0)
-    p.plant(free, m * -0.135, -0.035, yaw=m * -14.0, pole=(m * -0.25, -1.0, 0.0))
-    hang_arm(p, sup, fwd=-5.0 + 0.8 * late, out=13.3 + 0.5 * late, bend=21.0 + 1.5 * late + 1.5 * look, twist=30.0, flex=9.0, roll=8.0)
-    hang_arm(p, free, fwd=7.0 + 0.8 * late - 1.5 * look, out=13.5 + 0.5 * late, bend=32.0 + 1.5 * late, twist=28.0, flex=12.0, roll=14.0)
+    p.root = Vector((m * (0.040 + 0.009 * shift + 0.003 * look), -0.019 + 0.003 * drift, 0.0))
+    feet = {sup: dict(x=m * 0.105, y=0.0, yaw=m * 6.0), free: dict(x=m * -0.135, y=-0.035, yaw=m * -14.0)}
+    # as the weight goes further onto the standing leg that knee locks a little more and the other eases
+    tilt = stand_on(p, {s: foot_pose(f['x'], f['y'], 0.0, f['yaw'])[0] for s, f in feet.items()},
+                    {sup: 4.6 - 0.4 * shift, free: 7.3 + 0.7 * shift}, pitch=1.0, turn=m * (4.0 + 0.8 * drift))
+    # the spine takes the pelvis' tilt back out and a little more: the shoulder is low over the standing leg.
+    # As the hips go further over that foot the trunk comes back a little, so the head sways less than the hips.
+    p.q['spine'] = Q(x=0.4 - 0.3 * br, y=-0.5 * tilt + m * (0.5 - 0.15 * settle), z=m * -1.5)
+    p.q['chest'] = Q(x=0.4 - 0.9 * br, y=-0.5 * tilt + m * (0.6 - 0.15 * settle), z=m * (-3.0 - 0.6 * drift + 2.0 * look))
+    p.q['neck'] = Q(x=-0.8 + 0.5 * br, y=m * -1.0, z=m * (-2.5 + 4.0 * look))
+    p.q['head'] = Q(x=-1.0 + 0.4 * br + 0.8 * math.sin(w * t + 0.4) - 1.5 * look, y=m * (-1.6 + 1.2 * look), z=m * (-5.0 + 8.0 * look))
+    p.shrug(sup, up=-1.0 + 1.6 * br, fwd=0.0)
+    p.shrug(free, up=0.8 + 1.6 * br, fwd=0.0)
+    p.plant(sup, **feet[sup])
+    p.plant(free, pole=(m * -0.25, -1.0, 0.0), **feet[free])
+    hang_arm(p, sup, fwd=-5.0 + 0.6 * late, out=11.5 + 0.4 * late, bend=9.5 + 1.0 * late + 1.0 * look, twist=14.0, flex=8.0, roll=6.0)
+    hang_arm(p, free, fwd=-3.5 + 0.6 * late - 1.0 * look, out=13.5 + 0.4 * late, bend=12.0 + 1.0 * late, twist=10.0, flex=10.0, roll=2.0)
     return p
 
 
@@ -2422,6 +2468,14 @@ def clip_test(t):
 #     idle_pose). WorkStand keeps nearly the same feet. JumpStart, Land, Wave and Collapse still
 #     begin or end in the square stance of stand_pose(): the cross-fade to or from Idle moves the
 #     feet about 4 cm, which reads as settling.
+#   * Idle stands upright by itself (knees 5 and 7 degrees, hips over the ankles, trunk 1.5
+#     degrees forward, arms at the sides): play it without any added spine rotation. stand_pose()
+#     is still the older ready stance (knees 19.5 degrees, hips 12 mm low, hands ahead of the
+#     thighs), so a clip that starts in it (JumpStart, Wave, Collapse) dips about 9 mm out of Idle
+#     and Land rises the same 9 mm into it.
+#   * Idle to WorkKneel and back: the left hand crosses the left knee pad in the middle third of
+#     the cross-fade (it hangs outside the thigh in Idle and works inside the raised knee in
+#     WorkKneel). A plain cross-fade cannot avoid that; it wants a shorter fade or a clip of its own.
 #   * Above the neck ring there are two groups, told apart by material name, and the game shows
 #     one: the helmet (helmet_white, helmet_dark, helmet_metal, helmet_light, visor_gold) and the
 #     bare head (head_skin, head_cap, head_dark). Each fits inside the other's space, so nothing
