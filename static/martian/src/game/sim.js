@@ -19,9 +19,13 @@ import { SOL_LOGS } from './text.js';
 import { checkpoint, saveGame } from './save.js';
 import { showSleep, showSleepSummary } from '../ui/menus.js';
 // The simulation: resources, time, storms, events, sleep.
+/** The season: late northern spring. The sun stands 14 degrees north of the equator, so the
+ *  north pole has the midnight sun, the far south is in polar night, and days are longer in
+ *  the north. (Mars is tilted 25 degrees; the game holds one season.) */
+export const SUN_DECLINATION = 14 * D2R;
 export function updateSunDir() {
-  const a = S.tod * Math.PI * 2;
-  ctx.engine.sunDir.set(Math.cos(a), 0, Math.sin(a));
+  const a = S.tod * Math.PI * 2, c = Math.cos(SUN_DECLINATION);
+  ctx.engine.sunDir.set(Math.cos(a) * c, Math.sin(SUN_DECLINATION), Math.sin(a) * c);
 }
 /** The colony's clock: fraction of the sol elapsed since dawn (06:00 local) at the Hab.
  *  A new sol begins when this wraps, wherever on the planet the astronaut is. */

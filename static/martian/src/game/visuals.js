@@ -48,7 +48,7 @@ export function syncAllVisuals() {
   const powered = S.power > 0.5;
   setGlow(World.commsMats, S.pf.connected && powered ? 1 : 0.04);
   setGlow(World.oxyMats, powered ? 1 : 0.05);
-  for (const l of World.habLights) l.intensity = powered ? l.userData.on : l.userData.on * 0.05;
+  setGlow(World.habRoomLampMats || [], powered ? 0.55 : 0.03);
   for (const rec of World.pods) syncPod(rec);
   if (World.rtgSite) { setSiteShown(World.rtgSite.group, !World.rtgSite.taken); setColliders(World.rtgSite.cols, !World.rtgSite.taken); }
   for (const site of World.iceSites) syncIce(site);

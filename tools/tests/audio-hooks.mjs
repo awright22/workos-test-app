@@ -109,7 +109,7 @@ check('trying something that cannot be done gives the error sound', has(r, 'uiEr
 r = await act(async (G) => { G.S.inv.candle = 1; G.S.suit = 20; G.tpLocal(0, 40); await window.__run(0.3); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' })); await window.__run(0.2); });
 check('cracking an O2 candle', has(r, 'candle'), r.h);
 
-r = await act(async (G) => { G.S.suit = 6; await window.__run(0.6); G.S.suit = 6; });
+r = await act(async (G) => { G.S.suit = 6; await window.__run(1.4); G.S.suit = 6; });     // the warning has a second or so to sound
 check('low oxygen sounds the suit warning', has(r, 'o2Warn') && r.p.o2 < 0.1, r.h);
 await g.eval((G) => { G.S.suit = 100; });
 

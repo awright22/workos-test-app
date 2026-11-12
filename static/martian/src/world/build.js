@@ -7,6 +7,7 @@ import { R } from '../planet/constants.js';
 import { S } from '../game/state.js';
 import { hash3, srand } from '../core/math.js';
 import { colliderAnchors, model, ownMaterials } from './models.js';
+import { addLamp } from './lamps.js';
 import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
 import { log } from '../ui/dom.js';
@@ -79,8 +80,15 @@ export function buildHabColony(spawn) {
   World.breachPatch = hab.part('breach_patch');
   for (const n of [World.hydFlame, World.breachHole, World.breachPatch]) if (n) n.visible = false;
   World.habInterior = hab.part('interior');
-  // the dome's own shadow covers the room: nothing inside needs to cast one
-  if (World.habInterior) World.habInterior.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+  // By daylight the dome's own shadow covers the room, so nothing inside casts one. Sealed in, it
+  // is the other way about: the room casts under its ceiling light and the shell does not (updateDoors).
+  if (World.habInterior) World.habInterior.traverse((o) => { if (o.isMesh) { if (!o.castShadow) o.userData.neverCasts = true; o.castShadow = false; } });
+  World.habShell = [];
+  hab.inner.traverse((o) => {
+    if (!o.isMesh || !o.castShadow) return;
+    for (let p = o; p; p = p.parent) if (p === World.habInterior) return;
+    World.habShell.push(o);
+  });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
@@ -88,17 +96,33 @@ export function buildHabColony(spawn) {
     const d = hab.part(n);
     return d ? { node: d, x0: d.position.x, dx: d.userData.open_dx || (n.endsWith('_L') ? -1.05 : 1.05), k: 0, outer: n.includes('outer') } : null;
   }).filter(Boolean);
-  // room lights: a few real lights at the fixtures (fewer on low quality), the rest just glow
-  World.habLights = [];
-  const names = ctx.engine.q.scale < 0.7 ? ['light_0', 'light_2'] : ['light_0', 'light_1', 'light_2', 'light_3'];
-  for (const n of names) {
-    const anchor = hab.part(n);
-    if (!anchor) continue;
-    const l = new THREE.PointLight(0xffe4c4, 15, 26, 1.6);
-    l.userData.on = 15;
-    anchor.add(l);
-    World.habLights.push(l);
+  // Lamps: every fitting is a source; a small pool of real lights serves the nearest (see lamps.js).
+  const powered = () => (S.power > 0.5 ? 1 : 0.05);
+  const dark = () => World.dark || 0;
+  for (const n of ['light_0', 'light_1', 'light_2', 'light_3']) {
+    const a = hab.part(n);
+    if (a) addLamp(a, { color: 0xffe4c4, power: 15, range: 26, decay: 1.6, level: powered, room: true });
   }
+  // the grow lights over the farm: two pink pools, one for each pair of trays
+  for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 2.6, range: 4.5, level: powered, room: true });
+  for (const [n, power, range] of [['lamp_bench', 3.5, 6], ['lamp_bunk', 2.5, 5]]) {
+    const a = hab.part(n);
+    if (a) addLamp(a, { color: 0xffd9a8, power, range, level: powered, room: true });
+  }
+  // outside: the porch lamps and the work light by the tanks come on as it gets dark
+  const outside = () => dark() * (S.power > 0.5 ? 1 : 0);
+  for (const [n, power, range] of [['lamp_door_L', 5.5, 20], ['lamp_door_R', 5.5, 20], ['lamp_tanks', 5, 16]]) {
+    const a = hab.part(n);
+    if (a) addLamp(a, { color: 0xffe2bd, power, range, level: outside });
+  }
+  // the fittings themselves glow: outside only in the dark, inside whenever there is power
+  World.habLampMats = []; World.habRoomLampMats = [];
+  hab.inner.traverse((o) => {
+    if (!o.isMesh || Array.isArray(o.material) || !/^light_white/.test(o.material.name || '')) return;
+    let inRoom = false;
+    for (let p = o; p; p = p.parent) if (p === World.habInterior) inRoom = true;
+    (inRoom ? World.habRoomLampMats : World.habLampMats).push(...ownMaterials(o));
+  });
 
   // farm plots (6 base; greenhouses add more)
   for (let i = 0; i < 6; i++) {
@@ -181,6 +205,11 @@ export function updateDoors(dt) {
   if (World.habFurnishings) World.habFurnishings.visible = showRoom;
   // sealed in: inside the room with every door shut, so nothing outside can be seen
   World.sealedInside = S.mode === 'walk' && dist < HAB_R - 0.3 && World.doors.every((d) => d.k < 0.01);
+  if (World.sealedInside !== World.roomCasts) {
+    World.roomCasts = World.sealedInside;
+    for (const part of [World.habInterior, World.habFurnishings]) if (part) part.traverse((o) => { if (o.isMesh && !o.material.transparent && !(o.userData.neverCasts)) o.castShadow = World.roomCasts; });
+    if (World.habShell) for (const o of World.habShell) o.castShadow = !World.roomCasts;
+  }
   for (const d of World.doors) {
     const dz = local.z - (d.outer ? 11.6 : HAB_R);
     const near = Math.abs(local.x) < 2.6 && Math.abs(dz) < 3.4 && S.mode === 'walk';
@@ -343,6 +372,8 @@ export function addSupplyPod(g, loot, label) {
   const pod = { group: g, kind: 'pod', taken: false, loot, label, cols: m.cols, lid: m.part('lid'),
     strobe: ownMaterials(m.part('strobe'), /^light_/) };
   World.pods.push(pod);
+  pod.pulse = 0;
+  addLamp(m.part('strobe') || g, { color: 0xffb04a, power: 10, range: 14, level: () => (pod.taken ? 0 : (0.25 + 0.75 * (World.dark || 0)) * pod.pulse) });
   return pod;
 }
 
@@ -361,11 +392,17 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     addSiteModel(g, 'solar_kit');
   } else if (kind === 'greenhouse') {
     g.position.addScaledVector(g.userData.up, -GREENHOUSE.floor);       // the deck is the ground you walk on
-    addSiteModel(g, 'greenhouse');
+    const gm = addSiteModel(g, 'greenhouse');
+    // its lights: white from the apex, pink from the grow strips; they carry the dome at night
+    const lit = () => 0.3 + 0.7 * (World.dark || 0);
+    addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 13, level: lit });
+    addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 8, range: 9, level: lit });
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
   } else if (kind === 'beacon') {
     const m = addSiteModel(g, 'beacon');
     b.lamp = ownMaterials(m.part('lamp'), /^light_/);
+    b.pulse = 0;
+    addLamp(m.part('light') || m.part('lamp') || g, { color: 0x8fc4ff, power: 9, range: 16, level: () => (World.dark || 0) * b.pulse });
   } else if (kind === 'cache') {
     const m = addSiteModel(g, 'o2_cache');
     b.tanks = [0, 1, 2].map((i) => m.part('tank_' + i));

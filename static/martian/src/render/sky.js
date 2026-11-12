@@ -24,6 +24,11 @@ const GLSL_SKY = /* glsl */`
   const float PI = 3.14159265;
 
   float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+  float vnoise(vec3 p) {
+    vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hash13(i), hash13(i + vec3(1, 0, 0)), f.x), mix(hash13(i + vec3(0, 1, 0)), hash13(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(hash13(i + vec3(0, 0, 1)), hash13(i + vec3(1, 0, 1)), f.x), mix(hash13(i + vec3(0, 1, 1)), hash13(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  }
 
   // colour of the sky in direction v (unit, world). Linear, scene-referred.
   vec3 skyColor(vec3 v, out float space) {
@@ -34,9 +39,12 @@ const GLSL_SKY = /* glsl */`
     float low = 1.0 - smoothstep(0.0, 0.45, sunE);           // 1 at the horizon, 0 high sun
     // base dome: zenith to horizon
     float h = pow(1.0 - clamp(mu, 0.0, 1.0), 3.0);
-    vec3 zen = mix(vec3(0.270, 0.180, 0.115), vec3(0.150, 0.130, 0.125), low);
-    vec3 hor = mix(vec3(0.800, 0.540, 0.330), vec3(0.40, 0.30, 0.25), low);
-    vec3 col = mix(zen, hor, h) * (0.90 * day);
+    vec3 zen = mix(vec3(0.290, 0.172, 0.088), vec3(0.135, 0.115, 0.105), low);
+    vec3 hor = mix(vec3(0.760, 0.470, 0.235), vec3(0.34, 0.25, 0.20), low);
+    vec3 col = mix(zen, hor, h);
+    // the dust is not even: slow broad bands of thicker and thinner haze
+    float band = vnoise(v * vec3(2.2, 7.0, 2.2) + vec3(uTime * 0.004, 0.0, uTime * 0.002)) - 0.5;
+    col *= (1.0 + band * 0.16 * (1.0 - uDust)) * (0.90 * day);
     // night: the faint cool light of a dusty sky under the stars, a little brighter at the horizon
     col += mix(vec3(0.0110, 0.0140, 0.0235), vec3(0.0260, 0.0290, 0.0400), h) * (1.0 - day);
     // dust aureole around the sun: warm white by day, blue when the sun is low
@@ -46,7 +54,10 @@ const GLSL_SKY = /* glsl */`
     vec3 aur = mix(vec3(1.0, 0.86, 0.66), vec3(0.34, 0.52, 0.92), smoothstep(0.30, 0.02, sunE));
     float sunUp = smoothstep(-0.10, 0.04, sunE);
     // near the horizon the sun shines through far more dust: the glow shrinks and dims with it
-    col += aur * (hg * mix(0.30, 0.085, low) + wide * mix(0.16, 0.10, low)) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    col += aur * (hg * mix(0.36, 0.045, sqrt(low)) + wide * mix(0.20, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    // ... and what is left of it close to a low sun is blue: fine dust scatters blue light forward
+    float ang0 = acos(clamp(cosT, -1.0, 1.0));
+    col += vec3(0.20, 0.40, 0.95) * exp(-ang0 * 6.5) * 0.55 * smoothstep(0.38, 0.04, sunE) * smoothstep(-0.10, 0.02, sunE);
     // twilight glow hugging the horizon on the sun's side after sunset
     float tw = smoothstep(-0.34, -0.02, sunE) * (1.0 - sunUp);
     col += vec3(0.20, 0.25, 0.42) * tw * pow(max(cosT * 0.5 + 0.5, 0.0), 3.0) * (0.25 + h) * 0.55;
@@ -80,9 +91,9 @@ const GLSL_SKY = /* glsl */`
       if (rnd > (layer == 0 ? 0.965 : 0.985)) {
         vec3 c = ip + (vec3(hash13(ip + 3.1), hash13(ip + 7.7), hash13(ip + 11.3)) - 0.5) * 0.7;
         float d = length(p - normalize(c) * length(p));
-        float mag = pow(hash13(ip + 23.0), layer == 0 ? 7.0 : 2.5);
+        float mag = pow(hash13(ip + 23.0), layer == 0 ? 9.0 : 4.0);
         float tw = 0.85 + 0.15 * sin(uTime * (2.0 + rnd * 5.0) + rnd * 60.0);
-        float s = exp(-d * d * (layer == 0 ? 220.0 : 90.0)) * (0.35 + 5.0 * mag) * tw;
+        float s = exp(-d * d * (layer == 0 ? 420.0 : 210.0)) * (0.22 + 7.0 * mag) * tw;
         vec3 tint = mix(vec3(1.0, 0.86, 0.72), vec3(0.75, 0.86, 1.0), hash13(ip + 41.0));
         acc += tint * s;
       }
@@ -125,16 +136,19 @@ export class Sky {
           float night = 1.0 - smoothstep(-0.20, 0.06, sunE);
           // stars need darkness: night, or real height above the dust (not a mountain top by day)
           float airless = smoothstep(0.80, 0.98, space);
-          float starVis = max(night, airless) * (1.0 - uDust) * smoothstep(-0.06, 0.12, dot(v, uUp) + airless);
+          // ... and they drown in the dust toward the horizon and in the glow of the set sun
+          float starVis = max(night, airless) * (1.0 - uDust) * smoothstep(0.0, 0.38, dot(v, uUp) + airless)
+            * (1.0 - 0.8 * smoothstep(-0.34, -0.04, sunE) * (1.0 - airless) * pow(max(dot(v, uSun) * 0.5 + 0.5, 0.0), 2.0));
           col += stars(v, starVis) * 0.9;
           // the sun: a small hard disc (0.35 degrees across on Mars) with a tight halo
           float cosT = dot(v, uSun);
           float ang = acos(clamp(cosT, -1.0, 1.0));
-          float disc = smoothstep(0.0046, 0.0030, ang);
-          float halo = exp(-ang * 60.0) * 0.6 + exp(-ang * 14.0) * 0.08;
+          float disc = smoothstep(0.0052, 0.0036, ang);
+          float halo = exp(-ang * 70.0) * 0.5 + exp(-ang * 16.0) * 0.06;
+          float lowDim = mix(1.0, 0.16, smoothstep(0.40, 0.02, sunE));        // through a long path of dust the sun is a pale disc
           float through = (1.0 - uDust * 0.93) * smoothstep(-0.03, 0.03, sunE);
           vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
-          col += sunCol * (disc * 90.0 * uSunDisc + halo * mix(6.0, 2.5, smoothstep(0.45, 0.0, sunE)) * uSunDisc) * through;
+          col += sunCol * (disc * 70.0 * lowDim * uSunDisc + halo * 5.0 * lowDim * uSunDisc) * through;
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -174,13 +188,13 @@ export class Sky {
     this.sunE = sunE;
     // direct sunlight: fades through the dust near the horizon; slightly blue-white when low
     const through = smoothstep(-0.04, 0.16, sunE);
-    this.sunIntensity = 3.3 * through * (1 - dust * 0.86);
+    this.sunIntensity = 3.3 * through * (1 + 1.2 * low * low) * (1 - dust * 0.86);
     this.sunColor.setRGB(lerp(0.80, 1.0, 1 - low * 0.6), lerp(0.80, 0.93, 1 - low), lerp(0.86, 0.80, 1 - low));
     // sky light: the dome's average colour above, the lit ground's bounce below
     const k = 0.90 * day, nk = 1 - day;
-    this.ambientSky.setRGB(lerp(0.54, 0.28, low) * k + 0.019 * nk, lerp(0.36, 0.22, low) * k + 0.022 * nk, lerp(0.22, 0.19, low) * k + 0.032 * nk);
+    this.ambientSky.setRGB(lerp(0.52, 0.24, low) * k + 0.019 * nk, lerp(0.32, 0.18, low) * k + 0.022 * nk, lerp(0.16, 0.15, low) * k + 0.032 * nk);
     this.ambientGround.setRGB(0.30 * k * (0.3 + 0.7 * through), 0.15 * k * (0.3 + 0.7 * through), 0.08 * k * (0.3 + 0.7 * through));
-    this.fogColor.setRGB(lerp(0.80, 0.40, low) * k + 0.026 * nk, lerp(0.54, 0.30, low) * k + 0.029 * nk, lerp(0.33, 0.25, low) * k + 0.040 * nk);
+    this.fogColor.setRGB(lerp(0.76, 0.34, low) * k + 0.026 * nk, lerp(0.47, 0.25, low) * k + 0.029 * nk, lerp(0.235, 0.20, low) * k + 0.040 * nk);
     if (dust > 0) {
       _c.setRGB(0.50 * (0.03 + 0.63 * day), 0.30 * (0.03 + 0.63 * day), 0.16 * (0.03 + 0.63 * day));
       this.fogColor.lerp(_c, dust * 0.88);

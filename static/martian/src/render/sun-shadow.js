@@ -11,7 +11,7 @@ import { Vector3, Matrix4 } from 'three';
 import { SunLightShadow } from 'three/addons/lights/SunLightShadow.js';
 
 const FADE = 0.12;               // part of each cascade's depth that blends into the next
-const _orient = new Matrix4(), _toLight = new Matrix4();
+const _orient = new Matrix4(), _toLight = new Matrix4(), _inv = new Matrix4();
 const _dir = new Vector3(), _up = new Vector3(), _c = new Vector3();
 const _near = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
 const _far = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
@@ -23,6 +23,9 @@ export class SunShadow extends SunLightShadow {
     super();
     /** View depth (m) where the first cascade hands over to the second. */
     this.split = 14;
+    /** A world point the light starts from, or null for open sky: indoors the shadow volume begins
+     *  under the ceiling, so the room's own roof does not shade everything in it. */
+    this.roof = null;
   }
 
   updateMatrices(light, viewCamera) {
@@ -51,6 +54,7 @@ export class SunShadow extends SunLightShadow {
       maxZ = Math.max(maxZ, a.z, b.z);
     }
     maxZ += camFar;                                   // casters up to one shadow distance toward the sun still count
+    if (this.roof) maxZ = _c.copy(this.roof).applyMatrix4(_inv.copy(_orient).transpose()).z;
     const shadowNear = this.camera.near;
     for (let i = 0; i < n; i++) {
       const from = i === 0 ? splits[0] : this._cascadeData[i - 1].z;        // overlap the previous cascade's fade band

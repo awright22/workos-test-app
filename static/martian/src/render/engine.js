@@ -121,7 +121,7 @@ export class Engine {
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
     if (this.q.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.22, 0.55, 1.15);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.17, 0.32, 1.35);
       this.composer.addPass(this.bloom);
     }
     this.final = new FinalPass();
@@ -174,23 +174,38 @@ export class Engine {
     sky.update(this.sunDir, cam.position, p.dust || 0, this.time);
     // the sun; at night a faint cool key from the same direction mirrored keeps shapes readable
     const night = sky.sunIntensity < 0.02;
-    this.sun.color.copy(sky.sunColor);
-    this.sun.intensity = p.sealed ? 0 : Math.max(sky.sunIntensity, 0.0);
     _u.copy(p.focus || cam.position).normalize();
-    // the light shines from its position toward the origin; with no sun there is nothing to cast
-    this.sun.position.copy(this.sunDir);
+    const sh = this.sun.shadow;
+    if (p.sealed) {
+      // sealed in the Hab: the shadowed light becomes the room's ceiling light, straight down from
+      // under the roof, so people and furniture stand on the floor instead of floating over it
+      this.sun.color.setRGB(1.0, 0.93, 0.82);
+      this.sun.intensity = p.power === false ? 0.06 : 1.25;
+      this.sun.position.copy(_u);
+      sh.roof = p.roof || null; sh.radius = 3.0; sh.autoUpdate = true;
+    } else {
+      this.sun.color.copy(sky.sunColor);
+      this.sun.intensity = Math.max(sky.sunIntensity, 0.0);
+      // the light shines from its position toward the origin; with no sun there is nothing to cast
+      this.sun.position.copy(this.sunDir);
+      sh.roof = null; sh.radius = 1.6; sh.autoUpdate = !night;
+    }
     this.sun.updateMatrixWorld();
-    this.sun.shadow.autoUpdate = !(night || p.sealed);
     // indoors the sky cannot reach: the room is lit by its own lamps
     this.indoor = lerp(this.indoor || 0, p.inside ? 1 : 0, damp(0.35, p.dt || 0.016));
     const pw = p.power === false ? 0.08 : 1;
-    this.hemi.color.setRGB(0.50 * pw, 0.46 * pw, 0.40 * pw);
-    this.hemi.groundColor.setRGB(0.26 * pw, 0.24 * pw, 0.21 * pw);
-    this.hemi.intensity = this.indoor;
+    // one soft fill light: the room's bounce indoors; outdoors, starlight and the after-glow, so
+    // the ground keeps its shape at night instead of going black
+    const dusk = 1 - sky.day, glow = smoothstep(-0.34, -0.02, sky.sunE) * dusk;
+    const nr = 0.115 + 0.10 * glow, ng = 0.14 + 0.13 * glow, nb = 0.215 + 0.22 * glow;
+    const io = this.indoor;
+    this.hemi.color.setRGB(lerp(nr, 0.50 * pw, io), lerp(ng, 0.46 * pw, io), lerp(nb, 0.40 * pw, io));
+    this.hemi.groundColor.setRGB(lerp(0.02, 0.26 * pw, io), lerp(0.02, 0.24 * pw, io), lerp(0.03, 0.21 * pw, io));
+    this.hemi.intensity = lerp(dusk * 1.6, 1, io);
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
     this._updateEnvironment(p.dt || 0.016, p.dust || 0);
-    this.scene.environmentIntensity = lerp(1.2, 0.12, this.indoor);
+    this.scene.environmentIntensity = lerp(1.05, 0.12, this.indoor);
     // fog: aerial perspective that matches the horizon; thins out with altitude
     const fog = this.scene.fog;
     fog.color.copy(sky.fogColor);
@@ -204,7 +219,7 @@ export class Engine {
     const lowSun = 1 - smoothstep(0.03, 0.55, sky.sunE);
     const facing = Math.max(0, _v.set(0, 0, -1).applyQuaternion(cam.quaternion).dot(this.sunDir));
     const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
-    const dayExposure = lerp(1.08, 0.92, smoothstep(0.62, 1.0, sky.sunE)) * (1 + 0.55 * lowSun * (1 - 0.9 * intoSun));
+    const dayExposure = lerp(1.0, 0.88, smoothstep(0.62, 1.0, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun));
     const target = (p.inside ? 0.95 : lerp(2.3 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
     this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
     if (this.snapLight > 0) this.snapLight--;

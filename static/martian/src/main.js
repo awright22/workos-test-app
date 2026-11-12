@@ -19,6 +19,7 @@ import { devils, spawnDevil, updateDevils } from './game/devils.js';
 import { MACHINES, dawnFaults, service, serviceCost, wearMachines, wearRover } from './game/machines.js';
 import { machineEff } from './game/state.js';
 import { initDiag } from './ui/diag.js';
+import { LampPool } from './world/lamps.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
@@ -65,6 +66,7 @@ async function boot() {
     shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
+  ctx.lamps = new LampPool(engine.scene, engine.q.scale < 0.7 ? 3 : 5);
   ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 18 : 36 });
   initEffects();
   const mapImg = new Image();
@@ -108,6 +110,7 @@ function titleCamera(dt) {
   camLookAt(_v3.set(0, 0, 0), _v2.set(0, 1, 0));
 }
 
+const _roof = new THREE.Vector3();
 let photoCam = null;                 // a free camera for pictures, set through the debug hook
 function draw(dt, focus) {
   const e = ctx.engine;
@@ -118,9 +121,11 @@ function draw(dt, focus) {
   updateSites(e.camera.position);
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;
-  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
+  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus,
+    roof: sealed ? _roof.copy(World.hab.position).addScaledVector(World.hab.userData.up, 2.8) : null });
   ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
+  ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();
@@ -152,11 +157,18 @@ function tick(dt) {
     updateDevils(dt);
   }
   blinkT += dt;
+  // how dark it is where the camera is: lamps come on with it (a storm counts as dusk)
+  World.dark = Math.max(1 - clamp(ctx.engine.sky.day * 2.5, 0, 1), S.started && S.storm.i > 0.55 ? 0.5 : 0);
   if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
   if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
-  const strobe = Math.sin(blinkT * 6) > 0.7 ? 1.8 : 0.03;
-  for (const p of World.pods) if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe);
-  for (const b of World.builtMeshes) if (b.lamp && b.group.visible) setGlow(b.lamp, 0.25 + 1.5 * Math.max(0, Math.sin(blinkT * 2.2)) ** 6);
+  if (World.habLampMats) setGlow(World.habLampMats, S.power > 0.5 ? 0.04 + 0.96 * World.dark : 0.02);
+  const strobe = Math.sin(blinkT * 6) > 0.7 ? 1 : 0;
+  for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }
+  for (const b of World.builtMeshes) {
+    if (!b.lamp) continue;
+    b.pulse = Math.max(0, Math.sin(blinkT * 2.2)) ** 6;
+    if (b.group.visible) setGlow(b.lamp, 0.25 + 1.5 * b.pulse);
+  }
   if (World.padLampMats) setGlow(World.padLampMats, S.pf.loaded && !S.pf.connected ? 0.55 + 0.45 * Math.sin(blinkT * 4) : 0.2);
   updateDoors(dt);
   updateSunDir();
