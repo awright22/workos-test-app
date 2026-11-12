@@ -12,7 +12,7 @@ import { FEATURES } from '../planet/features.js';
 import { R } from '../planet/constants.js';
 import { closeScreens } from '../ui/screens.js';
 import { surfaceAt } from '../planet/surface.js';
-import { buildModel, hasModel, model } from '../world/models.js';
+import { model } from '../world/models.js';
 import { ctx } from './ctx.js';
 import { clamp, smoothstep } from '../core/math.js';
 import { tryReload } from './flow.js';
@@ -200,8 +200,8 @@ export function startLaunch() {
   }
   [3, 2, 1].forEach((n, i) => setTimeout(() => { Snd.beep(700 + n * 60, 0.18, 'square', 0.15); log(`${n}...`, 'nasa'); }, 2000 + i * 1000));
   if (!hermes) {
-    if (hasModel('hermes')) { const h = model('hermes'); hermes = h.root; World.hermesRing = h.part('ring'); hermes.scale.setScalar(30); }
-    else hermes = buildModel('hermes', 1.4);
+    const h = model('hermes');
+    hermes = h.root; World.hermesRing = h.part('ring'); hermes.scale.setScalar(30);
     ctx.world.add(hermes);
   }
   hermes.position.copy(mavUp).multiplyScalar(R * 1.85).addScaledVector(_pe, R * 0.8);

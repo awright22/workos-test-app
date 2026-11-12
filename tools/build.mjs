@@ -48,7 +48,7 @@ const configs = [
 // Files that make up the running game, relative to static/martian. Everything here is
 // precached by the service worker and copied to gh-pages by tools/publish.mjs.
 export async function shippedFiles() {
-  const out = ['index.html', 'game.js', 'terrain-worker.js', 'game.css', 'manifest.webmanifest'];
+  const out = ['index.html', 'game.js', 'terrain-worker.js', 'game.css', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
   async function walk(dir) {
     let entries = [];
     try { entries = await readdir(path.join(game, dir), { withFileTypes: true }); } catch { return; }

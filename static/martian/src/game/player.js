@@ -13,7 +13,7 @@ import { angDist, frameQuat, groundDist } from '../planet/geo.js';
 import { X_AXIS, Y_AXIS, _du, _q1, _q2, _v1, _v2, _v3 } from '../core/scratch.js';
 import { surfaceAt, groundSlope } from '../planet/surface.js';
 import { R } from '../planet/constants.js';
-import { DOOR_HALF, HAB_R, World, colliders, siteLocalToWorld, siteWorldToLocal } from '../world/build.js';
+import { DOOR_HALF, GREENHOUSE, HAB_R, World, colliders, siteLocalToWorld, siteWorldToLocal } from '../world/build.js';
 import { BAL, S } from './state.js';
 import { rockColliders } from '../world/rocks.js';
 import { model } from '../world/models.js';
@@ -74,6 +74,40 @@ export function frameYaw(q, dYaw) { q.multiply(_q2.setFromAxisAngle(Y_AXIS, dYaw
 /** Airlock side walls, in Hab-local (x, z): the passage is 2.2 m wide out to z = 11.6. */
 const AIRLOCK_HALF = 1.1, AIRLOCK_END = 11.75, AIRLOCK_OUTER_HALF = 2.4;
 
+/**
+ * Keep a walker out of a round wall except through its doorway (at the building's local +Z)
+ * and the passage beyond it. Expects the walker's up vector in _v1 and leaves the new one there.
+ * @param wallR radius of the wall line   @param wallHalf how far the walker's centre stays from it
+ * @param doorAngle half-angle of the opening   @param passHalf clear half-width of the passage
+ * @param passOuter outer half-width of the passage's walls   @param passEnd how far out it reaches
+ */
+function ringWall(q, group, radius, wallR, wallHalf, doorAngle, passHalf, passOuter, passEnd) {
+  siteWorldToLocal(group, _v2.copy(_v1).multiplyScalar(surfaceAt(_v1)), _v3);
+  const hd = Math.hypot(_v3.x, _v3.z);
+  if (hd > passEnd + 6 || Math.abs(_v3.y) > 6) return false;
+  let x = _v3.x, z = _v3.z, hit = false;
+  const inDoor = Math.abs(Math.atan2(x, z)) <= doorAngle || (Math.abs(x) < passHalf && z > 0);
+  if (Math.abs(hd - wallR) < wallHalf && hd > 0.001 && !inDoor) {
+    const target = hd < wallR ? wallR - wallHalf : wallR + wallHalf;
+    x = x / hd * target; z = z / hd * target; hit = true;
+  }
+  // the passage: keep a walker inside it once in it, and outside its walls otherwise
+  if (z > wallR - 0.3 && z < passEnd + radius && Math.abs(x) < passOuter + radius) {
+    const lim = passHalf - radius * 0.6;
+    if (Math.abs(x) <= passHalf + 0.25 && z < passEnd) {
+      if (Math.abs(x) > lim) { x = Math.sign(x) * lim; hit = true; }          // inside: slide along the walls
+    } else if (z < passEnd) {
+      x = Math.sign(x) * (passOuter + radius); hit = true;                    // outside: stay off the box
+    }
+  }
+  if (!hit) return false;
+  siteLocalToWorld(group, x, _v3.y, z, _v2);
+  _v2.normalize();
+  _q1.setFromUnitVectors(_v1, _v2);
+  q.premultiply(_q1);
+  _v1.set(0, 1, 0).applyQuaternion(q);
+  return true;
+}
 export function collideUnit(q, radius) {
   _v1.set(0, 1, 0).applyQuaternion(q);              // current up
   let moved = false;
@@ -97,35 +131,12 @@ export function collideUnit(q, radius) {
     test(c.v, c.r);
   }
   for (const c of rockColliders) test(c.v, c.r);
-  // the Hab: a wall ring with a door gap, and the airlock passage beyond it
-  if (World.hab) {
-    siteWorldToLocal(World.hab, _v2.copy(_v1).multiplyScalar(surfaceAt(_v1)), _v3);
-    const hd = Math.hypot(_v3.x, _v3.z);
-    if (hd < 16 && Math.abs(_v3.y) < 6) {
-      let x = _v3.x, z = _v3.z, hit = false;
-      const wallHalf = 0.5 + radius * 0.5;
-      const inDoor = Math.abs(Math.atan2(x, z)) <= DOOR_HALF + 0.02 || (Math.abs(x) < AIRLOCK_HALF && z > 0);
-      if (Math.abs(hd - HAB_R) < wallHalf && hd > 0.001 && !inDoor) {
-        const target = hd < HAB_R ? HAB_R - wallHalf : HAB_R + wallHalf;
-        x = x / hd * target; z = z / hd * target; hit = true;
-      }
-      // airlock: keep a walker inside the passage once in it, and outside the box otherwise
-      if (z > HAB_R - 0.3 && z < AIRLOCK_END + radius && Math.abs(x) < AIRLOCK_OUTER_HALF + radius) {
-        const lim = AIRLOCK_HALF - radius * 0.6;
-        if (Math.abs(x) <= AIRLOCK_HALF + 0.25 && z < AIRLOCK_END) {
-          if (Math.abs(x) > lim) { x = Math.sign(x) * lim; hit = true; }       // inside: slide along the walls
-        } else if (z < AIRLOCK_END) {
-          x = Math.sign(x) * (AIRLOCK_OUTER_HALF + radius); hit = true;        // outside: stay off the box
-        }
-      }
-      if (hit) {
-        siteLocalToWorld(World.hab, x, _v3.y, z, _v2);
-        _v2.normalize();
-        _q1.setFromUnitVectors(_v1, _v2);
-        q.premultiply(_q1);
-        moved = true;
-      }
-    }
+  // round buildings: the Hab with its airlock, and any greenhouse dome the player has put up
+  if (World.hab && ringWall(q, World.hab, radius, HAB_R, 0.5 + radius * 0.5, DOOR_HALF + 0.02, AIRLOCK_HALF, AIRLOCK_OUTER_HALF, AIRLOCK_END)) moved = true;
+  for (const b of World.builtMeshes) {
+    if (b.kind !== 'greenhouse') continue;
+    if (ringWall(q, b.group, radius, GREENHOUSE.wall, 0.1 + radius * 0.75, Math.asin(GREENHOUSE.doorHalf / GREENHOUSE.wall),
+      GREENHOUSE.doorHalf, GREENHOUSE.portalOuter, GREENHOUSE.portalEnd)) moved = true;
   }
   return moved;
 }

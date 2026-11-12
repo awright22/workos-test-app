@@ -1,10 +1,9 @@
 import { S, suitCap } from './state.js';
-import { World, buildDeployable, placeAt } from '../world/build.js';
+import { World, addSupplyPod, buildDeployable, placeAt } from '../world/build.js';
 import { llToVec, vecToLl } from '../planet/geo.js';
 import { _v1 } from '../core/scratch.js';
 import { player, syncPlayerPos } from './player.js';
 import { roverF, syncRoverVisual } from './rover.js';
-import { buildModel } from '../world/models.js';
 import { Snd } from '../audio/sound.js';
 import { UI, hideOverlay, log } from '../ui/dom.js';
 import { syncAllVisuals } from './visuals.js';
@@ -30,7 +29,7 @@ export function serializeState() {
       ll: vecToLl(_v1.copy(p.group.position).normalize()) })),
     ice: World.iceSites.map(s => s.left),
     rtgTaken: World.rtgSite ? World.rtgSite.taken : false,
-    built: World.builtMeshes.map(b => ({ kind: b.kind, charges: b.charges,
+    built: World.builtMeshes.map(b => ({ kind: b.kind, charges: b.charges, yaw: b.yaw || 0,
       ll: vecToLl(_v1.copy(b.group.position).normalize()) })),
     playerQ: player.q.toArray(), roverQ: roverF.q.toArray(),
   };
@@ -51,7 +50,7 @@ export function applyState(d) {
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore
   for (let i = World.builtMeshes.length; i < (d.built || []).length; i++) {
     const b = d.built[i];
-    const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon));
+    const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon), b.yaw || 0);
     bb.charges = b.charges;
   }
   d.plots.forEach((cp, i) => { if (World.plots[i]) Object.assign(World.plots[i], cp); });
@@ -60,11 +59,8 @@ export function applyState(d) {
   // rebuild dynamically dropped pods missing from the world (load path)
   for (let i = World.pods.length; i < (d.podLoot || []).length; i++) {
     const pd = d.podLoot[i];
-    const g = placeAt(pd.ll.lat, pd.ll.lon, 0);
-    g.add(buildModel('supplyPod'));
-    const pod = { group: g, kind: 'pod', taken: false, loot: pd.loot, label: pd.label };
+    const pod = addSupplyPod(placeAt(pd.ll.lat, pd.ll.lon, i * 2.1), pd.loot, pd.label);
     if (pd.blueprint) pod.blueprint = pd.blueprint;
-    World.pods.push(pod);
   }
   d.pods.forEach((v, i) => { if (World.pods[i]) World.pods[i].taken = v; });
   d.ice.forEach((v, i) => { if (World.iceSites[i]) World.iceSites[i].left = v; });

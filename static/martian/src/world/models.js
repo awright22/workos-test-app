@@ -1,7 +1,6 @@
 /*
- * 3D models. The real ones are .glb files built by tools/assets (see tools/assets/SPEC.md);
- * a few props that have not been rebuilt yet still come from the first version's baked
- * triangle data (legacyModel), and are replaced as their .glb arrives.
+ * 3D models: .glb files built by tools/assets (see tools/assets/SPEC.md), loaded once and
+ * instanced. Plain surfaces of a model are folded into one mesh per moving part.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -9,7 +8,6 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { asset } from '../planet/load.js';
-import { MODELS_DATA } from './legacy-models.js';
 
 const loaded = new Map();           // name -> { scene, animations, skinned }
 const EMISSIVE = /^(light_|screen|flame|window_glow)/;
@@ -95,10 +93,40 @@ function mergeStatic(scene) {
   }
 }
 
+/** The same folding for a skinned model: its plain surfaces become one skinned mesh. */
+function mergeSkinned(scene) {
+  const all = [];
+  scene.traverse((o) => { if (o.isSkinnedMesh && !Array.isArray(o.material)) all.push(o); });
+  const plainOnes = all.filter((o) => !(SPECIAL.test(o.material.name || '') || o.material.transparent || o.material.map));
+  if (plainOnes.length < 2) return;
+  const first = plainOnes[0];
+  if (!plainOnes.every((o) => o.parent === first.parent && o.skeleton.bones.length === first.skeleton.bones.length)) return;
+  const geos = plainOnes.map((o) => {
+    const g = floatGeometry(o.geometry, o.material.color, o.material.roughness, o.material.metalness);
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+    const idx = new Uint16Array(si.count * 4), wgt = new Float32Array(si.count * 4);
+    for (let i = 0; i < si.count; i++) {
+      idx[i * 4] = si.getX(i); idx[i * 4 + 1] = si.getY(i); idx[i * 4 + 2] = si.getZ(i); idx[i * 4 + 3] = si.getW(i);
+      wgt[i * 4] = sw.getX(i); wgt[i * 4 + 1] = sw.getY(i); wgt[i * 4 + 2] = sw.getZ(i); wgt[i * 4 + 3] = sw.getW(i);
+    }
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(idx, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(wgt, 4));
+    return g;
+  });
+  const merged = mergeGeometries(geos, false);
+  if (!merged) return;
+  const mesh = new THREE.SkinnedMesh(merged, plainMaterial());
+  mesh.name = 'body';
+  mesh.frustumCulled = false;
+  first.parent.add(mesh);
+  mesh.bind(first.skeleton, first.bindMatrix);
+  for (const o of plainOnes) { o.parent.remove(o); o.geometry.dispose(); }
+}
+
 function prepare(gltf) {
   let skinned = false;
   gltf.scene.traverse((o) => { if (o.isSkinnedMesh) skinned = true; });
-  if (!skinned) mergeStatic(gltf.scene);
+  if (skinned) mergeSkinned(gltf.scene); else mergeStatic(gltf.scene);
   const seen = new Set();
   gltf.scene.traverse((o) => {
     if (o.isSkinnedMesh) { skinned = true; o.frustumCulled = false; }
@@ -128,8 +156,8 @@ function prepare(gltf) {
   return { scene: gltf.scene, animations: gltf.animations || [], skinned };
 }
 
-/** Load a set of models before the world is built. Missing files are skipped (returns the
- *  names that loaded), so a model that is still being made simply falls back. */
+/** Load a set of models before the world is built. A model that fails to load fails the
+ *  whole load: the game is not playable with part of the world missing. */
 export async function preloadModels(names, onProgress) {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -137,12 +165,10 @@ export async function preloadModels(names, onProgress) {
   const ok = [];
   await Promise.all(names.map(async (name) => {
     if (!loaded.has(name)) {
-      try {
-        const gltf = await loader.loadAsync(asset(`assets/models/${name}.glb`));
-        loaded.set(name, prepare(gltf));
-      } catch (e) { /* not built yet */ }
+      const gltf = await loader.loadAsync(asset(`assets/models/${name}.glb`));
+      loaded.set(name, prepare(gltf));
     }
-    if (loaded.has(name)) ok.push(name);
+    ok.push(name);
     done++;
     if (onProgress) onProgress(done / names.length);
   }));
@@ -171,14 +197,18 @@ export function model(name, o = {}) {
 }
 
 /** Give a part of an instance its own copies of its materials, so the game can drive it
- *  (blink a lamp, switch a screen on) without changing every other instance. */
-export function ownMaterials(obj) {
+ *  (blink a lamp, switch a screen on) without changing every other instance. `only` limits
+ *  this to materials whose name matches (for example /^light_/). */
+export function ownMaterials(obj, only) {
   const out = [];
   if (!obj) return out;
+  const own = (x) => {
+    if (only && !only.test(x.name || '')) return x;
+    const c = x.clone(); c.userData = { ...x.userData }; out.push(c); return c;
+  };
   obj.traverse((m) => {
     if (!m.isMesh) return;
-    if (Array.isArray(m.material)) m.material = m.material.map((x) => { const c = x.clone(); c.userData = { ...x.userData }; out.push(c); return c; });
-    else { const c = m.material.clone(); c.userData = { ...m.material.userData }; m.material = c; out.push(c); }
+    m.material = Array.isArray(m.material) ? m.material.map(own) : own(m.material);
   });
   return out;
 }
@@ -198,36 +228,3 @@ export function colliderAnchors(inst) {
   });
   return out;
 }
-
-// ------------------------------------------------------------------------------------------
-// First-version models (triangle soup with flat colours)
-// ------------------------------------------------------------------------------------------
-export function legacyModel(name, scale) {
-  const g = new THREE.Group();
-  const byName = {};
-  for (const p of MODELS_DATA[name]) {
-    const geo = new THREE.BufferGeometry();
-    const v = new Float32Array(p.v.length);
-    for (let i = 0; i < p.v.length; i++) v[i] = p.v[i] / 1000;
-    geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.c[0], p.c[1], p.c[2]), roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide });
-    if (p.o !== undefined) { mat.transparent = true; mat.opacity = p.o; mat.depthWrite = false; }
-    if (p.e) { mat.emissive = new THREE.Color(p.e[0], p.e[1], p.e[2]); mat.emissiveIntensity = 2; }
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(p.p[0] / 1000, p.p[1] / 1000, p.p[2] / 1000);
-    m.name = p.n;
-    m.castShadow = p.o === undefined;
-    m.receiveShadow = true;
-    byName[p.n] = m;
-    if (p.par && byName[p.par]) byName[p.par].add(m);
-    else g.add(m);
-  }
-  g.rotation.y = Math.PI;
-  if (scale) g.scale.setScalar(scale);
-  const wrap = new THREE.Group();
-  wrap.add(g);
-  return wrap;
-}
-/** @deprecated name kept for the modules not yet moved to .glb models */
-export const buildModel = legacyModel;

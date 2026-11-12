@@ -69,7 +69,9 @@ async function boot() {
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
 
-  await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
+  await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish',
+    'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'ingenuity', 'zhurong', 'schiaparelli_wreck',
+    'greenhouse', 'solar_kit', 'beacon', 'o2_cache', 'supply_pod', 'rtg', 'debris_a', 'debris_b', 'debris_c', 'regolith_pile', 'ice_outcrop', 'uplink_pad'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
   buildAstronaut();
   initInput();
   updateSunDir();
@@ -144,6 +146,10 @@ function tick(dt) {
   blinkT += dt;
   if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
   if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
+  const strobe = Math.sin(blinkT * 6) > 0.7 ? 1.8 : 0.03;
+  for (const p of World.pods) if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe);
+  for (const b of World.builtMeshes) if (b.lamp && b.group.visible) setGlow(b.lamp, 0.25 + 1.5 * Math.max(0, Math.sin(blinkT * 2.2)) ** 6);
+  if (World.padLampMats) setGlow(World.padLampMats, S.pf.loaded && !S.pf.connected ? 0.55 + 0.45 * Math.sin(blinkT * 4) : 0.2);
   updateDoors(dt);
   updateSunDir();
   updateHud();

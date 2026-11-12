@@ -1,0 +1,2362 @@
+"""
+Stranded II historic landers (Family D in SPEC.md): every spacecraft that soft-landed on Mars (and
+one that did not), at real size, authored headlessly in Blender through tools/assets/lib.py.
+
+Run:   /home/user/blender-venv/bin/python tools/assets/landers.py [pathfinder] [viking] [mars3] ...
+Look:  node tools/assets/preview.mjs pathfinder viking ...
+       TRIS=1 before the command prints the triangle count of every bucket of geometry.
+
+Layout of this file
+  1. helpers: matrix-placed primitives, lathes, sweeps, the Kit (one bmesh per material per part),
+     and the shared kit of spacecraft parts: solar panels of any outline, dishes, wheels, legs,
+     crumpled fabric
+  2. one build_<name>() per model, in the order of SPEC.md
+
+Axes follow SPEC.md: metres, Z up, the FRONT of a model faces -Y, the origin is on the ground
+under the model's centre.
+"""
+import os
+import random
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import lib  # noqa: E402  (imports bpy before bmesh/mathutils)
+from lib import *  # noqa: E402,F401,F403
+
+cos, sin, pi, sqrt = math.cos, math.sin, math.pi, math.sqrt
+
+
+# ==============================================================================================
+# 1. Helpers
+# ==============================================================================================
+def T(x=0.0, y=0.0, z=0.0):
+    return Matrix.Translation((x, y, z))
+
+
+def R(axis, deg):
+    return Matrix.Rotation(rad(deg), 4, axis)
+
+
+def S(x=1.0, y=1.0, z=1.0):
+    return Matrix.Diagonal((x, y, z, 1.0))
+
+
+I4 = Matrix.Identity(4)
+YZX = Matrix(((0, 0, 1, 0), (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1)))    # prism outline (y, z), extruded along x
+AX = {'X': Matrix.Rotation(pi / 2, 4, 'Y'), 'Y': Matrix.Rotation(-pi / 2, 4, 'X'), 'Z': Matrix.Identity(4)}
+
+
+def frame(origin, z_axis, x_hint=(1, 0, 0)):
+    """A matrix whose local +Z points along `z_axis` and whose origin is `origin`."""
+    z = Vector(z_axis).normalized()
+    x = Vector(x_hint)
+    x = x - z * x.dot(z)
+    if x.length < 1e-6:
+        x = z.orthogonal()
+    x.normalize()
+    y = z.cross(x)
+    m = Matrix((x, y, z)).transposed().to_4x4()
+    m.translation = Vector(origin)
+    return m
+
+
+def polar(r, deg, z=0.0):
+    return (r * cos(rad(deg)), r * sin(rad(deg)), z)
+
+
+def lerp(a, b, t):
+    return tuple(a[i] + (b[i] - a[i]) * t for i in range(len(a)))
+
+
+def _mk(bm, pts, M=None):
+    if M is None:
+        return [bm.verts.new(p) for p in pts]
+    return [bm.verts.new(M @ Vector(p)) for p in pts]
+
+
+def moved(bm, verts, M):
+    bmesh.ops.transform(bm, matrix=M, verts=verts)
+    return verts
+
+
+def box(bm, size, loc=(0, 0, 0), M=None):
+    """Axis-aligned box in the local frame of M."""
+    sx, sy, sz = size[0] / 2, size[1] / 2, size[2] / 2
+    x, y, z = loc
+    v = _mk(bm, [(x - sx, y - sy, z - sz), (x + sx, y - sy, z - sz), (x + sx, y + sy, z - sz), (x - sx, y + sy, z - sz),
+                 (x - sx, y - sy, z + sz), (x + sx, y - sy, z + sz), (x + sx, y + sy, z + sz), (x - sx, y + sy, z + sz)], M)
+    for q in ((3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
+        bm.faces.new([v[i] for i in q])
+    return v
+
+
+def taper_box(bm, bottom, top, z0, z1, loc=(0, 0), top_off=(0, 0), M=None):
+    """A box whose top rectangle differs from its bottom rectangle (a frustum / wedge)."""
+    bx, by = bottom[0] / 2, bottom[1] / 2
+    tx, ty = top[0] / 2, top[1] / 2
+    x, y = loc
+    ox, oy = top_off
+    v = _mk(bm, [(x - bx, y - by, z0), (x + bx, y - by, z0), (x + bx, y + by, z0), (x - bx, y + by, z0),
+                 (x + ox - tx, y + oy - ty, z1), (x + ox + tx, y + oy - ty, z1), (x + ox + tx, y + oy + ty, z1),
+                 (x + ox - tx, y + oy + ty, z1)], M)
+    for q in ((3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
+        bm.faces.new([v[i] for i in q])
+    return v
+
+
+def circ(r, n, phase=0.0, ry=None):
+    ry = r if ry is None else ry
+    return [(r * cos(phase + TAU * i / n), ry * sin(phase + TAU * i / n)) for i in range(n)]
+
+
+def ngon(r, n, phase_deg=0.0):
+    return [(r * cos(rad(phase_deg) + TAU * i / n), r * sin(rad(phase_deg) + TAU * i / n)) for i in range(n)]
+
+
+def rrect(w, h, r, n=3):
+    """Rounded-rectangle outline, counter-clockwise."""
+    r = min(r, w / 2 - 1e-4, h / 2 - 1e-4)
+    pts = []
+    for cx, cy, a0 in ((w / 2 - r, h / 2 - r, 0), (-w / 2 + r, h / 2 - r, 90), (-w / 2 + r, -h / 2 + r, 180),
+                       (w / 2 - r, -h / 2 + r, 270)):
+        for i in range(n + 1):
+            a = rad(a0 + 90 * i / n)
+            pts.append((cx + r * cos(a), cy + r * sin(a)))
+    return pts
+
+
+def chamf(w, h, c):
+    """Chamfered-rectangle section (8 points, counter-clockwise), w across, h up."""
+    a, b = w / 2, h / 2
+    return [(a, -b + c), (a, b - c), (a - c, b), (-a + c, b), (-a, b - c), (-a, -b + c), (-a + c, -b), (a - c, -b)]
+
+
+def prism(bm, outline, depth, M=None, z0=None, cap_bottom=True, cap_top=True):
+    """Extrude a counter-clockwise outline [(x, y)] along local +Z (centred unless z0 is given)."""
+    z0 = -depth / 2 if z0 is None else z0
+    bot = _mk(bm, [(x, y, z0) for x, y in outline], M)
+    top = _mk(bm, [(x, y, z0 + depth) for x, y in outline], M)
+    n = len(outline)
+    if cap_bottom:
+        bm.faces.new(list(reversed(bot)))
+    if cap_top:
+        bm.faces.new(top)
+    for i in range(n):
+        bm.faces.new((bot[i], bot[(i + 1) % n], top[(i + 1) % n], top[i]))
+    return bot + top
+
+
+def cbox(bm, size, loc=(0, 0, 0), M=None, c=0.01):
+    """Box with its four vertical edges chamfered (cheap, and never a razor corner in plan)."""
+    x, y, z = loc
+    w, d, h = size
+    return prism(bm, [(px + x, py + y) for px, py in chamf(w, d, min(c, w * 0.45, d * 0.45))], h, M, z0=z - h / 2)
+
+
+def lathe(bm, profile, seg=24, M=None, arc=TAU, close=False, phase=0.0, caps=False):
+    """Revolve [(radius, height)] about local Z. close=True joins the last point back to the
+    first (a ring section); caps=True closes the two ends of a partial arc of such a section."""
+    full = abs(arc - TAU) < 1e-6
+    n = seg if full else seg + 1
+    prof = list(profile)
+    cols = []
+    poles = {}
+    for i in range(n):
+        a = phase + arc * i / seg
+        col = []
+        for k, (r, h) in enumerate(prof):
+            if r <= 1e-9:
+                if k not in poles:
+                    poles[k] = _mk(bm, [(0, 0, h)], M)[0]
+                col.append(poles[k])
+            else:
+                col.append(_mk(bm, [(r * cos(a), r * sin(a), h)], M)[0])
+        cols.append(col)
+    m = len(prof)
+    for i in range(seg):
+        a, b = cols[i], cols[(i + 1) % n]
+        for k in range(m if close else m - 1):
+            k2 = (k + 1) % m
+            quad = []
+            for v in (a[k], b[k], b[k2], a[k2]):
+                if v not in quad:
+                    quad.append(v)
+            if len(quad) >= 3:
+                bm.faces.new(quad)
+    if caps and close and not full:
+        bm.faces.new(cols[0])
+        bm.faces.new(list(reversed(cols[-1])))
+    return [v for c in cols for v in c]
+
+
+def disc(bm, r, z0, z1, seg=16, M=None, r2=None):
+    """A capped cylinder (or frustum) standing on local Z from z0 to z1."""
+    return lathe(bm, [(0.0, z0), (r, z0), (r if r2 is None else r2, z1), (0.0, z1)], seg, M)
+
+
+def rod(bm, a, b, r=0.01, seg=6, r2=None, caps=True, M=None):
+    """A straight round strut from a to b."""
+    a, b = Vector(a), Vector(b)
+    L = (b - a).length
+    F = frame(a, b - a)
+    if M is not None:
+        F = M @ F
+    r2 = r if r2 is None else r2
+    prof = ([(0.0, 0.0)] if caps else []) + [(r, 0.0), (r2, L)] + ([(0.0, L)] if caps else [])
+    return lathe(bm, prof, seg, F)
+
+
+def ball(bm, p, r, seg=8, rings=4, M=None, sz=1.0):
+    prof = [(r * sin(pi * i / rings) if 0 < i < rings else 0.0, -r * sz * cos(pi * i / rings)) for i in range(rings + 1)]
+    return lathe(bm, prof, seg, (M or I4) @ T(*p))
+
+
+def dome_profile(r, height, steps=6, z0=0.0, r_in=0.0, up=True):
+    """Points of an elliptical dome from the rim (r, z0) to the pole, as (radius, height)."""
+    out = []
+    for i in range(steps + 1):
+        a = (pi / 2) * i / steps
+        rr = r_in + (r - r_in) * cos(a)
+        out.append((rr if i < steps or r_in > 0 else 0.0, z0 + (height * sin(a) if up else -height * sin(a))))
+    return out
+
+
+def sweep(bm, pts, profile, up=(0, 0, 1), closed=False, caps=True, scales=None, M=None):
+    """Sweep a 2D profile [(u, v)] along a polyline. v points along `up` (made perpendicular to
+    the path), u = direction x up. Corners are mitred."""
+    P = [Vector(p) for p in pts]
+    n = len(P)
+    upv = Vector(up).normalized()
+    rings = []
+    for i, p in enumerate(P):
+        if closed:
+            d_in = (p - P[i - 1]).normalized()
+            d_out = (P[(i + 1) % n] - p).normalized()
+        else:
+            d_in = (p - P[i - 1]).normalized() if i > 0 else None
+            d_out = (P[i + 1] - p).normalized() if i < n - 1 else None
+            d_in = d_in if d_in is not None else d_out
+            d_out = d_out if d_out is not None else d_in
+        t = d_in + d_out
+        t = t.normalized() if t.length > 1e-6 else d_out
+        side = t.cross(upv)
+        if side.length < 1e-5:
+            side = t.orthogonal()
+        side.normalize()
+        vv = side.cross(t).normalized()
+        cosh = max(0.35, t.dot(d_in))
+        bend = d_out - d_in
+        s = scales[i] if scales else 1.0
+        ring = []
+        for (u, v) in profile:
+            off = side * (u * s) + vv * (v * s)
+            if bend.length > 1e-6:
+                b = bend.normalized()
+                off += b * off.dot(b) * (1.0 / cosh - 1.0)
+            ring.append(p + off)
+        rings.append(_mk(bm, ring, M))
+    m = len(profile)
+    for i in range(n if closed else n - 1):
+        a, b = rings[i], rings[(i + 1) % n]
+        for j in range(m):
+            bm.faces.new((a[j], b[j], b[(j + 1) % m], a[(j + 1) % m]))
+    if caps and not closed:
+        bm.faces.new(rings[0])
+        bm.faces.new(list(reversed(rings[-1])))
+    return [v for r in rings for v in r]
+
+
+def fillet(pts, radius, steps=3):
+    """Round the corners of a polyline (quadratic arcs of roughly the given radius)."""
+    P = [Vector(p) for p in pts]
+    out = [P[0]]
+    for i in range(1, len(P) - 1):
+        a, c, b = P[i - 1], P[i], P[i + 1]
+        r = min(radius, (c - a).length * 0.45, (b - c).length * 0.45)
+        p0 = c + (a - c).normalized() * r
+        p1 = c + (b - c).normalized() * r
+        for s in range(steps + 1):
+            t = s / steps
+            out.append(p0 * (1 - t) ** 2 + c * 2 * t * (1 - t) + p1 * t ** 2)
+    out.append(P[-1])
+    return out
+
+
+def tube(bm, pts, r=0.02, seg=6, round_r=0.0, caps=True, closed=False, M=None, up=(0, 0, 1), steps=3):
+    """Round tube along a polyline, optionally with filleted corners."""
+    if round_r > 0:
+        pts = fillet(pts, round_r, steps)
+    return sweep(bm, pts, circ(r, seg), up=up, caps=caps, closed=closed, M=M)
+
+
+def beam(bm, a, b, w, h, up=(0, 0, 1), c=0.0, M=None):
+    """Straight box (or chamfered) beam from a to b: w across, h along `up`."""
+    prof = chamf(w, h, c) if c > 0 else [(w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2), (-w / 2, -h / 2)]
+    return sweep(bm, [a, b], prof, up=up, M=M)
+
+
+def bolt(bm, r=0.012, h=0.008, M=None, seg=6):
+    """Hex bolt head sitting on local z=0."""
+    ring0 = _mk(bm, [(r * cos(TAU * i / seg), r * sin(TAU * i / seg), 0) for i in range(seg)], M)
+    ring1 = _mk(bm, [(r * cos(TAU * i / seg), r * sin(TAU * i / seg), h) for i in range(seg)], M)
+    for i in range(seg):
+        bm.faces.new((ring0[i], ring0[(i + 1) % seg], ring1[(i + 1) % seg], ring1[i]))
+    bm.faces.new(ring1)
+
+
+def bolt_circle(bm, radius, count, r=0.012, h=0.008, M=None, phase=0.0, seg=6):
+    M = M or I4
+    for i in range(count):
+        a = phase + TAU * i / count
+        bolt(bm, r, h, M @ T(radius * cos(a), radius * sin(a), 0), seg)
+
+
+def foil_panel(bm, M, w, h, nx=4, ny=4, jitter=0.02, seed=1, bulge=0.02, skirt=0.014):
+    """A crinkled insulation blanket in local XY (flat-shaded facets), bulging along +Z. It is a
+    closed pillow whose back sits `skirt` behind z=0, so push it against a wall without z-fighting."""
+    rng = random.Random(seed)
+    grid = []
+    for j in range(ny + 1):
+        row = []
+        for i in range(nx + 1):
+            edge = i in (0, nx) or j in (0, ny)
+            z = 0.0 if edge else bulge + rng.uniform(-jitter, jitter)
+            x = -w / 2 + w * i / nx + (0 if edge else rng.uniform(-0.25, 0.25) * w / nx)
+            y = -h / 2 + h * j / ny + (0 if edge else rng.uniform(-0.25, 0.25) * h / ny)
+            row.append(bm.verts.new(M @ Vector((x, y, z))))
+        grid.append(row)
+    for j in range(ny):
+        for i in range(nx):
+            a, b, c, d = grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]
+            if (i + j) % 2:
+                bm.faces.new((a, b, c))
+                bm.faces.new((a, c, d))
+            else:
+                bm.faces.new((a, b, d))
+                bm.faces.new((b, c, d))
+    rim = grid[0][:] + [grid[j][nx] for j in range(1, ny + 1)] + grid[ny][-2::-1] + [grid[j][0] for j in range(ny - 1, 0, -1)]
+    back = [bm.verts.new(v.co - (M.to_3x3() @ Vector((0, 0, skirt)))) for v in rim]
+    n = len(rim)
+    for i in range(n):
+        bm.faces.new((rim[i], back[i], back[(i + 1) % n], rim[(i + 1) % n]))
+    bm.faces.new(list(reversed(back)))
+
+
+# ---- noise ------------------------------------------------------------------------------------
+def _hash(i, j, k, seed):
+    n = ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ (seed * 2654435761)) & 0xffffffff
+    n = ((n ^ (n >> 13)) * 1274126177) & 0xffffffff
+    return ((n ^ (n >> 16)) & 0xffff) / 65535.0
+
+
+def noise3(x, y, z, seed=0):
+    """Smooth value noise in 0..1."""
+    xi, yi, zi = math.floor(x), math.floor(y), math.floor(z)
+    fx, fy, fz = x - xi, y - yi, z - zi
+    fx, fy, fz = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy), fz * fz * (3 - 2 * fz)
+    out = 0.0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (fx if dx else 1 - fx) * (fy if dy else 1 - fy) * (fz if dz else 1 - fz)
+                out += w * _hash(xi + dx, yi + dy, zi + dz, seed)
+    return out
+
+
+# ---- polygons ---------------------------------------------------------------------------------
+def poly_area(o):
+    return 0.5 * sum(o[i][0] * o[(i + 1) % len(o)][1] - o[(i + 1) % len(o)][0] * o[i][1] for i in range(len(o)))
+
+
+def ccw(o):
+    o = [tuple(p[:2]) for p in o]
+    return o if poly_area(o) > 0 else list(reversed(o))
+
+
+def inset_poly(outline, d):
+    """Offset a convex counter-clockwise outline inward by d (a number, or one per edge)."""
+    n = len(outline)
+    ds = d if isinstance(d, (list, tuple)) else [d] * n
+    lines = []
+    for i in range(n):
+        a, b = Vector(outline[i]), Vector(outline[(i + 1) % n])
+        e = (b - a).normalized()
+        lines.append((a + Vector((-e.y, e.x)) * ds[i], e))
+    out = []
+    for i in range(n):
+        (p0, e0), (p1, e1) = lines[i - 1], lines[i]
+        den = e0.x * e1.y - e0.y * e1.x
+        if abs(den) < 1e-9:
+            out.append((p1.x, p1.y))
+            continue
+        t = ((p1.x - p0.x) * e1.y - (p1.y - p0.y) * e1.x) / den
+        q = p0 + e0 * t
+        out.append((q.x, q.y))
+    return out
+
+
+def clip_line(outline, p, d):
+    """The part of the line p + t*d inside a convex counter-clockwise outline, as two points."""
+    t0, t1 = -1e9, 1e9
+    n = len(outline)
+    for i in range(n):
+        a, b = outline[i], outline[(i + 1) % n]
+        nx, ny = -(b[1] - a[1]), b[0] - a[0]
+        den = nx * d[0] + ny * d[1]
+        num = nx * (a[0] - p[0]) + ny * (a[1] - p[1])
+        if abs(den) < 1e-12:
+            if num > 0:
+                return None
+            continue
+        t = num / den
+        if den > 0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+    if t1 - t0 < 1e-3:
+        return None
+    return (p[0] + d[0] * t0, p[1] + d[1] * t0), (p[0] + d[0] * t1, p[1] + d[1] * t1)
+
+
+# ---- the Kit: one bucket of geometry per material for a part -----------------------------------
+class Kit:
+    """k = Kit(part_node); k('aluminium') is a bmesh for that material under that part.
+    k('painted_white', smooth=25, bevel=0.01) is a separate bucket with its own shading angle and
+    chamfer. k(('foam', 'painted_white')) is a bucket whose faces pick a material by
+    face.material_index (for closed shells that are one colour outside and another inside).
+    flush() orients every face outward and turns each bucket into a helper mesh."""
+
+    def __init__(self, parent, tag=''):
+        self.parent, self.tag, self.b = parent, tag or parent.name, {}
+
+    def __call__(self, material, smooth=38.0, bevel=0.0):
+        key = (material, smooth, bevel)
+        if key not in self.b:
+            self.b[key] = bm_new()
+        return self.b[key]
+
+    def flush(self):
+        for (material, smooth, bevel), bm in self.b.items():
+            if not bm.faces:
+                bm.free()
+                continue
+            bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+            mname = material if isinstance(material, str) else '+'.join(material)
+            name = f'{self.tag}_{mname}_{int(smooth)}_{int(bevel * 1000)}'
+            if os.environ.get('TRIS'):
+                print(f'    {name:44s} {sum(len(f.verts) - 2 for f in bm.faces):6d}')
+            mesh_obj(name, bm, material if isinstance(material, str) else list(material), parent=self.parent, bevel=bevel,
+                     bevel_segments=1, smooth_angle=smooth)
+        self.b = {}
+
+
+def report_parts(root):
+    """Triangles per part node (after export_model has collapsed the helpers)."""
+    rows = []
+    for o in [root] + lib._descendants(root):
+        if o.type == 'MESH':
+            rows.append((o.parent.name if o.parent else o.name, sum(len(p.vertices) - 2 for p in o.data.polygons),
+                         len(o.data.materials)))
+    print('  parts:', ', '.join(f'{n}={t} tris/{m} mats' for n, t, m in rows))
+
+
+def finish(root, name, kits, ao_distance=0.7, samples=24):
+    for k in kits:
+        k.flush()
+    info = export_model(root, name, ao_samples=samples, ao_distance=ao_distance)
+    report_parts(root)
+    return info
+
+
+# ---- spacecraft kit ---------------------------------------------------------------------------
+def solar_poly(sub, cell, outline, M, t=0.02, margin=0.02, pitch=(0.10, 0.10), strip=0.007, grid_dir=0.0,
+               origin=(0.0, 0.0)):
+    """A solar panel of any convex outline lying in local XY with its underside on z=0: a substrate
+    of thickness t, a slab of cells inset by `margin`, and raised interconnect strips every `pitch`.
+    grid_dir (degrees) turns the cell grid in the plane; `origin` is a point a strip passes through."""
+    o = ccw(outline)
+    prism(sub, o, t, M, z0=0.0)
+    inner = inset_poly(o, margin)
+    prism(cell, inner, 0.008, M, z0=t - 0.002, cap_bottom=False)
+    zc = t + 0.006
+    ext = max(max(abs(p[0]), abs(p[1])) for p in o) * 4 + 4
+    ca, sa = cos(rad(grid_dir)), sin(rad(grid_dir))
+    for (dx, dy), step in (((ca, sa), pitch[1]), ((-sa, ca), pitch[0])):
+        if not step:
+            continue
+        nx, ny = -dy, dx                                   # strips run along (dx, dy), repeated along (nx, ny)
+        nmax = int(ext / step)
+        for i in range(-nmax, nmax + 1):
+            p = (origin[0] + nx * step * i, origin[1] + ny * step * i)
+            seg = clip_line(inner, p, (dx, dy))
+            if seg is None:
+                continue
+            (ax, ay), (bx, by) = seg
+            if (bx - ax) ** 2 + (by - ay) ** 2 < 0.03 ** 2:
+                continue
+            beam(sub, (ax, ay, zc), (bx, by, zc), strip, 0.008, M=M)
+
+
+def dish(shell, fit, M, r, depth, seg=24, feed=True, rim=0.006, struts=3, back_ribs=6, thick=0.012):
+    """A parabolic reflector opening along local +Z with its vertex at the origin."""
+    kq = depth / (r * r)
+    rs = [r, r * 0.84, r * 0.64, r * 0.42, r * 0.2]
+    prof = [(q, kq * q * q) for q in rs] + [(0.0, 0.0), (0.0, -thick)] + [(q, kq * q * q - thick) for q in reversed(rs)]
+    lathe(shell, prof, seg, M, close=True)
+    if rim:
+        lathe(fit, [(r + rim, depth - thick - 0.004), (r + rim, depth + 0.004), (r - rim, depth + 0.004),
+                    (r - rim, depth - thick - 0.004)], seg, M, close=True)
+    for i in range(back_ribs):
+        Mr = M @ R('Z', 360 * i / back_ribs + 15)
+        prism(fit, [(r * 0.16, -thick - r * 0.16), (r * 0.9, kq * r * r * 0.81 - thick - 0.012),
+                    (r * 0.9, kq * r * r * 0.81 - thick + 0.002), (r * 0.55, kq * r * r * 0.3025 - thick + 0.002),
+                    (r * 0.16, -thick + 0.002)], max(0.006, r * 0.02), Mr @ R('X', 90))
+    if feed:
+        f = min(1.0 / (4 * kq), r * 1.1)                 # focal length (clamped for shallow dishes)
+        for i in range(struts):
+            a = TAU * i / struts + pi / 2
+            rod(fit, (r * 0.92 * cos(a), r * 0.92 * sin(a), kq * (r * 0.92) ** 2), (r * 0.06 * cos(a), r * 0.06 * sin(a), f),
+                max(0.004, r * 0.014), 5, M=M)
+        lathe(fit, [(0.0, f - r * 0.05), (r * 0.10, f - r * 0.05), (r * 0.07, f + r * 0.08), (0.0, f + r * 0.08)], 8, M)
+
+
+def footpad(bm, M, r=0.15, h=0.05, seg=14):
+    """A dished lander footpad sitting on local z=0 with its ball socket on top."""
+    lathe(bm, [(0.0, 0.0), (r * 0.72, 0.0), (r, h * 0.55), (r, h), (r * 0.9, h), (r * 0.66, h * 0.5), (r * 0.26, h * 0.5),
+               (r * 0.2, h * 1.5), (0.0, h * 1.5)], seg, M)
+
+
+def blob(bm, M, rx, ry, h, seed=1, nu=18, pleats=7, rough=0.3, pleat_depth=0.45, rings=None):
+    """Deflated fabric (an airbag lobe, a heap of parachute): a low rumpled mound over an ellipse
+    with a rolled edge and radial gathers, open underneath."""
+    rings = rings or ((1.0, 0.0), (0.96, 0.5), (0.74, 0.9), (0.46, 1.0), (0.2, 0.93))
+    rows = []
+    for j, (rf, hf) in enumerate(rings):
+        row = []
+        for i in range(nu):
+            a = TAU * i / nu
+            n1 = noise3(1.7 * cos(a) + 5, 1.7 * sin(a) + 5, 0.3, seed)           # outline wobble (same for every ring)
+            n2 = noise3(3.1 * rf * cos(a) + 9, 3.1 * rf * sin(a) + 9, 4.0, seed + 11)
+            fold = abs(sin(pleats * a / 2 + seed * 1.3 + 2.0 * n1)) if pleats else 1.0
+            f = rf * (1 + rough * (n1 - 0.5)) * (1 - 0.10 * (1 - fold) * (1 if j < 2 else 0.4))
+            z = h * hf * (1 - pleat_depth * (1 - fold) * (0.9 if j in (1, 2) else 0.5)) * (1 + rough * 1.4 * (n2 - 0.5))
+            row.append(bm.verts.new(M @ Vector((rx * f * cos(a), ry * f * sin(a), z if j else -0.01))))
+        rows.append(row)
+    top = bm.verts.new(M @ Vector((0.03 * rx, -0.02 * ry, h * (0.86 + 0.2 * (noise3(1, 2, 3, seed) - 0.5)))))
+    for a, b in zip(rows, rows[1:]):
+        for i in range(nu):
+            bm.faces.new((a[i], a[(i + 1) % nu], b[(i + 1) % nu], b[i]))
+    for i in range(nu):
+        bm.faces.new((rows[-1][i], rows[-1][(i + 1) % nu], top))
+
+
+def wheel(rim, hub, M, r, w, seg=20, th=0.006, cleats=12, cleat_h=0.006, cleat_t=0.006, chevron=0.0, crown=0.04,
+          spokes=6, spoke_twist=0.0, spoke_w=0.02, spoke_t=0.004, hub_r=None, hub_x=0.0, spoke_bm=None, cleat_bm=None,
+          hub_len=None, cap=True):
+    """A rover wheel with its axle on local Z (z = +w/2 is the outboard side). `rim` takes the tyre
+    band and cleats, `hub` the hub drum; spokes go to spoke_bm (default hub)."""
+    spoke_bm = spoke_bm or hub
+    cleat_bm = cleat_bm or rim
+    hw = w / 2
+    r0 = r * (1 - crown)
+    prof = [(r0, -hw), (r, -hw * 0.62), (r, hw * 0.62), (r0, hw), (r0 - th, hw), (r - th, hw * 0.62), (r - th, -hw * 0.62),
+            (r0 - th, -hw)]
+    lathe(rim, prof, seg, M, close=True)
+    for i in range(cleats):
+        a = 360.0 * i / cleats
+        Mc = M @ R('Z', a) @ T(r + cleat_h / 2 - 0.001, 0, 0)
+        if chevron:                                   # a V-shaped grouser that follows the tread, open underneath
+            st = []
+            for zz, off in ((-hw * 0.97, chevron), (0.0, 0.0), (hw * 0.97, chevron)):
+                a0 = rad(a) + off / r
+                rr = r0 if zz else r
+                da, db = cleat_t / r, cleat_t * 0.55 / r
+                st.append(_mk(cleat_bm, [(rr * 0.995 * cos(a0 - da), rr * 0.995 * sin(a0 - da), zz),
+                                         ((rr + cleat_h) * cos(a0 - db), (rr + cleat_h) * sin(a0 - db), zz),
+                                         ((rr + cleat_h) * cos(a0 + db), (rr + cleat_h) * sin(a0 + db), zz),
+                                         (rr * 0.995 * cos(a0 + da), rr * 0.995 * sin(a0 + da), zz)], M))
+            for p0, p1 in zip(st, st[1:]):
+                for j in range(3):
+                    cleat_bm.faces.new((p0[j], p1[j], p1[j + 1], p0[j + 1]))
+            cleat_bm.faces.new(st[0])
+            cleat_bm.faces.new(list(reversed(st[-1])))
+        else:
+            box(cleat_bm, (cleat_h, cleat_t, w * 0.94), (0, 0, 0), Mc)
+    hub_r = hub_r or r * 0.3
+    hub_len = hub_len or w * 0.5
+    z0, z1 = hub_x - hub_len / 2, hub_x + hub_len / 2
+    hp = [(0.0, z0), (hub_r * 0.85, z0), (hub_r, z0 + 0.006), (hub_r, z1 - 0.006), (hub_r * 0.85, z1)]
+    hp += [(hub_r * 0.5, z1 + hub_r * 0.18), (0.0, z1 + hub_r * 0.18)] if cap else [(0.0, z1)]
+    lathe(hub, hp, max(8, seg // 2), M)
+    for i in range(spokes):
+        a0 = TAU * i / spokes
+        a1 = a0 + spoke_twist
+        p0 = (hub_r * 0.9 * cos(a0), hub_r * 0.9 * sin(a0), hub_x)
+        p1 = ((r - th) * cos(a1), (r - th) * sin(a1), hub_x * 0.3)
+        if spoke_twist:
+            am = (a0 + a1) / 2
+            rm = (hub_r + r - th) / 2 * 1.06
+            pm = (rm * cos(am + spoke_twist * 0.12), rm * sin(am + spoke_twist * 0.12), hub_x * 0.65)
+            sweep(spoke_bm, [p0, pm, p1], [(spoke_t / 2, -spoke_w / 2), (spoke_t / 2, spoke_w / 2), (-spoke_t / 2, spoke_w / 2),
+                                           (-spoke_t / 2, -spoke_w / 2)], up=(0, 0, 1), M=M)
+        else:
+            beam(spoke_bm, p0, p1, spoke_t, spoke_w, up=(0, 0, 1), M=M)
+
+
+def lattice_mast(bm, M, r, height, bays=5, rr=0.005, twist=0.0, seg=4):
+    """A deployable three-longeron mast standing on local Z: longerons, batten triangles, diagonals."""
+    cols = []
+    for j in range(bays + 1):
+        z = height * j / bays
+        cols.append([(r * cos(TAU * i / 3 + twist * j), r * sin(TAU * i / 3 + twist * j), z) for i in range(3)])
+    for j in range(bays):
+        for i in range(3):
+            rod(bm, cols[j][i], cols[j + 1][i], rr, seg, caps=False, M=M)
+            rod(bm, cols[j][i], cols[j + 1][(i + 1) % 3], rr * 0.55, 3, caps=False, M=M)
+    for j in range(bays + 1):
+        for i in range(3):
+            rod(bm, cols[j][i], cols[j][(i + 1) % 3], rr * 0.8, seg, caps=False, M=M)
+
+
+def lander_leg(bm, top, foot, brace_l, brace_r, r=0.03, knee=0.42, seg=8, pad_bm=None, pad_r=0.15, sleeve=None):
+    """A tripod landing leg: a telescoping main strut from `top` down to the footpad at `foot`
+    (the pad's centre on the ground) and two side braces from the body to the lower strut."""
+    top, foot = Vector(top), Vector(foot)
+    ankle = foot + Vector((0, 0, pad_r * 0.42))
+    axis = top - ankle
+    L = axis.length
+    F = frame(ankle, axis)
+    lathe(bm, [(0.0, 0.0), (r * 0.72, 0.0), (r * 0.72, L * knee), (r * 1.25, L * knee), (r * 1.25, L * knee + r * 0.8),
+               (r, L * knee + r * 1.2), (r, L - r * 1.5), (r * 1.3, L - r * 1.2), (r * 1.3, L), (0.0, L)], seg, F)
+    if sleeve is not None:
+        lathe(sleeve, [(r * 1.12, L * (knee + 0.12)), (r * 1.12, L * 0.9)], seg, F)
+    kp = ankle + axis * (knee * 0.55)
+    for b in (brace_l, brace_r):
+        rod(bm, b, kp, r * 0.6, 6)
+        ball(bm, b, r * 0.95, 6, 3)
+    ball(bm, kp, r * 1.25, 8, 4)
+    ball(bm, ankle, r * 1.2, 8, 4)
+    footpad(pad_bm or bm, T(*foot), pad_r, pad_r * 0.36)
+
+
+# ==============================================================================================
+# 2. Models
+# ==============================================================================================
+def _sojourner(parent, loc, heading):
+    """The Sojourner rover (0.65 m long, 0.48 m wide, 0.30 m tall) as the part `sojourner`."""
+    sj = part('sojourner', parent, loc=loc, rot=(0, 0, rad(heading)))
+    k = Kit(sj)
+    alu, gold, cell, dark, steel = k('aluminium'), k('gold_foil', 28), k('solar_cell'), k('painted_dark'), k('steel')
+    WR, WW, X = 0.065, 0.075, 0.205
+    ys = (-0.235, 0.015, 0.235)
+    # warm electronics box: gold-wrapped tub under the solar deck
+    taper_box(gold, (0.30, 0.46), (0.32, 0.50), 0.135, 0.265, loc=(0, 0.005))
+    for sx in (-1, 1):
+        foil_panel(gold, T(sx * 0.158, 0.005, 0.20) @ R('Y', sx * 90) @ R('Z', 90), 0.42, 0.10, 4, 2, 0.006, seed=3 + sx, bulge=0.006)
+    cbox(alu, (0.36, 0.60, 0.012), (0, 0.0, 0.271), c=0.02)
+    solar_poly(alu, cell, [(-0.17, -0.29), (0.17, -0.29), (0.17, 0.29), (-0.17, 0.29)], T(0, 0, 0.277), t=0.008, margin=0.012,
+               pitch=(0.068, 0.058), strip=0.004)
+    # front cameras and laser stripe projectors, rear spectrometer on its deployment arm
+    cbox(dark, (0.22, 0.03, 0.045), (0, -0.238, 0.225), c=0.006)
+    lens = k('lens')
+    for sx in (-1, 1):
+        disc(lens, 0.014, 0.0, 0.012, 8, T(sx * 0.075, -0.25, 0.225) @ R('X', 90))
+        disc(alu, 0.007, 0.0, 0.014, 6, T(sx * 0.035, -0.25, 0.232) @ R('X', 90))
+    disc(alu, 0.007, 0.0, 0.014, 6, T(0, -0.25, 0.214) @ R('X', 90))
+    rod(alu, (0.06, 0.235, 0.20), (0.06, 0.305, 0.13), 0.008, 6)
+    disc(steel, 0.026, 0.0, 0.05, 10, T(0.06, 0.30, 0.135) @ R('X', -60))
+    disc(dark, 0.02, 0.05, 0.058, 10, T(0.06, 0.30, 0.135) @ R('X', -60))
+    # whip antenna on the rear corner, material-adherence strip on the deck edge
+    rod(steel, (-0.15, 0.27, 0.285), (-0.15, 0.275, 0.62), 0.0035, 5)
+    disc(alu, 0.012, 0.277, 0.31, 8, T(-0.15, 0.27, 0))
+    # rocker-bogie: a rocker to the rear wheel and bogie pivot, a bogie carrying front and middle wheels
+    for sx in (-1, 1):
+        x = sx * 0.168
+        piv = (x, 0.07, 0.185)
+        bog = (x, -0.11, 0.125)
+        ball(alu, piv, 0.016, 6, 3)
+        beam(alu, piv, (x, ys[2] - 0.01, 0.12), 0.012, 0.022, up=(0, 0, 1))
+        beam(alu, piv, bog, 0.012, 0.022, up=(0, 0, 1))
+        ball(alu, bog, 0.014, 6, 3)
+        beam(alu, bog, (x, ys[0] + 0.015, 0.10), 0.011, 0.02, up=(0, 0, 1))
+        beam(alu, bog, (x, ys[1], 0.10), 0.011, 0.02, up=(0, 0, 1))
+        for y in ys:
+            wx = sx * X
+            rod(alu, (x, y + (0.015 if y == ys[0] else -0.01 if y == ys[2] else 0), 0.10 if y != ys[2] else 0.12),
+                (x, y, WR + 0.02), 0.009, 6)
+            disc(dark, 0.022, -0.02, 0.022, 8, T(x, y, WR) @ AX['X'])
+            Mw = T(wx, y, WR) @ AX['X'] @ S(1, 1, sx)
+            wheel(alu, alu, Mw, WR, WW, seg=14, th=0.004, cleats=0, crown=0.06, spokes=0, hub_r=0.02, hub_len=0.03,
+                  hub_x=-0.01)
+            lathe(alu, [(0.02, -0.02), (WR - 0.004, -0.012), (WR - 0.004, -0.006), (0.02, -0.012)], 14, Mw, close=True)
+            for i in range(12):                                   # rows of steel cleats
+                for zz in (-0.02, 0.02):
+                    lathe(steel, [(0.006, 0.0), (0.0, 0.016)], 3, Mw @ R('Z', 30 * i + (15 if zz > 0 else 0)) @ T(WR - 0.002, 0, zz) @ AX['X'])
+    return sj, k
+
+
+def build_pathfinder():
+    """Mars Pathfinder (the Carl Sagan Memorial Station): the opened tetrahedron on its deflated
+    airbags, the camera mast, antennas, the two rover ramps, and Sojourner beside it."""
+    root = part('pathfinder')
+    k = Kit(root)
+    alu, cell, white, gold = k('aluminium'), k('solar_cell'), k('painted_white', 30), k('gold_foil', 28)
+    dark, bag, lens = k('painted_dark'), k('canvas', 55), k('lens')
+    a = 1.30                                    # edge of the base petal
+    Rc, ri, zb = a / sqrt(3), a / (2 * sqrt(3)), 0.31
+    hgt = a * sqrt(3) / 2
+
+    # --- base petal ---
+    tri = [polar(Rc - 0.04, 90 + 120 * i)[:2] for i in range(3)]
+    base = []
+    for i in range(3):                           # clip the three corners
+        p, q0, q1 = Vector(tri[i]), Vector(tri[i - 1]), Vector(tri[(i + 1) % 3])
+        base += [tuple(p + (q0 - p).normalized() * 0.10), tuple(p + (q1 - p).normalized() * 0.10)]
+    prism(alu, base, 0.07, T(0, 0, zb - 0.075), z0=0.0)
+    solar_poly(alu, cell, base, T(0, 0, zb - 0.012), t=0.012, margin=0.03, pitch=(0.085, 0.085), strip=0.005)
+    lathe(alu, [(0.50, 0.02), (0.56, zb - 0.07)], 12, I4)          # structure down into the airbags
+
+    # --- three side petals, hinged on the base edges, drooping onto the bags ---
+    petal = [(-0.61, 0.03), (0.61, 0.03), (0.105, 0.93), (-0.105, 0.93)]
+    droop = {-90: -7.0, 30: -5.0, 150: -8.5}
+    PM = {}
+    for th, dr in droop.items():
+        Mp = R('Z', th - 90) @ T(0, ri, zb - 0.01) @ R('X', dr)
+        PM[th] = Mp
+        prism(white, petal, 0.035, Mp, z0=-0.04)
+        if th == -90:                                             # rover petal: cells either side of the rover deck
+            solar_poly(alu, cell, [(-0.61, 0.03), (-0.20, 0.03), (-0.20, 0.50), (-0.345, 0.50)], Mp @ T(0, 0, -0.006),
+                       t=0.01, margin=0.02, pitch=(0.085, 0.085), strip=0.005)
+            solar_poly(alu, cell, [(0.20, 0.03), (0.61, 0.03), (0.345, 0.50), (0.20, 0.50)], Mp @ T(0, 0, -0.006),
+                       t=0.01, margin=0.02, pitch=(0.085, 0.085), strip=0.005)
+            solar_poly(alu, cell, [(-0.30, 0.58), (0.30, 0.58), (0.105, 0.93), (-0.105, 0.93)], Mp @ T(0, 0, -0.006),
+                       t=0.01, margin=0.02, pitch=(0.085, 0.085), strip=0.005)
+            prism(alu, [(-0.35, 0.03), (0.35, 0.03), (0.35, 0.58), (-0.35, 0.58)], 0.008, Mp, z0=-0.006)
+            for y in (0.20, 0.44):                                # rover tie-down rails and hold-down posts
+                beam(alu, (-0.33, y, 0.012), (0.33, y, 0.012), 0.05, 0.016, M=Mp)
+                for sx in (-1, 1):
+                    disc(dark, 0.016, 0.0, 0.05, 6, Mp @ T(sx * 0.19, y, 0.01))
+        else:
+            solar_poly(alu, cell, petal, Mp @ T(0, 0, -0.006), t=0.01, margin=0.028, pitch=(0.085, 0.085), strip=0.005)
+        for sx in (-1, 1):                                        # hinge actuators and edge stiffeners
+            disc(alu, 0.03, -0.07, 0.07, 8, Mp @ T(sx * 0.40, -0.005, -0.02) @ AX['X'])
+            disc(dark, 0.022, -0.09, 0.09, 6, Mp @ T(sx * 0.40, -0.005, -0.02) @ AX['X'])
+            rod(alu, (sx * 0.605, 0.04, -0.012), (sx * 0.11, 0.925, -0.012), 0.011, 5, M=Mp)
+        rod(alu, (-0.10, 0.93, -0.012), (0.10, 0.93, -0.012), 0.011, 5, M=Mp)
+        disc(dark, 0.02, -0.03, 0.02, 6, Mp @ T(0, 0.915, -0.01))  # tip latch
+
+    # --- electronics enclosure in the middle of the base ---
+    taper_box(white, (0.56, 0.48), (0.50, 0.42), zb, zb + 0.27, loc=(0, 0.04))
+    taper_box(white, (0.50, 0.42), (0.40, 0.32), zb + 0.27, zb + 0.31, loc=(0, 0.04))
+    for i, (sx, sy, w) in enumerate(((0, -1, 0.5), (1, 0, 0.42), (0, 1, 0.5), (-1, 0, 0.42))):
+        Mf = T(sx * 0.268, 0.04 + sy * 0.228, zb + 0.135) @ R('Z', (0, 90, 180, 270)[i]) @ R('X', 90 + 6.3)
+        foil_panel(gold, Mf, w - 0.06, 0.20, 4, 3, 0.008, seed=20 + i, bulge=0.012)
+    for sx in (-1, 1):
+        beam(dark, (sx * 0.17, -0.20, zb + 0.29), (sx * 0.17, 0.28, zb + 0.29), 0.022, 0.012)       # blanket straps
+    cbox(alu, (0.12, 0.09, 0.035), (-0.10, -0.08, zb + 0.325), c=0.012)                         # connector panel on the lid
+    for i in range(3):
+        disc(dark, 0.012, 0.0, 0.02, 6, T(-0.14 + 0.04 * i, -0.08, zb + 0.342))
+    tube(dark, [(-0.10, -0.03, zb + 0.32), (-0.14, 0.10, zb + 0.325), (-0.19, 0.17, zb + 0.325)], 0.009, 4, round_r=0.03)
+    tube(dark, [(-0.05, -0.05, zb + 0.32), (0.02, 0.02, zb + 0.325), (0.05, 0.07, zb + 0.325)], 0.009, 4, round_r=0.03)
+    # shelf boxes and harness on the base
+    cbox(gold, (0.22, 0.16, 0.12), (-0.33, -0.06, zb + 0.06), c=0.015)
+    cbox(alu, (0.16, 0.12, 0.09), (0.36, 0.0, zb + 0.045), c=0.012)
+    tube(dark, [(0.20, -0.21, zb + 0.03), (0.30, -0.27, zb + 0.015), (0.40, -0.33, zb + 0.012)], 0.012, 5)
+    tube(dark, [(-0.25, 0.20, zb + 0.03), (-0.34, 0.24, zb + 0.015), (-0.2, 0.42, zb + 0.012), (-0.05, 0.52, zb + 0.012)], 0.012, 5, round_r=0.05)
+
+    # --- camera on its lattice mast ---
+    mz = zb + 0.31
+    mx, my = 0.07, 0.10
+    lathe(alu, [(0.0, mz - 0.01), (0.075, mz - 0.01), (0.075, mz + 0.10), (0.062, mz + 0.115), (0.0, mz + 0.115)], 12, T(mx, my, 0))
+    lattice_mast(alu, T(mx, my, mz + 0.11), 0.042, 0.66, bays=6, rr=0.0045, twist=0.25)
+    hz = mz + 0.11 + 0.66
+    lathe(alu, [(0.0, hz - 0.01), (0.05, hz - 0.01), (0.05, hz + 0.02), (0.03, hz + 0.035), (0.03, hz + 0.07), (0.0, hz + 0.07)], 10, T(mx, my, 0))
+    Mh = T(mx, my, hz + 0.10)
+    lathe(gold, [(0.0, -0.105), (0.046, -0.105), (0.052, -0.095), (0.052, 0.095), (0.046, 0.105), (0.0, 0.105)], 12, Mh @ AX['X'])
+    cbox(alu, (0.06, 0.07, 0.07), (0, 0.045, -0.01), Mh, c=0.01)
+    for sx in (-1, 1):                                            # the two eyes, 15 cm apart
+        cbox(alu, (0.05, 0.035, 0.05), (sx * 0.075, -0.05, 0.0), Mh, c=0.008)
+        disc(lens, 0.017, 0.0, 0.006, 8, Mh @ T(sx * 0.075, -0.068, 0.0) @ R('X', 90))
+
+    # --- high-gain disc, low-gain mast ---
+    hx, hy = -0.20, 0.20
+    lathe(alu, [(0.0, mz), (0.035, mz), (0.035, mz + 0.03), (0.016, mz + 0.045), (0.016, mz + 0.20), (0.0, mz + 0.20)], 8, T(hx, hy, 0))
+    Mg = T(hx, hy, mz + 0.22) @ R('Z', 25) @ R('X', -38)
+    cbox(alu, (0.07, 0.05, 0.05), (0, 0, 0.0), T(hx, hy, mz + 0.21), c=0.008)
+    lathe(white, [(0.0, 0.03), (0.15, 0.03), (0.155, 0.036), (0.155, 0.05), (0.15, 0.056), (0.0, 0.056)], 20, Mg)
+    lathe(alu, [(0.0, 0.0), (0.05, 0.0), (0.05, 0.03), (0.0, 0.03)], 10, Mg)
+    lathe(dark, [(0.118, 0.056), (0.118, 0.059), (0.102, 0.059), (0.102, 0.056)], 20, Mg, close=True)
+    lx, ly = 0.20, 0.20
+    lathe(alu, [(0.0, mz), (0.024, mz), (0.024, mz + 0.04), (0.009, mz + 0.06), (0.009, mz + 0.50), (0.02, mz + 0.51),
+                (0.02, mz + 0.60), (0.012, mz + 0.615), (0.0, mz + 0.615)], 8, T(lx, ly, 0))
+
+    # --- weather mast with wind socks on the tip of a side petal ---
+    Mp = PM[150]
+    foot = Mp @ Vector((0.0, 0.86, 0.0))
+    disc(alu, 0.022, 0.0, 0.05, 8, T(*foot))
+    rod(alu, foot, foot + Vector((0, 0, 1.02)), 0.007, 5, r2=0.005)
+    for hz2, ang in ((0.35, 20), (0.63, 140), (0.92, 260)):
+        p = foot + Vector((0, 0, hz2))
+        q = p + Vector(polar(0.07, ang))
+        rod(alu, p, q, 0.003, 4)
+        lathe(white, [(0.0, 0.0), (0.011, -0.012), (0.0, -0.06)], 6, T(*q))
+    disc(dark, 0.012, 1.02, 1.045, 6, T(*foot))
+
+    # --- the two rover ramps: pairs of roll-out steel tracks from the rover petal to the ground ---
+    Mr = PM[-90]
+    for sx in (-1, 1):
+        mid = Vector((sx * 0.36, 0.33, 0.0))
+        out = Vector((sx * 0.871, 0.0, 0.0))
+        along = Vector((0.0, 1.0, 0.0))
+        for off in (-0.115, 0.115):
+            pts = []
+            for i in range(7):
+                t = i / 6
+                d = -0.06 + 1.22 * t
+                p_local = mid + out * d + along * off
+                w = Mr @ p_local
+                sag = -0.035 * sin(pi * t)
+                gz = max(0.012, w.z * (1 - t) ** 1.0 + sag + 0.0) if i else w.z + 0.012
+                pts.append((w.x, w.y, gz))
+            sweep(alu, pts, [(0.045, -0.002), (0.045, 0.012), (0.039, 0.012), (0.039, 0.003), (-0.039, 0.003), (-0.039, 0.012),
+                             (-0.045, 0.012), (-0.045, -0.002)], up=(0, 0, 1))
+            for i in range(1, 12):                                # cleats across each track
+                t = i / 12
+                j = min(5, int(t * 6))
+                u = t * 6 - j
+                p = Vector(pts[j]).lerp(Vector(pts[j + 1]), u)
+                q = Vector(pts[j + 1]) - Vector(pts[j])
+                box(alu, (0.078, 0.012, 0.006), (0, 0, 0.006), frame(p, Vector((0, 0, 1)), q.cross(Vector((0, 0, 1)))))
+        for t in (0.25, 0.6, 0.92):                               # ties between the two tracks
+            d = -0.06 + 1.22 * t
+            pa = Mr @ (mid + out * d + along * -0.115)
+            pb = Mr @ (mid + out * d + along * 0.115)
+            z = max(0.016, pa.z * (1 - t) - 0.035 * sin(pi * t)) + 0.004
+            rod(alu, (pa.x, pa.y, z), (pb.x, pb.y, z), 0.005, 4)
+
+    # --- deflated airbags: rumpled heaps in the three notches, low skirts under and beyond the petals ---
+    blob(bag, R('Z', 90) @ T(1.00, 0, 0), 0.74, 0.70, 0.30, seed=11, nu=22, pleats=9)
+    for sgn, th in ((1, 200), (-1, 340)):
+        blob(bag, R('Z', th) @ T(1.02, 0, 0) @ R('Z', 15), 0.62, 0.50, 0.24, seed=12 + sgn, nu=20, pleats=8)
+    for i, th in enumerate((90, 210, 330)):
+        blob(bag, R('Z', th + 27) @ T(1.30, 0, 0), 0.48, 0.44, 0.15, seed=31 + i, nu=16, pleats=6)
+        blob(bag, R('Z', th - 27) @ T(1.30, 0, 0), 0.46, 0.46, 0.14, seed=41 + i, nu=16, pleats=7)
+    for i, th in enumerate((-90, 30, 150)):
+        blob(bag, R('Z', th) @ T(1.36, 0, 0), 0.46, 0.60, 0.10, seed=51 + i, nu=18, pleats=8, rough=0.25)
+        blob(bag, R('Z', th) @ T(0.80, 0, 0), 0.52, 0.76, 0.13, seed=61 + i, nu=14, pleats=0, rough=0.2)
+
+    sj, ks = _sojourner(root, (1.92, -1.78, 0.0), -62.0)
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.9)
+    anchor('col_sojourner', root, loc=(1.92, -1.78, 0), radius=0.45)
+    return finish(root, 'pathfinder', [k, ks])
+
+
+def hull_poly(sides):
+    """Convex polygon from its sides, each (normal angle in degrees, distance from the origin),
+    listed by increasing angle. Returns the corners counter-clockwise."""
+    out = []
+    n = len(sides)
+    for i in range(n):
+        (a1, d1), (a2, d2) = sides[i], sides[(i + 1) % n]
+        n1, n2 = (cos(rad(a1)), sin(rad(a1))), (cos(rad(a2)), sin(rad(a2)))
+        det = n1[0] * n2[1] - n1[1] * n2[0]
+        out.append(((d1 * n2[1] - d2 * n1[1]) / det, (n1[0] * d2 - n2[0] * d1) / det))
+    return out
+
+
+def _viking_camera(k, M):
+    """Facsimile camera: a pedestal, a tall turret with a vertical slit window, a domed cap."""
+    white, alu, dark, lens = k('painted_white', 30), k('aluminium'), k('painted_dark'), k('lens')
+    lathe(alu, [(0.0, 0.0), (0.085, 0.0), (0.085, 0.018), (0.052, 0.035), (0.052, 0.20), (0.074, 0.215), (0.074, 0.245),
+                (0.0, 0.245)], 14, M)
+    lathe(white, [(0.092, 0.245), (0.092, 0.50), (0.086, 0.525), (0.060, 0.548), (0.0, 0.555)], 16, M)
+    lathe(alu, [(0.096, 0.245), (0.096, 0.262), (0.092, 0.262)], 16, M)
+    lathe(alu, [(0.096, 0.488), (0.096, 0.502), (0.092, 0.502)], 16, M)
+    # slit window in a raised frame, facing local -Y, and the dust post beside it
+    cbox(alu, (0.058, 0.02, 0.215), (0, -0.088, 0.375), M, c=0.006)
+    box(lens, (0.026, 0.012, 0.18), (0, -0.096, 0.375), M)
+    rod(dark, (0.075, -0.075, 0.245), (0.075, -0.075, 0.47), 0.007, 5, M=M)
+    disc(dark, 0.02, 0.552, 0.565, 8, M)
+    bolt_circle(alu, 0.066, 6, 0.008, 0.006, M @ T(0, 0, 0.018))
+
+
+def build_viking():
+    """Viking 1 / Viking 2 lander: the six-sided body on three legs, twin camera turrets, the
+    S-band dish, RTG wind covers and tanks, the sampler boom and the meteorology boom."""
+    root = part('viking')
+    k = Kit(root)
+    white, alu, dark = k('painted_white', 30), k('aluminium'), k('painted_dark')
+    body_b = k('painted_white', 25, 0.012)
+    tank, gold, lens, steel = k('canvas', 50), k('gold_foil', 28), k('lens'), k('steel')
+    L, s = 1.09, 0.56
+    dL, ds = (L + 2 * s) / (2 * sqrt(3)), (2 * L + s) / (2 * sqrt(3))
+    z0, z1 = 0.25, 0.70
+    sides = [(30, dL), (90, ds), (150, dL), (210, ds), (270, dL), (330, ds)]
+    outline = hull_poly(sides)
+
+    # --- body: a six-sided box with a deck plate, belly pan, side beams and access panels ---
+    prism(body_b, outline, z1 - z0, T(0, 0, z0), z0=0.0)
+    prism(alu, hull_poly([(a, d + 0.018) for a, d in sides]), 0.022, T(0, 0, z1 - 0.004), z0=0.0)
+    prism(alu, hull_poly([(a, d + 0.012) for a, d in sides]), 0.02, T(0, 0, z0 - 0.006), z0=0.0)
+    prism(dark, hull_poly([(a, d - 0.10) for a, d in sides]), 0.05, T(0, 0, z0 - 0.05), z0=0.0)
+    for a, d in sides:
+        Mside = R('Z', a) @ T(d, 0, (z0 + z1) / 2) @ R('Y', 90) @ R('Z', 90)       # local XY on the wall, +Z outward
+        if d == dL:
+            for sx in (-1, 1):
+                prism(white, rrect(0.42, 0.30, 0.03, 2), 0.01, Mside @ T(sx * 0.255, 0, 0), z0=0.0)
+                for bx in (-0.17, 0.17):
+                    for by in (-0.11, 0.11):
+                        bolt(alu, 0.009, 0.006, Mside @ T(sx * 0.255 + bx, by, 0.01))
+            box(alu, (0.03, 0.40, 0.016), (0, 0, 0.008), Mside)
+        else:
+            prism(alu, rrect(0.44, 0.34, 0.03, 2), 0.022, Mside, z0=0.0)                # leg fitting plate
+            for bx in (-0.17, 0.17):
+                for by in (-0.12, 0.12):
+                    bolt(dark, 0.012, 0.008, Mside @ T(bx, by, 0.022))
+
+    # conduit, junction boxes and the radar altimeter horn on the front wall
+    tube(dark, [(-0.50, -dL - 0.016, z1 - 0.06), (0.20, -dL - 0.016, z1 - 0.06), (0.26, -dL - 0.016, z1 - 0.12), (0.50, -dL - 0.016, z1 - 0.12)], 0.012, 5)
+    cbox(alu, (0.12, 0.05, 0.09), (0.33, -dL - 0.025, z0 + 0.10), c=0.012)
+    cbox(alu, (0.09, 0.04, 0.07), (-0.42, -dL - 0.02, z0 + 0.09), c=0.01)
+    lathe(alu, [(0.0, 0.0), (0.03, 0.0), (0.03, 0.03), (0.07, 0.10), (0.064, 0.10), (0.024, 0.03), (0.0, 0.03)], 10, T(0.0, -dL + 0.08, z0 - 0.01) @ R('X', 180))
+    # --- three legs: main strut from the top of each short side, bipod from its lower corners ---
+    foot_r = 2.21 / sqrt(3)
+    for a in (90, 210, 330):
+        Ml = R('Z', a)
+        top = Ml @ Vector((ds + 0.03, 0, z1 - 0.07))
+        foot = Ml @ Vector((foot_r, 0, 0))
+        bl, br = Ml @ Vector((ds + 0.02, 0.19, z0 + 0.06)), Ml @ Vector((ds + 0.02, -0.19, z0 + 0.06))
+        lander_leg(alu, top, foot, bl, br, r=0.034, knee=0.45, pad_bm=alu, pad_r=0.155, sleeve=None)
+        cbox(alu, (0.09, 0.12, 0.10), (ds + 0.03, 0, z1 - 0.07), Ml, c=0.015)
+        # stroke gauge / shock housing on the upper strut
+        ankle = foot + Vector((0, 0, 0.065))
+        ax = (top - ankle)
+        lathe(dark, [(0.046, ax.length * 0.60), (0.046, ax.length * 0.80)], 8, frame(ankle, ax))
+
+    # --- terminal descent engines under the three long sides (eighteen-nozzle shower heads) ---
+    for a in (30, 150, 270):
+        Me = R('Z', a) @ T(dL - 0.17, 0, z0)
+        lathe(gold, [(0.13, 0.0), (0.145, -0.03), (0.145, -0.10), (0.12, -0.125)], 12, Me)
+        lathe(dark, [(0.0, -0.11), (0.12, -0.11), (0.12, -0.125), (0.0, -0.125)], 12, Me)
+        for i in range(12):
+            r_n = 0.095 if i < 8 else 0.04
+            aa = TAU * i / 8 if i < 8 else TAU * (i - 8) / 4 + 0.4
+            lathe(steel, [(0.008, -0.125), (0.016, -0.15)], 5, Me @ T(r_n * cos(aa), r_n * sin(aa), 0))
+        rod(alu, (0.0, 0.0, 0.0), (0.0, 0.0, 0.04), 0.05, 8, M=Me)
+
+    # --- propellant tanks under their blankets and the RTG wind covers above the two rear long sides ---
+    for a in (30, 150):
+        Mt = R('Z', a)
+        c = (dL + 0.13, 0, 0.50)
+        ball(tank, c, 0.265, 14, 7, M=Mt)
+        lathe(alu, [(0.268, -0.012), (0.272, -0.012), (0.272, 0.012), (0.268, 0.012)], 14, Mt @ T(*c), close=True)
+        lathe(alu, [(0.268, -0.012), (0.272, -0.012), (0.272, 0.012), (0.268, 0.012)], 14, Mt @ T(*c) @ R('X', 90), close=True)
+        lathe(alu, [(0.0, 0.255), (0.05, 0.255), (0.05, 0.285), (0.02, 0.30), (0.02, 0.33), (0.0, 0.33)], 8, Mt @ T(*c))
+        tube(alu, [Mt @ Vector((dL + 0.13, 0, 0.82)), Mt @ Vector((dL + 0.02, 0.0, 0.84)), Mt @ Vector((dL - 0.06, 0.0, z1 + 0.02))],
+             0.011, 5, round_r=0.04)
+        for sy in (-1, 1):                                                   # tank support struts
+            rod(alu, Mt @ Vector((dL, sy * 0.30, z0 + 0.05)), Mt @ Vector((dL + 0.16, sy * 0.19, 0.34)), 0.012, 5)
+        # RTG wind cover: a slant-faced hood with a louvred top and stand-off feet
+        Mc = Mt @ T(0, 0, z1 + 0.035) @ R('X', 90)
+        prof = [(0.25, 0.0), (0.635, 0.0), (0.635, 0.19), (0.55, 0.35), (0.31, 0.35), (0.25, 0.29)]
+        prism(body_b, prof, 0.50, Mc)
+        for i in range(4):
+            box(alu, (0.20, 0.08, 0.012), (0.43, -0.156 + 0.104 * i, z1 + 0.035 + 0.356), Mt)
+        for sy in (-1, 1):
+            box(alu, (0.36, 0.012, 0.035), (0.445, sy * 0.22, z1 + 0.018), Mt)
+            prism(white, rrect(0.22, 0.15, 0.02, 2), 0.008, Mt @ T(0.44, sy * 0.25, z1 + 0.20) @ R('X', -sy * 90), z0=0.0)
+        tube(dark, [Mt @ Vector((0.33, 0.12, z1 + 0.30)), Mt @ Vector((0.19, 0.12, z1 + 0.30)), Mt @ Vector((0.17, 0.12, z1 + 0.03))],
+             0.014, 5, round_r=0.04)
+
+    Mg = R('Z', 30) @ T(0.43, 0, z1 + 0.035 + 0.352)                                              # grid target on top of one cover
+    box(alu, (0.012, 0.14, 0.012), (0.0, 0.26, -0.03), Mg)
+    cbox(white, (0.13, 0.11, 0.008), (0.0, 0.31, 0.01), Mg @ R('X', 30), c=0.01)
+    for i in range(3):
+        box(dark, (0.11, 0.004, 0.003), (0.0, 0.285 + 0.025 * i, 0.016), Mg @ R('X', 30))
+    for sx in (-1, 1):                                                                            # camera harness, magnifying mirror, brush
+        tube(dark, [(sx * 0.40, -0.36, z1 + 0.05), (sx * 0.38, -0.30, z1 + 0.03), (sx * 0.30, -0.22, z1 + 0.03)], 0.01, 4, round_r=0.03)
+    rod(alu, (0.27, -0.42, z1 + 0.02), (0.27, -0.42, z1 + 0.12), 0.006, 4)
+    disc(alu, 0.035, -0.004, 0.004, 10, T(0.27, -0.42, z1 + 0.15) @ R('X', 70))
+    cbox(dark, (0.05, 0.02, 0.03), (0.33, -0.50, z1 + 0.035), c=0.004)
+    # --- twin facsimile cameras on the front corners of the deck ---
+    for sx in (-1, 1):
+        _viking_camera(k, T(sx * 0.40, -0.44, z1 + 0.018) @ R('Z', sx * 12))
+
+    # --- S-band high-gain dish on its mast at the back ---
+    dx, dy = 0.0, 0.62
+    lathe(alu, [(0.0, z1), (0.07, z1), (0.07, z1 + 0.03), (0.034, z1 + 0.06), (0.034, 1.36), (0.05, 1.37), (0.05, 1.47), (0.0, 1.47)],
+          10, T(dx, dy, 0))
+    for an in (40, 160, 280):
+        prism(alu, [(0.034, 0.02), (0.11, 0.02), (0.034, 0.22)], 0.012, T(dx, dy, z1) @ R('Z', an) @ R('X', 90))
+    aim = Vector((0.25, -0.50, 0.83))
+    Md = frame((dx, dy, 1.55), aim, (1, 0, 0))
+    cbox(alu, (0.12, 0.10, 0.12), (dx, dy, 1.50), c=0.015)
+    disc(dark, 0.03, -0.09, 0.09, 8, T(dx, dy, 1.52) @ AX['X'])
+    dish(white, alu, Md @ T(0, 0, 0.07), 0.38, 0.10, seg=24, struts=3, back_ribs=6)
+    lathe(alu, [(0.0, 0.0), (0.06, 0.0), (0.06, 0.07), (0.0, 0.07)], 8, Md)
+    # low-gain S-band cone and the UHF antenna (a ribbed drum on a post)
+    lathe(alu, [(0.0, z1), (0.02, z1), (0.02, z1 + 0.30), (0.05, z1 + 0.33), (0.035, z1 + 0.42), (0.0, z1 + 0.43)], 8, T(0.17, 0.66, 0))
+    ux, uy = 0.0, 0.17
+    lathe(alu, [(0.0, z1), (0.03, z1), (0.03, z1 + 0.16), (0.0, z1 + 0.16)], 8, T(ux, uy, 0))
+    lathe(white, [(0.0, z1 + 0.16), (0.11, z1 + 0.16), (0.11, z1 + 0.19), (0.095, z1 + 0.27), (0.04, z1 + 0.30), (0.0, z1 + 0.30)], 14, T(ux, uy, 0))
+    for i in range(4):
+        box(alu, (0.012, 0.21, 0.012), (0, 0, z1 + 0.305), T(ux, uy, 0) @ R('Z', 45 * i))
+
+    # --- surface sampler: housing on an azimuth pedestal, the boom run out to the ground, collector head ---
+    S0 = Vector((0.10, -0.40, z1 + 0.17))
+    hd = Vector((0.447, -0.894, 0.0))
+    d = (hd * cos(rad(31)) + Vector((0, 0, -sin(rad(31))))).normalized()
+    lathe(alu, [(0.0, z1), (0.075, z1), (0.075, z1 + 0.03), (0.05, z1 + 0.05), (0.05, z1 + 0.12), (0.0, z1 + 0.12)], 10, T(S0.x, S0.y, 0))
+    Fh = frame(S0, d, (0, 0, 1))
+    prism(white, chamf(0.11, 0.10, 0.02), 0.46, Fh, z0=-0.20)
+    prism(gold, chamf(0.125, 0.115, 0.025), 0.13, Fh, z0=-0.24)
+    lathe(alu, [(0.04, 0.26), (0.04, 0.31), (0.022, 0.33)], 8, Fh)
+    for sy in (-1, 1):
+        disc(dark, 0.03, 0.0, 0.02, 8, Fh @ T(0, sy * 0.05, -0.05) @ R('X', -sy * 90))
+    tip = S0 + d * 1.30
+    sweep(alu, [S0 + d * 0.31, tip], [(0.014, 0.0), (0.008, 0.008), (-0.008, 0.008), (-0.014, 0.0), (-0.008, -0.008), (0.008, -0.008)],
+          up=(0, 0, 1))
+    Ft = frame(tip, d, (0, 0, 1))
+    cbox(alu, (0.07, 0.09, 0.12), (0, 0, 0.03), Ft, c=0.012)
+    prism(steel, [(-0.03, 0.09), (0.035, 0.09), (0.035, 0.20), (0.0, 0.235), (-0.03, 0.20)], 0.085, Ft @ R('Y', 90) @ R('Z', 90))   # jaw
+    prism(dark, [(-0.05, 0.03), (-0.035, 0.03), (-0.035, 0.17), (-0.05, 0.15)], 0.07, Ft @ R('Y', 90) @ R('Z', 90))                  # backhoe
+    disc(dark, 0.03, 0.0, 0.03, 8, Ft @ T(0, 0, -0.03))
+
+    # --- meteorology boom on the front-right leg: hinged up and out, sensors at the tip ---
+    Mm = R('Z', 330)
+    b0 = Mm @ Vector((ds + 0.07, 0.06, z1 - 0.02))
+    b1 = Mm @ Vector((ds + 0.30, 0.10, z1 + 0.30))
+    b2 = Mm @ Vector((ds + 0.52, 0.13, 1.52))
+    ball(alu, b0, 0.03, 8, 4)
+    tube(alu, [b0, b1, b2], 0.013, 6, round_r=0.08)
+    cbox(white, (0.07, 0.06, 0.09), tuple(b2 + Vector((0, 0, 0.03))), c=0.01)
+    for i, (ox, oy) in enumerate(((0.06, 0.0), (-0.03, 0.05), (-0.03, -0.05))):
+        rod(alu, b2 + Vector((0, 0, 0.06)), b2 + Vector((ox, oy, 0.17)), 0.004, 4)
+        ball(dark, tuple(b2 + Vector((ox, oy, 0.17))), 0.009, 5, 3)
+    rod(alu, b2 + Vector((0, 0, 0.0)), b2 + Vector((0.10, -0.06, -0.04)), 0.005, 4)
+    disc(dark, 0.014, 0.0, 0.04, 6, T(*(b2 + Vector((0.10, -0.06, -0.06)))))
+
+    # --- deck equipment: inlets for the three laboratories, seismometer, test charts, harness ---
+    zd = z1 + 0.018
+    for (x, y, r, h) in ((-0.13, -0.25, 0.055, 0.14), (-0.02, -0.10, 0.06, 0.11), (-0.28, -0.12, 0.045, 0.16)):
+        lathe(white, [(0.0, zd), (r, zd), (r, zd + h), (0.0, zd + h)], 10, T(x, y, 0))
+        lathe(alu, [(r * 0.5, zd + h), (r * 1.15, zd + h + 0.05), (r * 1.15, zd + h + 0.058), (r * 0.4, zd + h + 0.008)], 10,
+              T(x, y, 0), close=True)
+    cbox(white, (0.16, 0.14, 0.13), (0.24, -0.22, zd + 0.065), c=0.015)                       # seismometer
+    cbox(dark, (0.10, 0.08, 0.012), (0.24, -0.22, zd + 0.136), c=0.01)
+    for (x, y, rz) in ((-0.52, -0.16, 60), (0.52, -0.16, -60), (-0.14, -0.55, 0)):                # reference test charts
+        Mc = T(x, y, zd) @ R('Z', rz)
+        prism(alu, [(-0.045, 0.0), (0.045, 0.0), (0.045, 0.012), (-0.045, 0.012)], 0.09, Mc @ T(0, 0, 0.05) @ R('X', 55) @ T(0, 0, 0))
+        box(dark, (0.07, 0.07, 0.004), (0, 0.016, 0.0), Mc @ T(0, 0, 0.05) @ R('X', 55) @ R('X', -90))
+        rod(alu, (0, 0.02, 0), (0, 0.02, 0.05), 0.006, 4, M=Mc)
+    tube(dark, [(-0.40, -0.36, zd + 0.012), (-0.22, -0.34, zd + 0.012), (-0.04, -0.36, zd + 0.012), (0.10, -0.33, zd + 0.012)], 0.012, 5, round_r=0.05)
+    tube(dark, [(0.40, -0.36, zd + 0.012), (0.36, -0.3, zd + 0.012), (0.1, -0.02, zd + 0.012), (0.05, 0.10, zd + 0.012)], 0.012, 5, round_r=0.05)
+    tube(dark, [(dx + 0.03, dy - 0.06, zd + 0.012), (0.03, 0.40, zd + 0.012), (0.02, 0.28, zd + 0.012)], 0.012, 5, round_r=0.04)
+    for a in range(0, 360, 60):                                                               # deck edge tie-downs
+        p = polar(0.52, a + 30, zd)
+        bolt(dark, 0.014, 0.01, T(*p))
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.6)
+    return finish(root, 'viking', [k])
+
+
+def _steer_unit(k, x, y, r, w, sx, top_z, tube_r=0.016, mat='titanium', act_r=None):
+    """Steering actuator above a corner wheel and the bracket that drops down the inboard side of
+    the wheel to its drive hub. (x, y) is the wheel centre, sx the side (+1 or -1)."""
+    ti, dark, alu = k(mat), k('painted_dark'), k('aluminium')
+    ar = act_r or r * 0.30
+    z0 = 2 * r + r * 0.12
+    lathe(dark, [(0.0, z0 + ar * 0.5), (ar, z0 + ar * 0.5), (ar, top_z - 0.01), (ar * 0.8, top_z), (0.0, top_z)], 10, T(x, y, 0))
+    lathe(alu, [(ar * 1.15, z0 + ar * 0.55), (ar * 1.15, z0 + ar * 0.9), (ar, z0 + ar * 0.9)], 10, T(x, y, 0))
+    xi = x - sx * (w / 2 + tube_r * 2.2)
+    tube(ti, [(x, y, z0 + ar * 0.3), (xi, y, z0 + ar * 0.3), (xi, y, r)], tube_r, 6, round_r=r * 0.35)
+    disc(ti, tube_r * 1.6, -0.01, ar * 0.6, 8, T(x, y, z0 + ar * 0.3 - tube_r) )
+    disc(dark, r * 0.36, -w * 0.30, tube_r, 10, T(xi, y, r) @ AX['X'] @ S(1, 1, -sx))
+
+
+def build_mer():
+    """Mars Exploration Rover (Spirit / Opportunity): the swept solar deck over a gold electronics
+    box, rocker-bogie on six wheels, the Pancam mast (part `mast`), antennas and the stowed arm."""
+    root = part('mer')
+    k = Kit(root)
+    gold, cell, alu, ti = k('gold_foil', 28), k('solar_cell'), k('aluminium'), k('titanium')
+    white, dark, lens = k('painted_white', 30), k('painted_dark'), k('lens')
+    WR, WW, X = 0.13, 0.16, 0.56
+    YF, YM, YR = -0.70, 0.05, 0.70
+    zd = 0.555                                       # underside of the deck panels
+    zt = zd + 0.022                                  # top of the cells
+
+    # --- warm electronics box ---
+    taper_box(gold, (0.58, 0.84), (0.66, 0.90), 0.30, zd, loc=(0, -0.03))
+    for i, (sx, sy, w) in enumerate(((0, -1, 0.60), (1, 0, 0.84), (0, 1, 0.60), (-1, 0, 0.84))):
+        Mf = T(sx * 0.312, -0.03 + sy * 0.438, 0.43) @ R('Z', (0, 90, 180, 270)[i]) @ R('X', 90)
+        foil_panel(gold, Mf, w - 0.06, 0.21, 5, 3, 0.008, seed=40 + i, bulge=0.012)
+    cbox(dark, (0.50, 0.70, 0.02), (0, -0.03, 0.292), c=0.03)
+    for sx in (-1, 1):                               # radiators / heat-rejection plates on the rear corners
+        cbox(alu, (0.012, 0.22, 0.14), (sx * 0.336, 0.25, 0.44), c=0.004)
+    # --- solar deck: nose panel, two swept wings, tail panel with two flaps ---
+    panels = [
+        [(-0.20, -0.64), (0.20, -0.64), (0.40, -0.26), (0.40, 0.40), (-0.40, 0.40), (-0.40, -0.26)],
+        [(0.42, -0.25), (1.15, 0.14), (1.15, 0.42), (0.42, 0.42)],
+        [(-0.42, 0.42), (-1.15, 0.42), (-1.15, 0.14), (-0.42, -0.25)],
+        [(-0.39, 0.42), (0.39, 0.42), (0.29, 0.80), (-0.29, 0.80)],
+        [(0.41, 0.44), (0.80, 0.44), (0.58, 0.74), (0.32, 0.80)],
+        [(-0.32, 0.80), (-0.58, 0.74), (-0.80, 0.44), (-0.41, 0.44)],
+    ]
+    for i, o in enumerate(panels):
+        solar_poly(gold, cell, o, T(0, 0, zd), t=0.016, margin=0.016, pitch=(0.075, 0.058), strip=0.0035, origin=(0.0, 0.03))
+    for sx in (-1, 1):                               # hinges along the fold lines
+        for y in (-0.12, 0.10, 0.30):
+            disc(dark, 0.013, -0.035, 0.035, 6, T(sx * 0.41, y, zd + 0.012) @ AX['Y'])
+        disc(dark, 0.013, -0.03, 0.03, 6, T(sx * 0.22, 0.41, zd + 0.012) @ AX['X'])
+        disc(dark, 0.013, -0.03, 0.03, 6, T(sx * 0.60, 0.43, zd + 0.012) @ AX['X'])
+        # wing support struts from the box up to the underside of each wing
+        rod(ti, (sx * 0.33, 0.20, 0.36), (sx * 0.86, 0.26, zd - 0.004), 0.009, 5)
+        rod(ti, (sx * 0.33, -0.10, 0.36), (sx * 0.74, 0.06, zd - 0.004), 0.009, 5)
+    rod(ti, (0.0, 0.40, 0.36), (0.0, 0.70, zd - 0.004), 0.009, 5)
+
+    # --- deck equipment ---
+    # high-gain disc on its two-axis gimbal
+    hx, hy = -0.20, 0.16
+    lathe(alu, [(0.0, zt), (0.045, zt), (0.045, zt + 0.03), (0.022, zt + 0.045), (0.022, zt + 0.22), (0.0, zt + 0.22)], 8, T(hx, hy, 0))
+    cbox(alu, (0.07, 0.06, 0.06), (hx, hy, zt + 0.23), c=0.01)
+    Mg = T(hx, hy, zt + 0.26) @ R('Z', -30) @ R('X', -35)
+    lathe(white, [(0.0, 0.03), (0.135, 0.03), (0.14, 0.036), (0.14, 0.048), (0.135, 0.054), (0.0, 0.054)], 18, Mg)
+    lathe(alu, [(0.0, 0.0), (0.04, 0.0), (0.04, 0.03), (0.0, 0.03)], 8, Mg)
+    lathe(dark, [(0.105, 0.054), (0.105, 0.057), (0.09, 0.057), (0.09, 0.054)], 18, Mg, close=True)
+    # low-gain mast, UHF monopole
+    lathe(white, [(0.0, zt), (0.03, zt), (0.03, zt + 0.02), (0.014, zt + 0.035), (0.014, zt + 0.36), (0.024, zt + 0.37), (0.024, zt + 0.47),
+                  (0.014, zt + 0.485), (0.0, zt + 0.485)], 8, T(0.22, 0.22, 0))
+    lathe(alu, [(0.0, zt), (0.016, zt), (0.016, zt + 0.03), (0.005, zt + 0.04), (0.004, zt + 0.26), (0.0, zt + 0.26)], 6, T(0.30, 0.34, 0))
+    # camera calibration target (a sundial): square plate, rings, post with a ball
+    cbox(alu, (0.085, 0.085, 0.012), (0.31, 0.02, zt + 0.006), c=0.012)
+    lathe(dark, [(0.034, zt + 0.012), (0.034, zt + 0.015), (0.022, zt + 0.015), (0.022, zt + 0.012)], 10, T(0.31, 0.02, 0), close=True)
+    rod(dark, (0.31, 0.02, zt + 0.012), (0.31, 0.02, zt + 0.055), 0.004, 5)
+    ball(dark, (0.31, 0.02, zt + 0.06), 0.008, 6, 3)
+    # electronics boxes, mast stow cradle, cabling
+    cbox(alu, (0.16, 0.12, 0.05), (-0.12, -0.20, zt + 0.025), c=0.012)
+    cbox(dark, (0.10, 0.07, 0.03), (0.10, -0.06, zt + 0.015), c=0.01)
+    cbox(alu, (0.05, 0.05, 0.07), (-0.02, 0.30, zt + 0.035), c=0.01)
+    tube(dark, [(0.10, -0.42, zt + 0.008), (0.02, -0.30, zt + 0.008), (-0.06, -0.14, zt + 0.008), (hx + 0.03, hy - 0.04, zt + 0.008)], 0.008, 5, round_r=0.04)
+    tube(dark, [(0.10, -0.10, zt + 0.008), (0.18, 0.06, zt + 0.008), (0.22, 0.18, zt + 0.008)], 0.008, 5, round_r=0.04)
+    for sx in (-1, 1):                               # magnets / pyro brackets on the nose
+        disc(alu, 0.02, 0.0, 0.012, 8, T(sx * 0.17, -0.55, zt))
+    for (x, y) in ((0.36, -0.20), (-0.36, -0.20), (0.34, 0.36), (-0.34, 0.36), (0.0, 0.76)):     # cable-cutter housings left from the lander
+        cbox(alu, (0.045, 0.045, 0.03), (x, y, zt + 0.015), c=0.008)
+        disc(dark, 0.012, zt + 0.03, zt + 0.04, 6, T(x, y, 0))
+
+    # --- rocker-bogie suspension ---
+    for sx in (-1, 1):
+        P = Vector((sx * 0.36, 0.08, 0.41))
+        B = Vector((sx * 0.47, 0.40, 0.25))
+        top_z = WR * 2 + 0.11
+        disc(dark, 0.045, -0.02, 0.05, 10, T(P.x - sx * 0.03, P.y, P.z) @ AX['X'] @ S(1, 1, sx))
+        sec = chamf(0.032, 0.046, 0.009)
+        sweep(ti, [P, (sx * 0.47, -0.22, 0.455), (sx * 0.53, -0.52, 0.44), (sx * X, YF, top_z + 0.0)], sec)
+        sweep(ti, [P, (sx * 0.43, 0.26, 0.33), B], sec)
+        ball(ti, B, 0.03, 8, 4)
+        disc(dark, 0.028, -0.03, 0.03, 8, T(*B) @ AX['X'])
+        sweep(ti, [B, (sx * 0.52, 0.58, 0.345), (sx * X, YR, top_z)], sec)
+        xi = sx * (X - WW / 2 - 0.03)
+        sweep(ti, [B, (xi, 0.22, 0.20), (xi, YM, WR + 0.01)], chamf(0.028, 0.04, 0.008))
+        disc(dark, WR * 0.36, -WW * 0.3, 0.0, 10, T(xi, YM, WR) @ AX['X'] @ S(1, 1, -sx))
+        # motor harness clipped along the rocker and bogie
+        tube(dark, [P + Vector((sx * 0.02, -0.02, 0.03)), (sx * 0.47, -0.22, 0.487), (sx * 0.53, -0.52, 0.472), (sx * X, YF + 0.03, top_z + 0.03)], 0.006, 4)
+        tube(dark, [P + Vector((sx * 0.02, 0.02, 0.02)), (sx * 0.43, 0.26, 0.36), B + Vector((0, 0, 0.035)), (sx * 0.52, 0.58, 0.378), (sx * X, YR - 0.03, top_z + 0.03)], 0.006, 4)
+        for y in (YF, YR):
+            _steer_unit(k, sx * X, y, WR, WW, sx, top_z + 0.012, tube_r=0.014)
+        for y in (YF, YM, YR):
+            Mw = T(sx * X, y, WR) @ AX['X'] @ S(1, 1, sx)
+            wheel(alu, alu, Mw, WR, WW, seg=18, th=0.005, cleats=18, cleat_h=0.005, cleat_t=0.007, crown=0.07, spokes=6,
+                  spoke_twist=0.9, spoke_w=0.034, spoke_t=0.004, hub_r=0.036, hub_x=0.045, hub_len=0.05, spoke_bm=dark)
+    # differential bar across the back of the box
+    rod(ti, (-0.36, 0.08, 0.41), (0.36, 0.08, 0.41), 0.014, 6)
+
+    # --- instrument arm stowed across the front, hazard cameras ---
+    sh = Vector((0.20, -0.47, 0.40))
+    el = Vector((-0.21, -0.52, 0.43))
+    wr = Vector((0.06, -0.60, 0.37))
+    cbox(alu, (0.08, 0.07, 0.09), tuple(sh), c=0.012)
+    rod(ti, sh, el, 0.017, 6)
+    ball(dark, el, 0.03, 8, 4)
+    rod(ti, el, wr, 0.015, 6)
+    ball(dark, wr, 0.026, 8, 4)
+    for i in range(4):                               # turret: four instruments in a cross
+        Mi = T(*wr) @ R('Y', 90 * i + 20) @ T(0.055, -0.01, 0)
+        disc(alu if i % 2 else dark, 0.027, -0.04, 0.045, 8, Mi @ AX['Y'])
+    for sx in (-1, 1):
+        cbox(dark, (0.05, 0.035, 0.035), (sx * 0.07, -0.468, 0.50), c=0.006)
+        disc(lens, 0.012, 0.0, 0.006, 6, T(sx * 0.07, -0.486, 0.50) @ R('X', 90))
+        cbox(dark, (0.05, 0.035, 0.035), (sx * 0.07, 0.408, 0.50), c=0.006)
+        disc(lens, 0.012, 0.0, 0.006, 6, T(sx * 0.07, 0.426, 0.50) @ R('X', -90))
+
+    # --- Pancam mast: its own part, pivoting about the azimuth drive on the deck ---
+    mast = part('mast', root, loc=(0.10, -0.47, zt))
+    km = Kit(mast)
+    mw, ma, md, ml = km('painted_white', 30), km('aluminium'), km('painted_dark'), km('lens')
+    lathe(ma, [(0.0, 0.0), (0.05, 0.0), (0.05, 0.05), (0.036, 0.065), (0.036, 0.10), (0.0, 0.10)], 12, I4)
+    lathe(mw, [(0.027, 0.10), (0.027, 0.50), (0.031, 0.51), (0.031, 0.80), (0.0, 0.80)], 10, I4)
+    lathe(ma, [(0.033, 0.49), (0.033, 0.52), (0.031, 0.52)], 10, I4)
+    cbox(mw, (0.075, 0.08, 0.09), (0, 0.0, 0.84), c=0.012)                     # elevation drive housing
+    disc(md, 0.03, -0.06, 0.06, 8, T(0, 0, 0.85) @ AX['X'])
+    hb = 0.925
+    cbox(mw, (0.44, 0.085, 0.085), (0, -0.01, hb), c=0.014)                    # camera bar
+    cbox(mw, (0.10, 0.11, 0.11), (0, -0.005, hb), c=0.014)
+    for sx in (-1, 1):
+        for xx, rr, ln in ((0.165, 0.03, 0.05), (0.075, 0.019, 0.035)):         # Pancam outboard, Navcam inboard
+            lathe(ma, [(rr, 0.0), (rr, ln), (rr - 0.005, ln), (rr - 0.005, 0.0)], 10, T(sx * xx, -0.05, hb) @ R('X', 90), close=True)
+            disc(ml, rr - 0.005, 0.0, ln - 0.012, 8, T(sx * xx, -0.05, hb) @ R('X', 90))
+        cbox(md, (0.012, 0.09, 0.09), (sx * 0.222, -0.01, hb), c=0.01)
+    disc(md, 0.022, 0.0, 0.012, 8, T(0, -0.06, hb + 0.0) @ R('X', 90))          # spectrometer aperture in the head
+    tube(md, [(0.03, 0.03, 0.12), (0.04, 0.03, 0.45), (0.04, 0.035, 0.78)], 0.006, 4)
+
+    anchor('col_body', root, loc=(0, 0.05, 0), radius=1.05)
+    return finish(root, 'mer', [k, km])
+
+
+def build_msl():
+    """Mars Science Laboratory rover (Curiosity; also stands in for Perseverance): the white box
+    body on a black rocker-bogie with six big wheels, the tall mast with its one-eyed camera head
+    (part `mast`), the stowed robot arm and turret (part `arm`) and the finned RTG angled up at the back."""
+    root = part('msl')
+    k = Kit(root)
+    white, body, dark = k('painted_white', 30), k('painted_white', 25, 0.014), k('painted_dark')
+    alu, ti, gold, lens, cu = k('aluminium'), k('titanium'), k('gold_foil', 28), k('lens'), k('copper')
+    WR, WW, X = 0.26, 0.40, 1.10
+    YF, YM, YR = -1.10, 0.05, 1.05
+    zb0, zb1 = 0.66, 1.10
+    y0, y1 = -0.80, 0.70
+    yc = (y0 + y1) / 2
+
+    # --- body: belly pan, box, deck plate ---
+    taper_box(dark, (0.96, 1.32), (1.20, 1.50), zb0, zb0 + 0.13, loc=(0, yc))
+    box(body, (1.20, 1.50, zb1 - zb0 - 0.13), (0, yc, (zb0 + 0.13 + zb1) / 2))
+    cbox(body, (1.27, 1.57, 0.035), (0, yc, zb1 + 0.012), c=0.05)
+    zt = zb1 + 0.03
+    for sx in (-1, 1):                               # side panels, connector boxes, harness
+        Ms = T(sx * 0.60, yc, 0.955) @ R('Z', 90 * sx) @ R('X', 90)
+        for px in (-0.45, 0.05, 0.50):
+            prism(white, rrect(0.40, 0.20, 0.02, 2), 0.008, Ms @ T(px * sx, 0.01, 0), z0=0.0)
+            for bx in (-0.17, 0.17):
+                for by in (-0.07, 0.07):
+                    bolt(alu, 0.009, 0.006, Ms @ T(px * sx + bx, 0.01 + by, 0.008))
+        cbox(alu, (0.05, 0.22, 0.10), (sx * 0.625, 0.40, 0.84), c=0.012)
+        tube(dark, [(sx * 0.612, -0.70, 0.83), (sx * 0.612, -0.25, 0.83), (sx * 0.612, -0.15, 0.80), (sx * 0.612, 0.28, 0.80)], 0.012, 5)
+    for y, ry in ((y0, 0), (y1, 180)):               # hazard camera pairs front and rear
+        for sx in (-1, 1):
+            Mh = T(sx * 0.22, y, 0.90) @ R('Z', ry)
+            cbox(dark, (0.16, 0.06, 0.07), (0, -0.03, 0), Mh, c=0.01)
+            for ex in (-0.04, 0.04):
+                disc(lens, 0.018, 0.0, 0.008, 8, Mh @ T(ex, -0.06, 0) @ R('X', 90))
+    foil_panel(gold, T(0, y0 - 0.003, 0.80) @ R('X', 90), 0.80, 0.12, 5, 2, 0.006, seed=5, bulge=0.008)
+    rod(alu, (-0.36, y0, 0.78), (-0.36, y0 - 0.13, 0.76), 0.012, 5)                               # observation tray on its bracket
+    lathe(white, [(0.0, 0.0), (0.10, 0.0), (0.10, 0.012), (0.09, 0.012), (0.085, 0.006), (0.0, 0.006)], 16, T(-0.36, y0 - 0.20, 0.755))
+    for bx in (-0.10, 0.04):                                                                      # spare drill-bit boxes
+        cbox(alu, (0.10, 0.07, 0.11), (bx, y0 - 0.035, 0.74), c=0.012)
+        disc(dark, 0.028, 0.0, 0.012, 8, T(bx, y0 - 0.07, 0.75) @ R('X', 90))
+
+    # --- deck: differential bar, antennas, instrument inlets, descent-stage fittings, fasteners ---
+    disc(dark, 0.06, zt, zt + 0.05, 12, T(0, -0.08, 0))
+    rod(dark, (-0.63, -0.06, zt + 0.035), (0.63, -0.06, zt + 0.035), 0.022, 8)
+    hx, hy = 0.40, 0.34                                # high-gain: a six-sided panel on a two-axis gimbal
+    lathe(alu, [(0.0, zt), (0.06, zt), (0.06, zt + 0.03), (0.03, zt + 0.05), (0.03, zt + 0.17), (0.0, zt + 0.17)], 10, T(hx, hy, 0))
+    cbox(alu, (0.09, 0.08, 0.08), (hx, hy, zt + 0.20), c=0.012)
+    Mg = T(hx, hy, zt + 0.25) @ R('Z', -20) @ R('X', -40)
+    prism(cu, ngon(0.17, 6), 0.022, Mg, z0=0.02)
+    prism(alu, ngon(0.18, 6), 0.012, Mg, z0=0.01)
+    disc(alu, 0.04, -0.02, 0.012, 8, Mg)
+    lathe(alu, [(0.0, zt), (0.035, zt), (0.035, zt + 0.02), (0.02, zt + 0.03), (0.02, zt + 0.11), (0.03, zt + 0.12), (0.03, zt + 0.19),
+                (0.0, zt + 0.20)], 8, T(0.47, 0.60, 0))                                              # low-gain
+    ux, uy = -0.50, 0.58                               # UHF quad-helix can
+    lathe(white, [(0.0, zt), (0.055, zt), (0.055, zt + 0.30), (0.045, zt + 0.32), (0.0, zt + 0.32)], 12, T(ux, uy, 0))
+    for i in range(4):
+        tube(cu, [(0.057 * cos(TAU * (i / 4 + t / 6)), 0.057 * sin(TAU * (i / 4 + t / 6)), zt + 0.03 + 0.26 * t / 6) for t in range(7)],
+             0.004, 3, M=T(ux, uy, 0))
+    for (x, y, r) in ((0.02, -0.52, 0.045), (0.16, -0.56, 0.035), (0.30, -0.50, 0.035)):             # sample inlets with lids
+        lathe(alu, [(0.0, zt), (r, zt), (r, zt + 0.04), (r * 1.25, zt + 0.07), (r * 1.25, zt + 0.08), (0.0, zt + 0.08)], 10, T(x, y, 0))
+        disc(white, r * 1.1, zt + 0.08, zt + 0.092, 10, T(x + r * 0.5, y + r * 0.4, 0))
+    for (x, y) in ((0.0, 0.52), (-0.42, -0.30), (0.42, -0.30)):                                      # descent-stage bipod cones
+        lathe(alu, [(0.0, zt), (0.075, zt), (0.075, zt + 0.015), (0.03, zt + 0.07), (0.0, zt + 0.07)], 10, T(x, y, 0))
+    cbox(alu, (0.09, 0.09, 0.012), (-0.30, 0.50, zt + 0.006), c=0.012)                               # calibration target
+    rod(dark, (-0.30, 0.50, zt + 0.012), (-0.30, 0.50, zt + 0.05), 0.004, 5)
+    ball(dark, (-0.30, 0.50, zt + 0.055), 0.008, 6, 3)
+    disc(dark, 0.05, zt, zt + 0.012, 12, T(-0.12, 0.25, 0))                                          # radiation detector window
+    cbox(white, (0.34, 0.26, 0.06), (0.08, 0.22, zt + 0.03), c=0.02)
+    cbox(alu, (0.20, 0.14, 0.04), (-0.30, 0.10, zt + 0.02), c=0.015)
+    tube(dark, [(-0.42, -0.50, zt + 0.012), (-0.30, -0.36, zt + 0.012), (-0.30, 0.02, zt + 0.012)], 0.012, 5, round_r=0.05)
+    tube(dark, [(0.08, 0.36, zt + 0.012), (0.20, 0.44, zt + 0.012), (0.36, 0.40, zt + 0.012)], 0.012, 5, round_r=0.05)
+    for ix in range(6):
+        for iy in range(7):
+            if (ix in (0, 5)) or (iy in (0, 6)):
+                bolt(alu, 0.011, 0.006, T(-0.58 + 0.232 * ix, y0 + 0.05 + 0.233 * iy, zt))
+
+    # --- radioisotope generator on the tail, angled up, between its two heat-exchanger plates ---
+    axis = Vector((0, cos(rad(27)), sin(rad(27))))
+    base = Vector((0, y1 + 0.10, 0.99))
+    F = frame(base, axis, (1, 0, 0))
+    lathe(alu, [(0.0, 0.0), (0.15, 0.0), (0.17, 0.03), (0.17, 0.06), (0.125, 0.07), (0.125, 0.60), (0.17, 0.61), (0.17, 0.645),
+                (0.13, 0.67), (0.0, 0.67)], 14, F)
+    for i in range(8):
+        Mf = F @ R('Z', 45 * i + 22.5)
+        prism(white, [(0.115, 0.075), (0.325, 0.095), (0.325, 0.575), (0.115, 0.595)], 0.012, Mf @ R('X', 90))
+    bolt_circle(dark, 0.10, 8, 0.012, 0.01, F @ T(0, 0, 0.67))
+    for sx in (-1, 1):
+        Mp = F @ T(sx * 0.40, 0.03, -0.02) @ R('Y', sx * 9)
+        prism(body, [(-0.19, 0.0), (0.19, 0.0), (0.22, 0.66), (-0.22, 0.66)], 0.024, Mp @ R('Y', 90) @ R('Z', 90))
+        foil_panel(gold, Mp @ T(-sx * 0.013, 0, 0.33) @ R('Y', -sx * 90), 0.58, 0.34, 4, 3, 0.006, seed=7 + sx, bulge=0.006)
+        for zz in (0.10, 0.56):
+            box(alu, (0.03, 0.42, 0.03), (sx * 0.014, 0, zz), Mp)
+        rod(alu, (sx * 0.40, y1, 1.02), F @ Vector((sx * 0.42, 0.0, 0.10)), 0.014, 5)
+        rod(alu, (sx * 0.40, y1, 0.80), F @ Vector((sx * 0.42, -0.16, 0.16)), 0.014, 5)
+        tube(cu, [F @ Vector((sx * 0.17, 0.0, 0.05)), F @ Vector((sx * 0.30, 0.0, 0.05)), F @ Vector((sx * 0.40, 0.0, 0.16))], 0.010, 5, round_r=0.04)
+    rod(alu, (0, y1, 0.86), base + axis * 0.02, 0.05, 8)
+    cbox(alu, (0.36, 0.08, 0.22), (0, y1 + 0.03, 0.93), c=0.02)
+
+    # --- rocker-bogie: black tubes from the body pivot to the six wheels ---
+    top_z = 2 * WR + 0.21
+    tr = 0.034
+    for sx in (-1, 1):
+        P = Vector((sx * 0.67, -0.06, 0.93))
+        B = Vector((sx * 0.93, 0.62, 0.68))
+        disc(dark, 0.075, -0.07, 0.06, 12, T(*P) @ AX['X'] @ S(1, 1, sx))
+        disc(alu, 0.05, 0.06, 0.075, 10, T(*P) @ AX['X'] @ S(1, 1, sx))
+        rod(dark, (sx * 0.63, -0.06, zt + 0.035), (sx * 0.66, -0.06, 0.98), 0.016, 6)
+        tube(dark, [P, (sx * 0.80, -0.50, 1.01), (sx * 1.00, -0.95, 0.90), (sx * X, YF, top_z - 0.03)], tr, 6, round_r=0.12)
+        tube(dark, [P, (sx * 0.83, 0.34, 0.82), B], tr, 6, round_r=0.10)
+        ball(dark, B, 0.055, 8, 4)
+        disc(alu, 0.04, -0.06, 0.06, 8, T(*B) @ AX['X'])
+        tube(dark, [B, (sx * 1.02, 0.86, 0.745), (sx * X, YR, top_z - 0.03)], tr, 6, round_r=0.08)
+        xi = sx * (X - WW / 2 - 0.075)
+        tube(dark, [B, (xi, 0.36, 0.52), (xi, YM, WR + 0.02)], tr, 6, round_r=0.10)
+        disc(dark, WR * 0.36, -WW * 0.3, 0.03, 10, T(xi, YM, WR) @ AX['X'] @ S(1, 1, -sx))
+        for y in (YF, YR):
+            _steer_unit(k, sx * X, y, WR, WW, sx, top_z, tube_r=0.03, mat='painted_dark', act_r=0.06)
+        for y in (YF, YM, YR):
+            Mw = T(sx * X, y, WR) @ AX['X'] @ S(1, 1, sx)
+            wheel(dark, alu, Mw, WR, WW, seg=20, th=0.008, cleats=18, cleat_h=0.012, cleat_t=0.012, chevron=0.055, crown=0.035,
+                  spokes=6, spoke_twist=1.05, spoke_w=0.07, spoke_t=0.005, hub_r=0.075, hub_x=-0.06, hub_len=0.12, spoke_bm=ti)
+
+    # --- mast: its own part, turning on the deck at the front right ---
+    mast = part('mast', root, loc=(-0.43, -0.60, zt))
+    km = Kit(mast)
+    mw, ma, md, ml = km('painted_white', 30), km('aluminium'), km('painted_dark'), km('lens')
+    cbox(ma, (0.16, 0.20, 0.07), (0, 0.03, 0.035), c=0.02)                      # deploy hinge
+    disc(md, 0.045, -0.10, 0.10, 8, T(0, 0.10, 0.05) @ AX['X'])
+    lathe(mw, [(0.058, 0.07), (0.058, 0.36), (0.066, 0.37), (0.066, 0.42), (0.052, 0.43), (0.052, 0.74), (0.0, 0.74)], 12, I4)
+    for an, ln in ((205, 0.30), (320, 0.26)):                                    # weather booms part-way up
+        p0 = Vector(polar(0.05, an, 0.395))
+        p1 = Vector(polar(0.05 + ln, an, 0.40))
+        rod(ma, p0, p1, 0.011, 6, r2=0.007)
+        ball(md, p1, 0.011, 5, 3)
+    lathe(ma, [(0.07, 0.74), (0.07, 0.80), (0.05, 0.81), (0.0, 0.81)], 12, I4)   # azimuth drive
+    hz = 0.93
+    cbox(mw, (0.06, 0.09, 0.14), (-0.215, 0.02, hz - 0.02), c=0.012)             # elevation yoke
+    cbox(mw, (0.42, 0.06, 0.05), (0.0, 0.05, 0.835), c=0.012)
+    cbox(mw, (0.36, 0.25, 0.235), (0.0, 0.0, hz), c=0.035)                       # the head
+    cbox(mw, (0.30, 0.19, 0.03), (0.0, 0.01, hz + 0.125), c=0.03)
+    Mf = T(0, -0.125, hz) @ R('X', 90)                                           # the face (local XY, +Z out of it)
+    lathe(ma, [(0.082, 0.0), (0.082, 0.03), (0.066, 0.03), (0.066, 0.0)], 16, Mf @ T(-0.06, 0.035, 0), close=True)
+    disc(ml, 0.066, 0.0, 0.012, 14, Mf @ T(-0.06, 0.035, 0))                     # the big laser-spectrometer eye
+    for ex in (0.055, 0.135):                                                    # two mast cameras, square hoods
+        cbox(md, (0.05, 0.035, 0.05), (ex, -0.01, 0.035 + 0.0), Mf @ R('X', -90), c=0.008)
+        disc(ml, 0.016, 0.0, 0.006, 8, Mf @ T(ex, 0.035, 0.018))
+    for ex in (-0.145, -0.10, 0.10, 0.145):                                      # navigation cameras along the chin
+        disc(ma, 0.016, 0.0, 0.02, 8, Mf @ T(ex, -0.085, 0))
+        disc(ml, 0.011, 0.02, 0.024, 6, Mf @ T(ex, -0.085, 0))
+    tube(md, [(0.05, 0.05, 0.10), (0.064, 0.05, 0.40), (0.06, 0.05, 0.72), (0.05, 0.09, 0.84)], 0.009, 5)
+
+    # --- robot arm, stowed across the front; its own part, pivoting at the shoulder ---
+    sh = Vector((0.46, y0 - 0.10, 0.86))
+    cbox(alu, (0.18, 0.12, 0.14), (sh.x, y0 - 0.04, sh.z - 0.02), c=0.02)       # shoulder bracket on the body
+    arm = part('arm', root, loc=tuple(sh))
+    ka = Kit(arm)
+    aw, aa, ad, al, at = ka('painted_white', 30), ka('aluminium'), ka('painted_dark'), ka('lens'), ka('titanium')
+    disc(ad, 0.065, -0.10, 0.09, 12, I4)                                         # shoulder azimuth actuator
+    disc(aa, 0.07, 0.09, 0.105, 12, I4)
+    disc(ad, 0.055, -0.08, 0.08, 10, T(0, -0.085, 0.03) @ AX['X'])               # shoulder elevation
+    E = Vector((-0.86, -0.13, 0.05))
+    W = Vector((-0.10, -0.25, -0.03))
+    S0 = Vector((0, -0.085, 0.03))
+    for a, b in ((S0, E), (E, W)):
+        d = (b - a).normalized()
+        sweep(aw, [a + d * 0.05, b - d * 0.05], chamf(0.06, 0.085, 0.018), up=(0, 0, 1))
+        for t in (0.25, 0.5, 0.75):
+            p = a.lerp(b, t)
+            sweep(aa, [p - d * 0.012, p + d * 0.012], chamf(0.068, 0.093, 0.02), up=(0, 0, 1))
+        tube(ad, [a + d * 0.08 + Vector((0, 0, 0.05)), a.lerp(b, 0.5) + Vector((0, 0, 0.052)), b - d * 0.08 + Vector((0, 0, 0.05))], 0.008, 4)
+    disc(ad, 0.06, -0.08, 0.08, 10, T(*E) @ R('Z', 8))                           # elbow
+    disc(aa, 0.066, 0.08, 0.092, 10, T(*E) @ R('Z', 8))
+    disc(ad, 0.05, -0.07, 0.07, 10, T(*W))                                       # wrist
+    Tc = W + Vector((0.02, -0.13, -0.05))                                        # turret hub
+    disc(ad, 0.05, -0.06, 0.06, 10, T(*(W + Vector((0.01, -0.06, -0.03)))) @ AX['Y'])
+    lathe(aa, [(0.0, -0.07), (0.11, -0.07), (0.12, -0.06), (0.12, 0.06), (0.11, 0.07), (0.0, 0.07)], 14, T(*Tc) @ AX['Y'])
+    Md = T(*Tc) @ R('Y', 15)                                                     # drill: the long barrel under the hub
+    lathe(aa, [(0.0, -0.46), (0.018, -0.46), (0.022, -0.36), (0.05, -0.34), (0.06, -0.30), (0.06, -0.06), (0.0, -0.06)], 12, Md)
+    lathe(ad, [(0.066, -0.27), (0.066, -0.12), (0.06, -0.12)], 12, Md)
+    for sxx in (-1, 1):
+        rod(at, Md @ Vector((sxx * 0.07, 0.0, -0.20)), Md @ Vector((sxx * 0.075, 0.0, -0.43)), 0.009, 5)
+    cbox(aw, (0.20, 0.15, 0.22), (0.19, 0.0, 0.02), T(*Tc) @ R('Y', -10), c=0.03)      # sample-handling box
+    cbox(ad, (0.10, 0.155, 0.06), (0.19, 0.0, 0.14), T(*Tc) @ R('Y', -10), c=0.02)
+    Mx = T(*Tc) @ R('Y', 125)                                                    # spectrometer and hand-lens camera
+    disc(aa, 0.05, 0.10, 0.23, 10, Mx)
+    disc(ad, 0.042, 0.23, 0.245, 10, Mx)
+    Mc = T(*Tc) @ R('Y', -120)
+    disc(aw, 0.04, 0.10, 0.20, 10, Mc)
+    disc(al, 0.026, 0.20, 0.208, 8, Mc)
+    Mb = T(*Tc) @ R('Y', -65)                                                    # dust brush
+    disc(ad, 0.03, 0.10, 0.19, 8, Mb)
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.95)
+    return finish(root, 'msl', [k, km, ka])
+
+
+def fan_array(sub, cell, fit, M, r, n=10, cone=2.5, hub_r=0.07, rings=5):
+    """A circular fold-out solar fan (ten triangular gores on radial spars) lying in local XY,
+    its hub at the origin. `sub` is the membrane seen from below and between the cells."""
+    half = pi / n
+    for i in range(n):
+        Mg = M @ R('Z', 360.0 * i / n) @ R('Y', cone)
+        ri = hub_r * 1.5
+        o = [(ri * cos(half), -ri * sin(half)), (r * cos(half), -r * sin(half)), (r * cos(half), r * sin(half)),
+             (ri * cos(half), ri * sin(half))]
+        solar_poly(sub, cell, o, Mg, t=0.006, margin=0.014, pitch=((r * cos(half) - ri) / rings, 0), strip=0.006,
+                   origin=(r * cos(half) - 0.014, 0.0))
+        rod(fit, (hub_r * 0.8, hub_r * 0.8 * math.tan(half), -0.008), (r * cos(half), r * sin(half), -0.008), 0.009, 4, r2=0.005, M=Mg)
+    lathe(fit, [(0.0, -0.06), (hub_r, -0.06), (hub_r * 1.25, -0.04), (hub_r * 1.25, 0.012), (hub_r, 0.022), (0.0, 0.022)], n, M)
+
+
+def _lander_bus(k, zdeck=0.98, deck_r=0.76, array_r=0.92, array_x=1.86, foot_r=1.20):
+    """The Phoenix / InSight platform: a round deck over a foil-wrapped enclosure, tanks, twelve
+    descent thrusters, three legs (back, front-left, front-right) and the two solar fans on +/-X."""
+    white, alu, gold, dark = k('painted_white', 30), k('aluminium'), k('gold_foil', 28), k('painted_dark')
+    cell, ti = k('solar_cell'), k('titanium')
+    deck = ngon(deck_r, 12, 15)
+    prism(white, deck, 0.05, T(0, 0, zdeck - 0.05), z0=0.0)
+    prism(alu, ngon(deck_r + 0.012, 12, 15), 0.03, T(0, 0, zdeck - 0.062), z0=0.0)
+    for i in range(12):                                   # deck edge fasteners
+        bolt(alu, 0.012, 0.006, T(*polar(deck_r - 0.05, 30 * i, zdeck)))
+    dk = [(x * 0.985, y * 0.985) for x, y in deck]
+    for p0, dv in (((0.0, -0.30), (1, 0)), ((0.0, 0.30), (1, 0)), ((-0.26, 0.0), (0, 1)), ((0.26, 0.0), (0, 1))):   # panel seams
+        seg = clip_line(dk, p0, dv)
+        beam(alu, (seg[0][0], seg[0][1], zdeck), (seg[1][0], seg[1][1], zdeck), 0.012, 0.004)
+    for i in range(24):
+        if i % 2:
+            bolt(alu, 0.008, 0.004, T(*polar(0.36, 15 * i, zdeck)), 5)
+    # enclosure under the deck
+    ze0 = zdeck - 0.44
+    prism(gold, ngon(0.54, 8, 22.5), zdeck - 0.06 - ze0, T(0, 0, ze0), z0=0.0)
+    for i in range(8):
+        Mf = R('Z', 45 * i) @ T(0.54 * cos(rad(22.5)) + 0.002, 0, (ze0 + zdeck - 0.06) / 2) @ R('Y', 90) @ R('Z', 90)
+        foil_panel(gold, Mf, 0.38, zdeck - 0.10 - ze0, 4, 3, 0.008, seed=70 + i, bulge=0.012)
+    prism(dark, ngon(0.46, 8, 22.5), 0.04, T(0, 0, ze0 - 0.04), z0=0.0)
+    # propellant tanks on the +/-X sides, helium bottle at the back
+    for sx in (-1, 1):
+        ball(ti, (sx * 0.50, 0, ze0 + 0.16), 0.20, 12, 6)
+        lathe(alu, [(0.203, -0.012), (0.207, -0.012), (0.207, 0.012), (0.203, 0.012)], 12, T(sx * 0.50, 0, ze0 + 0.16), close=True)
+    ball(ti, (0.0, 0.50, ze0 + 0.13), 0.13, 10, 5)
+    # descent thrusters: four clusters of three under the rim
+    for a in (45, 135, 225, 315):
+        Mc = R('Z', a) @ T(0.56, 0, ze0 + 0.02)
+        cbox(alu, (0.10, 0.34, 0.06), (0, 0, 0.03), Mc, c=0.02)
+        for dy in (-0.11, 0.0, 0.11):
+            lathe(dark, [(0.022, 0.0), (0.02, -0.03), (0.045, -0.12), (0.04, -0.12), (0.014, -0.03)], 8, Mc @ T(0, dy, 0), close=True)
+    # legs
+    for a in (90, 210, 330):
+        Ml = R('Z', a)
+        top = Ml @ Vector((deck_r - 0.08, 0, zdeck - 0.07))
+        foot = Ml @ Vector((foot_r, 0, 0))
+        bl, br = Ml @ Vector((0.44, 0.26, ze0 + 0.02)), Ml @ Vector((0.44, -0.26, ze0 + 0.02))
+        lander_leg(alu, top, foot, bl, br, r=0.03, knee=0.40, pad_bm=alu, pad_r=0.145, sleeve=dark)
+    # solar fans and their yokes
+    for sx in (-1, 1):
+        Ma = T(sx * array_x, 0, zdeck - 0.02) @ R('Z', 90 + 90 * sx + 18)
+        fan_array(gold, cell, alu, Ma, array_r)
+        tube(alu, [(sx * (deck_r - 0.05), 0.0, zdeck - 0.09), (sx * (deck_r + 0.12), 0, zdeck - 0.10), (sx * (array_x - 0.05), 0, zdeck - 0.085)],
+             0.022, 6, round_r=0.05)
+        cbox(alu, (0.12, 0.16, 0.07), (sx * (deck_r + 0.02), 0, zdeck - 0.09), c=0.02)
+        for sy in (-1, 1):
+            rod(alu, (sx * (deck_r - 0.02), sy * 0.30, zdeck - 0.07), (sx * (array_x - array_r * 0.55), sy * 0.05, zdeck - 0.07), 0.009, 4)
+    return ze0
+
+
+def _ribbon(bm, pts, w=0.06, t=0.004, up=(0, 0, 1)):
+    """A flat tether lying along a path."""
+    sweep(bm, pts, [(w / 2, -t / 2), (w / 2, t / 2), (-w / 2, t / 2), (-w / 2, -t / 2)], up=up)
+
+
+def build_phoenix():
+    """Phoenix: the three-legged polar lander with two round solar fans, the stereo camera and
+    weather masts, the oven and wet-lab boxes, and the robot arm digging in front."""
+    root = part('phoenix')
+    k = Kit(root)
+    zd = 0.98
+    _lander_bus(k, zdeck=zd, deck_r=0.76, array_r=0.92, array_x=1.86)
+    white, alu, gold, dark, lens, ti = k('painted_white', 30), k('aluminium'), k('gold_foil', 28), k('painted_dark'), k('lens'), k('titanium')
+
+    # --- stereo camera on its mast (2 m above the ground) ---
+    cx, cy = -0.30, -0.36
+    lathe(alu, [(0.0, zd), (0.06, zd), (0.06, zd + 0.04), (0.03, zd + 0.06), (0.026, zd + 0.86), (0.04, zd + 0.87), (0.04, zd + 0.93), (0.0, zd + 0.93)], 10, T(cx, cy, 0))
+    Mh = T(cx, cy, zd + 0.99)
+    cbox(alu, (0.07, 0.08, 0.10), (0, 0.02, -0.02), Mh, c=0.012)
+    lathe(white, [(0.0, -0.15), (0.045, -0.15), (0.05, -0.14), (0.05, 0.14), (0.045, 0.15), (0.0, 0.15)], 12, Mh @ AX['X'])
+    for sx in (-1, 1):
+        cbox(white, (0.075, 0.06, 0.085), (sx * 0.10, -0.045, 0), Mh, c=0.012)
+        disc(lens, 0.022, 0.0, 0.006, 8, Mh @ T(sx * 0.10, -0.076, 0) @ R('X', 90))
+    # --- weather mast: tapered pole, three temperature arms, the wind telltale on top ---
+    wx, wy = 0.40, 0.42
+    lathe(alu, [(0.0, zd), (0.05, zd), (0.05, zd + 0.03), (0.022, zd + 0.05), (0.012, zd + 1.14), (0.0, zd + 1.14)], 8, T(wx, wy, 0))
+    for h, an in ((0.30, 40), (0.62, 40), (1.08, 40)):
+        p0 = Vector((wx, wy, zd + h))
+        p1 = p0 + Vector(polar(0.11, an))
+        rod(alu, p0, p1, 0.004, 4)
+        ball(dark, p1, 0.008, 5, 3)
+    rod(alu, (wx, wy, zd + 1.14), (wx, wy, zd + 1.20), 0.004, 4)
+    lathe(alu, [(0.035, zd + 1.20), (0.035, zd + 1.204), (0.03, zd + 1.204), (0.03, zd + 1.20)], 8, T(wx, wy, 0), close=True)
+    rod(dark, (wx + 0.004, wy, zd + 1.20), (wx + 0.02, wy + 0.01, zd + 1.13), 0.0025, 3)
+    ball(dark, (wx + 0.02, wy + 0.01, zd + 1.125), 0.009, 5, 3)
+    cbox(white, (0.20, 0.16, 0.14), (wx - 0.02, wy - 0.22, zd + 0.07), c=0.02)                 # lidar
+    disc(dark, 0.05, zd + 0.14, zd + 0.15, 10, T(wx - 0.05, wy - 0.22, 0))
+    disc(lens, 0.03, zd + 0.15, zd + 0.153, 8, T(wx - 0.05, wy - 0.22, 0))
+
+    # --- thermal and evolved-gas analyser: eight ovens under spring doors, some open ---
+    Mt = T(-0.36, 0.20, zd) @ R('Z', 20)
+    cbox(white, (0.36, 0.30, 0.20), (0, 0, 0.10), Mt, c=0.02)
+    prism(gold, [(-0.15, 0.20), (0.15, 0.20), (0.0, 0.27)], 0.34, Mt @ R('Z', 90) @ R('X', 90))
+    for i in range(4):
+        x = -0.132 + 0.088 * i
+        for sy, op in ((-1, (65, 20, 70, 8)[i]), (1, (10, 75, 30, 60)[i])):
+            Md = Mt @ T(x, sy * 0.15, 0.20) @ R('X', -sy * (25 + op))                               # door hinged on the eave
+            box(alu, (0.075, 0.004, 0.16), (0, 0, 0), Md @ R('X', sy * 90) @ T(0, 0, -0.08))
+    cbox(alu, (0.10, 0.34, 0.10), (-0.21, 0, 0.05), Mt, c=0.015)
+    # --- microscopy / wet chemistry box with its four beaker drawers, the mini-disc ---
+    Mm = T(0.16, -0.22, zd) @ R('Z', -10)
+    cbox(gold, (0.34, 0.26, 0.18), (0, 0, 0.09), Mm, c=0.02)
+    cbox(alu, (0.30, 0.22, 0.02), (0, 0, 0.19), Mm, c=0.02)
+    for i in range(4):
+        cbox(white, (0.055, 0.07, 0.07), (-0.11 + 0.073 * i, -0.06, 0.235), Mm, c=0.008)
+        box(dark, (0.035, 0.03, 0.004), (-0.11 + 0.073 * i, -0.075, 0.272), Mm)
+    cbox(dark, (0.12, 0.09, 0.05), (0.07, 0.06, 0.225), Mm, c=0.012)
+    lathe(alu, [(0.0, zd), (0.06, zd), (0.06, zd + 0.006), (0.0, zd + 0.006)], 16, T(-0.08, 0.50, 0))
+    lathe(dark, [(0.0, zd + 0.006), (0.02, zd + 0.006), (0.02, zd + 0.008), (0.0, zd + 0.008)], 8, T(-0.08, 0.50, 0))
+    cbox(alu, (0.10, 0.10, 0.012), (0.50, 0.12, zd + 0.006), c=0.012)                          # camera calibration target
+    for i in range(3):
+        disc(dark, 0.012, zd + 0.012, zd + 0.016, 6, T(0.50 + 0.028 * cos(i * 2.1), 0.12 + 0.028 * sin(i * 2.1), 0))
+    rod(dark, (0.50, 0.12, zd + 0.012), (0.50, 0.12, zd + 0.05), 0.004, 4)
+    cbox(gold, (0.20, 0.14, 0.09), (-0.50, -0.14, zd + 0.045), c=0.015)                   # arm electronics under a blanket
+    cbox(alu, (0.12, 0.08, 0.05), (0.02, 0.26, zd + 0.025), c=0.012)
+    lathe(alu, [(0.0, zd), (0.035, zd), (0.035, zd + 0.09), (0.02, zd + 0.10), (0.0, zd + 0.10)], 8, T(-0.56, 0.22, 0))
+    # --- UHF helix and monopole at the back ---
+    ux, uy = 0.10, 0.56
+    lathe(alu, [(0.0, zd), (0.07, zd), (0.07, zd + 0.02), (0.012, zd + 0.03), (0.012, zd + 0.34), (0.0, zd + 0.34)], 8, T(ux, uy, 0))
+    tube(alu, [(0.05 * cos(TAU * t / 8), 0.05 * sin(TAU * t / 8), zd + 0.04 + 0.28 * t / 28) for t in range(29)], 0.005, 4, M=T(ux, uy, 0))
+    rod(alu, (-0.40, 0.52, zd), (-0.40, 0.52, zd + 0.42), 0.006, 4, r2=0.004)
+    disc(alu, 0.022, zd, zd + 0.03, 6, T(-0.40, 0.52, 0))
+    tube(dark, [(cx + 0.04, cy + 0.04, zd + 0.01), (-0.10, -0.05, zd + 0.01), (0.10, 0.20, zd + 0.01), (wx - 0.06, wy - 0.06, zd + 0.01)], 0.01, 5, round_r=0.06)
+    tube(dark, [(-0.2, 0.26, zd + 0.01), (-0.02, 0.36, zd + 0.01), (ux - 0.04, uy - 0.05, zd + 0.01)], 0.01, 5, round_r=0.06)
+
+    # --- robot arm: shoulder on the front of the deck, elbow high, scoop on the ground ---
+    sh = Vector((0.42, -0.50, zd + 0.12))
+    el = Vector((0.52, -1.28, zd + 0.52))
+    wr = Vector((0.58, -2.02, 0.30))
+    lathe(alu, [(0.0, zd), (0.075, zd), (0.075, zd + 0.05), (0.055, zd + 0.06), (0.055, zd + 0.10), (0.0, zd + 0.10)], 12, T(sh.x, sh.y, 0))
+    disc(dark, 0.05, -0.07, 0.07, 10, T(*sh) @ AX['X'])
+    for a, b in ((sh, el), (el, wr)):
+        d = (b - a).normalized()
+        rod(alu, a + d * 0.04, b - d * 0.04, 0.026, 8)
+        tube(dark, [a + d * 0.08 + Vector((0.03, 0, 0.012)), a.lerp(b, 0.5) + Vector((0.032, 0, 0.012)), b - d * 0.08 + Vector((0.03, 0, 0.012))], 0.007, 4)
+        for t in (0.3, 0.7):
+            lathe(dark, [(0.03, -0.012), (0.03, 0.012)], 8, frame(a.lerp(b, t), d))
+    disc(dark, 0.045, -0.06, 0.06, 10, T(*el) @ AX['X'])
+    disc(alu, 0.05, 0.06, 0.07, 10, T(*el) @ AX['X'])
+    disc(dark, 0.04, -0.05, 0.05, 10, T(*wr) @ AX['X'])
+    Ms = T(*wr) @ R('X', 20)                                                                     # scoop with its rasp housing
+    prism(ti, [(0.0, 0.03), (-0.20, 0.035), (-0.27, -0.03), (-0.26, -0.075), (-0.05, -0.08), (0.02, -0.03)], 0.12, Ms @ YZX)
+    cbox(dark, (0.08, 0.10, 0.06), (0, -0.05, -0.105), Ms, c=0.012)
+    cbox(white, (0.06, 0.07, 0.06), (0.0, 0.06, 0.06), T(*wr), c=0.01)                           # arm camera
+    disc(lens, 0.015, 0.0, 0.005, 6, T(wr.x, wr.y + 0.025, wr.z + 0.06) @ R('X', 90) @ R('X', 180))
+    rod(alu, wr + Vector((-0.04, 0.02, 0.02)), wr + Vector((-0.07, -0.02, -0.22)), 0.007, 4)     # thermal probe needles
+    rod(alu, wr + Vector((-0.07, 0.02, 0.02)), wr + Vector((-0.10, -0.02, -0.22)), 0.007, 4)
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.45)
+    anchor('col_array_l', root, loc=(1.86, 0, 0), radius=1.0)
+    anchor('col_array_r', root, loc=(-1.86, 0, 0), radius=1.0)
+    return finish(root, 'phoenix', [k])
+
+
+def build_insight():
+    """InSight: the Phoenix-type platform with bigger solar fans and a bare-looking deck (arm,
+    helix and two horn antennas, weather booms), and its two instruments set on the ground in
+    front: the seismometer under its domed wind shield and the heat probe, each on a ribbon tether."""
+    root = part('insight')
+    k = Kit(root)
+    zd = 0.98
+    _lander_bus(k, zdeck=zd, deck_r=0.78, array_r=1.075, array_x=2.02)
+    white, alu, gold, dark, lens, ti = k('painted_white', 30), k('aluminium'), k('gold_foil', 28), k('painted_dark'), k('lens'), k('titanium')
+    cu = k('copper')
+
+    # --- deck: helix antenna, two horn antennas, weather booms, pressure inlet, reflector, empty cradles ---
+    ux, uy = -0.42, 0.40
+    lathe(alu, [(0.0, zd), (0.075, zd), (0.075, zd + 0.02), (0.014, zd + 0.03), (0.014, zd + 0.42), (0.0, zd + 0.42)], 8, T(ux, uy, 0))
+    tube(cu, [(0.055 * cos(TAU * t / 8), 0.055 * sin(TAU * t / 8), zd + 0.05 + 0.34 * t / 32) for t in range(33)], 0.005, 4, M=T(ux, uy, 0))
+    for sx in (-1, 1):
+        Mh = T(sx * 0.50, 0.40 if sx > 0 else -0.05, zd) @ R('Z', 90 - 90 * sx) @ R('Y', 58)       # horn leaning out over the fan
+        lathe(alu, [(0.0, 0.0), (0.03, 0.0), (0.03, 0.10), (0.085, 0.27), (0.08, 0.27), (0.024, 0.10), (0.0, 0.10)], 12, Mh @ T(0, 0, 0.06))
+        cbox(alu, (0.09, 0.09, 0.07), (0, 0, 0.03), T(sx * 0.50, 0.40 if sx > 0 else -0.05, zd), c=0.015)
+        # weather boom on the deck edge, facing outward
+        p0 = Vector((sx * 0.60, -0.42, zd + 0.03))
+        cbox(white, (0.07, 0.06, 0.06), tuple(p0), c=0.01)
+        rod(alu, p0, p0 + Vector((sx * 0.20, -0.04, 0.05)), 0.012, 6, r2=0.007)
+        ball(dark, p0 + Vector((sx * 0.20, -0.04, 0.05)), 0.01, 5, 3)
+    lathe(alu, [(0.0, zd), (0.02, zd), (0.02, zd + 0.10), (0.05, zd + 0.11), (0.05, zd + 0.14), (0.02, zd + 0.15), (0.0, zd + 0.15)], 10, T(0.05, 0.10, 0))
+    lathe(alu, [(0.0, zd), (0.06, zd), (0.06, zd + 0.01), (0.045, zd + 0.045), (0.0, zd + 0.055)], 12, T(0.34, -0.36, 0))    # retroreflector dome
+    for i in range(8):
+        disc(lens, 0.008, 0.0, 0.004, 5, T(0.34, -0.36, zd + 0.03) @ R('Z', 45 * i) @ R('Y', 40) @ T(0, 0, 0.022))
+    # the two empty cradles where the instruments rode, and the wind-shield's three hold-downs
+    lathe(alu, [(0.20, zd), (0.20, zd + 0.02), (0.17, zd + 0.02), (0.17, zd)], 16, T(-0.18, -0.02, 0), close=True)
+    for i in range(3):
+        lathe(alu, [(0.0, zd), (0.025, zd), (0.02, zd + 0.06), (0.0, zd + 0.06)], 6, T(-0.18, -0.02, 0) @ T(*polar(0.185, 120 * i + 30)))
+    cbox(alu, (0.22, 0.16, 0.025), (0.22, 0.42, zd + 0.012), c=0.02)
+    for sx in (-1, 1):
+        cbox(dark, (0.02, 0.16, 0.06), (0.22 + sx * 0.10, 0.42, zd + 0.04), c=0.005)
+    cbox(gold, (0.26, 0.20, 0.12), (-0.05, 0.50, zd + 0.06), c=0.02)                               # tether storage box
+    cbox(alu, (0.09, 0.09, 0.012), (0.46, -0.16, zd + 0.006), c=0.012)                             # camera calibration target
+    for i in range(3):
+        disc(dark, 0.011, zd + 0.012, zd + 0.016, 6, T(0.46 + 0.025 * cos(i * 2.1), -0.16 + 0.025 * sin(i * 2.1), 0))
+    for (x, y, rz) in ((-0.52, 0.10, 20), (0.10, -0.36, 0)):                                       # the two name chips on their brackets
+        cbox(alu, (0.07, 0.05, 0.03), (0, 0, zd + 0.015), T(x, y, 0) @ R('Z', rz), c=0.008)
+        box(dark, (0.045, 0.03, 0.003), (0, 0, zd + 0.031), T(x, y, 0) @ R('Z', rz))
+    cbox(gold, (0.18, 0.14, 0.08), (0.44, 0.16, zd + 0.04), c=0.015)                               # magnetometer and electronics under blankets
+    cbox(alu, (0.10, 0.07, 0.10), (-0.46, -0.24, zd + 0.05), c=0.012)
+    cbox(white, (0.16, 0.12, 0.08), (0.30, 0.05, zd + 0.04), c=0.015)
+    tube(dark, [(ux + 0.05, uy - 0.03, zd + 0.01), (-0.2, 0.28, zd + 0.01), (0.0, 0.36, zd + 0.01)], 0.01, 5, round_r=0.05)
+    tube(dark, [(0.30, 0.0, zd + 0.01), (0.34, -0.2, zd + 0.01), (0.26, -0.52, zd + 0.01)], 0.01, 5, round_r=0.05)
+
+    # --- instrument deployment arm: raised over the workspace, grapple hanging from the wrist ---
+    sh = Vector((0.24, -0.56, zd + 0.13))
+    el = Vector((0.20, -0.98, zd + 0.86))
+    wr = Vector((0.14, -1.52, zd + 0.34))
+    lathe(alu, [(0.0, zd), (0.08, zd), (0.08, zd + 0.05), (0.06, zd + 0.065), (0.06, zd + 0.11), (0.0, zd + 0.11)], 12, T(sh.x, sh.y, 0))
+    disc(dark, 0.052, -0.075, 0.075, 10, T(*sh) @ AX['X'])
+    for a, b in ((sh, el), (el, wr)):
+        d = (b - a).normalized()
+        rod(white, a + d * 0.04, b - d * 0.04, 0.027, 8)
+        tube(dark, [a + d * 0.08 + Vector((0.032, 0, 0.0)), a.lerp(b, 0.5) + Vector((0.034, 0, 0.0)), b - d * 0.08 + Vector((0.032, 0, 0.0))], 0.007, 4)
+        lathe(alu, [(0.031, -0.012), (0.031, 0.012)], 8, frame(a.lerp(b, 0.5), d))
+    disc(dark, 0.047, -0.065, 0.065, 10, T(*el) @ AX['X'])
+    disc(dark, 0.04, -0.055, 0.055, 10, T(*wr) @ AX['X'])
+    cbox(white, (0.07, 0.07, 0.08), (0.075, 0.0, -0.02), T(*el.lerp(wr, 0.55)), c=0.012)            # arm camera on the forearm
+    disc(lens, 0.016, 0.0, 0.005, 6, T(*el.lerp(wr, 0.55)) @ T(0.075, -0.036, -0.02) @ R('X', 90))
+    Msc = T(*wr) @ R('X', -35)                                                                    # scoop
+    prism(ti, [(0.0, 0.03), (-0.13, 0.03), (-0.17, -0.02), (-0.16, -0.06), (-0.03, -0.065), (0.02, -0.02)], 0.10, Msc @ YZX)
+    g0 = wr + Vector((0.0, -0.03, -0.03))                                                         # grapple on its cable
+    rod(dark, g0, g0 + Vector((0, 0, -0.22)), 0.004, 4)
+    lathe(alu, [(0.0, -0.22), (0.022, -0.22), (0.03, -0.25), (0.022, -0.30), (0.0, -0.30)], 8, T(*g0))
+    for i in range(5):
+        an = 72 * i
+        tube(alu, [g0 + Vector((0, 0, -0.29)), g0 + Vector(polar(0.055, an, -0.34)), g0 + Vector(polar(0.04, an, -0.41))], 0.005, 4)
+
+    # --- the seismometer under its wind and thermal shield, on the ground in front ---
+    sx0, sy0 = -0.40, -1.92
+    Ms = T(sx0, sy0, 0)
+    lathe(white, [(0.36, 0.10), (0.36, 0.22), (0.33, 0.31), (0.24, 0.375), (0.10, 0.40), (0.0, 0.40)], 20, Ms)
+    for i in range(3):                                                                            # shield legs with pad feet
+        p = Vector(polar(0.37, 120 * i + 40))
+        rod(alu, (sx0 + p.x, sy0 + p.y, 0.22), (sx0 + p.x * 1.18, sy0 + p.y * 1.18, 0.02), 0.012, 5)
+        disc(alu, 0.045, 0.0, 0.02, 8, T(sx0 + p.x * 1.18, sy0 + p.y * 1.18, 0))
+    rng = random.Random(4)                                                                        # the skirt: scale mail over a thermal blanket
+    rows = []
+    for j, (rr, zz) in enumerate(((0.362, 0.125), (0.39, 0.06), (0.47, 0.012), (0.55, 0.004))):
+        rows.append([Ms @ Vector(polar(rr * (1 + (0.05 * (rng.random() - 0.5) if j else 0)), 360 * i / 24, zz + (0.012 * rng.random() if j > 1 else 0)))
+                     for i in range(24)])
+    sk = k('gold_foil', 50)
+    vr = [[sk.verts.new(p) for p in row] for row in rows]
+    for a, b in zip(vr, vr[1:]):
+        for i in range(24):
+            sk.faces.new((a[i], a[(i + 1) % 24], b[(i + 1) % 24], b[i]))
+    lathe(alu, [(0.365, 0.10), (0.372, 0.10), (0.372, 0.135), (0.365, 0.135)], 20, Ms, close=True)
+    lathe(alu, [(0.0, 0.40), (0.035, 0.40), (0.035, 0.42), (0.012, 0.43), (0.012, 0.47), (0.03, 0.48), (0.03, 0.495), (0.0, 0.50)], 8, Ms)   # grapple hook
+    # --- the heat probe: a small tower on four feet with its mole tube ---
+    hx0, hy0 = 0.78, -1.78
+    Mp = T(hx0, hy0, 0) @ R('Z', 25)
+    cbox(dark, (0.26, 0.22, 0.30), (0, 0, 0.21), Mp, c=0.03)
+    cbox(gold, (0.20, 0.224, 0.16), (0, 0, 0.20), Mp, c=0.02)
+    lathe(alu, [(0.0, 0.05), (0.035, 0.05), (0.035, 0.52), (0.028, 0.54), (0.0, 0.54)], 10, Mp @ T(0.0, -0.145, 0))
+    cbox(alu, (0.10, 0.05, 0.06), (0, -0.12, 0.36), Mp, c=0.01)
+    for fx in (-1, 1):
+        for fy in (-1, 1):
+            rod(alu, Mp @ Vector((fx * 0.11, fy * 0.09, 0.08)), Mp @ Vector((fx * 0.19, fy * 0.16, 0.012)), 0.01, 5)
+            disc(alu, 0.035, 0.0, 0.014, 8, Mp @ T(fx * 0.19, fy * 0.16, 0))
+    lathe(alu, [(0.0, 0.36), (0.02, 0.36), (0.02, 0.40), (0.0, 0.42)], 6, Mp)                     # grapple knob
+    # --- ribbon tethers back to the lander ---
+    tw = k('painted_white', 60)
+    _ribbon(tw, [(-0.16, -0.72, zd - 0.10), (-0.17, -0.80, 0.50), (-0.19, -0.92, 0.06), (-0.22, -1.10, 0.008), (-0.28, -1.36, 0.008),
+                 (-0.33, -1.50, 0.03), (sx0 + 0.02, sy0 + 0.34, 0.012), (sx0 + 0.04, sy0 + 0.20, 0.10)], 0.07)
+    cbox(alu, (0.10, 0.06, 0.03), (-0.245, -1.20, 0.02), T() @ R('Z', 12), c=0.01)                # pinning mass
+    _ribbon(tw, [(0.12, -0.74, zd - 0.10), (0.14, -0.82, 0.50), (0.20, -0.95, 0.06), (0.32, -1.15, 0.008), (0.55, -1.42, 0.008),
+                 (hx0 - 0.10, hy0 + 0.24, 0.012), (hx0 - 0.04, hy0 + 0.11, 0.09)], 0.05)
+    cbox(alu, (0.36, 0.08, 0.05), (-0.02, -0.72, zd - 0.09), c=0.012)                             # tether guides under the deck edge
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.45)
+    anchor('col_array_l', root, loc=(2.02, 0, 0), radius=1.15)
+    anchor('col_array_r', root, loc=(-2.02, 0, 0), radius=1.15)
+    anchor('col_seis', root, loc=(sx0, sy0, 0), radius=0.6)
+    anchor('col_hp3', root, loc=(hx0, hy0, 0), radius=0.35)
+    return finish(root, 'insight', [k])
+
+
+def _shell_petal(bm, ribs, M, Rs, th, az_half, nu=6, nv=6, phi0=3.0, phi1=85.0):
+    """A segment of a spherical shell that hinges at its lower edge. Local origin at the hinge (a
+    point on the sphere's equator), local X radially outward, local Z up; closed, the petal covers
+    the sphere from the equator to near the pole. Faces: material 0 outside, 1 inside and edges."""
+    def pt(r, az, phi):
+        return (r * cos(phi) * cos(az) - Rs, r * cos(phi) * sin(az), r * sin(phi))
+
+    out, inn = [], []
+    for j in range(nv + 1):
+        phi = rad(phi0 + (phi1 - phi0) * j / nv)
+        azs = [rad(-az_half + 2 * az_half * i / nu) for i in range(nu + 1)]
+        out.append(_mk(bm, [pt(Rs, a, phi) for a in azs], M))
+        inn.append(_mk(bm, [pt(Rs - th, a, phi) for a in azs], M))
+    for j in range(nv):
+        for i in range(nu):
+            bm.faces.new((out[j][i], out[j][i + 1], out[j + 1][i + 1], out[j + 1][i])).material_index = 0
+            bm.faces.new((inn[j][i], inn[j + 1][i], inn[j + 1][i + 1], inn[j][i + 1])).material_index = 1
+    for i in range(nu):
+        bm.faces.new((out[0][i], inn[0][i], inn[0][i + 1], out[0][i + 1])).material_index = 1
+        bm.faces.new((out[nv][i], out[nv][i + 1], inn[nv][i + 1], inn[nv][i])).material_index = 1
+    for j in range(nv):
+        bm.faces.new((out[j][0], out[j + 1][0], inn[j + 1][0], inn[j][0])).material_index = 1
+        bm.faces.new((out[j][nu], inn[j][nu], inn[j + 1][nu], out[j + 1][nu])).material_index = 1
+    if ribs is not None:                                   # stiffening ribs on the inner face
+        rr = Rs - th - 0.008
+        sec = [(0.011, -0.007), (0.011, 0.007), (-0.011, 0.007), (-0.011, -0.007)]
+        for az in (-az_half * 0.5, 0.0, az_half * 0.5):
+            a = rad(az)
+            pts = [pt(rr, a, rad(phi0 + 2 + (phi1 - phi0 - (30 if az else 4)) * j / 6)) for j in range(7)]
+            sweep(ribs, pts, sec, up=(-sin(a), cos(a), 0), M=M)
+        for phi in (22.0, 48.0):
+            pts = [pt(rr, rad(-az_half * 0.94 + az_half * 1.88 * i / 6), rad(phi)) for i in range(7)]
+            sweep(ribs, pts, sec, up=(0, 0, 1), M=M)
+
+
+def build_mars3():
+    """Mars 3 (also Mars 6): the Soviet egg-shaped lander with its four petals folded down onto
+    the ground, whip antennas, two panoramic cameras and the little tethered Prop-M rover."""
+    root = part('mars3')
+    k = Kit(root)
+    Rs, zc = 0.60, 0.385
+    shell = k(('foam', 'painted_white'), 40)
+    white, alu, steel, dark = k('painted_white', 35), k('aluminium'), k('steel'), k('painted_dark')
+    lens, foam, cu = k('lens'), k('foam', 40), k('copper')
+
+    # --- the lower half of the egg, standing on its landing ring ---
+    lathe(foam, [(0.0, 0.0), (0.35, 0.0), (0.45, 0.04), (0.535, 0.13), (0.585, 0.25), (0.60, zc - 0.02), (0.0, zc - 0.02)], 28, I4)
+    lathe(alu, [(0.35, -0.002), (0.41, 0.0), (0.43, 0.025), (0.42, 0.045), (0.39, 0.03)], 28, I4, close=True)
+    for i in range(8):                                                # gores of the insulation cover
+        Mi = R('Z', 45 * i + 22.5)
+        sweep(alu, [Mi @ Vector((r + 0.004, 0, z)) for r, z in ((0.45, 0.04), (0.535, 0.13), (0.585, 0.25), (0.602, zc - 0.03))],
+              [(0.008, -0.003), (0.008, 0.003), (-0.008, 0.003), (-0.008, -0.003)], up=tuple(Mi @ Vector((0, 1, 0))))
+    # --- equator ring with the four petal hinges ---
+    lathe(alu, [(0.585, zc - 0.035), (0.625, zc - 0.035), (0.632, zc - 0.02), (0.632, zc + 0.012), (0.61, zc + 0.02), (0.585, zc + 0.02)],
+          28, I4, close=True)
+    bolt_circle(dark, 0.633, 24, 0.012, 0.008, T(0, 0, zc - 0.012), phase=0.13, seg=5)
+    # --- the instrument compartment under the petals ---
+    lathe(white, [(0.575, zc + 0.02), (0.54, zc + 0.10), (0.44, zc + 0.215), (0.27, zc + 0.30), (0.12, zc + 0.33), (0.0, zc + 0.335)], 24, I4)
+    lathe(alu, [(0.44, zc + 0.21), (0.455, zc + 0.215), (0.455, zc + 0.235), (0.42, zc + 0.24)], 24, I4, close=True)
+    for i in range(12):                                               # meridian seams and rivets on the dome
+        Mi = R('Z', 30 * i + 15)
+        sweep(alu, [Mi @ Vector((r + 0.003, 0, z)) for r, z in ((0.572, zc + 0.03), (0.542, zc + 0.10), (0.462, zc + 0.20))],
+              [(0.006, -0.003), (0.006, 0.003), (-0.006, 0.003), (-0.006, -0.003)], up=tuple(Mi @ Vector((0, 1, 0))))
+        bolt(dark, 0.008, 0.006, R('Z', 30 * i) @ T(0.556, 0, zc + 0.065) @ R('Y', 70), 5)
+    lathe(alu, [(0.0, zc + 0.33), (0.12, zc + 0.33), (0.12, zc + 0.37), (0.10, zc + 0.39), (0.0, zc + 0.39)], 14, I4)       # parachute-ring hub
+    bolt_circle(dark, 0.095, 8, 0.01, 0.008, T(0, 0, zc + 0.39))
+
+    # --- four petals, opened right over until their tips rest on the ground ---
+    opens = {0: 158.0, 90: 161.0, 180: 157.0, 270: 160.0}
+    for th, op in opens.items():
+        Mp = R('Z', th) @ T(Rs + 0.012, 0, zc) @ R('Y', op)
+        _shell_petal(shell, alu, Mp, Rs, 0.028, 43.0, nu=6, nv=6)
+        for sy in (-1, 1):                                            # hinge knuckles and spring struts
+            Mh = R('Z', th) @ T(Rs + 0.02, sy * 0.24, zc - 0.005)
+            disc(dark, 0.022, -0.05, 0.05, 6, Mh @ AX['Y'])
+            rod(steel, R('Z', th) @ Vector((0.54, sy * 0.24, zc + 0.10)), Mp @ Vector((-0.10, sy * 0.24, 0.20)), 0.008, 5)
+
+    # --- two panoramic cameras (scanning telephotometers) ---
+    for a in (45, 225):
+        Mc = R('Z', a) @ T(0.33, 0, zc + 0.265)
+        lathe(alu, [(0.0, 0.0), (0.06, 0.0), (0.06, 0.02), (0.035, 0.04), (0.035, 0.10), (0.0, 0.10)], 10, Mc)
+        lathe(white, [(0.0, 0.10), (0.048, 0.10), (0.048, 0.30), (0.04, 0.32), (0.0, 0.325)], 12, Mc)
+        cbox(alu, (0.024, 0.04, 0.12), (0.045, 0, 0.225), Mc, c=0.004)
+        box(lens, (0.008, 0.02, 0.10), (0.056, 0, 0.225), Mc)
+        disc(dark, 0.03, 0.325, 0.34, 8, Mc)
+    # --- four whip antennas springing up between the petals ---
+    for i, a in enumerate((45, 135, 225, 315)):
+        Ma = R('Z', a + 20)
+        pts = [Ma @ Vector(p) for p in ((0.47, 0, zc + 0.17), (0.56, 0, zc + 0.36), (0.72, 0, zc + 0.56), (0.92, 0, zc + 0.70 + 0.03 * (i % 2)),
+                                        (1.12, 0, zc + 0.74))]
+        sweep(steel, pts, circ(1.0, 4), scales=[0.008, 0.007, 0.006, 0.005, 0.004])
+        lathe(alu, [(0.0, 0.0), (0.028, 0.0), (0.02, 0.05), (0.0, 0.05)], 6, frame(pts[0] - Vector((0, 0, 0.02)), pts[1] - pts[0]))
+    # --- weather mast with wind cups, mass-spectrometer inlet, small boxes on the dome ---
+    Mw = R('Z', 135) @ T(0.26, 0, zc + 0.30)
+    rod(alu, Mw @ Vector((0, 0, 0)), Mw @ Vector((0, 0, 0.52)), 0.009, 6, r2=0.006)
+    for i in range(3):
+        p = Mw @ Vector(polar(0.06, 120 * i, 0.52))
+        rod(alu, Mw @ Vector((0, 0, 0.52)), p, 0.003, 3)
+        lathe(dark, [(0.0, -0.012), (0.016, 0.0), (0.0, 0.012)], 6, T(*p) @ R('Z', 120 * i + 135) @ AX['Y'])
+    cbox(white, (0.05, 0.05, 0.07), tuple(Mw @ Vector((0, 0, 0.30))), c=0.008)
+    for a, r, sz in ((95, 0.40, (0.11, 0.09, 0.07)), (275, 0.42, (0.12, 0.10, 0.06)), (180, 0.20, (0.10, 0.08, 0.06)), (0, 0.22, (0.09, 0.09, 0.05))):
+        zz = zc + (0.235 if r > 0.3 else 0.315)
+        cbox(alu, sz, (r, 0, zz + sz[2] / 2 - 0.01), R('Z', a), c=0.012)
+    lathe(cu, [(0.0, zc + 0.22), (0.03, zc + 0.22), (0.03, zc + 0.36), (0.045, zc + 0.38), (0.0, zc + 0.385)], 8, T(*polar(0.36, 315)))
+    tube(dark, [polar(0.40, 95, zc + 0.26), polar(0.33, 70, zc + 0.275), polar(0.33, 50, zc + 0.275)], 0.008, 4)
+
+    # --- Prop-M: the 4.5 kg walking rover on its skis, set down by a two-link arm, on a tether ---
+    pa = 315
+    Mr = R('Z', pa) @ T(1.30, 0, 0) @ R('Z', 20)
+    cbox(alu, (0.215, 0.16, 0.05), (0, 0, 0.065), Mr, c=0.02)
+    cbox(dark, (0.14, 0.10, 0.012), (0, 0, 0.096), Mr, c=0.015)
+    for sy in (-1, 1):
+        prism(steel, [(-0.11, 0.0), (0.09, 0.0), (0.125, 0.025), (0.115, 0.03), (0.085, 0.012), (-0.11, 0.012)], 0.04,
+              Mr @ T(0, sy * 0.105, 0) @ R('X', 90))
+        for xx in (-0.06, 0.05):
+            rod(alu, Mr @ Vector((xx, sy * 0.105, 0.012)), Mr @ Vector((xx, sy * 0.082, 0.06)), 0.006, 4)
+    for sy in (-1, 1):
+        rod(steel, Mr @ Vector((0.105, sy * 0.05, 0.07)), Mr @ Vector((0.16, sy * 0.06, 0.03)), 0.004, 3)       # feeler bars
+    s0 = R('Z', pa) @ Vector((0.52, 0, zc + 0.12))
+    s1 = R('Z', pa) @ Vector((0.86, 0, zc + 0.30))
+    s2 = R('Z', pa) @ Vector((1.22, 0, 0.16))
+    rod(alu, s0, s1, 0.012, 6)
+    rod(alu, s1, s2, 0.010, 6)
+    for p in (s0, s1, s2):
+        ball(dark, p, 0.02, 6, 3)
+    tube(dark, [s0 + Vector((0, 0, -0.06)), R('Z', pa - 8) @ Vector((0.75, 0, 0.10)), R('Z', pa - 6) @ Vector((1.0, 0, 0.012)),
+                Mr @ Vector((-0.11, 0, 0.05))], 0.004, 3, round_r=0.1)
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.45)
+    return finish(root, 'mars3', [k])
+
+
+def build_beagle2():
+    """Beagle 2: the pocket-watch lander lying open, base and lid side by side, with only two of
+    its four solar panels unfolded and the other two still stacked on the lid."""
+    root = part('beagle2')
+    k = Kit(root)
+    white, alu, gold, dark = k('painted_white', 40), k('aluminium'), k('gold_foil', 30), k('painted_dark')
+    cell, lens, cu = k('solar_cell'), k('lens'), k('copper')
+    B, L = Vector((-0.42, 0, 0)), Vector((0.28, 0, 0))
+    R0 = 0.33
+    for C, h in ((B, 0.135), (L, 0.105)):                              # the two shells: a dish, its gold lining, a rim
+        Mc = T(*C)
+        lathe(white, [(0.0, 0.0), (0.16, 0.006), (0.27, 0.04), (R0, h - 0.02), (R0, h), (R0 - 0.014, h), (R0 - 0.014, h - 0.02),
+                      (0.26, 0.055), (0.16, 0.022), (0.0, 0.016)], 28, Mc)
+        lathe(gold, [(0.0, 0.016), (0.16, 0.022), (0.26, 0.055), (R0 - 0.014, h - 0.02), (R0 - 0.014, h - 0.006), (R0 - 0.03, h - 0.006),
+                     (0.25, 0.066), (0.16, 0.034), (0.0, 0.028)], 28, Mc)
+        lathe(alu, [(R0 - 0.016, h - 0.004), (R0 + 0.006, h - 0.004), (R0 + 0.006, h + 0.006), (R0 - 0.016, h + 0.006)], 28, Mc, close=True)
+        for i in range(10):
+            disc(dark, 0.009, 0.0, 0.012, 5, Mc @ T(*polar(R0 + 0.004, 36 * i + 18, h - 0.016)) @ R('Z', 36 * i + 18) @ AX['X'])
+    # main hinge between base and lid
+    hx = (B.x + L.x) / 2
+    disc(alu, 0.022, -0.09, 0.09, 8, T(hx, 0, 0.11) @ AX['Y'])
+    for sy in (-1, 1):
+        cbox(alu, (0.11, 0.03, 0.035), (hx, sy * 0.06, 0.105), c=0.008)
+        disc(dark, 0.028, -0.012, 0.012, 8, T(hx, sy * 0.10, 0.11) @ AX['Y'])
+    tube(dark, [(B.x + 0.26, -0.03, 0.09), (hx, -0.03, 0.14), (L.x - 0.26, -0.03, 0.08)], 0.008, 4, round_r=0.05)
+
+    # --- base: electronics tub, gas analysis package, batteries, the folded arm and its instrument cluster ---
+    Mb = T(*B)
+    prism(gold, ngon(0.21, 8, 22.5), 0.055, Mb @ T(0, 0, 0.035), z0=0.0)
+    prism(alu, ngon(0.20, 8, 22.5), 0.008, Mb @ T(0, 0, 0.09), z0=0.0)
+    lathe(alu, [(0.0, 0.098), (0.075, 0.098), (0.075, 0.14), (0.06, 0.15), (0.0, 0.15)], 12, Mb @ T(0.06, 0.07, 0))       # gas analysis package
+    lathe(dark, [(0.0, 0.15), (0.03, 0.15), (0.03, 0.165), (0.0, 0.165)], 8, Mb @ T(0.06, 0.07, 0))
+    for i in range(3):
+        rod(cu, Mb @ Vector((0.06 + 0.05 * cos(i * 2.1), 0.07 + 0.05 * sin(i * 2.1), 0.15)), Mb @ Vector((0.06 + 0.02 * cos(i * 2.1), 0.07 + 0.02 * sin(i * 2.1), 0.172)), 0.004, 3)
+    cbox(white, (0.10, 0.07, 0.035), (-0.10, 0.11, 0.115), Mb @ R('Z', 30), c=0.01)
+    cbox(dark, (0.09, 0.05, 0.03), (0.10, -0.06, 0.112), Mb, c=0.008)
+    sh = B + Vector((-0.20, -0.10, 0.10))
+    el = B + Vector((0.14, -0.20, 0.135))
+    wr = B + Vector((-0.06, -0.07, 0.17))
+    lathe(alu, [(0.0, 0.06), (0.035, 0.06), (0.035, 0.11), (0.0, 0.11)], 10, T(sh.x, sh.y, 0))
+    rod(white, sh + Vector((0, 0, 0.012)), el, 0.016, 8)
+    rod(white, el, wr, 0.014, 8)
+    for p, r in ((sh + Vector((0, 0, 0.012)), 0.024), (el, 0.024), (wr, 0.02)):
+        ball(dark, p, r, 8, 4)
+    Mpw = T(*wr) @ R('Z', 25) @ R('X', 12)                              # the instrument cluster ("PAW")
+    lathe(alu, [(0.0, -0.02), (0.05, -0.02), (0.055, -0.01), (0.055, 0.02), (0.0, 0.02)], 12, Mpw)
+    inst = ((0, 0.022, 0.07, alu), (55, 0.018, 0.085, dark), (110, 0.024, 0.06, alu), (170, 0.016, 0.09, white), (225, 0.02, 0.07, alu),
+            (285, 0.024, 0.065, dark))
+    for a, r, ln, bm_i in inst:
+        disc(bm_i, r, 0.045, 0.045 + ln, 8, Mpw @ R('Z', a) @ AX['X'])
+        disc(lens if a in (0, 110) else dark, r * 0.7, 0.045 + ln, 0.049 + ln, 6, Mpw @ R('Z', a) @ AX['X'])
+    disc(cu, 0.012, -0.10, 0.16, 8, Mpw @ T(0, 0.0, 0.04) @ R('Z', 140) @ AX['X'])                # the mole in its launch tube
+    disc(alu, 0.017, -0.11, -0.03, 8, Mpw @ T(0, 0.0, 0.04) @ R('Z', 140) @ AX['X'])
+    disc(alu, 0.03, 0.02, 0.035, 8, Mpw)
+    tube(dark, [sh + Vector((0.03, 0.02, 0.03)), sh.lerp(el, 0.5) + Vector((0, 0.03, 0.02)), el + Vector((-0.02, 0.03, 0.02)),
+                el.lerp(wr, 0.6) + Vector((0.02, 0.01, 0.02))], 0.005, 4)
+
+    # --- lid: cells on its floor, the UHF patch antenna, and the four panels ---
+    Ml = T(*L)
+    solar_poly(gold, cell, ngon(0.24, 10, 0), Ml @ T(0, 0, 0.045), t=0.008, margin=0.012, pitch=(0.055, 0.04), strip=0.0035)
+    cbox(white, (0.10, 0.10, 0.008), (0.0, 0.0, 0.066), Ml, c=0.012)
+    pent = ngon(0.285, 5, 0)
+
+    def panel(beta, tilt, level=0):
+        hz = 0.112 + 0.024 * level
+        Mh = Ml @ R('Z', beta) @ T(R0 + 0.022, 0, hz)
+        disc(alu, 0.011, -0.07, 0.07, 6, Mh @ AX['Y'])                                              # hinge pin on the lid rim
+        cbox(alu, (0.03, 0.10, 0.02), (-0.012, 0, -0.008 - 0.012 * level), Mh, c=0.005)
+        Mp = Mh @ R('Y', tilt) @ T(R0 + 0.022, 0, 0)
+        solar_poly(gold, cell, pent, Mp @ T(0, 0, -0.005), t=0.009, margin=0.016, pitch=(0.058, 0.043), strip=0.0035)
+        for sy in (-1, 1):                                                                          # hinge arms out to the panel edge
+            beam(alu, (-(R0 + 0.022), sy * 0.05, 0.0), (-0.20, sy * 0.07, 0.0), 0.014, 0.008, M=Mp)
+        for i in range(5):                                                                          # stiffener spokes on the back
+            a = rad(72 * i)
+            beam(gold, (0.04 * cos(a), 0.04 * sin(a), -0.008), (0.27 * cos(a), 0.27 * sin(a), -0.008), 0.016, 0.006, M=Mp)
+        disc(alu, 0.045, -0.014, -0.004, 10, Mp)
+        return Mp
+
+    panel(40, 7.0)                                                      # two panels out flat on the ground side
+    panel(118, 9.0)
+    panel(-118, 180.0, level=0)                                         # two that never unfolded, still stacked on the lid
+    panel(-40, 180.0 + 17.0, level=1)                                   # ... the upper one sprung part-way
+    rod(alu, tuple(L + Vector((0.13, -0.11, 0.075))), tuple(L + Vector((0.075, -0.065, 0.21))), 0.006, 4)   # its stuck release strut
+
+    anchor('col_body', root, loc=(0.1, 0.15, 0), radius=1.0)
+    return finish(root, 'beagle2', [k])
+
+
+def _blade(bm, M, L, spin=1):
+    """One rotor blade along local +X from the hub: wide, twisted inboard, narrow and flat at the tip."""
+    st = ((0.06, 0.022, 24, 0.010), (0.14, 0.050, 22, 0.009), (0.26, 0.082, 17, 0.007), (0.42, 0.078, 12, 0.005), (0.62, 0.064, 8, 0.004),
+          (0.82, 0.048, 5, 0.003), (0.96, 0.034, 3, 0.0025), (1.0, 0.018, 3, 0.002))
+    rings = []
+    for t, c, pitch, th in st:
+        p = rad(pitch) * spin
+        sec = [(-0.32 * c * spin, 0.0), (-0.02 * c * spin, th * 0.6), (0.68 * c * spin, 0.0), (-0.02 * c * spin, -th * 0.4)]
+        rings.append(_mk(bm, [(t * L, y * cos(p) + z * sin(p), -y * sin(p) + z * cos(p)) for y, z in sec], M))
+    for a, b in zip(rings, rings[1:]):
+        for j in range(4):
+            bm.faces.new((a[j], a[(j + 1) % 4], b[(j + 1) % 4], b[j]))
+    bm.faces.new(rings[0])
+    bm.faces.new(list(reversed(rings[-1])))
+
+
+def build_ingenuity():
+    """Ingenuity, the Mars helicopter: a foil-wrapped box on four thin carbon legs, two stacked
+    1.2 m rotors (parts `rotor_upper`, `rotor_lower`, spinning about Z) and the little solar
+    panel and antenna on top of the mast."""
+    root = part('ingenuity')
+    k = Kit(root)
+    gold, carbon, alu, cell = k('gold_foil', 28), k('carbon', 40), k('aluminium'), k('solar_cell')
+    dark, lens = k('painted_dark'), k('lens')
+    zf0, zf1 = 0.132, 0.295
+    fx, fy = 0.136, 0.195
+    # --- fuselage: a crinkled foil box with a carbon frame, cameras underneath and at the front ---
+    cbox(gold, (fx, fy, zf1 - zf0), (0, 0, (zf0 + zf1) / 2), c=0.012)
+    for i, (sx, sy, w) in enumerate(((0, -1, fx), (1, 0, fy), (0, 1, fx), (-1, 0, fy))):
+        Mf = T(sx * (fx / 2 + 0.001), sy * (fy / 2 + 0.001), (zf0 + zf1) / 2) @ R('Z', (0, 90, 180, 270)[i]) @ R('X', 90)
+        foil_panel(gold, Mf, w - 0.03, zf1 - zf0 - 0.03, 3, 3, 0.004, seed=90 + i, bulge=0.005)
+    cbox(carbon, (fx + 0.012, fy + 0.012, 0.012), (0, 0, zf1), c=0.014)
+    cbox(carbon, (fx + 0.008, fy + 0.008, 0.008), (0, 0, zf0), c=0.014)
+    disc(dark, 0.022, zf0 - 0.012, zf0 - 0.004, 10, T(0.0, -0.03, 0))                               # navigation camera
+    disc(lens, 0.014, zf0 - 0.016, zf0 - 0.012, 8, T(0.0, -0.03, 0))
+    cbox(dark, (0.03, 0.022, 0.012), (0.03, 0.04, zf0 - 0.008), c=0.004)                            # laser altimeter
+    cbox(dark, (0.04, 0.02, 0.035), (-0.02, -fy / 2 - 0.006, zf0 + 0.022), c=0.006)   # colour camera on the front lower edge
+    disc(lens, 0.011, 0.0, 0.005, 8, T(-0.02, -fy / 2 - 0.016, zf0 + 0.02) @ R('X', 110))
+    # --- four legs: thin bowed carbon tubes from brackets on the top frame out to small feet ---
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            a = Vector((sx * 0.052, sy * 0.082, zf1 + 0.004))
+            b = Vector((sx * 0.275, sy * 0.30, 0.016))
+            mid = a.lerp(b, 0.5) + Vector((sx * 0.012, sy * 0.012, 0.022))
+            cbox(alu, (0.026, 0.026, 0.022), tuple(a), c=0.005)
+            sweep(carbon, [a, a.lerp(mid, 0.55) + Vector((0, 0, 0.008)), mid, mid.lerp(b, 0.5) + Vector((0, 0, -0.004)), b], circ(1.0, 6),
+                  scales=[0.0065, 0.006, 0.0055, 0.005, 0.0045])
+            lathe(dark, [(0.0, 0.0), (0.014, 0.0), (0.019, 0.006), (0.015, 0.016), (0.006, 0.024), (0.0, 0.024)], 8, T(b.x, b.y, 0))
+    # --- mast, swashplates and servos ---
+    zl, zu, zp = 0.365, 0.452, 0.485
+    lathe(alu, [(0.0, zf1), (0.03, zf1), (0.03, zf1 + 0.02), (0.012, zf1 + 0.03), (0.012, zp - 0.01), (0.0, zp - 0.01)], 10, I4)
+    for i in range(3):
+        cbox(dark, (0.022, 0.016, 0.03), tuple(polar(0.034, 120 * i + 30, zf1 + 0.022)), c=0.004)
+        rod(alu, polar(0.034, 120 * i + 30, zf1 + 0.036), polar(0.03, 120 * i + 30, zl - 0.02), 0.0025, 3)
+        rod(alu, polar(0.03, 120 * i + 90, zl + 0.022), polar(0.03, 120 * i + 90, zu - 0.02), 0.0025, 3)
+    for z in (zl - 0.02, zu - 0.02):
+        lathe(alu, [(0.014, z - 0.004), (0.034, z - 0.004), (0.034, z + 0.004), (0.014, z + 0.004)], 12, I4, close=True)
+    lathe(dark, [(0.0, zl + 0.016), (0.022, zl + 0.016), (0.022, zl + 0.05), (0.014, zl + 0.058), (0.0, zl + 0.058)], 10, I4)   # upper motor
+    tube(dark, [(0.02, 0.03, zf1 + 0.006), (0.016, 0.012, zf1 + 0.05), (0.014, 0.004, zl + 0.07), (0.014, 0.0, zp - 0.012)], 0.003, 4)
+    for sx in (-1, 1):
+        for sy in (-1, 1):                                                                         # leg pivots: little spring dampers
+            rod(alu, (sx * 0.04, sy * 0.065, zf1 + 0.012), (sx * 0.085, sy * 0.112, zf1 - 0.012), 0.0045, 4)
+    # --- solar panel and antenna on top ---
+    cbox(alu, (0.05, 0.05, 0.012), (0, 0, zp - 0.006), c=0.01)
+    solar_poly(carbon, cell, [(-0.2125, -0.0825), (0.2125, -0.0825), (0.2125, 0.0825), (-0.2125, 0.0825)], T(0, 0, zp), t=0.005,
+               margin=0.008, pitch=(0.068, 0.055), strip=0.003)
+    rod(alu, (0, 0, zp + 0.01), (0, 0, zp + 0.045), 0.0022, 4)
+    disc(dark, 0.008, zp + 0.008, zp + 0.016, 6, I4)
+
+    # --- the two rotors: counter-rotating, two blades each, set at right angles ---
+    kits = [k]
+    for name, z, spin, yaw in (('rotor_lower', zl, 1, 28.0), ('rotor_upper', zu, -1, 118.0)):
+        rp = part(name, root, loc=(0, 0, z), rot=(0, 0, rad(yaw)))
+        kr = Kit(rp)
+        rc, ra = kr('carbon', 40), kr('aluminium')
+        lathe(ra, [(0.0, -0.014), (0.022, -0.014), (0.026, -0.008), (0.026, 0.008), (0.022, 0.014), (0.0, 0.014)], 12, I4)
+        for s in (0, 180):
+            Mb = R('Z', s)
+            _blade(rc, Mb, 0.60, spin)
+            cbox(ra, (0.05, 0.022, 0.016), (0.035, 0, 0), Mb, c=0.005)                              # blade grip
+            rod(ra, Mb @ Vector((0.03, spin * 0.02, -0.004)), Mb @ Vector((0.012, spin * 0.03, -0.02)), 0.0025, 3)   # pitch link
+        kits.append(kr)
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=0.4)
+    return finish(root, 'ingenuity', kits, ao_distance=0.35)
+
+
+def build_zhurong():
+    """Zhurong: the Chinese rover with four butterfly-wing solar panels over a gold body, six
+    wheels, the camera mast at the front (part `mast`) and the dish at the back."""
+    root = part('zhurong')
+    k = Kit(root)
+    gold, cell, alu, white = k('gold_foil', 28), k('solar_cell'), k('aluminium'), k('painted_white', 30)
+    dark, lens, ti = k('painted_dark'), k('lens'), k('titanium')
+    WR, WW, X = 0.15, 0.20, 0.63
+    YF, YM, YR = -0.80, 0.0, 0.80
+    bw, bl, z0, z1 = 1.00, 1.50, 0.45, 0.87
+    # --- body: gold box with a white deck, the two round heat-collector windows on top ---
+    taper_box(gold, (bw - 0.12, bl - 0.12), (bw, bl), z0, z0 + 0.10)
+    cbox(gold, (bw, bl, z1 - z0 - 0.10), (0, 0, (z0 + 0.10 + z1) / 2), c=0.04)
+    for i, (sx, sy, w) in enumerate(((0, -1, bw), (1, 0, bl), (0, 1, bw), (-1, 0, bl))):
+        Mf = T(sx * (bw / 2 + 0.002), sy * (bl / 2 + 0.002), (z0 + 0.10 + z1) / 2) @ R('Z', (0, 90, 180, 270)[i]) @ R('X', 90)
+        foil_panel(gold, Mf, w - 0.14, z1 - z0 - 0.16, 6 if w > 1.2 else 4, 2, 0.008, seed=110 + i, bulge=0.012)
+    cbox(white, (bw + 0.03, bl + 0.03, 0.03), (0, 0, z1 + 0.012), c=0.05)
+    zt = z1 + 0.027
+    for sx in (-1, 1):
+        lathe(alu, [(0.0, zt), (0.155, zt), (0.155, zt + 0.016), (0.135, zt + 0.02), (0.0, zt + 0.02)], 20, T(sx * 0.23, 0.22, 0))
+        lathe(lens, [(0.0, zt + 0.02), (0.132, zt + 0.02), (0.12, zt + 0.03), (0.0, zt + 0.036)], 20, T(sx * 0.23, 0.22, 0))
+    cbox(alu, (0.30, 0.20, 0.05), (0.0, -0.20, zt + 0.025), c=0.02)
+    cbox(dark, (0.16, 0.10, 0.012), (0.0, -0.20, zt + 0.056), c=0.012)
+    cbox(white, (0.14, 0.12, 0.09), (-0.30, -0.42, zt + 0.045), c=0.015)                            # surface composition detector
+    disc(lens, 0.03, 0.0, 0.006, 10, T(-0.30, -0.482, zt + 0.05) @ R('X', 90))
+    tube(dark, [(0.0, -0.50, zt + 0.01), (0.12, -0.36, zt + 0.01), (0.16, -0.22, zt + 0.01)], 0.01, 5, round_r=0.05)
+    tube(dark, [(0.20, 0.52, zt + 0.01), (0.05, 0.48, zt + 0.01), (0.0, 0.30, zt + 0.01), (0.0, -0.10, zt + 0.01)], 0.01, 5, round_r=0.05)
+    for sx in (-1, 1):                               # radiator plates and access panels on the sides, tie-down lugs
+        Ms = T(sx * (bw / 2 + 0.012), 0, (z0 + 0.10 + z1) / 2) @ R('Z', 90 * sx) @ R('X', 90)
+        for px, w in ((-0.42, 0.44), (0.12, 0.36), (0.52, 0.26)):
+            prism(white, rrect(w, 0.20, 0.02, 2), 0.008, Ms @ T(px * sx, 0.0, 0), z0=0.0)
+            for bx in (-w / 2 + 0.03, w / 2 - 0.03):
+                for by in (-0.07, 0.07):
+                    bolt(alu, 0.008, 0.005, Ms @ T(px * sx + bx, by, 0.008))
+    Mb = T(0, bl / 2 + 0.012, (z0 + 0.10 + z1) / 2) @ R('Z', 180) @ R('X', 90)
+    prism(white, rrect(0.50, 0.18, 0.02, 2), 0.008, Mb, z0=0.0)
+    Mfr = T(0, -bl / 2 - 0.012, (z0 + 0.10 + z1) / 2 - 0.05) @ R('X', 90)
+    prism(white, rrect(0.36, 0.12, 0.02, 2), 0.008, Mfr, z0=0.0)
+    for bx in (-0.15, 0.15):
+        bolt(alu, 0.008, 0.005, Mfr @ T(bx, 0, 0.008))
+    for ex in (-0.32, 0.32):
+        cbox(dark, (0.05, 0.03, 0.045), (ex, bl / 2 + 0.02, 0.76), c=0.006)
+        disc(lens, 0.014, 0.0, 0.006, 8, T(ex, bl / 2 + 0.035, 0.76) @ R('X', -90))
+    for y in (-0.36, 0.02, 0.46):                    # deck seams and fasteners
+        box(alu, (bw - 0.08, 0.008, 0.003), (0, y, zt + 0.001))
+    for ix in range(5):
+        for iy in range(7):
+            if ix in (0, 4) or iy in (0, 6):
+                bolt(alu, 0.009, 0.005, T(-bw / 2 + 0.05 + (bw - 0.10) * ix / 4, -bl / 2 + 0.05 + (bl - 0.10) * iy / 6, zt))
+    # --- four solar wings: forewings out and forward, hindwings out and back, with a little dihedral ---
+    fore = [(0.02, -0.55), (0.45, -0.86), (0.85, -0.78), (1.02, -0.42), (0.92, -0.05), (0.02, -0.02)]
+    hind = [(0.02, 0.03), (0.80, 0.08), (0.90, 0.42), (0.70, 0.82), (0.30, 0.95), (0.02, 0.62)]
+    for sx in (-1, 1):
+        for o, dih, org in ((fore, 7.0, (0.0, -0.30)), (hind, 4.0, (0.0, 0.40))):
+            oo = o if sx > 0 else [(-x, y) for x, y in reversed(o)]
+            Mw = T(sx * (bw / 2 + 0.02), 0, zt + 0.012) @ R('Y', -sx * dih)
+            solar_poly(alu, cell, oo, Mw, t=0.014, margin=0.02, pitch=(0.092, 0.075), strip=0.005, origin=org)
+            y0 = sum(p[1] for p in o) / len(o)
+            for yy in (o[0][1] + 0.08 * (1 if o is hind else 0) + 0.06, o[-1][1] - 0.06):               # hinges on the body edge
+                disc(dark, 0.018, -0.05, 0.05, 6, Mw @ T(sx * 0.0, yy, 0.004) @ AX['Y'])
+            rod(ti, (sx * bw / 2, y0, z1 - 0.12), Mw @ Vector((sx * 0.55, y0, -0.002)), 0.012, 5)   # deployment strut under the wing
+    # --- high-gain dish on a post at the back, omni antenna, weather pole ---
+    hx, hy = 0.26, 0.58
+    lathe(alu, [(0.0, zt), (0.05, zt), (0.05, zt + 0.03), (0.024, zt + 0.045), (0.024, zt + 0.27), (0.0, zt + 0.27)], 8, T(hx, hy, 0))
+    cbox(alu, (0.08, 0.07, 0.07), (hx, hy, zt + 0.29), c=0.012)
+    Md = frame((hx, hy, zt + 0.33), (0.25, 0.35, 0.90), (1, 0, 0))
+    dish(white, alu, Md @ T(0, 0, 0.03), 0.19, 0.05, seg=20, struts=3, back_ribs=0, thick=0.008)
+    lathe(alu, [(0.0, 0.0), (0.035, 0.0), (0.035, 0.03), (0.0, 0.03)], 8, Md)
+    lathe(alu, [(0.0, zt), (0.03, zt), (0.03, zt + 0.02), (0.012, zt + 0.03), (0.012, zt + 0.16), (0.03, zt + 0.17), (0.03, zt + 0.21),
+                (0.0, zt + 0.22)], 8, T(-0.34, 0.60, 0))
+    rod(alu, (-0.38, -0.62, zt), (-0.38, -0.62, zt + 0.55), 0.009, 5, r2=0.006)                     # climate station
+    for i in range(3):
+        rod(alu, (-0.38, -0.62, zt + 0.53), (-0.38 + 0.07 * cos(i * 2.1), -0.62 + 0.07 * sin(i * 2.1), zt + 0.55), 0.003, 3)
+        ball(dark, (-0.38 + 0.07 * cos(i * 2.1), -0.62 + 0.07 * sin(i * 2.1), zt + 0.55), 0.008, 5, 3)
+    # --- two ground-penetrating radar whips angled out ahead of the front wheels ---
+    for sx in (-1, 1):
+        cbox(alu, (0.06, 0.06, 0.05), (sx * 0.36, -bl / 2 - 0.02, 0.60), c=0.01)
+        rod(alu, (sx * 0.36, -bl / 2 - 0.03, 0.60), (sx * 0.86, -1.52, 0.50), 0.006, 4, r2=0.004)
+        for ex in (-0.08, 0.08):                                                                    # hazard-avoidance cameras
+            cbox(dark, (0.05, 0.03, 0.045), (sx * 0.2 + ex * 0, -bl / 2 - 0.012, 0.76), c=0.006)
+        disc(lens, 0.014, 0.0, 0.006, 8, T(sx * 0.2, -bl / 2 - 0.028, 0.76) @ R('X', 90))
+    # --- suspension: main rocker on each side, bogie behind, all six wheels steering ---
+    top_z = 2 * WR + 0.13
+    for sx in (-1, 1):
+        P = Vector((sx * 0.53, -0.12, 0.56))
+        B = Vector((sx * 0.60, 0.42, 0.42))
+        sec = chamf(0.04, 0.055, 0.012)
+        disc(dark, 0.055, -0.03, 0.05, 10, T(*P) @ AX['X'] @ S(1, 1, sx))
+        sweep(ti, [P, (sx * 0.60, -0.50, 0.56), (sx * X, YF, top_z - 0.01)], sec)
+        sweep(ti, [P, (sx * 0.58, 0.20, 0.50), B], sec)
+        ball(dark, B, 0.04, 8, 4)
+        sweep(ti, [B, (sx * 0.61, 0.22, 0.47), (sx * X, YM, top_z - 0.01)], sec)
+        sweep(ti, [B, (sx * 0.61, 0.62, 0.47), (sx * X, YR, top_z - 0.01)], sec)
+        rod(alu, P + Vector((0, 0.10, 0.02)), B + Vector((0, -0.08, 0.05)), 0.014, 6)               # suspension angle actuator
+        for y in (YF, YM, YR):
+            _steer_unit(k, sx * X, y, WR, WW, sx, top_z, tube_r=0.016, mat='titanium', act_r=0.04)
+            Mw = T(sx * X, y, WR) @ AX['X'] @ S(1, 1, sx)
+            wheel(alu, alu, Mw, WR, WW, seg=18, th=0.005, cleats=16, cleat_h=0.007, cleat_t=0.006, crown=0.05, spokes=8,
+                  spoke_twist=0.0, spoke_w=0.03, spoke_t=0.006, hub_r=0.04, hub_x=0.03, hub_len=0.07, spoke_bm=alu)
+    # --- camera mast at the front: its own part ---
+    mast = part('mast', root, loc=(0.0, -0.56, zt))
+    km = Kit(mast)
+    mw, ma, md, ml = km('painted_white', 30), km('aluminium'), km('painted_dark'), km('lens')
+    lathe(ma, [(0.0, 0.0), (0.06, 0.0), (0.06, 0.04), (0.04, 0.06), (0.04, 0.10), (0.0, 0.10)], 12, I4)
+    lathe(mw, [(0.03, 0.10), (0.03, 0.72), (0.0, 0.72)], 10, I4)
+    lathe(ma, [(0.035, 0.40), (0.035, 0.43), (0.03, 0.43)], 10, I4)
+    cbox(ma, (0.07, 0.07, 0.08), (0, 0, 0.75), c=0.012)
+    disc(md, 0.028, -0.05, 0.05, 8, T(0, 0, 0.76) @ AX['X'])
+    hb = 0.85
+    cbox(mw, (0.40, 0.10, 0.10), (0, -0.01, hb), c=0.02)
+    for sx in (-1, 1):                                                                              # stereo navigation cameras
+        lathe(ma, [(0.04, 0.0), (0.04, 0.045), (0.032, 0.045), (0.032, 0.0)], 12, T(sx * 0.15, -0.06, hb) @ R('X', 90), close=True)
+        disc(ml, 0.032, 0.0, 0.03, 10, T(sx * 0.15, -0.06, hb) @ R('X', 90))
+    cbox(md, (0.07, 0.04, 0.06), (0, -0.075, hb), c=0.01)                                           # multispectral camera
+    disc(ml, 0.02, 0.0, 0.006, 8, T(0, -0.095, hb) @ R('X', 90))
+    for sx in (-1, 1):                                                                              # magnetometer probes on the mast
+        rod(ma, (0, 0, 0.42), (sx * 0.16, 0.02, 0.44), 0.006, 4)
+        cbox(md, (0.03, 0.03, 0.03), (sx * 0.17, 0.02, 0.44), c=0.005)
+
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.55)
+    return finish(root, 'zhurong', [k, km])
+
+
+def shard(bm, M, r, t=0.012, seed=1, n=7, crumple=0.22, curl=0.0):
+    """A torn piece of plate: an irregular outline, crumpled and curled, with real thickness."""
+    rng = random.Random(seed)
+    pts = [(0.0, 0.0)]
+    for i in range(n):
+        a = TAU * (i + rng.uniform(-0.3, 0.3)) / n
+        rr = r * rng.uniform(0.45, 1.15)
+        pts.append((rr * cos(a), rr * sin(a)))
+
+    def z_at(x, y):
+        return (noise3(x * 2.2 / r, y * 2.2 / r, 0.5, seed) - 0.5) * 2 * crumple * r + curl * (x * x) / max(r, 1e-6)
+
+    top = _mk(bm, [(x, y, z_at(x, y) + t) for x, y in pts], M)
+    bot = _mk(bm, [(x, y, z_at(x, y)) for x, y in pts], M)
+    for i in range(1, n + 1):
+        j = i % n + 1
+        bm.faces.new((top[0], top[i], top[j]))
+        bm.faces.new((bot[0], bot[j], bot[i]))
+        bm.faces.new((top[i], bot[i], bot[j], top[j]))
+
+
+def kinked(bm, p0, direction, length, r=0.02, seed=1, seg=5, kinks=2, bend=0.35):
+    """A bent strut or pipe: a tube with a couple of random kinks."""
+    rng = random.Random(seed)
+    p = Vector(p0)
+    d = Vector(direction).normalized()
+    pts = [p.copy()]
+    for i in range(kinks + 1):
+        p = p + d * (length / (kinks + 1))
+        pts.append(p.copy())
+        d = (d + Vector((rng.uniform(-bend, bend), rng.uniform(-bend, bend), rng.uniform(-bend, bend) * 0.6))).normalized()
+    for q in pts:
+        q.z = max(q.z, r)
+    tube(bm, pts, r, seg, round_r=length * 0.06, steps=2)
+
+
+def _canopy(bm, M, rx, ry, h, seed=1, nu=44, gores=10, tears=((0.07, 0.21, 4), (0.43, 0.51, 2), (0.63, 0.78, 6), (0.90, 0.94, 3))):
+    """A collapsed parachute: a low, lopsided heap of pleated cloth with alternating coloured gores
+    and ragged sectors torn out of it (from, to as fractions of the way round, rings deep). Faces: material 0
+    and 1 by gore. Returns the skirt verts."""
+    rings = ((1.0, 0.0), (0.96, 0.25), (0.86, 0.6), (0.72, 0.9), (0.56, 1.0), (0.40, 0.75), (0.24, 0.7), (0.10, 0.9))
+    rows = []
+    for j, (rf, hf) in enumerate(rings):
+        row = []
+        ox, oy = 0.30 * rx * (1 - rf), -0.16 * ry * (1 - rf)          # the apex was dragged off to one side
+        for i in range(nu):
+            a = TAU * i / nu
+            n1 = noise3(1.6 * cos(a) + 5, 1.6 * sin(a) + 5, 0.3, seed)
+            n2 = noise3(2.9 * rf * cos(a) + 9, 2.9 * rf * sin(a) + 9, 4.0, seed + 11)
+            n3 = noise3(5.5 * rf * cos(a) + 2, 5.5 * rf * sin(a) + 2, 7.0, seed + 5)
+            fold = abs(sin(gores * a / 2 + 0.4 + 1.5 * n1))
+            f = rf * (0.72 + 0.62 * n1) * (1 - 0.10 * (1 - fold))
+            z = h * hf * (0.35 + 0.65 * fold) * (0.25 + 1.5 * n2) + 0.05 * h * n3 + (0.012 if j else 0.004)
+            row.append(bm.verts.new(M @ Vector((ox + rx * f * cos(a), oy + ry * f * sin(a), z))))
+        rows.append(row)
+
+    def torn(i, j):
+        return any(a * nu <= i <= b * nu and j < d for a, b, d in tears)
+
+    for j in range(len(rings) - 1):
+        for i in range(nu):
+            if torn(i, j):
+                continue
+            f = bm.faces.new((rows[j][i], rows[j][(i + 1) % nu], rows[j + 1][(i + 1) % nu], rows[j + 1][i]))
+            f.material_index = (i * gores // nu) % 2
+    f = bm.faces.new(rows[-1])
+    f.material_index = 1
+    return rows[0]
+
+
+def build_schiaparelli_wreck():
+    """The Schiaparelli impact site: the lander struck at 150 m/s with its tanks nearly full. A
+    crushed, burnt-out core in the middle, deck plates and structure thrown outward, pieces of
+    back shell and heat shield, and the torn parachute, all within about three metres."""
+    root = part('schiaparelli_wreck')
+    k = Kit(root)
+    white, alu, gold = k('painted_white', 32), k('aluminium', 32), k('gold_foil', 25)
+    ti, dark = k('titanium', 45), k('painted_dark', 32)
+    char, comb = dark, k('canvas', 30)
+    cloth = k(('canvas', 'suit_orange'), 50)
+    rng = random.Random(16)
+
+    # --- the core: crushed central bay, three tanks, broken deck plates, ribs, thruster clusters ---
+    Mc = T(-0.10, 0.05, 0.0) @ R('Y', 13) @ R('X', -8)
+    vs = prism(dark, ngon(0.40, 8, 10), 0.36, Mc, z0=-0.06)
+    for v in vs[8:]:
+        v.co += Vector((rng.uniform(-0.07, 0.07), rng.uniform(-0.07, 0.07), rng.uniform(-0.12, 0.03)))
+    vs = prism(alu, ngon(0.24, 6, 0), 0.20, Mc @ T(0.03, 0.02, 0.22) @ R('X', 12), z0=0.0)
+    for v in vs[6:]:
+        v.co += Vector((rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), rng.uniform(-0.06, 0.02)))
+    for i, (a, rr, zz, sc) in enumerate(((20, 0.56, 0.17, (1, 1, 0.9)), (145, 0.60, 0.15, (1.0, 0.8, 0.7)), (262, 0.78, 0.16, (1, 1, 1)))):
+        Mt = T(*polar(rr, a, zz)) @ R('Z', a) @ S(*sc)
+        ball(ti, (0, 0, 0), 0.19, 12, 6, M=Mt)
+        lathe(alu, [(0.192, -0.012), (0.197, -0.012), (0.197, 0.012), (0.192, 0.012)], 12, Mt @ R('X', 70 + 30 * i), close=True)
+        lathe(alu, [(0.0, 0.18), (0.04, 0.18), (0.03, 0.22), (0.0, 0.22)], 6, Mt @ R('X', 70 + 30 * i))
+    plates = ((75, 0.62, 0.52, 18, -24, white), (118, 0.70, 0.46, -30, 20, white), (200, 0.66, 0.56, 22, 16, white), (318, 0.74, 0.50, -16, -30, white),
+              (240, 0.42, 0.40, 55, 10, alu), (0, 0.50, 0.38, -48, 8, alu), (160, 0.35, 0.34, 65, -20, dark))
+    for i, (a, rr, sz, tx, ty, bm_p) in enumerate(plates):
+        Mp = T(*polar(rr, a, 0.12 + 0.05 * (i % 3))) @ R('Z', a + 20 * i) @ R('X', tx) @ R('Y', ty)
+        shard(bm_p, Mp, sz, t=0.022, seed=30 + i, n=8, crumple=0.20, curl=0.25)
+        shard(gold, Mp @ T(0.03, 0.02, -0.03), sz * 0.7, t=0.004, seed=50 + i, n=7, crumple=0.35)
+    for i, a in enumerate((35, 95, 170, 215, 285, 335)):                                           # radial ribs, sprung and bent
+        p0 = Vector(polar(0.30, a, 0.10 + 0.04 * (i % 2)))
+        dv = Vector(polar(1.0, a + rng.uniform(-25, 25), rng.uniform(0.1, 0.9)))
+        kinked(alu, p0, dv, rng.uniform(0.6, 1.05), 0.022, seed=70 + i, seg=4, kinks=2, bend=0.5)
+    for i, (a, rr) in enumerate(((60, 0.95), (190, 1.05), (300, 0.50))):                           # thruster clusters torn loose
+        Mn = T(*polar(rr, a, 0.07)) @ R('Z', a * 2) @ R('X', 70 + 25 * i)
+        cbox(alu, (0.26, 0.10, 0.06), (0, 0, 0), Mn, c=0.02)
+        for dx in (-0.085, 0.0, 0.085):
+            lathe(dark, [(0.022, -0.03), (0.02, -0.06), (0.05, -0.17), (0.044, -0.17), (0.014, -0.06)], 8, Mn @ T(dx, 0, 0), close=True)
+    for i in range(5):                                                                             # harness spilling out
+        a = 72 * i + 10
+        tube(dark, [polar(0.25, a, 0.22), polar(0.55, a + 14, 0.20 + 0.1 * (i % 2)), polar(0.85, a + 30, 0.03), polar(1.05, a + 24, 0.012)],
+             0.009, 4, round_r=0.12, steps=2)
+    blob(char, T(-0.05, 0.0, 0.0), 0.62, 0.55, 0.10, seed=5, nu=14, pleats=5, rough=0.5)           # slag and soot under the core
+    for i, (a0, arc, rr, tilt, zz) in enumerate(((210, 105, 0.82, 16, 0.02), (55, 70, 0.86, -22, 0.06))):   # what is left of the platform's rim
+        Mr = T(0.05 * i, 0.04, zz) @ R('Z', a0) @ R('X', tilt)
+        vs = lathe(white, [(rr, 0.0), (rr + 0.02, 0.0), (rr + 0.02, 0.22), (rr, 0.22)], 8, Mr, arc=rad(arc), close=True, caps=True)
+        for v in vs:
+            v.co += Vector((rng.uniform(-0.035, 0.035), rng.uniform(-0.035, 0.035), rng.uniform(-0.03, 0.03)))
+        vs = lathe(comb, [(rr - 0.22, 0.02), (rr - 0.005, 0.02), (rr - 0.005, 0.10), (rr - 0.22, 0.06)], 8, Mr, arc=rad(arc * 0.9), close=True, caps=True)
+        for v in vs:                                                                               # crushable honeycomb, burst
+            v.co += Vector((rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03)))
+
+    # --- a section of the back shell lying on its side, gold blanket hanging out of it ---
+    Mb = T(2.25, 0.25, -0.57) @ R('Z', 200) @ R('Y', -52) @ R('Z', -52)
+    vs = lathe(white, [(1.18, 0.0), (0.46, 0.80), (0.44, 0.78), (1.15, -0.01)], 7, Mb, arc=rad(104), close=True, caps=True)
+    for i, v in enumerate(vs):
+        if i < 4 or i >= len(vs) - 4:
+            v.co += Vector((rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), rng.uniform(-0.02, 0.06)))
+    lathe(alu, [(0.47, 0.80), (0.47, 0.86), (0.42, 0.86), (0.42, 0.78)], 7, Mb, arc=rad(104), close=True, caps=True)
+    for i in range(3):
+        Mi = Mb @ R('Z', 22 + 30 * i) @ T(0.80, 0, 0.40) @ R('Y', 90 - 42)
+        shard(gold, Mi @ T(0, 0, -0.05), 0.30, t=0.004, seed=80 + i, n=7, crumple=0.3)
+    blob(gold, T(2.0, 0.55, 0) @ R('Z', 40), 0.34, 0.24, 0.10, seed=9, nu=10, pleats=4, rough=0.6)
+    # --- a slab of heat shield, charred, face down ---
+    Mh = T(-2.05, 1.35, 0.235) @ R('Z', 70) @ R('X', 180) @ R('Y', 4) @ R('Z', -40)
+    vs = lathe(char, [(1.15, 0.26), (0.30, 0.05), (0.30, 0.0), (1.17, 0.20)], 6, Mh, arc=rad(80), close=True, caps=True)
+    for i, v in enumerate(vs):
+        if i < 4 or i >= len(vs) - 4:
+            v.co += Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), rng.uniform(-0.02, 0.03)))
+    lathe(comb, [(1.14, 0.255), (0.32, 0.052), (0.32, 0.03), (1.15, 0.225)], 6, Mh, arc=rad(76), close=True, caps=True, phase=rad(2))
+
+    # --- scattered fragments: scorched plate, foil, struts ---
+    spots = ((1.25, 30), (1.6, 75), (2.6, 110), (1.45, 150), (2.3, 172), (1.15, 205), (2.75, 215), (1.9, 248), (2.85, 262), (1.3, 292),
+             (2.35, 305), (1.75, 338), (2.9, 20), (0.95, 255), (2.9, 330), (2.45, 140))
+    for i, (rr, a) in enumerate(spots):
+        size = (0.34 - 0.07 * rr / 3) * (0.6 + 0.8 * rng.random())
+        bm_f = (white, alu, dark, white, gold, alu)[i % 6]
+        Mf = T(*polar(rr, a + rng.uniform(-6, 6), 0.012)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-22, 22)) @ R('Y', rng.uniform(-14, 14))
+        if bm_f is gold:
+            blob(gold, Mf @ R('X', 0), size * 0.8, size * 0.6, size * 0.35, seed=100 + i, nu=9, pleats=4, rough=0.7)
+        else:
+            shard(bm_f, Mf @ T(0, 0, size * 0.12), size, t=0.014, seed=100 + i, n=6 + i % 3, crumple=0.25, curl=0.3)
+    for i, (rr, a) in enumerate(((1.7, 10), (2.2, 95), (1.5, 185), (2.6, 235), (2.1, 280), (1.2, 125), (2.75, 48))):
+        kinked(alu if i % 2 else ti, polar(rr, a, 0.02), polar(1.0, a + 80 + 40 * i, 0.15 * (i % 2)), 0.35 + 0.12 * (i % 4), 0.014 + 0.004 * (i % 2),
+               seed=130 + i, seg=4, kinks=1 + i % 2, bend=0.6)
+    lathe(alu, [(0.50, 0.0), (0.53, 0.0), (0.53, 0.04), (0.50, 0.04)], 9, T(-1.25, -1.85, 0.01) @ R('X', 5), arc=rad(150), close=True, caps=True)   # part of a separation ring
+    for i in range(26):                                                                            # small stuff: chips of tile, plate and foil
+        rr, a = 0.8 + 2.25 * rng.random() ** 0.8, rng.uniform(0, 360)
+        if 0.6 < polar(rr, a)[0] < 2.6 and 1.2 < polar(rr, a)[1] < 3.0:
+            continue                                                                               # (not on the canopy)
+        bm_f = (white, dark, alu, char)[i % 4]
+        shard(bm_f, T(*polar(rr, a, 0.006)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-30, 30)), 0.05 + 0.09 * rng.random(), t=0.008,
+              seed=200 + i, n=5, crumple=0.3)
+
+    # --- the parachute: canopy collapsed in a heap, torn, lines trailing back to the shell ---
+    Mcan = T(1.05, 2.05, 0.0) @ R('Z', 25)
+    rim = _canopy(cloth, Mcan, 1.55, 0.95, 0.22, seed=6)
+    conf = Vector((2.05, 0.75, 0.10))
+    lines = k('canvas', 60)
+    for i in range(0, 44, 3):
+        if 0.05 < i / 44 < 0.23 or 0.41 < i / 44 < 0.53 or 0.61 < i / 44 < 0.80:
+            continue
+        p = rim[i].co.copy()
+        mid = p.lerp(conf, 0.5) + Vector((rng.uniform(-0.15, 0.15), rng.uniform(-0.15, 0.15), 0))
+        mid.z = 0.008
+        sweep(lines, [Vector((p.x, p.y, 0.02)), Vector((p.x, p.y, 0.01)).lerp(mid, 0.5), mid, mid.lerp(conf, 0.6), conf], circ(0.006, 3), caps=False)
+    tube(lines, [conf, conf + Vector((0.10, -0.12, 0.10)), Vector((2.22, 0.42, 0.40))], 0.016, 5)
+    ball(alu, (2.05, 0.75, 0.10), 0.03, 6, 3)
+    for i, (x, y) in enumerate(((0.2, 2.95), (-0.5, 2.3))):                                         # ripped-off panels of canopy
+        shard(k('canvas', 50) if i else k('suit_orange', 50), T(x, y, 0.03) @ R('Z', 40 * i), 0.36, t=0.003, seed=160 + i, n=7, crumple=0.3)
+
+    for kk in (k,):
+        kk.flush()
+    collapse(root)
+    bake_ao(root, samples=24, distance=0.7)
+    # scorching: darken the baked vertex colour toward the centre of the impact, in ragged patches
+    for o in [root] + lib._descendants(root):
+        if o.type != 'MESH':
+            continue
+        attr = o.data.color_attributes.get('Col')
+        mw = o.matrix_world
+        for i, v in enumerate(o.data.vertices):
+            p = mw @ v.co
+            d = sqrt(p.x * p.x + p.y * p.y)
+            n = noise3(p.x * 1.7 + 3, p.y * 1.7 + 3, p.z * 2.5, 21)
+            burn = max(0.0, min(1.0, (2.7 - d) / 2.3)) * (0.45 + 0.9 * n)
+            f = 1.0 - 0.80 * max(0.0, min(1.0, burn))
+            c = attr.data[i].color
+            attr.data[i].color = (c[0] * f, c[1] * f, c[2] * f, 1.0)
+    anchor('col_body', root, loc=(0, 0, 0), radius=1.25)
+    anchor('col_backshell', root, loc=(2.2, 0.3, 0), radius=0.75)
+    info = export_model(root, 'schiaparelli_wreck', ao=False, do_collapse=False)
+    report_parts(root)
+    return info
+
+
+# === END OF MODELS ===
+BUILDERS = {}
+for _n, _f in list(globals().items()):
+    if _n.startswith('build_') and callable(_f):
+        BUILDERS[_n[6:]] = _f
+ORDER = ['pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'ingenuity', 'zhurong',
+         'schiaparelli_wreck']
+
+if __name__ == '__main__':
+    names = [a for a in sys.argv[1:] if not a.startswith('-')] or [n for n in ORDER if n in BUILDERS]
+    results = []
+    for name in names:
+        if name not in BUILDERS:
+            raise SystemExit(f'unknown model {name}; have {sorted(BUILDERS)}')
+        reset_scene()
+        results.append(BUILDERS[name]())
+    for r in results:
+        print(json.dumps(r))

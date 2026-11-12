@@ -6,7 +6,7 @@ import { clamp, hash3, lerp, smoothstep } from '../core/math.js';
 import { D2R, R, SOL_HOURS } from '../planet/constants.js';
 import { UI, flashScreen, hideOverlay, log } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
-import { World, placeAt } from '../world/build.js';
+import { World, addSupplyPod, placeAt } from '../world/build.js';
 import { angDist, fmtDist, groundDist, llToVec, tangentBasis, vecToLl } from '../planet/geo.js';
 import { moveInputMag, sprinting } from './input.js';
 import { player, playerUnit } from './player.js';
@@ -15,7 +15,6 @@ import { die } from './flow.js';
 import { syncAllVisuals } from './visuals.js';
 import { SOL_LOGS } from './text.js';
 import { checkpoint, saveGame } from './save.js';
-import { buildModel } from '../world/models.js';
 // The simulation: resources, time, storms, events, sleep.
 export function updateSunDir() {
   const a = S.tod * Math.PI * 2;
@@ -279,10 +278,7 @@ export function dropRoutePods() {
   for (let i = 1; i <= n; i++) {
     const t = i / (n + 1);
     _v3.copy(_v1).lerp(_v2, t).normalize();
-    const g = placeAt(_v3);
-    g.add(buildModel('supplyPod'));
-    World.pods.push({ group: g, kind: 'pod', taken: false,
-      loot: { rations: 2, water: 10, candle: 1, scrap: 1 }, label: 'Open NASA route cache' });
+    addSupplyPod(placeAt(_v3, undefined, i * 2.1), { rations: 2, water: 10, candle: 1, scrap: 1 }, 'Open NASA route cache');
   }
   setTimeout(() => log(`NASA pre-dropped ${n} supply caches along the Pathfinder route. They appear on the map. Somebody up there likes me.`, 'nasa'), 9000);
 }

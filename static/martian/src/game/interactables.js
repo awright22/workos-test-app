@@ -1,14 +1,14 @@
 import { HAB_R, World, buildDeployable, setSiteShown, siteLocalToWorld } from '../world/build.js';
-import { groundDist } from '../planet/geo.js';
+import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
 import { BAL, S, roverPowerCap, suitCap } from './state.js';
 import { flashScreen, log, showOverlay } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
-import { _v1, _v2, _v3 } from '../core/scratch.js';
+import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { SOL_LOGS } from './text.js';
-import { syncAllVisuals } from './visuals.js';
+import { syncAllVisuals, syncIce, syncPod } from './visuals.js';
 import { clamp } from '../core/math.js';
 import { localSunEl, sleepToDawn } from './sim.js';
 import { closeScreens, toggleScreen } from '../ui/screens.js';
@@ -385,7 +385,7 @@ addI({
     const site = World._activeIce;
     if (!site || site.left <= 0) return;
     site.left--; S.inv.ice++; S.stats.mined++;
-    if (site.left <= 0) setSiteShown(site.group, false);
+    syncIce(site);
     Snd.pickup();
     checkAchievements();
   },
@@ -408,7 +408,7 @@ addI({
     const p = World._activePod;
     if (!p || p.taken) return;
     p.taken = true;
-    setSiteShown(p.group, false);
+    syncPod(p);
     const got = gainLoot(p.loot);
     log(`Recovered: ${got}.`);
     if (p.blueprint) { S.blueprints[p.blueprint] = true; log(`NASA attached schematics: ${p.blueprint.toUpperCase()} blueprint unlocked.`, 'nasa'); }
@@ -422,7 +422,7 @@ addI({
   label: () => 'Dig up the RTG (radioactive. cozy.)',
   use: () => {
     World.rtgSite.taken = true;
-    setSiteShown(World.rtgSite.group, false);
+    syncAllVisuals();
     S.flags.hasRtg = true;
     Snd.pickup();
     log('One RTG: a plutonium space-heater NASA buried out of an abundance of caution. I am strapping it to my life. Socket it at the fabricator.');
@@ -484,14 +484,16 @@ addI({
     const kitKey = 'kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1);
     if ((S.inv[kitKey] || 0) <= 0) { deployKind = null; return; }
     S.inv[kitKey]--;
+    // set it down in front of the astronaut with its front (the greenhouse door) toward him
+    const kind = deployKind;
     _v1.copy(player.pos).normalize();
     _v2.set(0, 0, -1).applyQuaternion(player.q);
-    _v1.addScaledVector(_v2, 5 / R).normalize();
-    const kind = deployKind;
-    buildDeployable(kind, _v1);
+    _v1.addScaledVector(_v2, (kind === 'greenhouse' ? 6.4 : 2.6) / R).normalize();
+    tangentBasis(_v1, _fe, _fn);
+    buildDeployable(kind, _v1, Math.atan2(-_v2.dot(_fe), -_v2.dot(_fn)));
     Snd.craft();
     log(`${ITEM_NAMES[kitKey]} deployed. Mars: 0, engineering: 1.`);
-    if (deployKind === 'greenhouse') syncAllVisuals();
+    syncAllVisuals();
     onQuestEvent('deploy', deployKind);
     deployKind = null;
     checkAchievements();

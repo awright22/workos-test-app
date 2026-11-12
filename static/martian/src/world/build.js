@@ -6,7 +6,7 @@ import { ctx } from '../game/ctx.js';
 import { R } from '../planet/constants.js';
 import { S } from '../game/state.js';
 import { hash3, srand } from '../core/math.js';
-import { buildModel, colliderAnchors, hasModel, model, ownMaterials } from './models.js';
+import { colliderAnchors, model, ownMaterials } from './models.js';
 import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
 import { log } from '../ui/dom.js';
@@ -32,20 +32,6 @@ export function addColliderAt(group, lx, lz, r) {
   // math-space transform: never rely on matrixWorld (ctx.world shifts each frame)
   const w = new THREE.Vector3(lx, 0, lz).applyQuaternion(group.quaternion).add(group.position);
   colliders.push({ v: w.normalize().clone(), r });
-}
-export function mkBox(w, h, d, color, x, y, z, parent, opts) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {})));
-  m.position.set(x, y, z);
-  (parent || ctx.world).add(m);
-  return m;
-}
-export function mkCyl(rt, rb, h, color, x, y, z, parent, seg, opts) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 14),
-    new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {})));
-  m.position.set(x, y, z);
-  (parent || ctx.world).add(m);
-  return m;
 }
 export const HAB_R = 8.4;
 export const HAB_FLOOR = 0.06;
@@ -125,19 +111,10 @@ export function buildHabColony(spawn) {
   for (let i = 0; i < 8; i++) {
     const px = -Math.floor(i / 4) * 5.5, pz = (i % 4) * 4.6;
     const g = new THREE.Group(); g.position.set(px, 0, pz); solar.add(g);
-    let rec;
-    if (hasModel('solar_panel')) {
-      const m = model('solar_panel');
-      g.add(m.root);
-      const cells = ownMaterials(m.part('panel') || m.root).filter((x) => x.name === 'solar_cell');
-      rec = { mesh: m.part('panel') || m.root, cells, dust: 0.22 + i * 0.05, group: g };
-    } else {
-      mkCyl(0.14, 0.18, 1.1, 0x5a5a5a, 0, 0.55, 0, g, 8);
-      const panel = mkBox(3.4, 0.1, 2.2, 0x1c2c50, 0, 1.15, 0, g);
-      panel.rotation.x = -0.42;
-      panel.material = panel.material.clone();
-      rec = { mesh: panel, cells: [panel.material], dust: 0.22 + i * 0.05, group: g };
-    }
+    const m = model('solar_panel');
+    g.add(m.root);
+    const cells = ownMaterials(m.part('panel') || m.root).filter((x) => x.name === 'solar_cell');
+    const rec = { mesh: m.part('panel') || m.root, cells, dust: 0.22 + i * 0.05, group: g };
     addColliderAt(solar, px, pz, 1.0);
     World.panels.push(rec);
   }
@@ -146,48 +123,32 @@ export function buildHabColony(spawn) {
   // rover
   buildRover(placeOffset(World.hab, 15, 15, 2.6));
 
-  // regolith piles
-  for (const [x, z] of [[22, -8], [26, 6], [-14, 24], [8, 27], [-24, -16], [16, -22]]) {
-    const g = placeOffset(World.hab, x, z, 0);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8),
-      new THREE.MeshLambertMaterial({ color: 0x6e3418 }));
-    m.position.y = -0.5; m.scale.y = 0.55;
-    g.add(m);
-    World.soilPiles.push({ mesh: m, group: g, left: 2 });
-  }
+  // heaps of dug soil to fill the farm trays from
+  [[22, -8], [31, 15], [-14, 24], [8, 27], [-24, -16], [16, -22]].forEach        /* clear of the rover's way out of its parking spot */(([x, z], i) => {
+    const g = placeOffset(World.hab, x, z, hash3(i, 3, 5) * 6.28);
+    const m = addSiteModel(g, 'regolith_pile');
+    World.soilPiles.push({ mesh: m.part('heap'), group: g, left: 2, cols: [siteCollider(g, 0, 0, 0.85)] });
+  });
 
   // uplink dish + pathfinder parking ring
   const up = placeOffset(World.hab, 11.5, 7.5, 0);
-  if (hasModel('uplink_dish')) up.add(model('uplink_dish').root);
-  else {
-    mkCyl(0.1, 0.14, 1.3, 0x6a6a6a, 0, 0.65, 0, up, 8);
-    const dish = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.6),
-      new THREE.MeshStandardMaterial({ color: 0xd8d0c0, side: THREE.DoubleSide }));
-    dish.position.y = 1.5; dish.rotation.x = -0.9;
-    up.add(dish);
-  }
+  up.add(model('uplink_dish').root);
   World.uplink = up;
   colliders.push({ v: up.position.clone().normalize(), r: 0.8 });
   const ringG = placeOffset(World.hab, 7.0, 9.5, 0);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.08, 6, 28),
-    new THREE.MeshBasicMaterial({ color: 0xffb45e }));
-  ring.rotation.x = Math.PI / 2; ring.position.y = 0.12;
-  ringG.add(ring);
+  const pad = addSiteModel(ringG, 'uplink_pad');
+  World.padLampMats = ownMaterials(pad.root, /^light_/);
   World.uplinkRing = ringG;
 
-  // crash debris trail (starter scrap) + buried RTG site
+  // crash debris trail (starter scrap) and the RTG the crew buried well away from the Hab
   for (let i = 0; i < 3; i++) {
     const ang = 0.7 + i * 0.5, dist = 60 + i * 45;
     const g = placeOffset(World.hab, Math.sin(ang) * dist, Math.cos(ang) * dist, srand() * 6);
-    const m = mkBox(1.4 + srand(), 0.5, 1.0 + srand(), 0x8a8a92, 0, 0.25, 0, g);
-    m.rotation.z = srand() * 0.5;
-    World.pods.push({ group: g, kind: 'debris', taken: false, loot: { scrap: 2 }, label: 'Salvage MDV debris' });
+    const m = addSiteModel(g, ['debris_a', 'debris_b', 'debris_c'][i]);
+    World.pods.push({ group: g, kind: 'debris', taken: false, loot: { scrap: 2 }, label: 'Salvage MDV debris', cols: m.cols });
   }
-  const rtg = placeOffset(World.hab, -420, 590, 0);
-  const rtgModel = buildModel('rtgUnit');
-  rtgModel.rotation.z = 0.25;
-  rtg.add(rtgModel);
-  World.rtgSite = { group: rtg, taken: false };
+  const rtg = placeOffset(World.hab, -420, 590, 0.6);
+  World.rtgSite = { group: rtg, taken: false, cols: addSiteModel(rtg, 'rtg').cols };
 }
 
 // place a child group at a local tangent offset from a parent site, re-snapped to the terrain
@@ -257,25 +218,10 @@ export function addFarmPlot(parent, px, pz, collide, holder) {
   const plot = new THREE.Group();
   plot.position.set(px, 0.06, pz);
   (holder || parent).add(plot);
-  let soil, plants, dead = null;
-  if (hasModel('farm_plot')) {
-    const m = model('farm_plot');
-    plot.add(m.root);
-    soil = m.part('soil'); plants = m.part('plants'); dead = m.part('plants_dead');
-    if (dead) dead.visible = false;
-  } else {
-    mkBox(1.6, 0.34, 1.9, 0x6b6459, 0, 0.17, 0, plot);
-    soil = mkBox(1.42, 0.3, 1.72, 0x3a2418, 0, 0.24, 0, plot);
-    plants = new THREE.Group();
-    plants.position.y = 0.4;
-    plot.add(plants);
-    for (let p = 0; p < 4; p++) {
-      const stem = mkCyl(0.02, 0.03, 0.3, 0x3f7a2f, (p % 2) * 0.7 - 0.35, 0.15, Math.floor(p / 2) * 0.8 - 0.4, plants, 6);
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4e9a3a }));
-      leaf.position.y = 0.32; leaf.scale.y = 0.75;
-      stem.add(leaf);
-    }
-  }
+  const m = model('farm_plot');
+  plot.add(m.root);
+  const soil = m.part('soil'), plants = m.part('plants'), dead = m.part('plants_dead');
+  if (dead) dead.visible = false;
   soil.visible = false;
   plants.visible = false;
   if (collide) addColliderAt(parent, px, pz, 0.85);
@@ -309,12 +255,43 @@ export function buildRover(group) {
   colliders.push(World.roverCollider);
 }
 
+/** Which model stands at each historic landing site. */
+export const LANDER_MODEL = {
+  'Mars 3': 'mars3', 'Mars 6': 'mars3', 'Viking 1': 'viking', 'Viking 2': 'viking', 'Beagle 2': 'beagle2',
+  'Spirit': 'mer', 'Opportunity': 'mer', 'Phoenix': 'phoenix', 'Curiosity': 'msl', 'Perseverance': 'msl',
+  'Schiaparelli EDM': 'schiaparelli_wreck', 'InSight': 'insight', 'Zhurong': 'zhurong',
+};
+const _aw = new THREE.Vector3();
+/** A collision circle at a local offset in a placed group. Switch it with setColliders. */
+export function siteCollider(g, lx, lz, r) {
+  const w = new THREE.Vector3(lx, 0, lz).applyQuaternion(g.quaternion).add(g.position);
+  const col = { v: w.normalize(), r, r0: r };
+  colliders.push(col);
+  return col;
+}
+export function setColliders(cols, on) { if (cols) for (const c of cols) c.r = on ? c.r0 : 0.001; }
+/** Put a model in a placed group and register the collision circles it carries (`.cols`). */
+export function addSiteModel(g, name, o = {}) {
+  const m = model(name);
+  if (o.at) m.root.position.set(o.at[0], 0, o.at[1]);
+  if (o.yaw) m.root.rotation.y = o.yaw;
+  g.add(m.root);
+  m.cols = [];
+  for (const c of colliderAnchors(m)) {
+    c.node.updateWorldMatrix(true, false);
+    g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
+    m.cols.push(siteCollider(g, _aw.x, _aw.z, c.r));
+  }
+  return m;
+}
+
 export function buildStorySites() {
   // Pathfinder at its real landing site (Ares Vallis)
   const pf = placeAt(19.13, 326.79, 0.7);
-  pf.add(buildModel('pathfinder'));
+  World.pfModel = model('pathfinder');
+  pf.add(World.pfModel.root);
   World.pathfinder = pf;
-  World.pfCollider = { v: pf.position.clone().normalize(), r: 2.2 };
+  World.pfCollider = { v: pf.position.clone().normalize(), r: 2.0 };
   colliders.push(World.pfCollider);
 
   // Ares 4 MAV waits inside Schiaparelli crater
@@ -336,17 +313,12 @@ export function buildStorySites() {
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
 
-  // every real lander, at its real coordinates
+  // every real lander, at its real coordinates, as the machine it really was
   for (const L of LANDERS) {
     if (L.name === 'Pathfinder') { World.landers.push({ data: L, group: pf }); continue; }
     const g = placeAt(L.lat, L.lon, srand() * 6);
-    const isRover = ['Spirit', 'Opportunity', 'Curiosity', 'Perseverance', 'Zhurong', 'Sojourner'].includes(L.name);
-    g.add(buildModel(isRover ? 'roverGeneric' : 'landerGeneric', 0.85 + hash3(L.lat | 0, L.lon | 0, 7) * 0.4));
-    if (L.name === 'Perseverance') {   // Ingenuity!
-      mkBox(0.42, 0.14, 0.42, 0x9ab0c0, 2.4, 0.28, 1.5, g);
-      mkBox(1.0, 0.03, 0.12, 0x2a2a2a, 2.4, 0.44, 1.5, g).rotation.y = 0.7;
-    }
-    colliders.push({ v: g.position.clone().normalize(), r: 1.6 });
+    addSiteModel(g, LANDER_MODEL[L.name]);
+    if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }
 
@@ -354,36 +326,50 @@ export function buildStorySites() {
   const iceSpots = [[72.77, 164.58]];
   for (let i = 0; i < 11; i++) iceSpots.push([42 + hash3(i, 7, 1) * 32, hash3(i, 3, 9) * 360]);
   for (const [la, lo] of iceSpots) {
-    const g = placeAt(la, lo, 0);
-    for (let i = 0; i < 5; i++) {
-      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5 + hash3(i, la, lo) * 0.8, 0),
-        new THREE.MeshLambertMaterial({ color: 0xd8ecf4, emissive: 0x223038 }));
-      m.position.set((hash3(i, 2, la) - 0.5) * 6, 0.3, (hash3(i, 5, lo) - 0.5) * 6);
-      g.add(m);
+    const g = placeAt(la, lo, hash3(la, lo, 4) * 6.28);
+    const m = addSiteModel(g, 'ice_outcrop');
+    const blocks = [];
+    for (let i = 0; i < 6; i++) {
+      const b = m.part('block_' + i);
+      if (b) blocks.push({ node: b, col: siteCollider(g, b.position.x, b.position.z, 0.6) });
     }
-    World.iceSites.push({ group: g, left: 6, korolev: la > 70 });
+    World.iceSites.push({ group: g, left: 6, korolev: la > 70, blocks });
   }
 }
 
-// deployable buildables
-export function buildDeployable(kind, atVec) {
-  const g = placeAt(atVec);
-  if (kind === 'solar') {
-    g.add(buildModel('solarDeploy'));
-  } else if (kind === 'greenhouse') {
-    g.add(buildModel('greenhouse'));
-    const fl = new THREE.Mesh(new THREE.CircleGeometry(4.1, 18),
-      new THREE.MeshLambertMaterial({ color: 0x9a9284 }));
-    fl.rotation.x = -Math.PI / 2; fl.position.y = 0.05;
-    g.add(fl);
-    for (let i = 0; i < 4; i++)
-      addFarmPlot(g, -1.1 + (i % 2) * 2.2, -1.2 + Math.floor(i / 2) * 2.4, false);
-  } else if (kind === 'beacon') {
-    g.add(buildModel('beacon'));
-  } else if (kind === 'cache') {
-    g.add(buildModel('o2cache'));
+/** A supply capsule (or route cache) standing in a placed group. */
+export function addSupplyPod(g, loot, label) {
+  const m = addSiteModel(g, 'supply_pod');
+  const pod = { group: g, kind: 'pod', taken: false, loot, label, cols: m.cols, lid: m.part('lid'),
+    strobe: ownMaterials(m.part('strobe'), /^light_/) };
+  World.pods.push(pod);
+  return pod;
+}
+
+// Things the player builds in the field. `yaw` turns the front (the greenhouse door, the face of
+// a panel) to that bearing, east of north.
+export const GREENHOUSE = { wall: 3.93, doorHalf: 0.75, portalOuter: 0.86, portalEnd: 4.62, floor: 0.06 };
+export function buildDeployable(kind, atVec, yaw = 0) {
+  if (kind === 'greenhouse') {                 // a dome needs level ground under it
+    const u = _aw.copy(atVec).normalize();
+    const padRec = ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5);
+    ctx.terrain.syncPads([padRec]);
   }
-  const b = { kind, group: g, v: g.position.clone().normalize(), charges: kind === 'cache' ? 3 : 0 };
+  const g = placeAt(atVec, undefined, yaw);
+  const b = { kind, group: g, v: g.position.clone().normalize(), yaw, charges: kind === 'cache' ? 3 : 0 };
+  if (kind === 'solar') {
+    addSiteModel(g, 'solar_kit');
+  } else if (kind === 'greenhouse') {
+    g.position.addScaledVector(g.userData.up, -GREENHOUSE.floor);       // the deck is the ground you walk on
+    addSiteModel(g, 'greenhouse');
+    for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
+  } else if (kind === 'beacon') {
+    const m = addSiteModel(g, 'beacon');
+    b.lamp = ownMaterials(m.part('lamp'), /^light_/);
+  } else if (kind === 'cache') {
+    const m = addSiteModel(g, 'o2_cache');
+    b.tanks = [0, 1, 2].map((i) => m.part('tank_' + i));
+  }
   World.builtMeshes.push(b);
   return b;
 }
@@ -391,10 +377,8 @@ export function buildDeployable(kind, atVec) {
 // supply pod (quest rewards) — lands near the hab
 export function dropSupplyPod(loot, label) {
   const ang = srand() * Math.PI * 2, dist = 40 + srand() * 30;
-  const g = placeOffset(World.hab, Math.sin(ang) * dist, Math.cos(ang) * dist, 0);
-  g.add(buildModel('supplyPod'));
-  const pod = { group: g, kind: 'pod', taken: false, loot, label: label || 'Open supply pod' };
-  World.pods.push(pod);
+  const g = placeOffset(World.hab, Math.sin(ang) * dist, Math.cos(ang) * dist, srand() * 6);
+  const pod = addSupplyPod(g, loot, label || 'Open supply pod');
   Snd.jingle();
   log('Supply pod down, ' + Math.round(dist) + 'm out. NASA delivers. No tip expected.', 'nasa');
   return pod;
