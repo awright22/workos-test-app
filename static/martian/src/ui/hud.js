@@ -38,7 +38,7 @@ export const OBJECTIVES = [
   { id: 'pf', why: 'Its radio is the only way to tell Earth you are alive.',  text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
     dist: () => groundDist(player.pos, S.pf.loaded ? World.uplink.position : World.pathfinder.position),
     shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
-  { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
+  { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} so far)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
   { id: 'dinner', pos: () => habPoint(4.2, 1.4, 4.8),  why: 'A cooked meal lifts morale, and in good spirits the work goes faster.',  text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   { id: 'breach', pos: () => habPoint(0, 1.6, -HAB_R + 0.5),  why: 'The Hab is losing its air through the far wall.',  text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
   { id: 'survive', why: 'The Hermes is coming back for you.',  text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },

@@ -170,10 +170,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           vec4 fld = texture2D(uField, uv / 16.0);
           // ripples belong to sand: ice has none
           // (nor has a lava flow beyond a skin of drift, nor trodden ground, nor anything steeper than sand will lie)
-          float ripples = (1.0 - ice * 0.85) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope));
+          // (and the land's own colour says what it is made of: the dark regions are basalt sand, which the wind works into
+          // strong ripples and leaves strewn with gravel; the bright ones are deep dust, which lies smooth)
+          float sandy = 1.0 - smoothstep(0.11, 0.26, albLum);
+          float ripples = (1.0 - ice * 0.85) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
           flatSlope += (fld.rg - 0.5) * (4.0 * fField * ripples);
           tone += (fld.b - 0.56) * 1.5 * fField * (1.0 - ice * 0.6) * (0.35 + 0.65 * ripples);
-          gravelHere = min(1.0, fld.a * (1.0 - ice) + lava * 0.3);      // clinker lies all over a flow
+          gravelHere = min(1.0, fld.a * (1.0 - ice) * mix(0.7, 1.25, sandy) + lava * 0.3);      // clinker lies all over a flow
           // patterned ground: polygons cracked by frost, from the mid-latitudes to the poles, and on all ice
           // (and lava that froze level cracked into columns as it cooled: the same pattern, larger meaning)
           float frosty = max(max(smoothstep(0.52, 0.76, abs(pDir.y)), ice), pond);
@@ -289,6 +292,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain12' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain13' + (o.fine !== false ? 'F' : '');
   return mat;
 }

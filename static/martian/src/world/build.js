@@ -58,26 +58,46 @@ export function pickSpawn(rng) {
   return { lat: 18, lon: 340, v: llToVec(18, 340) };                  // safe fallback
 }
 
-let stainTexture = null;
 /** A soft, ragged stain on level ground: scorch under the rocket, trodden soil round the Hab. */
-export function groundStain(parent, radius, color, opacity, y = 0.03) {
-  if (!stainTexture) {
+/** Every stain's material and its colour in full light: they are unlit, so the light is put into their colour. */
+const stains = [];
+/** How much light there is to see a stain by, 0..1 (call each frame). Left at its daylight colour, a dark patch
+ *  was paler than the ground round it at night. */
+export function setStainLight(k) { for (const st of stains) st.mat.color.copy(st.base).multiplyScalar(k); }
+const stainTextures = {};
+/**
+ * A patch of disturbed ground under something. kind 'soft': darker, packed soil with a ragged edge.
+ * kind 'blast': what a descent engine leaves, dust blown out in rays from under the nozzles.
+ */
+export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'soft') {
+  if (!stainTextures[kind]) {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d'), img = g.createImageData(128, 128);
     for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
       const dx = (i - 63.5) / 64, dy = (j - 63.5) / 64, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
-      const ragged = 0.80 + 0.10 * Math.sin(a * 5 + 1.3) + 0.06 * Math.sin(a * 11 + 0.4) + 0.04 * Math.sin(a * 23);
-      const v = Math.max(0, Math.min(1, (ragged - d) / 0.42)) * (0.75 + 0.25 * hash3(i, j, 3));
+      let v;
+      if (kind === 'blast') {
+        // rays: long and short, uneven round the circle, strongest a little out from the middle where the plume struck
+        const ray = 0.5 + 0.22 * Math.sin(a * 7 + 0.9) + 0.16 * Math.sin(a * 13 + 2.1) + 0.12 * Math.sin(a * 29 + 0.3) + 0.1 * Math.sin(a * 53 + 1.7);
+        const reach = 0.42 + 0.56 * Math.max(0, Math.min(1, ray));
+        const fall = Math.max(0, Math.min(1, (reach - d) / (0.30 * reach + 0.06)));
+        v = fall * (0.55 + 0.45 * Math.min(1, d / 0.22)) * (0.7 + 0.3 * hash3(i, j, 5));
+      } else {
+        const ragged = 0.80 + 0.10 * Math.sin(a * 5 + 1.3) + 0.06 * Math.sin(a * 11 + 0.4) + 0.04 * Math.sin(a * 23);
+        v = Math.max(0, Math.min(1, (ragged - d) / 0.42)) * (0.75 + 0.25 * hash3(i, j, 3));
+      }
       img.data[(j * 128 + i) * 4] = img.data[(j * 128 + i) * 4 + 1] = img.data[(j * 128 + i) * 4 + 2] = Math.round(v * v * (3 - 2 * v) * 255);
       img.data[(j * 128 + i) * 4 + 3] = 255;
     }
     g.putImageData(img, 0, 0);
-    stainTexture = new THREE.CanvasTexture(c);
-    stainTexture.colorSpace = THREE.NoColorSpace;
+    stainTextures[kind] = new THREE.CanvasTexture(c);
+    stainTextures[kind].colorSpace = THREE.NoColorSpace;
   }
   const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
   geo.rotateX(-Math.PI / 2);
-  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, alphaMap: stainTexture, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  const mat = new THREE.MeshBasicMaterial({ color, alphaMap: stainTextures[kind], transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  stains.push({ mat, base: new THREE.Color(color) });
+  const m = new THREE.Mesh(geo, mat);
   m.position.y = y; m.renderOrder = 1;
   parent.add(m);
   return m;
@@ -135,10 +155,10 @@ export function buildHabColony(spawn) {
     // Sealed in, most of the ceiling's light comes from the one light that casts shadows (render/engine.js),
     // so things stand on the floor; these then only add the glow near each fitting. With a door open that
     // light is the sun again, and these carry the room.
-    if (a) addLamp(a, { color: 0xffe4c4, power: 15, range: 26, decay: 1.6, level: () => powered() * (World.sealedInside ? 0.36 : 1), room: true });
+    if (a) addLamp(a, { color: 0xffe4c4, power: 15, range: 26, decay: 1.6, level: () => powered() * (World.sealedInside ? 0.55 : 1), room: true });
   }
   // the grow lights over the farm: two pink pools, one for each pair of trays
-  for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 2.6, range: 4.5, level: powered, room: true });
+  for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 4.2, range: 5, level: powered, room: true });
   for (const [n, power, range] of [['lamp_bench', 3.5, 6], ['lamp_bunk', 2.5, 5]]) {
     const a = hab.part(n);
     if (a) addLamp(a, { color: 0xffd9a8, power, range, level: powered, room: true });
@@ -389,7 +409,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) groundStain(g, o.stain, 0x1e0f08, o.stainOpacity || 0.5, 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) groundStain(g, o.stain, 0x1e0f08, o.stainOpacity || 0.5, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -422,7 +442,7 @@ export function buildStorySites() {
   (flameAt || World.mavRocket).add(flame);
   flame.visible = false;
   World.mavFlame = flame;
-  groundStain(mav, 9, 0x140a06, 0.5);                 // the descent engine's scorch, years old
+  groundStain(mav, 12, 0x140a06, 0.5, 0.03, 'blast');   // what four descent engines left in the dust, years old
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
@@ -431,7 +451,9 @@ export function buildStorySites() {
   for (const L of LANDERS) {
     if (L.name === 'Pathfinder') { World.landers.push({ data: L, group: pf }); continue; }
     const g = placeAt(L.lat, L.lon, srand() * 6);
-    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : 4.2 });
+    // those that came down on engines left their blast in the dust; those that bounced in on airbags, a scuffed patch
+    const engines = !/Pathfinder|Spirit|Opportunity|Beagle|Schiaparelli/.test(L.name);
+    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 7.5 : 4.2, blast: engines, stainOpacity: engines ? 0.42 : 0.5 });
     if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }

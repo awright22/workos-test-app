@@ -212,7 +212,7 @@ export function renderColony() {
     if (ok) homeReady++;
     const costHtml = Object.keys(c.cost).length ? costChips(c.cost) : '<span class="chip ok">Nothing but time</span>';
     home += `<article class="rcp ${made ? 'done' : ok ? 'ready' : locked ? 'locked' : ''}" data-card="${c.id}"><div class="rcp-hd"><h4>${esc(c.name)}</h4>` +
-      (made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Not yet</span>` : '') +
+      (made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') +
       `<span class="badge mood">${icon('mood')}+${c.cheer} a sol</span></div><p class="ds">${esc(c.desc)}</p>` +
       (made ? '' : `<div class="cost">${costHtml}</div><div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
         `<span class="why${block && !locked && block !== 'Made' ? ' bad' : ''}">${locked ? esc(c.why) : block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`) +
@@ -222,7 +222,7 @@ export function renderColony() {
     '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home;
 
   // (the number is how many things on that tab can be made now, and says so: bare, it read as a total and disagreed with the tab's own heading)
-  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}">${icon(ic)}${label}${n ? `<em>${n}<i> ready</i></em>` : ''}</button>`;
+  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}>${icon(ic)}${label}${n ? `<em>${n}<i> ready</i></em>` : ''}</button>`;
   body.innerHTML = '<div class="colony">' +
     `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
     `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +

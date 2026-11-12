@@ -275,6 +275,6 @@ export function winGame() {
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,
     quote: `${S.sol} sols alone on a planet. He ${fed}, ${went}, and came home.${mood}<cite>Ares 3 mission record, closing entry</cite>`,
-    buttons: [{ label: 'Play again (new random site)', keep: true, fn: () => tryReload() }],
+    buttons: [{ label: 'Back to the title', keep: true, fn: () => tryReload() }],
   });
 }

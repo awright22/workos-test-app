@@ -62,7 +62,7 @@ addI({
   enabled: () => {
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
-      case 'empty': return S.inv.regolith > 0 ? true : 'Needs soil — dig regolith outside';
+      case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith — dig some outside';
       case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)') : 'Nothing left to plant';
       case 'growing':
         if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)';
@@ -222,7 +222,7 @@ addI({
 addI({
   pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
   visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
-  label: () => 'Dig regolith here (+1, slow)',
+  label: () => 'Dig regolith (+1, slow going here)',
   use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); },
 });
 // hydrazine rig
@@ -310,7 +310,7 @@ addI({
   use: () => {
     S.flags.didMath = true;
     Snd.play('terminal');
-    log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The math says: farm or starve. I'm going to have to science the sh*t out of this.`);
+    log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`);
     // the premise of the whole game: a card he reads and puts down, not a line that scrolls away
     showOverlay({
       kicker: 'The numbers', title: 'Farm or starve',
@@ -318,7 +318,7 @@ addI({
       // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
         'The Hab has six farm beds: fill them with soil from the heaps outside, plant, water, and eat what grows. A potato bed costs one ration to plant.\n\n' +
-        'Top left, the six bars that keep him alive. Top right, what to do next and why.',
+        'Top left, the six bars that keep you alive (tap or pause to see what each one is). Top right, what to do next and why.',
       buttons: [{ label: 'Get to work' }],
     });
   },
@@ -583,7 +583,7 @@ addI({
   use: () => {
     showOverlay({
       title: 'LAUNCH?',
-      body: 'The MAV is a convertible now. The math says Hermes can catch you.\nThe math has been wrong before.\n\nNo coming back. The potatoes forgive you.',
+      body: 'The MAV is a convertible now. The numbers say Hermes can catch you.\nThe numbers have been wrong before.\n\nNo coming back. The potatoes forgive you.',
       buttons: [
         { label: 'PUNCH IT', fn: () => startLaunch() },
         { label: 'Not yet', ghost: true, fn: () => {} },
