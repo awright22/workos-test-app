@@ -155,13 +155,16 @@ export class Vfx {
           float along = length(w);
           vec2 dir = along > 1e-4 ? w / along : vec2(1.0, 0.0);
           // (soft smears of blown grit, not hairlines: thin bright lines read as rain)
-          float len = (0.08 + 0.34 * uStorm) * (0.5 + aRnd) * max(along, 0.12), wide = 0.014 + 0.034 * aRnd;
+          // (the ones close to the eye are kept short and fine, or a still frame shows them as bars)
+          float d = length(rel);
+          float far = smoothstep(2.0, 10.0, d);
+          float len = (0.10 + 0.52 * uStorm) * (0.5 + aRnd) * max(along, 0.12) * mix(0.3, 1.0, far);
+          float wide = (0.007 + 0.02 * aRnd) * mix(0.45, 1.0, far);
           mv.xy += dir * (position.x * len) + vec2(-dir.y, dir.x) * (position.y * wide);
           mv.w = 1.0;
           gl_Position = projectionMatrix * mv;
           vQ = position.xy;
-          float d = length(rel);
-          vA = smoothstep(0.25, 1.0, uStorm) * 0.30 * smoothstep(0.5, 2.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
+          vA = smoothstep(0.25, 1.0, uStorm) * 0.5 * smoothstep(1.2, 4.5, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uLight;

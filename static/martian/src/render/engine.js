@@ -147,7 +147,7 @@ export class Engine {
       // a ceiling on what reaches the bloom: one blown surface (a lamp on white a metre away, a glint, an
       // emitter) would otherwise spread into a white blob many times its size
       this.composer.addPass(new CeilingPass(7.0));
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.17, 0.32, 1.35);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.14, 0.3, 1.5);
       this.composer.addPass(this.bloom);
     }
     this.final = new FinalPass();

@@ -78,7 +78,7 @@ async function boot() {
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
   dustUniforms.uDustAlbedo.value = data.albedoCube;
   ctx.lamps = new LampPool(engine.scene, engine.q.scale < 0.7 ? 3 : 5);
-  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 28 : 60, streaks: engine.q.scale < 0.7 ? 800 : 1800 });
+  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 28 : 60, streaks: engine.q.scale < 0.7 ? 1100 : 2800 });
   initEffects();
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };

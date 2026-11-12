@@ -152,13 +152,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
             // pebbles only where the field says gravel lies; the sand between them everywhere
             float g1 = s1.a * smoothstep(0.34, 0.60, gravelHere + hFar * 0.6), g2 = s2.a * smoothstep(0.55, 0.80, gravelHere - hFar * 0.6);
             flatSlope += ((s1.rg - 0.5) * mix(0.55, 1.0, g1) + vec2(-(s2.g - 0.5), s2.r - 0.5) * mix(0.45, 1.0, g2)) * (4.0 * fSand * (1.0 - ice * 0.6));
-            tone += ((s1.b - 0.56) * mix(0.55, 1.0, g1) + (s2.b - 0.56) * mix(0.45, 1.0, g2)) * 1.3 * fSand;
+            tone += ((s1.b - 0.56) * mix(0.55, 1.0, g1) + (s2.b - 0.56) * mix(0.45, 1.0, g2)) * 1.7 * fSand;
             stone = max(g1, g2) * fSand;
             // the last two metres: the same grit again at a quarter of the size, so the ground at his feet is not a blur
             float fNear = (1.0 - smoothstep(1.5, 6.0, viewDist)) * level * (1.0 - ice * 0.7);
             vec4 s3 = texture2D(uSand, uv / 0.5 + vec2(0.21, 0.67));
             flatSlope += (s3.rg - 0.5) * (2.6 * fNear);
-            tone += (s3.b - 0.56) * 0.9 * fNear;
+            tone += (s3.b - 0.56) * 1.5 * fNear;        // tone, not relief: it shows at noon, when no slope casts a shade
           #endif
         }
 
@@ -220,6 +220,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain6' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain7' + (o.fine !== false ? 'F' : '');
   return mat;
 }

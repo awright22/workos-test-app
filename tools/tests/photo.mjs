@@ -30,7 +30,10 @@ check('the clock is stopped: time and the suit tank do not move', t.tod === inPh
 const before = await ev((G) => ({ ...G.photoMode.photo }));
 await page.mouse.move(640, 200); await page.mouse.down(); await page.mouse.move(760, 240, { steps: 6 }); await page.mouse.up();
 await page.mouse.wheel(0, 600);
-await page.keyboard.down('d'); await sleep(500); await page.keyboard.up('d');
+// (held until the camera has slid: at one software-rendered frame a second, half a second may be no frame at all)
+await page.keyboard.down('d');
+for (let i = 0; i < 16; i++) { await sleep(500); if (await ev((G) => G.photoMode.photo.slide > 0.12)) break; }
+await page.keyboard.up('d');
 await sleep(200);
 const after = await ev((G) => ({ ...G.photoMode.photo, pause: G.S.uiOpen }));
 check('drag orbits, the wheel zooms, a key slides, and none of it pauses the game', Math.abs(after.yaw - before.yaw) > 0.1 && Math.abs(after.pitch - before.pitch) > 0.02 && after.dist > before.dist * 1.5 && after.slide > 0.1 && after.pause === false,

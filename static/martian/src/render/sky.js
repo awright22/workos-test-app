@@ -55,7 +55,8 @@ const GLSL_SKY = /* glsl */`
     vec3 aur = mix(vec3(1.0, 0.86, 0.66), vec3(0.34, 0.52, 0.92), smoothstep(0.30, 0.02, sunE));
     float sunUp = smoothstep(-0.10, 0.04, sunE);
     // near the horizon the sun shines through far more dust: the glow shrinks and dims with it
-    col += aur * (hg * mix(0.36, 0.045, sqrt(low)) + wide * mix(0.20, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    // (kept tight: a broad white aureole veils the whole frame when he looks toward the sun, and Mars turns beige)
+    col += aur * (hg * mix(0.25, 0.045, sqrt(low)) + wide * mix(0.13, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
     // ... and what is left of it close to a low sun is blue: fine dust scatters blue light forward
     float ang0 = acos(clamp(cosT, -1.0, 1.0));
     col += vec3(0.20, 0.40, 0.95) * exp(-ang0 * 6.5) * 0.55 * smoothstep(0.38, 0.04, sunE) * smoothstep(-0.10, 0.02, sunE);
