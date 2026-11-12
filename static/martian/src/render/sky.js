@@ -33,10 +33,10 @@ const GLSL_SKY = /* glsl */`
     float day = smoothstep(-0.16, 0.10, sunE);
     float low = 1.0 - smoothstep(0.0, 0.45, sunE);           // 1 at the horizon, 0 high sun
     // base dome: zenith to horizon
-    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 2.6);
-    vec3 zen = mix(vec3(0.30, 0.215, 0.150), vec3(0.150, 0.130, 0.125), low);
-    vec3 hor = mix(vec3(0.86, 0.60, 0.39), vec3(0.40, 0.30, 0.25), low);
-    vec3 col = mix(zen, hor, h) * (0.10 + 1.25 * day);
+    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 3.0);
+    vec3 zen = mix(vec3(0.270, 0.180, 0.115), vec3(0.150, 0.130, 0.125), low);
+    vec3 hor = mix(vec3(0.800, 0.540, 0.330), vec3(0.40, 0.30, 0.25), low);
+    vec3 col = mix(zen, hor, h) * (0.06 + 0.84 * day);
     // dust aureole around the sun: warm white by day, blue when the sun is low
     float g = 0.80;
     float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosT, 1.5) * 0.25;
@@ -123,9 +123,9 @@ export class Sky {
           float ang = acos(clamp(cosT, -1.0, 1.0));
           float disc = smoothstep(0.0046, 0.0030, ang);
           float halo = exp(-ang * 60.0) * 0.6 + exp(-ang * 14.0) * 0.08;
-          float through = (1.0 - uDust * 0.93) * smoothstep(-0.03, 0.03, sunE + (1.0 - uSunDisc));
+          float through = (1.0 - uDust * 0.93) * smoothstep(-0.03, 0.03, sunE);
           vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
-          col += sunCol * (disc * 90.0 + halo * 6.0) * through;
+          col += sunCol * (disc * 90.0 * uSunDisc + halo * 6.0 * uSunDisc) * through;
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -168,10 +168,10 @@ export class Sky {
     this.sunIntensity = 3.3 * through * (1 - dust * 0.86);
     this.sunColor.setRGB(lerp(0.80, 1.0, 1 - low * 0.6), lerp(0.80, 0.93, 1 - low), lerp(0.86, 0.80, 1 - low));
     // sky light: the dome's average colour above, the lit ground's bounce below
-    const k = 0.10 + 1.25 * day;
-    this.ambientSky.setRGB(lerp(0.58, 0.28, low) * k, lerp(0.41, 0.22, low) * k, lerp(0.27, 0.19, low) * k);
+    const k = 0.06 + 0.84 * day;
+    this.ambientSky.setRGB(lerp(0.54, 0.28, low) * k, lerp(0.36, 0.22, low) * k, lerp(0.22, 0.19, low) * k);
     this.ambientGround.setRGB(0.30 * k * (0.3 + 0.7 * through), 0.15 * k * (0.3 + 0.7 * through), 0.08 * k * (0.3 + 0.7 * through));
-    this.fogColor.setRGB(lerp(0.86, 0.40, low) * k, lerp(0.60, 0.30, low) * k, lerp(0.39, 0.25, low) * k);
+    this.fogColor.setRGB(lerp(0.80, 0.40, low) * k, lerp(0.54, 0.30, low) * k, lerp(0.33, 0.25, low) * k);
     this.ambientSky.offsetHSL(0, 0, 0.004);
     if (dust > 0) {
       _c.setRGB(0.50 * (0.06 + 0.60 * day), 0.30 * (0.06 + 0.60 * day), 0.16 * (0.06 + 0.60 * day));

@@ -13,8 +13,9 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
-import { World, siteLocalToWorld, updateDoors } from './world/build.js';
+import { World, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
+import { RockField } from './world/rocks.js';
 import { input, initInput } from './game/input.js';
 import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, initRoverAt } from './game/rover.js';
@@ -52,10 +53,14 @@ async function boot() {
   ctx.planet = data.planet;
   const material = makeTerrainMaterial(data.albedoCube, { fine: engine.q.fine });
   ctx.terrainMaterial = material;
+  ctx.outdoor = new THREE.Group();                 // terrain and rocks: skipped while sealed inside the Hab
+  engine.scene.add(ctx.outdoor);
   ctx.terrain = new Terrain({
-    planet: data.planet, heightData: data.heightData, parent: engine.scene, material,
+    planet: data.planet, heightData: data.heightData, parent: ctx.outdoor, material,
     workerUrl: asset('terrain-worker.js'), grid: engine.q.grid, maxLevel: engine.q.maxLevel, split: engine.q.split, workers: engine.q.workers,
+    shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
+  ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0 });
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
@@ -97,7 +102,11 @@ function draw(dt, focus) {
   const e = ctx.engine;
   e.camera.updateMatrixWorld();
   ctx.terrain.update(e.camera.position);
-  e.update({ dt, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
+  ctx.rocks.update(e.camera.position);
+  updateSites(e.camera.position);
+  const sealed = S.started && !!World.sealedInside && !S.over;
+  ctx.outdoor.visible = !sealed;
+  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();
@@ -244,7 +253,7 @@ function installDebug() {
     setStorm(i) { S.storm.i = i; S.storm.hold = i; },
     look(pitch) { player.pitch = pitch; },
     async settle() { ctx.engine.camera.updateMatrixWorld(); return ctx.terrain.settle(ctx.engine.camera.position, 20000); },
-    info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats() }; },
+    info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats(), rocks: ctx.rocks.counts }; },
   };
 }
 

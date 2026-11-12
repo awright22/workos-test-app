@@ -106,7 +106,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // real colour of this spot on Mars, graded from orbital imagery toward surface colour
         vec3 alb = textureCube(uAlbedo, pDir).rgb;
         float albLum = dot(alb, vec3(0.3, 0.55, 0.15));
-        alb = mix(vec3(albLum), alb, 1.25) * vec3(1.22, 0.93, 0.74);
+        alb = mix(vec3(albLum), alb, 1.15) * vec3(1.16, 0.94, 0.77);
         float ice = smoothstep(0.50, 0.72, albLum) * smoothstep(0.80, 0.95, abs(pDir.y));
         float slope = 1.0 - clamp(dot(geoN, pDir), 0.0, 1.0);
         vec3 tw = pow(abs(geoN), vec3(4.0));
@@ -130,12 +130,12 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float rock = smoothstep(0.10, 0.42, slope + hgt * 0.12);
         vec3 rockCol = alb * vec3(0.55, 0.50, 0.50);
         vec3 col = mix(alb, rockCol, rock * 0.75);
-        col *= 1.0 + hgt * 0.42;
+        col *= 1.0 + hgt * 0.30;
         col = mix(col, col * vec3(0.50, 0.44, 0.42), clamp(pebbles, 0.0, 1.0) * 0.8);
         col = mix(col, vec3(0.80, 0.84, 0.90), ice);
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
         diffuseColor.rgb = col;
-        float terrainRough = mix(0.96, 0.82, rock) - ice * 0.5 - clamp(pebbles, 0.0, 1.0) * 0.12;
+        float terrainRough = mix(0.97, 0.88, rock) - ice * 0.5;
         vec3 terrainGrad = grad * (1.0 - ice * 0.6);`)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor = clamp(terrainRough, 0.05, 1.0);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>

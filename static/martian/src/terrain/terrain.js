@@ -28,7 +28,7 @@ class Node {
     this.size = chunkSize(level);
     this.radius = this.size * 0.75;                        // bounding radius, refined likewise
     this.angle = (this.size * 0.71) / R;                   // angular radius (radians)
-    this.maxR = R + 320;
+    this.maxR = parent ? parent.maxR + 6 : R + 320;      // until built: no higher than its parent (plus fine detail)
   }
 }
 
@@ -53,6 +53,8 @@ export class Terrain {
     this.maxLevel = o.maxLevel || 9;
     this.split = o.split || 2.4;
     this.shadowLevel = o.shadowLevel === undefined ? 7 : o.shadowLevel;
+    /** which quadtree levels carry rocks: boulders on a coarser level (seen from afar), stones on the finest */
+    this.rockLevels = { big: Math.min(7, this.maxLevel - 1), small: this.maxLevel };
     this.index = new THREE.BufferAttribute(chunkIndices(this.G), 1);
     this.roots = [];
     for (let f = 0; f < 6; f++) this.roots.push(new Node(f, 0, 0, 0, null));
@@ -100,6 +102,8 @@ export class Terrain {
     }
   }
 
+  _rockKind(level) { return level === this.rockLevels.big ? 'big' : level === this.rockLevels.small ? 'small' : null; }
+
   _request(node, priority) {
     if (node.state !== 0) return;
     node.state = 1;
@@ -115,7 +119,7 @@ export class Terrain {
       this.queue.sort((a, b) => a.priority - b.priority);
       for (let n = 0; n < 2 && this.queue.length; n++) {
         const node = this.queue.shift();
-        this.ready.push([node, buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G)]);
+        this.ready.push([node, buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level))]);
       }
       return;
     }
@@ -128,7 +132,7 @@ export class Terrain {
       const id = this.nextId++;
       node._worker = w;
       this.pending.set(id, node);
-      w.postMessage({ type: 'build', id, face: node.face, level: node.level, ix: node.ix, iy: node.iy, G: this.G });
+      w.postMessage({ type: 'build', id, face: node.face, level: node.level, ix: node.ix, iy: node.iy, G: this.G, rocks: this._rockKind(node.level) });
     }
     // drop stale requests so the queue cannot grow without bound while moving fast
     if (this.queue.length > 64) {
@@ -171,6 +175,34 @@ export class Terrain {
     node.state = 0;
   }
 
+  /**
+   * Radius of a sphere that the ground is nowhere below within sight of the camera. Anything
+   * hidden by that sphere is hidden by the real ground. Near the surface it is the lowest
+   * ground within about 1.5 km (which is where a grazing sight-line touches down); from high
+   * up it is the lowest point on the planet.
+   */
+  _localFloor(camPos, camDir, camR) {
+    const globalFloor = R - 130;
+    if ((this.frame & 7) !== 1 && this._floor !== undefined) return this._floor;
+    const ground = this.planet.radius(camDir.x, camDir.y, camDir.z, 12);
+    if (camR - ground > 250) return (this._floor = globalFloor);
+    let low = ground;
+    // local east/north
+    let ex = -camDir.z, ez = camDir.x; const el = Math.hypot(ex, ez) || 1; ex /= el; ez /= el;
+    const nx = camDir.y * ez, ny = camDir.z * ex - camDir.x * ez, nz = -camDir.y * ex;
+    for (const dist of [120, 320, 650, 1050, 1500]) {
+      const k = dist / R;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + dist, c = Math.cos(a) * k, s = Math.sin(a) * k;
+        let x = camDir.x + ex * c + nx * s, y = camDir.y + ny * s, z = camDir.z + ez * c + nz * s;
+        const l = 1 / Math.hypot(x, y, z);
+        const r = this.planet.radius(x * l, y * l, z * l, 24);
+        if (r < low) low = r;
+      }
+    }
+    return (this._floor = Math.max(globalFloor, low - 18));
+  }
+
   /** Below the horizon as seen from the camera (never visible, so never built). */
   _hidden(node, camDir, camR, horizon) {
     const ang = Math.acos(Math.min(1, Math.max(-1, camDir.dot(node.dir))));
@@ -191,7 +223,7 @@ export class Terrain {
     }
     const camR = camPos.length();
     const camDir = _v.copy(camPos).multiplyScalar(1 / camR);
-    this.floorR = R - 130;
+    this.floorR = this._localFloor(camPos, camDir, camR);
     const horizon = Math.acos(Math.min(1, this.floorR / Math.max(camR, this.floorR + 1)));
     for (const v of this.visible) v.mesh.visible = false;
     this.visible.length = 0;
@@ -281,7 +313,7 @@ export class Terrain {
   }
 
   _rebuild(node) {
-    const c = buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G);
+    const c = buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level));
     const old = node.mesh;
     if (this.onDispose) this.onDispose(node);
     this.parent.remove(old);

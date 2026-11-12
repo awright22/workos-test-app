@@ -5,6 +5,7 @@
  */
 import { faceToDir, FINEST } from '../planet/height.js';
 import { R } from '../planet/constants.js';
+import { gnoise3, hashU } from '../core/math.js';
 
 const PI_4 = Math.PI / 4;
 /** Detail-texture coordinates wrap every TEX_PERIOD metres; all texture scales divide it. */
@@ -16,7 +17,7 @@ export function chunkSpacing(level, G) { return (2 / (1 << level)) * R * PI_4 / 
 /** Arc length of a chunk's side at a face centre (world metres). */
 export function chunkSize(level) { return (2 / (1 << level)) * R * PI_4; }
 
-export function buildChunk(planet, face, level, ix, iy, G) {
+export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   const spacing = chunkSpacing(level, G);
   const minW = Math.max(FINEST, spacing * 1.25);
   const W = G + 3;                                   // one extra ring for normals
@@ -82,7 +83,9 @@ export function buildChunk(planet, face, level, ix, iy, G) {
   for (let j = 0; j < G; j++) skirt(G, j);          // right edge, top to bottom
   for (let i = G; i > 0; i--) skirt(i, G);          // bottom edge, right to left
   for (let j = G; j > 0; j--) skirt(0, j);          // left edge, bottom to top
-  return { pos, nor, tex, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
+  const out = { pos, nor, tex, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
+  if (rocks) out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz);
+  return out;
 }
 
 /** Triangle indices shared by every chunk of grid size G (grid + skirt). */
@@ -108,4 +111,46 @@ export function chunkIndices(G) {
     idx.push(a, b, sa, b, sb, sa);
   }
   return new Uint16Array(idx);
+}
+
+/**
+ * Rocks for one chunk, placed by a hash of the chunk's address so the same rock is always in
+ * the same place. Boulder fields are patchy and denser on rough, old terrain; small stones are
+ * everywhere. Returns 8 numbers per rock: position relative to the chunk origin (3), the
+ * surface direction (3), size in metres, and a random 0..1 for shape and colour.
+ * @param {'big'|'small'} kind
+ */
+export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
+  const span = 2 / (1 << level);
+  const s0 = -1 + ix * span, t0 = -1 + iy * span;
+  const side = chunkSize(level);
+  faceToDir(face, s0 + span / 2, t0 + span / 2, d);
+  const rough = planet.roughness(d[0], d[1], d[2]);
+  const field = gnoise3(d[0] * R / 260 + 7.7, d[1] * R / 260, d[2] * R / 260 - 3.1);       // patchy boulder fields
+  const patch = Math.min(1, Math.max(0, (field + 0.15) * 1.8));
+  const lat = Math.abs(d[1]);
+  let density = kind === 'big' ? (0.0008 + 0.0075 * rough * rough) * (0.15 + 0.85 * patch) : (0.03 + 0.13 * rough) * (0.35 + 0.65 * patch);
+  if (lat > 0.97) density *= 0.15;                                                           // the ice caps are nearly bare
+  const n = Math.min(kind === 'big' ? 120 : 230, Math.floor(side * side * density));
+  const out = new Float32Array(n * 8);
+  let seed = hashU(ix, iy, face, level * 7 + (kind === 'big' ? 1 : 2));
+  const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  let k = 0;
+  const pads = planet.pads;
+  for (let i = 0; i < n; i++) {
+    const s = s0 + rnd() * span, t = t0 + rnd() * span, u = rnd(), v = rnd();
+    faceToDir(face, s, t, d);
+    let clear = true;
+    for (let p = 0; p < pads.length; p++) {
+      const pd = pads[p];
+      if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos((pd.r + pd.blend * 0.35) / R)) { clear = false; break; }
+    }
+    if (!clear) continue;
+    const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.5)) : 0.09 + 0.36 * u * u;
+    const r = planet.radiusFace(face, s, t, d[0], d[1], d[2], FINEST) - size * 0.08;
+    out[k++] = d[0] * r - ox; out[k++] = d[1] * r - oy; out[k++] = d[2] * r - oz;
+    out[k++] = d[0]; out[k++] = d[1]; out[k++] = d[2];
+    out[k++] = size; out[k++] = v;
+  }
+  return k === out.length ? out : out.slice(0, k);
 }

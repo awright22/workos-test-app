@@ -15,8 +15,11 @@ import { log } from '../ui/dom.js';
 export const World = { plots: [], panels: [], soilPiles: [], landers: [], iceSites: [], builtMeshes: [],
   markers: [], pods: [] };
 export const colliders = [];                 // { v: unitVec, r: meters, group?: hab }
+/** Everything placed on the planet; drawn only when near enough to matter (updateSites). */
+export const sites = [];
 export function placeAt(latOrVec, lon, yaw) {
   const g = new THREE.Group();
+  sites.push(g);
   const u = latOrVec.isVector3 ? _pv.copy(latOrVec).normalize().clone() : llToVec(latOrVec, lon);
   const r = surfaceAt(u);
   g.position.copy(u).multiplyScalar(r);
@@ -45,6 +48,7 @@ export function mkCyl(rt, rb, h, color, x, y, z, parent, seg, opts) {
   return m;
 }
 export const HAB_R = 8.4;
+export const HAB_FLOOR = 0.06;
 export const DOOR_HALF = 0.16;
 
 export function pickSpawn(rng) {
@@ -69,6 +73,7 @@ export function pickSpawn(rng) {
 
 export function buildHabColony(spawn) {
   World.hab = placeAt(spawn.lat, spawn.lon, 0);
+  World.hab.position.addScaledVector(World.hab.userData.up, -HAB_FLOOR);     // the model's floor sits HAB_FLOOR above its origin
   const hab = model('hab');
   World.hab.add(hab.root);
   World.habModel = hab;
@@ -88,6 +93,11 @@ export function buildHabColony(spawn) {
   World.breachPatch = hab.part('breach_patch');
   for (const n of [World.hydFlame, World.breachHole, World.breachPatch]) if (n) n.visible = false;
   World.habInterior = hab.part('interior');
+  // the dome's own shadow covers the room: nothing inside needs to cast one
+  if (World.habInterior) World.habInterior.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+  World.hab.userData.reach = 6000;                 // home is visible from a long way off
+  World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
+  World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
     const d = hab.part(n);
     return d ? { node: d, x0: d.position.x, dx: d.userData.open_dx || (n.endsWith('_L') ? -1.05 : 1.05), k: 0, outer: n.includes('outer') } : null;
@@ -107,7 +117,7 @@ export function buildHabColony(spawn) {
   // farm plots (6 base; greenhouses add more)
   for (let i = 0; i < 6; i++) {
     const px = -5.2 + (i % 2) * 2.0, pz = -3.2 + Math.floor(i / 2) * 2.4;
-    addFarmPlot(World.hab, px, pz, true);
+    addFarmPlot(World.hab, px, pz, true, World.habFurnishings);
   }
 
   // solar array, in its own group beside the hab
@@ -181,13 +191,35 @@ export function buildHabColony(spawn) {
 }
 
 // place a child group at a local tangent offset from a parent site, re-snapped to the terrain
+/** Show or hide a placed thing for game reasons (taken, used up); distance culling still applies. */
+export function setSiteShown(g, shown) { g.userData.hidden = !shown; g.visible = shown && g.userData.near !== false; }
+const _sv = new THREE.Vector3();
+/** Show only the sites that are near enough to see: within their reach and above the horizon. */
+export function updateSites(camPos) {
+  const camR = camPos.length();
+  const horizon = Math.sqrt(Math.max(0, camR * camR - (R - 130) * (R - 130)));
+  for (const g of sites) {
+    if (g.parent !== ctx.world) continue;                 // riding on something else (Pathfinder on the rover)
+    const d = _sv.copy(g.position).sub(camPos).length();
+    const reach = g.userData.reach || 1800;
+    g.userData.near = World.sealedInside ? g === World.hab : d < Math.min(reach, horizon + 700);
+    if (g.userData.hidden) g.visible = false; else if (g.userData.near !== g.visible) g.visible = g.userData.near;
+  }
+}
+
 /** Airlock doors slide open as someone approaches; the interior is skipped when far away. */
 export function updateDoors(dt) {
   if (!World.hab || !World.doors) return;
   const pos = S.mode === 'rover' ? World.rover.group.position : (World.playerPos || World.hab.position);
   const local = siteWorldToLocal(World.hab, pos, _pv);
   const dist = Math.hypot(local.x, local.z);
-  if (World.habInterior) World.habInterior.visible = dist < 70;
+  // the room is only drawn from inside, from the airlock, or looking in through the open door
+  const lookingIn = Math.abs(local.x) < 5 && local.z > 0 && local.z < 26;
+  const showRoom = dist < HAB_R + 0.5 || lookingIn;
+  if (World.habInterior) World.habInterior.visible = showRoom;
+  if (World.habFurnishings) World.habFurnishings.visible = showRoom;
+  // sealed in: inside the room with every door shut, so nothing outside can be seen
+  World.sealedInside = S.mode === 'walk' && dist < HAB_R - 0.3 && World.doors.every((d) => d.k < 0.01);
   for (const d of World.doors) {
     const dz = local.z - (d.outer ? 11.6 : HAB_R);
     const near = Math.abs(local.x) < 2.6 && Math.abs(dz) < 3.4 && S.mode === 'walk';
@@ -213,6 +245,7 @@ export function placeOffset(parentGroup, lx, lz, yaw) {
   const w = new THREE.Vector3(lx, 0, lz).applyQuaternion(parentGroup.quaternion).add(parentGroup.position);
   const u = w.normalize().clone();
   const g = new THREE.Group();
+  sites.push(g);
   g.position.copy(u).multiplyScalar(surfaceAt(u));
   frameQuat(u, yaw || 0, g.quaternion);
   g.userData.up = u.clone();
@@ -220,10 +253,10 @@ export function placeOffset(parentGroup, lx, lz, yaw) {
   return g;
 }
 
-export function addFarmPlot(parent, px, pz, collide) {
+export function addFarmPlot(parent, px, pz, collide, holder) {
   const plot = new THREE.Group();
   plot.position.set(px, 0.06, pz);
-  parent.add(plot);
+  (holder || parent).add(plot);
   let soil, plants, dead = null;
   if (hasModel('farm_plot')) {
     const m = model('farm_plot');
@@ -300,6 +333,7 @@ export function buildStorySites() {
   flame.visible = false;
   World.mavFlame = flame;
   World.mav = mav;
+  mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
 
   // every real lander, at its real coordinates

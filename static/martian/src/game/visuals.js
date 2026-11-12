@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { World, siteLocalToWorld } from '../world/build.js';
+import { World, siteLocalToWorld, setSiteShown } from '../world/build.js';
 import { setGlow } from '../world/models.js';
 import { syncPlot } from './interactables.js';
 import { clamp } from '../core/math.js';
@@ -34,9 +34,9 @@ export function syncAllVisuals() {
   setGlow(World.commsMats, S.pf.connected && powered ? 1 : 0.04);
   setGlow(World.oxyMats, powered ? 1 : 0.05);
   for (const l of World.habLights) l.intensity = powered ? l.userData.on : l.userData.on * 0.05;
-  for (const rec of World.pods) rec.group.visible = !rec.taken;
-  if (World.rtgSite) World.rtgSite.group.visible = !World.rtgSite.taken;
-  for (const site of World.iceSites) site.group.visible = site.left > 0;
+  for (const rec of World.pods) setSiteShown(rec.group, !rec.taken);
+  if (World.rtgSite) setSiteShown(World.rtgSite.group, !World.rtgSite.taken);
+  for (const site of World.iceSites) setSiteShown(site.group, site.left > 0);
   // pathfinder: exactly one home per state, collider follows (review finding: all 3 states)
   const pfG = World.pathfinder;
   if (S.pf.connected) {
@@ -46,7 +46,7 @@ export function syncAllVisuals() {
     frameQuat(_v1.copy(pfG.position).normalize(), 0.3, pfG.quaternion);
     pfG.scale.set(1, 1, 1);
     World.pfCollider.r = 0.001;
-    World.uplinkRing.visible = false;
+    setSiteShown(World.uplinkRing, false);
   } else if (S.pf.loaded) {
     const rack = World.rover.cargo || World.rover.group;
     if (pfG.parent !== rack) {
@@ -56,7 +56,7 @@ export function syncAllVisuals() {
       pfG.scale.set(0.8, 0.8, 0.8);
     }
     World.pfCollider.r = 0.001;
-    World.uplinkRing.visible = true;
+    setSiteShown(World.uplinkRing, true);
   } else {
     if (pfG.parent !== ctx.world) ctx.world.add(pfG);
     const u = llToVec(19.13, 326.79);
@@ -64,6 +64,6 @@ export function syncAllVisuals() {
     frameQuat(u, 0.7, pfG.quaternion);
     pfG.scale.set(1, 1, 1);
     World.pfCollider.r = 2.2;
-    World.uplinkRing.visible = false;
+    setSiteShown(World.uplinkRing, false);
   }
 }

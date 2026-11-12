@@ -7,14 +7,98 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { asset } from '../planet/load.js';
 import { MODELS_DATA } from './legacy-models.js';
 
 const loaded = new Map();           // name -> { scene, animations, skinned }
 const EMISSIVE = /^(light_|screen|flame|window_glow)/;
+/** Materials the game drives by name, or that cannot be folded into a shared one. */
+const SPECIAL = /^(light_|screen|flame|window_glow|glass_clear|solar_cell|void)/;
+let plain = null;
+/** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
+ *  the vertices and every such surface of a part can be one mesh with one shared material.
+ *  This turns the Hab's ~100 draw calls into about fifteen. */
+function plainMaterial() {
+  if (plain) return plain;
+  plain = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1 });
+  plain.name = 'plain';
+  plain.envMapIntensity = 1.15;
+  plain.userData.modelMaterial = true;
+  plain.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 aPbr;\nvarying vec2 vPbr;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = aPbr;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vPbr;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = clamp(vPbr.x, 0.05, 1.0);')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0);');
+  };
+  plain.customProgramCacheKey = () => 'plain-pbr';
+  return plain;
+}
+
+function floatGeometry(src, color, rough, metal) {
+  const g = new THREE.BufferGeometry();
+  const p = src.attributes.position, n = src.attributes.normal, c = src.attributes.color;
+  const pos = new Float32Array(p.count * 3), nor = new Float32Array(p.count * 3), col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    pos[i * 3] = p.getX(i); pos[i * 3 + 1] = p.getY(i); pos[i * 3 + 2] = p.getZ(i);
+    if (n) { nor[i * 3] = n.getX(i); nor[i * 3 + 1] = n.getY(i); nor[i * 3 + 2] = n.getZ(i); }
+    const a = c ? c.getX(i) : 1;
+    col[i * 3] = (color ? color.r : 1) * a; col[i * 3 + 1] = (color ? color.g : 1) * (c ? c.getY(i) : 1); col[i * 3 + 2] = (color ? color.b : 1) * (c ? c.getZ(i) : 1);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pbr = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) { pbr[i * 2] = rough; pbr[i * 2 + 1] = metal; }
+  g.setAttribute('aPbr', new THREE.BufferAttribute(pbr, 2));
+  if (src.index) g.setIndex(new THREE.BufferAttribute(Uint32Array.from(src.index.array), 1));
+  return g;
+}
+
+function mergeStatic(scene) {
+  scene.updateMatrixWorld(true);
+  const groups = new Map();                        // owner -> Map(material -> [mesh])
+  scene.traverse((o) => {
+    if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material)) return;
+    let owner = o.parent;
+    while (owner && owner !== scene && !(owner.userData && owner.userData.part)) owner = owner.parent;
+    owner = owner || scene;
+    const m = o.material;
+    const special = SPECIAL.test(m.name || '') || m.transparent || m.map;
+    const target = special ? m : plainMaterial();
+    if (!groups.has(owner)) groups.set(owner, new Map());
+    const g = groups.get(owner);
+    if (!g.has(target)) g.set(target, []);
+    g.get(target).push({ mesh: o, bake: !special });
+  });
+  const inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
+  for (const [owner, byMat] of groups) {
+    inv.copy(owner.matrixWorld).invert();
+    for (const [mat, list] of byMat) {
+      const geos = list.map(({ mesh, bake }) => {
+        const g = floatGeometry(mesh.geometry, bake ? mesh.material.color : null, mesh.material.roughness, mesh.material.metalness);
+        g.applyMatrix4(rel.multiplyMatrices(inv, mesh.matrixWorld));
+        return g;
+      });
+      const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+      if (!merged) continue;
+      merged.computeBoundingSphere();
+      if (!list[0].bake) { mat.vertexColors = true; mat.needsUpdate = true; merged.deleteAttribute('aPbr'); }
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.name = (owner.name || 'model') + ':' + (mat.name || 'm');
+      for (const { mesh: old } of list) { old.parent.remove(old); old.geometry.dispose(); }
+      owner.add(mesh);
+    }
+  }
+}
 
 function prepare(gltf) {
   let skinned = false;
+  gltf.scene.traverse((o) => { if (o.isSkinnedMesh) skinned = true; });
+  if (!skinned) mergeStatic(gltf.scene);
   const seen = new Set();
   gltf.scene.traverse((o) => {
     if (o.isSkinnedMesh) { skinned = true; o.frustumCulled = false; }

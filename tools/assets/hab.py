@@ -1072,7 +1072,7 @@ def hab_interior_shell(interior):
     bm = bm_new()
     for z in (1.56, HEAD_Z):
         pair = [(A_IN - 0.006, z - 0.03, 1.0, 0.0), (A_IN - 0.006, z + 0.03, 1.0, 0.0)]
-        lobed_shell(bm, pair, [0, 0], 1, skip=(lambda g, i: g == 0), flip=True)
+        lobed_shell(bm, pair, [0, 0], 4, skip=(lambda g, i: g == 0), flip=True)   # four columns: it must hug the wall
     for d in (20, 40, 58):
         pair = [roof_pt(A_IN, Z0_IN, C_IN, d - 0.5), roof_pt(A_IN, Z0_IN, C_IN, d + 0.5)]
         lobed_shell(bm, pair, [0, 0], 1, offset=-0.006, flip=True)
@@ -2635,9 +2635,10 @@ def hab_breach(root):
             return Vector(pol(r + sgn * off, th, z))
         # the void, lying just proud of the wall so that it covers it
         bm_void = H.open('void', smooth=30.0 + sgn)
-        c = bm_void.verts.new(on_wall(0, 0, 0.022))
-        ring = [bm_void.verts.new(on_wall(u, v, 0.022)) for u, v in rim]
-        mids = [bm_void.verts.new(on_wall(u * 0.5, v * 0.5, 0.022)) for u, v in rim]
+        # (offsets are generous: the hole's coarse facets must clear the creases of the quilting)
+        c = bm_void.verts.new(on_wall(0, 0, 0.05))
+        ring = [bm_void.verts.new(on_wall(u, v, 0.05)) for u, v in rim]
+        mids = [bm_void.verts.new(on_wall(u * 0.5, v * 0.5, 0.05)) for u, v in rim]
         for i in range(n):
             k = (i + 1) % n
             bm_void.faces.new((c, mids[i], mids[k]))
@@ -2648,21 +2649,21 @@ def hab_breach(root):
             (u0, v0), (u1, v1) = rim[i], rim[(i + 1) % n]
             um, vm = (u0 + u1) / 2, (v0 + v1) / 2
             k = (1.18 + 0.3 * rng.random()) * 0.72
-            tip = on_wall(um * k, vm * k, 0.10 + 0.14 * rng.random())
-            bm_flap.faces.new((bm_flap.verts.new(on_wall(u0 * 1.12, v0 * 1.12, 0.026)), bm_flap.verts.new(on_wall(u1 * 1.12, v1 * 1.12, 0.026)),
+            tip = on_wall(um * k, vm * k, 0.13 + 0.14 * rng.random())
+            bm_flap.faces.new((bm_flap.verts.new(on_wall(u0 * 1.12, v0 * 1.12, 0.054)), bm_flap.verts.new(on_wall(u1 * 1.12, v1 * 1.12, 0.054)),
                                bm_flap.verts.new(tip)))
         # stressed, darkened fabric round the tear
         bm_ring = H.open('canvas_dark', smooth=33.0 + sgn)
         for i in range(n):
             (u0, v0), (u1, v1) = rim[i], rim[(i + 1) % n]
-            q = [on_wall(u0, v0, 0.024), on_wall(u1, v1, 0.024), on_wall(u1 * 1.22, v1 * 1.22, 0.008), on_wall(u0 * 1.22, v0 * 1.22, 0.008)]
+            q = [on_wall(u0, v0, 0.052), on_wall(u1, v1, 0.052), on_wall(u1 * 1.25, v1 * 1.25, 0.012), on_wall(u0 * 1.25, v0 * 1.25, 0.012)]
             bm_ring.faces.new([bm_ring.verts.new(p) for p in q])
         # the patch: a tarp bulging under pressure (outwards), taped round the edge and in a cross
-        puff = 1.0 if sgn > 0 else -0.25
+        puff, base = (1.0, 0.04) if sgn > 0 else (0.25, 0.06)
         bm_tarp = Pk.open('tarp', smooth=60.0 + sgn)
         nx = 6
         grid = [[bm_tarp.verts.new(on_wall(-hw + 2 * hw * i / nx, -hh + 2 * hh * j / nx,
-                                           0.035 + puff * bulge(-hw + 2 * hw * i / nx, -hh + 2 * hh * j / nx)
+                                           base + puff * bulge(-hw + 2 * hw * i / nx, -hh + 2 * hh * j / nx)
                                            + 0.01 * math.sin(i * 2.3 + j * 1.7))) for j in range(nx + 1)] for i in range(nx + 1)]
         for i in range(nx):
             for j in range(nx):
@@ -2677,7 +2678,7 @@ def hab_breach(root):
             prev = None
             for k in range(m + 1):
                 u, v = u0 + (u1 - u0) * k / m, v0 + (v1 - v0) * k / m
-                off = 0.035 + puff * bulge(u, v) + 0.012 + lift
+                off = base + puff * bulge(u, v) + 0.012 + lift
                 cur = (bm_tape.verts.new(on_wall(u + nn.x, v + nn.y, off)), bm_tape.verts.new(on_wall(u - nn.x, v - nn.y, off)))
                 if prev:
                     bm_tape.faces.new((prev[0], prev[1], cur[1], cur[0]))

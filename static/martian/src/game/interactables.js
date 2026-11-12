@@ -1,4 +1,4 @@
-import { HAB_R, World, buildDeployable, siteLocalToWorld } from '../world/build.js';
+import { HAB_R, World, buildDeployable, setSiteShown, siteLocalToWorld } from '../world/build.js';
 import { groundDist } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
@@ -385,7 +385,7 @@ addI({
     const site = World._activeIce;
     if (!site || site.left <= 0) return;
     site.left--; S.inv.ice++; S.stats.mined++;
-    if (site.left <= 0) site.group.visible = false;
+    if (site.left <= 0) setSiteShown(site.group, false);
     Snd.pickup();
     checkAchievements();
   },
@@ -408,7 +408,7 @@ addI({
     const p = World._activePod;
     if (!p || p.taken) return;
     p.taken = true;
-    p.group.visible = false;
+    setSiteShown(p.group, false);
     const got = gainLoot(p.loot);
     log(`Recovered: ${got}.`);
     if (p.blueprint) { S.blueprints[p.blueprint] = true; log(`NASA attached schematics: ${p.blueprint.toUpperCase()} blueprint unlocked.`, 'nasa'); }
@@ -422,7 +422,7 @@ addI({
   label: () => 'Dig up the RTG (radioactive. cozy.)',
   use: () => {
     World.rtgSite.taken = true;
-    World.rtgSite.group.visible = false;
+    setSiteShown(World.rtgSite.group, false);
     S.flags.hasRtg = true;
     Snd.pickup();
     log('One RTG: a plutonium space-heater NASA buried out of an abundance of caution. I am strapping it to my life. Socket it at the fabricator.');

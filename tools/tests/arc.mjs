@@ -34,7 +34,7 @@ check('digging regolith from a pile', s.regolith === 2 && s.left === 0, s);
 
 s = await ev((G) => {
   const out = {};
-  G.tpLocal(-4.1, -3.2);
+  G.tpLocal(-6.7, -3.2);            // west of the first tray, between it and the wall
   G.hold(1.5); out.afterFill = G.World.plots[0].state;
   const w0 = G.S.water;
   G.hold(1.5); out.afterPlant = G.World.plots[0].state; out.waterUsed = +(w0 - G.S.water).toFixed(1);
