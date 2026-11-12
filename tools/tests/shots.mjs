@@ -1,5 +1,5 @@
 // Screenshot matrix: the scenes the quality bar is judged on (see static/martian/QUALITY.md).
-//   node tools/tests/shots.mjs [--quality medium] [--only name,name] [--size 1280x720] [--touch]
+//   node tools/tests/shots.mjs [--quality medium] [--only name,name] [--size 1280x720] [--touch] [--phone]
 // Images go to tools/tests/.cache/shots/. Rendering is software WebGL: slow, and not a
 // measure of frame rate.
 import { openGame, sleep, outDir } from './lib.mjs';
@@ -9,12 +9,15 @@ import path from 'node:path';
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const quality = arg('--quality', 'medium');
 const only = arg('--only', '').split(',').filter(Boolean);
-const [W, H] = arg('--size', '1280x720').split('x').map(Number);
-const touch = process.argv.includes('--touch');
-const dir = path.join(outDir, 'shots');
+// --phone: the picture as the owner's iPhone shows it. Landscape, 844x390 at twice the pixels, touch, the
+// notch and home indicator as safe-area insets, on the preset a phone starts on. Pictures go to shots-phone/.
+const phone = process.argv.includes('--phone');
+const [W, H] = (phone ? '844x390' : arg('--size', '1280x720')).split('x').map(Number);
+const touch = phone || process.argv.includes('--touch');
+const dir = path.join(outDir, phone ? 'shots-phone' : 'shots');
 await mkdir(dir, { recursive: true });
 
-const g = await openGame({ quality, width: W, height: H, touch });
+const g = await openGame({ quality, width: W, height: H, touch, dsf: phone ? 2 : 1, query: phone ? 'safe=0,47,21,47' : '' });
 const ev = (fn, a) => g.eval(fn, a);
 const snap = async (name) => { await sleep(900); await g.page.screenshot({ path: path.join(dir, `${name}.png`), timeout: 180000 }); console.log('  shot', name); };
 const want = (n) => !only.length || only.includes(n);
