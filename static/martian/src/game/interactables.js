@@ -311,6 +311,16 @@ addI({
     S.flags.didMath = true;
     Snd.play('terminal');
     log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The math says: farm or starve. I'm going to have to science the sh*t out of this.`);
+    // the premise of the whole game: a card he reads and puts down, not a line that scrolls away
+    showOverlay({
+      kicker: 'The numbers', title: 'Farm or starve',
+      stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
+      body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
+        'The Hab has six farm beds. Fill them with soil from the heaps outside, plant them, water them, and eat what grows. Planting a potato bed takes one ration; the botany kit also holds seed packets.\n\n' +
+        'The six bars at the top left are what keeps him alive: Hab oxygen, water, food, power, vitals and morale. The mission list at the top right says what to do next, and why.',
+      quote: 'I\'m going to have to science the sh*t out of this.',
+      buttons: [{ label: 'Get to work' }],
+    });
   },
 });
 addI({
@@ -355,7 +365,7 @@ addI({
   r: 3.8, hold: 0.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   label: () => 'Drive the rover',
-  sub: () => `PWR ${Math.round(S.roverPower)}/${roverPowerCap()} · O2 tank ${Math.round(S.roverO2)}`,
+  sub: () => `Power ${Math.round(S.roverPower)}/${roverPowerCap()} · O2 tank ${Math.round(S.roverO2)}`,
   use: () => enterRover(),
 });
 addI({

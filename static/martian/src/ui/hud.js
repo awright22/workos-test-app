@@ -7,7 +7,7 @@ import { HAB_R, World, siteLocalToWorld } from '../world/build.js';
 import { clamp, perf } from '../core/math.js';
 import { Snd } from '../audio/sound.js';
 import { QUEST_DEFS, questTargetPos } from '../game/story.js';
-import { UI, el, root } from './dom.js';
+import { UI, el, root, toast } from './dom.js';
 import { _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { roverF } from '../game/rover.js';
 import { regionName } from '../planet/features.js';
@@ -22,31 +22,31 @@ import { layout, onLayout } from './layout.js';
 // ============================================================
 const habDist = () => groundDist(player.pos, World.hab.position);
 export const OBJECTIVES = [
-  { id: 'reach', text: () => 'Suit breach — get to the Hab', dist: habDist, shown: () => true, done: () => S.flags.suitSealed, urgent: true },
-  { id: 'systems', text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
-  { id: 'math', text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
-  { id: 'panels', text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
-  { id: 'farm', text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
-  { id: 'water', text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
-  { id: 'hydra', text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
-  { id: 'pf', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
+  { id: 'reach', why: 'The suit is losing air. The airlock door will let you reseal it.',  text: () => 'Suit breach — get to the Hab', dist: habDist, shown: () => true, done: () => S.flags.suitSealed, urgent: true },
+  { id: 'systems', why: 'They make the air and the water. Know what keeps you alive.',  text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
+  { id: 'math', why: 'How long will the food last?',  text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
+  { id: 'panels', why: 'Dust on the panels starves the Hab of power.',  text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
+  { id: 'farm', why: 'Ten rations will not last until the rescue.',  text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
+  { id: 'water', why: 'A bed stalls at half grown until it is watered again.',  text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
+  { id: 'hydra', why: 'The farm drinks more than the reclaimer makes.',  text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
+  { id: 'pf', why: 'Its radio is the only way to tell Earth you are alive.',  text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'),
     dist: () => groundDist(player.pos, S.pf.loaded ? World.uplink.position : World.pathfinder.position),
     shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
   { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} banked)`, shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
-  { id: 'dinner', text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
-  { id: 'breach', text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
-  { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
-  { id: 'mav', text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
+  { id: 'dinner', why: 'A cooked meal lifts morale, and in good spirits the work goes faster.',  text: () => 'Cook a dinner at the food shelf', shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
+  { id: 'breach', why: 'The Hab is losing its air through the far wall.',  text: () => 'Hab breach: seal it', dist: () => (World.breachPos ? groundDist(player.pos, World.breachPos) : 0), shown: () => S.breach.active, done: () => !S.breach.active, urgent: true },
+  { id: 'survive', why: 'The Hermes is coming back for you.',  text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
+  { id: 'mav', why: 'It is the only rocket on the planet.',  text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
 export const objDone = new Set();
-let objSeeded = false, objThrottle = 0, objHead = null;
+let objSeeded = false, objThrottle = 0, objHead = null, objLead = null;
 const objNodes = new Map();          // row key -> { el, tx, ds, text, dist, cls }
 const objDoneAt = {};                // objective id -> time it was completed (shown ticked for a moment)
 function objRow(key) {
   let n = objNodes.get(key);
   if (!n) {
-    const e = el('div', null, 'obj new', UI.objectives, '<i class="mk"></i><span class="tx"></span><span class="ds t-num"></span>');
-    n = { el: e, tx: e.querySelector('.tx'), ds: e.querySelector('.ds'), text: null, dist: null, cls: null };
+    const e = el('div', null, 'obj new', UI.objectives, '<i class="mk"></i><span class="tx"></span><span class="ds t-num"></span><span class="why"></span>');
+    n = { el: e, tx: e.querySelector('.tx'), ds: e.querySelector('.ds'), wy: e.querySelector('.why'), text: null, dist: null, cls: null, why: null };
     objNodes.set(key, n);
     setTimeout(() => e.classList.remove('new'), 600);
   }
@@ -74,8 +74,15 @@ export function updateObjectivesHud() {
     if (shown >= 4) break;
     let cls = d ? 'done' : o.urgent ? 'urgent' : '';
     if (!d && !primary) { primary = true; cls = o.urgent ? 'urgent first' : 'primary'; }
-    rows.push({ key: o.id, text: o.text(), dist: !d && o.dist ? fmtDist(o.dist()) : '', cls });
+    // the one thing to do next carries its reason
+    rows.push({ key: o.id, text: o.text(), dist: !d && o.dist ? fmtDist(o.dist()) : '', cls, why: /primary|first/.test(cls) ? (o.why || '') : '' });
     shown++;
+  }
+  // on a phone the reason for a new first objective is said once, as it takes over
+  const lead = rows.find((r) => r.why);
+  if (lead && lead.key !== objLead) {
+    if (objSeeded && layout.compact && S.started && !S.flags.coldOpen) toast('NEXT', lead.text.replace(/ \(\d+\/\d+\)$/, ''), lead.why);
+    objLead = lead.key;
   }
   objSeeded = true;
   // the two nearest active survey tasks
@@ -94,6 +101,7 @@ export function updateObjectivesHud() {
     const n = objRow(r.key);
     if (n.text !== r.text) { n.text = r.text; n.tx.textContent = r.text; }
     if (n.dist !== r.dist) { n.dist = r.dist; n.ds.textContent = r.dist; }
+    if (n.why !== (r.why || '')) { n.why = r.why || ''; n.wy.textContent = n.why; n.wy.style.display = n.why ? '' : 'none'; }
     if (n.cls !== r.cls) { n.el.classList.remove('done', 'urgent', 'first', 'primary', 'quest'); if (r.cls) n.el.classList.add(...r.cls.split(' ')); n.cls = r.cls; }
     if (prev.nextSibling !== n.el) UI.objectives.insertBefore(n.el, prev.nextSibling);
     prev = n.el;

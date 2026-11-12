@@ -14,8 +14,8 @@ export const ITEM_NAMES = {
   kitBeacon: 'Nav Beacon Kit', kitCache: 'O2 Cache Kit',
 };
 export const RECIPES = [
-  { id: 'candle', name: 'O2 Candle', desc: '+40 suit O2 in the field (press X)', cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
-  { id: 'meltIce', name: 'Melt Ice', desc: '+10L water (uses 2 PWR)', cost: { ice: 1 }, run: () => {
+  { id: 'candle', name: 'O2 Candle', desc: '+40 suit O2 in the field: press X, or the O2 button on a touch screen', cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
+  { id: 'meltIce', name: 'Melt Ice', desc: '+10L water (uses 2% Hab power)', cost: { ice: 1 }, run: () => {
       if (S.power < 2) return 'Not enough hab power';
       S.power -= 2; S.water = clamp(S.water + BAL.iceWater, 0, BAL.waterMax);
       return true;
@@ -35,7 +35,7 @@ export const UPGRADES = [
   { id: 'insulation', name: 'Hab Insulation', desc: 'Hab base power draw −30%', cost: { scrap: 6 } },
   { id: 'wiper', name: 'Panel Auto-Wiper', desc: 'Panel dust accrual −70%', cost: { scrap: 5, circuit: 1 } },
   { id: 'drill', name: 'Ice Drill', desc: 'Unlocks mining at ice deposits', cost: { scrap: 4, circuit: 1 }, bp: 'drill' },
-  { id: 'rtg', name: 'Socket the RTG', desc: 'Cold stops draining power; +6 PWR/sol at night', cost: {}, needsRtg: true },
+  { id: 'rtg', name: 'Socket the RTG', desc: 'Cold stops draining power; +6% power a sol at night', cost: {}, needsRtg: true },
 ];
 export function hasCost(cost) {
   for (const k in cost) if ((S.inv[k] || 0) < cost[k]) return false;

@@ -1,7 +1,7 @@
 // The astronaut's log: lines spoken at the start of a sol (silence on unlisted sols).
 export const SOL_LOGS = {
   1: "Log, Sol 1. Storm hit. Crew evac'd. An antenna went through my bio-monitor, so the suit told everyone I was dead. Surprise: I'm not. I'm just... alone. On a planet.",
-  2: "Sol 2. Did the math. Rations won't last to rescue. I'm going to have to science the sh*t out of this.",
+  2: "Sol 2. Still here. The Hab holds air, the machines hum, and nobody on two planets knows I am alive. First things first: the farm.",
   3: "Sol 3. Today's agenda: farming. On a planet where nothing grows. I am the greatest botanist on this planet.",
   4: "Sol 4. Fun fact: humanity has been littering Mars with robots since 1971. One of them can call home.",
   5: "Sol 5. Weather report: dust, followed by dust, with a chance of dust.",

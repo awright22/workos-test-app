@@ -15,8 +15,8 @@ check('new game starts in the cold open', s.cold && s.suit < 60 && Math.abs(s.ha
 s = await ev((G) => { G.tpLocal(0, 8.4 + 1.6); G.hold(2.6); return { sealed: G.S.flags.suitSealed, cold: G.S.flags.coldOpen, suit: G.S.suit }; });
 check('sealing the suit at the Hab door ends the cold open', s.sealed && !s.cold && s.suit >= 99, s);
 
-s = await ev((G) => { G.tpLocal(4.0, -3.0); G.hold(1.0); G.tpLocal(4.3, -0.4); G.hold(1.0); G.tpLocal(0, -5.0); G.hold(1.1); return { checked: G.S.checkedSystems, math: G.S.flags.didMath, inside: G.S.inside }; });
-check('inspecting systems and running the numbers', s.checked.oxy && s.checked.rec && s.math && s.inside, s);
+s = await ev((G) => { G.tpLocal(4.0, -3.0); G.hold(1.0); G.tpLocal(4.3, -0.4); G.hold(1.0); G.tpLocal(0, -5.0); G.hold(1.1); const card = document.querySelector('#mg-panel .dlg h1'); const cardTitle = card ? card.textContent : null; const go = document.querySelector('#mg-panel .btns button'); if (go) go.click(); return { cardTitle, ui: G.S.uiOpen, checked: G.S.checkedSystems, math: G.S.flags.didMath, inside: G.S.inside }; });
+check('inspecting systems and running the numbers, which shows the premise as a card to dismiss', s.checked.oxy && s.checked.rec && s.math && s.inside && s.cardTitle === 'Farm or starve' && s.ui === false, s);
 
 s = await ev((G) => {
   const parts = () => { let helmet = 0, head = 0; G.player && G.ctx.world.traverse((o) => { if (o.isSkinnedMesh && o.visible) { if (o.name === 'helmet') helmet++; if (o.name === 'head') head++; } }); return { helmet, head }; };

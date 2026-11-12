@@ -371,6 +371,7 @@ function verbOf(label) {
   const w = label.replace(/\[[^\]]*\]/g, ' ').replace(/[^A-Za-z' ]/g, ' ').trim().split(/\s+/);
   let v = w[0] || 'USE';
   if (/ly$/i.test(v) && w[1]) v = w[1];
+  if (/^run$/i.test(v)) v = 'USE';                       // "Run the numbers" beside a button marked RUN (sprint)
   return v.toUpperCase().slice(0, 8);
 }
 /**

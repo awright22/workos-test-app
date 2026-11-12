@@ -10,7 +10,7 @@ const SLIDERS = [
   ['dist', 'Distance', 1.2, 40, 0.1, (v) => `${(+v).toFixed(1)} m`],
   ['fov', 'Lens', 16, 95, 1, (v) => `${Math.round(v)}°`],
   ['rise', 'Height', -1, 12, 0.1, (v) => `${(+v) >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} m`],
-  ['slide', 'Slide', -14, 14, 0.1, (v) => `${(+v) >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} m`],
+  ['slide', 'Sideways', -14, 14, 0.1, (v) => `${(+v) >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} m`],
   ['exposure', 'Exposure', -1.5, 1.5, 0.05, (v) => `${(+v) >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} EV`],
 ];
 
@@ -25,9 +25,10 @@ function build() {
     '<div class="ph-top"><span class="ph-title">' + icon('camera') + 'Photo mode</span><span class="ph-hint"></span></div>' +
     `<div class="ph-row"><div class="ph-sliders">${sliders}</div>` +
     `<div class="ph-side"><div class="mg-seg ph-looks" role="radiogroup" aria-label="Look">${looks}</div>` +
-    '<div class="ph-btns"><button type="button" class="mg-btn small" data-act="astro" aria-pressed="true">Astronaut</button>' +
-    '<button type="button" class="mg-btn small" data-act="bars" aria-pressed="false">Cinema bars</button>' +
-    '<button type="button" class="mg-btn small" data-act="reset">Reset</button>' +
+    `<div class="ph-btns"><button type="button" class="mg-btn small ph-more" data-act="astro" aria-pressed="true">${icon('check')}Astronaut</button>` +
+    `<button type="button" class="mg-btn small ph-more" data-act="bars" aria-pressed="false">${icon('check')}Cinema bars</button>` +
+    '<button type="button" class="mg-btn small ph-more" data-act="reset">Reset</button>' +
+    '<button type="button" class="mg-btn small" data-act="min" aria-expanded="true">Hide controls</button>' +
     `<button type="button" class="mg-btn primary" data-act="snap">${icon('camera')}Take photo</button>` +
     '<button type="button" class="mg-btn" data-act="done">Done</button></div></div></div>';
   flash = el('div', 'mg-photo-flash', null, root);
@@ -47,6 +48,7 @@ function build() {
     if (a === 'astro') { photo.showAstronaut = !photo.showAstronaut; sync(); }
     else if (a === 'bars') { root.classList.toggle('ph-bars'); sync(); }
     else if (a === 'reset') { Object.assign(photo, { dist: 6, fov: 50, rise: 0, slide: 0, push: 0, exposure: 0, look: 'natural', showAstronaut: true }); sync(); }
+    else if (a === 'min') { root.classList.toggle('ph-min'); sync(); }
     else if (a === 'snap') snap();
     else if (a === 'done') exitPhoto();
   });
@@ -72,6 +74,8 @@ export function sync() {
   bar.querySelectorAll('[data-look]').forEach((b) => { b.setAttribute('aria-checked', b.dataset.look === photo.look); });
   bar.querySelector('[data-act="astro"]').setAttribute('aria-pressed', photo.showAstronaut);
   bar.querySelector('[data-act="bars"]').setAttribute('aria-pressed', root.classList.contains('ph-bars'));
+  const min = root.classList.contains('ph-min'), mb = bar.querySelector('[data-act="min"]');
+  mb.textContent = min ? 'Controls' : 'Hide controls'; mb.setAttribute('aria-expanded', !min);
 }
 
 async function snap() {
@@ -102,7 +106,8 @@ export function initPhotoUi(draw) {
     const touch = matchMedia('(pointer: coarse)').matches;
     bar.querySelector('.ph-hint').textContent = touch ? 'Drag to look round' : 'Drag to look round · W A S D move · Q E lower and raise · wheel zooms · Esc leaves';
     root.classList.add('is-photo');
+    root.classList.toggle('ph-min', root.classList.contains('mg-compact'));      // on a phone the picture comes first: the controls open on request
     sync();
-  }, () => { root.classList.remove('is-photo', 'ph-bars'); });
+  }, () => { root.classList.remove('is-photo', 'ph-bars', 'ph-min'); });
 }
 export function togglePhoto() { if (photo.on) exitPhoto(); else enterPhoto(); }

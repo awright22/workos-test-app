@@ -101,26 +101,26 @@ phone.
 | # | Finding | State |
 | --- | --- | --- |
 | U1 | Pause screen overlaps itself: four audio sliders are strewn under the run card (both sizes) | fixed: the music, effects and ambience sliders moved into Settings > Sound. (The Master volume slider there had never worked: it now does) |
-| U2 | Phone HUD: six unlabelled bars with about 9 px numbers; no suit countdown | open |
+| U2 | Phone HUD: six unlabelled bars with about 9 px numbers; no suit countdown | fixed: on phones each bar has its name and a 13 px number, and the suit's time left shows under the dial (the narrowest phones keep icons only) |
 | U3 | Desktop colony Inventory: two-line rows collide in a one-line pitch | fixed: taller rows; Morale has its own heading; a machine at 12% is "failing", not "failed" |
 | U4 | Emergencies do not lead the mission list ("Seal the breach" sat second, under "Cook a dinner") | fixed: an emergency always leads the list, largest, with its distance ("Hab breach: seal it") |
-| U5 | Phone touch targets under 44 px: top-right buttons, tabs, Fabricate/Make/Install, photo-mode controls, map close | open |
-| U6 | Keyboard wording on touch ("press X"), "PWR" against "POWER" | open |
+| U5 | Phone touch targets under 44 px: top-right buttons, tabs, Fabricate/Make/Install, photo-mode controls, map close | fixed in CSS: 44 px minimum for the top-right buttons, tabs, small buttons, option groups, sliders and photo-mode controls on touch. To re-review |
+| U6 | Keyboard wording on touch ("press X"), "PWR" against "POWER" | fixed: no keyboard-only wording; "power" spelled out |
 | U7 | Numbers that read as bugs: "next NASA grant at 25" when science is 52; a blueprint shown locked after its task is complete; trend arrows that contradict the alert beside them; "13 LEFT" against "N TO PLANT" in the seed chooser | open (some are test-fixture states; each to be checked) |
-| U8 | Phone drops what the player needs: third mission line, crop descriptions, storm explanation, photo-mode hint | open |
-| U9 | Focus ring contradicts the selection (new game, colony tabs); a ring shown on touch | open |
-| U10 | Photo-mode bar takes 150 of 390 px on a phone, cannot be hidden; "Slide" and "Astronaut" unclear | open |
+| U8 | Phone drops what the player needs: third mission line, crop descriptions, storm explanation, photo-mode hint | part fixed: the reason for each new objective is toasted on phones; the seed chooser's sub-line carries what planting costs. The phone still shows two mission lines (three collide with the touch buttons) |
+| U9 | Focus ring contradicts the selection (new game, colony tabs); a ring shown on touch | fixed for touch: no focus ring there |
+| U10 | Photo-mode bar takes 150 of 390 px on a phone, cannot be hidden; "Slide" and "Astronaut" unclear | fixed: starts minimised on phones (Controls / Take photo / Done); check marks on toggles; "Sideways" |
 | U11 | Map: unlabelled icon buttons over content on the phone, labels piling on the player marker, legend covering the corner | open |
 | U12 | Suit number goes dark red on dark when critical | open |
-| U13 | Hold/tap labels disagree; the action button can read "RUN" beside the sprint button "RUN" | open |
+| U13 | Hold/tap labels disagree; the action button can read "RUN" beside the sprint button "RUN" | part fixed: the action button no longer reads RUN beside the sprint button |
 | U14–17 | Sliced section headers with no scroll cue; nine different status words; chips that read "1 tomato seeds"; thin win and sleep screens; nine identical "unknown lander" cards | open |
-| O1 | The six bars are never named or explained; Morale appears and moves without a word | open |
-| O2 | The premise and the goal ("10 rations, rescue Sol 25: farm or starve") are toasts that vanish | open |
-| O3 | Objectives say what, never why or where; no marker for the current target | open |
-| O4 | Cold open: the Hab can be off-screen, no arrow, no countdown on the phone | open |
+| O1 | The six bars are never named or explained; Morale appears and moves without a word | part fixed: named bars on phones; the premise card names the six bars; Morale is explained at the first dawn |
+| O2 | The premise and the goal ("10 rations, rescue Sol 25: farm or starve") are toasts that vanish | fixed: "the numbers" is a card he reads and dismisses (rations, earliest rescue, sols with nothing to eat, what to do) |
+| O3 | Objectives say what, never why or where; no marker for the current target | part fixed: the current objective carries its reason (in the panel on desktop, as a toast on phones). No world marker for indoor targets yet |
+| O4 | Cold open: the Hab can be off-screen, no arrow, no countdown on the phone | part fixed: the suit's time left now shows on phones. No edge arrow when the Hab is off-screen |
 | O5 | Everything unlocks at once at the airlock | open |
 | O6 | Farming's costs and care are silent (planting takes food; beds need a second watering) | part fixed: the seed chooser says potatoes use one of your food and what each crop yields; a "Water the farm beds" objective appears when beds stall |
-| O7 | Sleep: no cue that it is time, the bunk re-offered sleep at dawn (fixed: not offered in the morning), a Sol 2 line repeats | part fixed |
+| O7 | Sleep: no cue that it is time, the bunk re-offered sleep at dawn (fixed: not offered in the morning), a Sol 2 line repeats | fixed: sleep is not offered in the morning; the Sol 2 line no longer repeats the premise |
 
 ## Open items
 
@@ -128,7 +128,7 @@ phone.
 | --- | --- | --- |
 | 3 | Act on the round-2 picture findings (R1–R17 above), bugs first; then a third review | in progress |
 | 18 | Act on the interface and onboarding review (U1–U17, O1–O7 above), the pause screen and the phone HUD first | next |
-| 12 | Publish to `gh-pages` | **Preview published** to `gh-pages/next/` (the first game is still at the root). Refresh the preview after the second review; replace the root once the preview has been seen running on the owner's phone |
+| 12 | Publish to `gh-pages` | **Preview refreshed** at `gh-pages/next/` after the second review round (the first game is still at the root). Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | blocked on hardware |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |
 | 15 | Listen to the audio on real speakers and a phone; retune by ear | blocked on a listener |

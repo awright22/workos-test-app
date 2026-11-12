@@ -61,3 +61,16 @@
 .mg-compact #mg-trow .mg-tbtn { width: 2.625rem; height: 2.625rem; }
 /* tablets and other large touch screens: the clock and mission move below the buttons */
 .mg-touch:not(.mg-compact) #mg-tr { top: calc(var(--m) + var(--sat) + 3.5rem); }
+
+/* ================================================================ a thumb needs 44 px
+   (the interface's rem is 16 px on a phone, so 2.75rem) */
+.mg-compact #mg-trow .mg-tbtn { width: 2.75rem; height: 2.75rem; }
+.mg-touch .mg-btn.small { min-height: 2.75rem; padding-left: 1rem; padding-right: 1rem; }
+.mg-touch .tabs button { min-height: 2.75rem; }
+.mg-touch .mg-seg button { min-height: 2.75rem; }
+.mg-touch .mg-range { height: 2.75rem; }
+.mg-touch .mg-range::-webkit-slider-thumb { width: 1.5rem; height: 1.75rem; margin-top: calc(-.875rem + 1px); }
+.mg-touch #mg-photo .mg-btn { min-height: 2.75rem; }
+/* nothing has the keyboard's focus on a touch screen: no ring round whatever was opened first */
+.mg-touch :focus-visible { outline: none !important; }
+.mg-touch .diff:focus-visible, .mg-touch .menu-item:focus-visible, .mg-touch .choice:focus-visible { border-color: var(--line-2); background: transparent; box-shadow: none; }

@@ -63,7 +63,7 @@ check('sealing the suit: its own sound, tool work while holding, leak stops', ha
 
 r = await act(async (G) => { G.tpLocal(4.0, -3.0); await window.__run(1.0, true); });
 check('walking into the Hab cycles the airlock; inspecting confirms', has(r, 'airlockIn', 'ok') && r.p.place === 'hab' && r.p.habAmt === 1, r.h);
-r = await act(async (G) => { G.tpLocal(4.3, -0.4); await window.__run(1.0, true); G.tpLocal(0, -5.0); await window.__run(1.1, true); });
+r = await act(async (G) => { G.tpLocal(4.3, -0.4); await window.__run(1.0, true); G.tpLocal(0, -5.0); await window.__run(1.1, true); const go = document.querySelector('#mg-panel .btns button'); if (go) go.click(); });
 check('running the numbers at the desk', has(r, 'terminal'), r.h);
 
 r = await act(async (G) => {

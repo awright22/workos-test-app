@@ -83,8 +83,8 @@ function wire() {
 // ============================================================
 // COLONY: inventory / fabrication / upgrades
 // ============================================================
-const LOOT_NAMES = { rations: 'Rations', hydrazine: 'Hydrazine', water: 'L water', seedRadish: 'radish seeds', seedLettuce: 'lettuce seeds', seedSoy: 'soybean seeds', seedTomato: 'tomato seeds' };
-const itemName = (k) => ITEM_NAMES[k] || LOOT_NAMES[k] || k;
+const LOOT_NAMES = { rations: 'Rations', hydrazine: 'Hydrazine', water: 'L water', seedRadish: 'radish seed packet', seedLettuce: 'lettuce seed packet', seedSoy: 'soybean seed packet', seedTomato: 'tomato seed packet' };
+const itemName = (k, n) => (ITEM_NAMES[k] || LOOT_NAMES[k] || k) + (/^seed/.test(k) && n > 1 ? 's' : '');
 const KIT_ICON = { kitSolar: 'solar', kitGreenhouse: 'dome', kitBeacon: 'beacon', kitCache: 'cache' };
 let colonyTab = 'craft';
 
@@ -314,7 +314,7 @@ function tasksHtml() {
   h += '<div class="jr-grid">';
   for (const { q, st, d } of list) {
     const isDone = st === 'done';
-    const loot = Object.keys(q.loot || {}).map((k) => `<span class="chip"><b class="t-num">${q.loot[k]}</b> ${chem(esc(itemName(k)))}</span>`).join('');
+    const loot = Object.keys(q.loot || {}).map((k) => `<span class="chip"><b class="t-num">${q.loot[k]}</b> ${chem(esc(itemName(k, q.loot[k])))}</span>`).join('');
     const bp = q.bp ? `<span class="chip bp">${icon('blueprint')}${esc((UPGRADES.find((u) => u.bp === q.bp) || { name: q.bp }).name)} blueprint</span>` : '';
     const reveal = q.reveal ? `<span class="chip bp">${icon('map')}Full survey map</span>` : '';
     h += `<article class="card quest${isDone ? ' done' : ''}"><div class="card-hd">${icon(isDone ? 'check' : 'target')}<h4>${esc(q.name)}${q.target ? `<small>${esc(q.target)}</small>` : ''}</h4>` +

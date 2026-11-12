@@ -252,14 +252,15 @@
 .mg-compact .suit .num { font-size: 1.1875rem; margin-top: 0; }
 .mg-compact .ring .ticks { display: none; }
 .mg-compact .suit .lb { font-size: .5rem; letter-spacing: .1em; margin-top: .0625rem; }
-.mg-compact .suit .st { display: none; }
+.mg-compact .suit .st { font-size: .5625rem; letter-spacing: .06em; margin-top: .125rem; white-space: nowrap; }
 .mg-compact .ring .trk { stroke-width: 4; }
 .mg-compact .ring .arc { stroke-width: 4.5; }
 .mg-compact .res { gap: .125rem; padding-left: .5rem; }
-.mg-compact .res .row { grid-template-columns: .8125rem 2.75rem 2.125rem .375rem; column-gap: .3125rem; height: .6875rem; }
-.mg-compact .res .row .lb { display: none; }
+/* on a phone each bar keeps a short name and a number big enough to read at arm's length */
+.mg-compact .res .row { grid-template-columns: .875rem 2.5rem 2.125rem 2.5rem .375rem; column-gap: .3125rem; height: .875rem; }
+.mg-compact .res .row .lb { font-size: .5625rem; letter-spacing: .05em; }
 .mg-compact .res .row .ic { width: .8125rem; height: .8125rem; }
-.mg-compact .res .row .val { font-size: .6875rem; }
+.mg-compact .res .row .val { font-size: .8125rem; }
 .mg-compact .row .tr { border-left-width: .1875rem; border-right-width: .1875rem; }
 .mg-compact .row .tr.up { border-bottom-width: .25rem; }
 .mg-compact .row .tr.dn { border-top-width: .25rem; }
@@ -279,7 +280,7 @@
 .mg-compact .alert { font-size: .75rem; padding: .25rem .625rem .25rem .5rem; }
 .mg-compact .alert small { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */
-.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + 5.875rem); }
+.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + 7.125rem); }
 .mg-compact.has-toast #mg-log { visibility: hidden; }
 .mg-compact .toast { min-width: 0; max-width: none; width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); padding: .4375rem .625rem .5rem; }
 .mg-compact .toast .ti { display: none; }
@@ -299,13 +300,13 @@
 .mg-compact #mg-clock .meta .ic { width: .75rem; height: .75rem; }
 .mg-compact #mg-objectives { padding: .3125rem .5rem .375rem; }
 .mg-compact #mg-objectives .hd { display: none; }
-.mg-compact .obj { font-size: .6875rem; padding: .0625rem 0; column-gap: .375rem; }
-.mg-compact .obj.primary { font-size: .75rem; }
+.mg-compact .obj { font-size: .75rem; padding: .0625rem 0; column-gap: .375rem; }
+.mg-compact .obj.primary { font-size: .8125rem; }
 .mg-compact .obj .ds { font-size: .6875rem; }
 .mg-compact .obj .mk { margin-top: .25rem; width: .375rem; height: .375rem; }
 .mg-compact .obj:nth-of-type(n+4) { display: none; }
 
-.mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + 5.5rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
+.mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + 7.125rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
 .mg-compact .mg-line { grid-template-columns: 2.25rem 1fr; column-gap: .375rem; padding: .25rem .5rem .3125rem .4375rem; font-size: .6875rem; line-height: 1.32; }
 .mg-compact .mg-line .who { font-size: .5625rem; letter-spacing: .12em; }
 .mg-compact .mg-line:nth-last-child(n+3) { display: none; }
@@ -353,6 +354,12 @@
 .ph-looks button { min-width: 0; padding: 0 .625rem; }
 .ph-btns { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
 .ph-btns .mg-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.ph-btns .mg-btn[aria-pressed] .ic { width: .875rem; height: .875rem; visibility: hidden; }
+.ph-btns .mg-btn[aria-pressed="true"] .ic { visibility: visible; }
+/* minimised: only the shutter, the way back and the way out, so the picture can be seen */
+.ph-min #mg-photo { left: auto; padding: .375rem .5rem; }
+.ph-min .ph-top, .ph-min .ph-sliders, .ph-min .ph-looks, .ph-min .ph-more { display: none; }
+.ph-min .ph-side { gap: 0; }
 .is-photo #mg-photo-flash { display: block; position: absolute; inset: 0; z-index: 59; background: #fff; opacity: 0; pointer-events: none; }
 #mg-photo-flash.go { animation: mg-photo-flash .45s ease-out; }
 @keyframes mg-photo-flash { 0% { opacity: .75; } 100% { opacity: 0; } }
@@ -360,7 +367,7 @@
   box-shadow: inset 0 calc((100vh - 100vw / 2.39) / 2) 0 0 #000, inset 0 calc((100vw / 2.39 - 100vh) / 2) 0 0 #000; }
 .mg-compact #mg-photo { padding: .375rem .5rem .4375rem; }
 .mg-compact .ph-top { margin-bottom: .25rem; }
-.mg-compact .ph-hint { display: none; }
+.mg-compact .ph-hint { font-size: .625rem; }
 .mg-compact .ph-row { gap: .625rem; }
 .mg-compact .ph-sliders { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem .5rem; }
 .mg-compact .ph-btns .mg-btn { min-height: 2rem; padding: 0 .5rem; font-size: .6875rem; }
@@ -369,3 +376,13 @@
 /* an emergency at the head of the mission list is the largest thing in it */
 .obj.urgent.first { font-size: .9375rem; }
 .mg-compact .obj.urgent.first { font-size: .8125rem; }
+
+/* the narrowest phones have no room for the bars' names beside the compass */
+@media (max-width: 760px) {
+  .mg-compact .res .row { grid-template-columns: .875rem 2.5rem 2.5rem .375rem; }
+  .mg-compact .res .row .lb { display: none; }
+}
+/* the reason for the current objective, under it */
+.obj .why { grid-column: 2 / -1; font-size: .75rem; line-height: 1.3; color: var(--ink-3); font-weight: 400; }
+/* (no room for it in the phone's panel beside the touch buttons: there the reason arrives as a toast) */
+.mg-compact .obj .why { display: none !important; }
