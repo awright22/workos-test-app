@@ -1,5 +1,5 @@
 """
-Family A — the astronaut: one skinned mesh on one armature, with twelve animation clips.
+Family A — the astronaut: one skinned mesh on one armature, with fourteen animation clips.
 
 Run:   /home/user/blender-venv/bin/python tools/assets/astronaut.py [astronaut] [--anim-only] [--fast] [--out FILE.glb]
 Then:  node tools/assets/preview.mjs astronaut --clips
@@ -1986,27 +1986,12 @@ def mix(a, b, t):
 # The clips. Each is a function of time (seconds) returning a Pose.
 # ==============================================================================================
 SIDES = (('L', 1), ('R', -1))
-STANCE_X, TOE_OUT = 0.118, 7.0
+STANCE_X = 0.118
 
 
 def relaxed_arms(p, fwd=3.0, out=11.0, bend=20.0, twist=8.0):
     for side, sx in SIDES:
         p.arm_fk(side, fwd=fwd, out=out, bend=bend, twist=twist)
-
-
-def stand_pose(crouch=0.0, lean=0.0, shift=0.0, heel=0.0, back=0.0, arms=True):
-    p = Pose()
-    p.root = Vector((shift, 0.012 + back, -0.012 - crouch))
-    p.q['hips'] = Q(x=1.5 + lean * 0.38)
-    p.q['spine'] = Q(x=1.5 + lean * 0.34)
-    p.q['chest'] = Q(x=1.0 + lean * 0.28)
-    p.q['neck'] = Q(x=-1.5 - lean * 0.25)
-    p.q['head'] = Q(x=-2.0 - lean * 0.35)
-    for side, sx in SIDES:
-        p.plant(side, sx * STANCE_X, 0.0, pitch=heel, yaw=sx * TOE_OUT)
-    if arms:
-        relaxed_arms(p)
-    return p
 
 
 IDLE_T = 8.0
@@ -2057,8 +2042,8 @@ def idle_pose(t=0.0):
     pelvis pushed over the standing foot and the shoulders tilted the other way; the arms hanging
     at his sides, hands beside the thighs; the head off centre and level.
     Over eight seconds: two breaths, a slow drift of the weight, and one look to the right.
-    (The left foot leads because WorkKneel plants the left foot forward: the blend into it then
-    has less far to go.)
+    (The left foot leads because WorkKneel kneels with the left foot forward: it stays in this
+    footprint all the way down and up.)
     The stance is set by its knee angles (see stand_on), so the breath lives in the chest and
     shoulders and never in the height of the hips. Seen from the side the trunk leans about a
     degree and a half forward under the pack and the hips sit a centimetre ahead of the ankles:
@@ -2066,8 +2051,7 @@ def idle_pose(t=0.0):
     The arms hang from the vertical with the elbows 10 and 12 degrees bent. They are kept this
     far out (about 12 degrees) by the hoses on the flanks, which the inner elbow links pass at
     15 mm, and the hands are turned thumb-forward because a thumb turned in reaches the thigh
-    pocket. Known cost: in the cross-fade to WorkKneel the left hand starts outside the left knee
-    and ends inside it, and passes through the knee pad on the way (see the notes above CLIPS)."""
+    pocket. (WorkKneel rests the left hand on the left knee, so that hand never has to pass the leg.)"""
     sup, free, m = 'R', 'L', -1.0                         # supporting side, eased side, mirror sign
     w = TAU / IDLE_T
     ph = 2 * w * t - 0.6
@@ -2100,6 +2084,60 @@ def idle_pose(t=0.0):
 
 def clip_idle(t):
     return idle_pose(t)
+
+
+# ---- Every clip that starts or ends standing does it in Idle's stance at time 0 ---------------
+# (the game restarts Idle at time 0 whenever it fades back to it). These are Idle's feet and the
+# way its knees point; a clip that plants its feet here moves no foot in a fade to or from Idle.
+IDLE_FEET = {'R': dict(x=-0.105, y=0.0, yaw=-6.0), 'L': dict(x=0.135, y=-0.035, yaw=14.0)}
+IDLE_KNEE = {'R': None, 'L': (0.25, -1.0, 0.0)}
+ARM_BONES = ('shoulder', 'upper_arm', 'forearm', 'hand')
+
+
+def copy_pose(p):
+    q = Pose()
+    q.root, q.q, q.notes = p.root.copy(), {n: v.copy() for n, v in p.q.items()}, list(p.notes)
+    return q
+
+
+def knee_flex(p, side):
+    F = p.frames()[0]
+    return math.degrees((F['thigh_' + side] @ REST_DIR['thigh_' + side]).angle(F['shin_' + side] @ REST_DIR['shin_' + side]))
+
+
+def on_idle_feet(p, heel=0.0):
+    """Plant both feet where Idle has them, whatever the pelvis is doing."""
+    for side in 'LR':
+        p.plant(side, pitch=heel, pole=IDLE_KNEE[side], **IDLE_FEET[side])
+
+
+def blend_arm(p, side, to, w):
+    """Move one arm of pose p towards the same arm of pose `to` (0 leaves it, 1 takes it)."""
+    if w > 0.0:
+        for b in ARM_BONES:
+            p.q[b + '_' + side] = p.q[b + '_' + side].slerp(to.q[b + '_' + side], min(w, 1.0))
+
+
+def stand_pose(crouch=0.0, lean=0.0, shift=0.0, heel=0.0, back=0.0):
+    """Idle's stance at time 0, bent: hips lowered by `crouch` metres, moved `back` and sideways by
+    `shift`, the trunk leant `lean` degrees, the heels raised `heel` degrees. With nothing asked
+    for it is Idle at time 0 exactly; the feet never leave Idle's footprints."""
+    p = idle_pose(0.0)
+    p.root += Vector((shift, back, -crouch))
+    for bone, k in (('hips', 0.38), ('spine', 0.34), ('chest', 0.28), ('neck', -0.25), ('head', -0.35)):
+        p.q[bone] = Q(x=lean * k) @ p.q[bone]
+    on_idle_feet(p, heel)
+    return p
+
+
+def _idle_square():
+    """How far Idle's pelvis sits to one side of the middle of its two feet (he stands on one leg)."""
+    P = idle_pose(0.0).frames()[1]
+    assert all((P['foot_' + s] - foot_pose(f['x'], f['y'], 0.0, f['yaw'])[0]).length < 1e-6 for s, f in IDLE_FEET.items()), 'IDLE_FEET no longer matches idle_pose'
+    return (IDLE_FEET['L']['x'] + IDLE_FEET['R']['x']) / 2 - (P['thigh_L'].x + P['thigh_R'].x) / 2
+
+
+IDLE_SQUARE = _idle_square()     # metres to move the hips to stand square on both feet
 
 
 WALK = dict(
@@ -2186,14 +2224,20 @@ def clip_run(t):
     return gait(t, RUN)
 
 
-JUMP_K = Keys([0.0, 0.12, 0.19, 0.25], ends='free', crouch=[0.0, 0.17, 0.09, -0.052], lean=[0, 26, 18, 7], heel=[0, 0, 12, 44],
+JUMP_K = Keys([0.0, 0.12, 0.19, 0.25], ends='free', crouch=[0.0, 0.18, 0.10, -0.045], lean=[0, 26, 18, 7], heel=[0, 0, 12, 44],
               fwd=[3, -42, -5, 58], bend=[20, 34, 42, 50], out=[11, 15, 16, 17])
 
 
 def clip_jump_start(t):
+    """From Idle's stance: drops into a crouch with the arms thrown back, then drives up onto the
+    toes with the arms swinging through. Ends at take-off."""
     k = JUMP_K(t)
-    p = stand_pose(crouch=k['crouch'], lean=k['lean'], heel=max(k['heel'], 0.0), back=0.07 * max(k['crouch'], 0) / 0.17, arms=False)
-    relaxed_arms(p, fwd=k['fwd'], out=k['out'], bend=k['bend'])
+    go = smooth01(t / 0.10)             # leaving Idle: the weight comes square onto both feet and the arms are taken up
+    p = stand_pose(crouch=k['crouch'], lean=k['lean'], shift=IDLE_SQUARE * go, heel=max(k['heel'], 0.0), back=0.07 * max(k['crouch'], 0) / 0.18)
+    a = copy_pose(p)
+    relaxed_arms(a, fwd=k['fwd'], out=k['out'], bend=k['bend'])
+    for side in 'LR':
+        blend_arm(p, side, a, go)
     return p
 
 
@@ -2218,75 +2262,158 @@ def clip_air(t):
     return air_pose(t)
 
 
-LAND_K = Keys([0.0, 0.10, 0.22, 0.35], crouch=[0.035, 0.21, 0.10, 0.0], lean=[9, 30, 14, 0], heel=[14, 0, 0, 0],
-              fwd=[20, 38, 18, 3], bend=[34, 48, 30, 20], out=[40, 30, 18, 11], back=[0.02, 0.08, 0.03, 0.0])
+LAND_K = Keys([0.0, 0.10, 0.22, 0.35], crouch=[0.045, 0.22, 0.11, 0.0], lean=[9, 30, 14, 0], heel=[14, 0, 0, 0],
+              fwd=[20, 38, 18, 3], bend=[34, 48, 30, 20], out=[40, 30, 18, 11], back=[0.02, 0.08, 0.03, 0.0], settle=[0.0, 0.0, 0.5, 1.0])
 
 
 def clip_land(t):
+    """Touches down in Idle's footprints, square on both feet with the arms out, sinks, and comes
+    up into Idle's stance: the weight settles onto the right leg and the arms drop to his sides."""
     k = LAND_K(t)
-    p = stand_pose(crouch=k['crouch'], lean=k['lean'], heel=max(k['heel'], 0.0), back=k['back'], arms=False)
-    relaxed_arms(p, fwd=k['fwd'], out=k['out'], bend=k['bend'], twist=8 + (k['out'] - 11) * 0.7)
+    settle = min(max(k['settle'], 0.0), 1.0)
+    p = stand_pose(crouch=k['crouch'], lean=k['lean'], shift=IDLE_SQUARE * (1 - settle), heel=max(k['heel'], 0.0), back=k['back'])
+    a = copy_pose(p)
+    relaxed_arms(a, fwd=k['fwd'], out=k['out'], bend=k['bend'], twist=8 + (k['out'] - 11) * 0.7)
+    for side in 'LR':
+        blend_arm(p, side, a, 1 - settle)
     return p
 
 
+def _bump(x, width):
+    """A smooth pulse of height 1, `width` wide, centred on x = 0."""
+    return math.cos(math.pi * x / width) ** 2 if abs(x) < width / 2 else 0.0
+
+
 def clip_work_stand(t):
-    """Standing at a console or a wall, leaning into it: the feet as in Idle (weight on the
-    right, left foot ahead), the right hand wiping a circle at chest height with that shoulder
-    following it, the left hand steadying itself and tapping, the head watching the work."""
-    w = TAU / 2.0
-    s1 = math.sin(w * t)
-    circ = 2 * w * t                                       # the wiping hand goes round twice a loop
-    lean = 9.0
+    """Standing at a bench or a console, as a man stands at one: on Idle's feet with the knees
+    soft (about 6 and 9 degrees), leaning in a little from the hips, upper arms nearly plumb and
+    forearms up. The right hand works two places on the panel (two presses at each, then across),
+    the left rests on its edge and presses once, the head follows the working hand and the weight
+    goes with it. The stance is set by knee angles (see stand_on), so nothing here can squat."""
+    u = (t / 2.0) % 1.0
+    w = TAU * u
+    across = smooth01((u - 0.36) / 0.14) - smooth01((u - 0.86) / 0.14)      # 0 at the outer place, 1 at the inner one
+    press = sum(_bump(u - c, 0.12) for c in (0.10, 0.24, 0.60, 0.74))        # the right hand pressing
+    tap = _bump(u - 0.43, 0.16)                                               # the left hand pressing
+    sway = math.sin(w - 0.9)
+    breath = math.sin(w + 0.5)
     p = Pose()
-    p.root = Vector((-0.028 + 0.010 * s1, 0.030 + 0.004 * math.sin(circ + 0.6), -0.040 - 0.004 * math.sin(circ + 1.2)))
-    p.q['hips'] = Q(x=1.5 + lean * 0.38, y=3.2 + 0.8 * s1, z=-4.0)
-    p.q['spine'] = Q(x=1.5 + lean * 0.34, y=-2.0 - 0.5 * s1, z=2.0)
-    p.q['chest'] = Q(x=1.0 + lean * 0.28 + 1.0 * math.sin(circ), y=-2.6 + 1.6 * math.sin(circ + 0.5), z=5.0 + 3.0 * math.sin(w * t + 0.4))
-    p.q['neck'] = Q(x=-1.5 - lean * 0.25, y=1.0, z=-3.0)
-    p.q['head'] = Q(x=9 + 1.5 * math.sin(circ), y=1.5, z=-7 + 5 * math.sin(w * t + 0.4))
-    p.plant('R', -0.108, 0.010, yaw=-7.0)
-    p.plant('L', 0.135, -0.060, yaw=12.0, pole=(0.22, -1.0, 0.0))
-    p.shrug('R', fwd=10, up=4.0 + 2.5 * math.sin(circ + 0.3))
-    p.shrug('L', fwd=7, up=1.0 + 0.8 * s1)
-    # right hand wipes a circle on a panel in front; left hand steadies itself and taps
-    r = Vector((-0.15 + 0.07 * math.cos(circ), -0.50, 1.27 + 0.06 * math.sin(circ)))
-    p.arm('R', r - Vector((0, -0.02, 0.085)), pole=(-0.85, 0.25, -0.45), hand=hand_q('R', (0.1, -0.25, 1), (0, -1, -0.2)))
-    tap = max(0.0, math.sin(circ + 2.2)) ** 2
-    l = Vector((0.15 + 0.01 * s1, -0.46 + 0.02 * tap, 1.14 + 0.012 * math.sin(w * t + 1)))
-    p.arm('L', l, pole=(0.5, 0.35, -0.8), hand=hand_q('L', (-0.2, -1, 0.15), (0, 0.1 - 0.5 * tap, -1)))
+    p.root = Vector((-0.022 + 0.007 * across + 0.002 * sway, 0.004 - 0.002 * press, 0.0))
+    ankles = {s: foot_pose(f['x'], f['y'], 0.0, f['yaw'])[0] for s, f in IDLE_FEET.items()}
+    tilt = stand_on(p, ankles, {'R': 5.5 + 0.8 * across, 'L': 9.5 - 1.0 * across}, pitch=5.5 + 0.4 * press, turn=-3.5 + 1.0 * across)
+    p.q['spine'] = Q(x=1.5, y=-0.5 * tilt - 0.4, z=1.0)
+    p.q['chest'] = Q(x=2.0 + 0.4 * breath + 0.5 * press, y=-0.5 * tilt - 0.6 + 0.8 * across, z=0.5 + 2.0 * across)
+    p.q['neck'] = Q(x=4.0, z=-3.0 + 2.0 * across)
+    p.q['head'] = Q(x=11.0 + 1.0 * press, y=1.0, z=-6.0 + 4.5 * across)
+    on_idle_feet(p)
+    # the work is fixed in the world (a sloping panel in front of him at chest height), so the hands stay on it while the body shifts
+    r = Vector((-0.200, -0.430, 1.235)).lerp(Vector((-0.075, -0.445, 1.265)), across) + Vector((0, 0, 0.022)) * math.sin(math.pi * across) + Vector((0.0, -0.022, -0.012)) * press
+    p.shrug('R', fwd=6 + 2 * across, up=2.0 + 1.0 * across)
+    p.arm('R', r, pole=(-0.9, 0.3, -0.5), hand=hand_q('R', (0.28 + 0.10 * across, -1, 0.30 - 0.12 * press), (0.05, -0.30, -1)))
+    l = Vector((0.145, -0.400, 1.118 - 0.012 * tap))
+    p.shrug('L', fwd=5, up=0.5)
+    p.arm('L', l, pole=(0.9, 0.3, -0.55), hand=hand_q('L', (-0.38, -1, 0.04 - 0.08 * tap), (-0.05, -0.10, -1)))
     return p
 
 
 KNEEL_FOOT = 50.0          # heel-up angle of a foot resting on its toes behind a grounded knee
 KNEE_DOWN = 0.113          # height of the knee joint when the knee pad rests on the ground
-KNEEL_KNEE_L = (1.0, -1, 0.25)                                   # where the raised left knee points: wide enough for the arm inside it
-KNEEL_ELBOW = {'L': (1.0, 0.4, 0.6), 'R': (-0.8, 0.5, 0.3)}      # where the elbows point (the left one clear of that knee)
+KNEEL = dict(
+    knee=(-0.165, 0.16),            # where the right knee rests on the ground (x, y)
+    sit=20.0,                       # how far the right thigh leans back from that knee (degrees)
+    yaw_r=-4.0,                     # the right foot, up on its toes behind the knee
+    knee_l=(0.45, -1.0, 0.3),       # which way the raised left knee points
+    dig=(-0.19, -0.27, 0.285),      # the middle of the right hand's work (the wrist)
+    cap=0.112,                      # from the left knee joint out to the palm that rests on it
+)
+
+
+def kneel_pose(t=0.0):
+    """Down on the right knee to work on the ground, as a man kneels to a job: the left foot is
+    still in Idle's footprint with that knee up in front of the left shoulder, the right knee is
+    on the ground behind the left heel with the foot on its toes, the trunk leans forward and
+    over to the right, the left hand is braced on the left knee and the right hand digs in front."""
+    w = TAU / 2.0
+    ph = 2 * w * t                                         # two scoops a loop
+    s2 = math.sin(ph)                                      # +1 with the hand at its lowest
+    p = Pose()
+    p.q['hips'] = Q(x=30 + 0.8 * s2, y=-2.0, z=-6)
+    p.q['spine'] = Q(x=17 + 0.6 * s2, y=-3.0, z=4)
+    p.q['chest'] = Q(x=14 + 2.2 * s2, y=-3.0 - 1.0 * s2, z=7 + 2.0 * math.sin(ph - 0.6))
+    p.q['neck'] = Q(x=-12, z=3)
+    p.q['head'] = Q(x=-16 - 1.5 * math.sin(ph - 0.5), z=4 + 2.5 * math.sin(w * t + 0.5))
+    knee = Vector((KNEEL['knee'][0], KNEEL['knee'][1], KNEE_DOWN))
+    off, fq, _ = foot_pose(0.0, 0.0, KNEEL_FOOT, KNEEL['yaw_r'])
+    g = math.asin((off.z - KNEE_DOWN) / L_SHIN)
+    ank = knee + Vector((0, math.cos(g), math.sin(g))) * L_SHIN       # the right foot back on its toes
+    a = rad(KNEEL['sit'])
+    p.pin('thigh_R', BONE_HEAD['thigh_R'], knee + Vector((0, math.sin(a), math.cos(a))) * L_THIGH)
+    p.leg('R', ank, fq, pole=knee - p.frames()[1]['thigh_R'], toe=-KNEEL_FOOT)
+    p.plant('L', pole=KNEEL['knee_l'], **IDLE_FEET['L'])
+    p.shrug('R', fwd=14 + 3.0 * math.cos(ph), up=-5 - 1.5 * s2)
+    # the right hand goes in ahead, pulls back through the soil towards him, lifts and goes forward again; the trunk dips with it
+    wr = Vector(KNEEL['dig']) + Vector((0.015 * math.sin(ph), -0.065 * math.cos(ph), -0.05 * math.sin(ph)))
+    p.arm('R', wr, pole=(-0.8, 0.5, 0.3), hand=hand_q('R', (0.12, -0.35 - 0.2 * math.cos(ph), -1), (0, 1, -0.3)))
+    # the left hand lies over the left knee, wherever the leg has put it
+    F, P = p.frames()
+    ut, us = F['thigh_L'] @ REST_DIR['thigh_L'], F['shin_L'] @ REST_DIR['shin_L']
+    cap = (ut - us).normalized()                           # straight out of the front of the knee
+    fingers = (ut * 0.8 + us * 0.4 + Vector((-0.35, 0, 0))).normalized()
+    palm = -(cap - fingers * cap.dot(fingers)).normalized()
+    wrist = P['shin_L'] + cap * KNEEL['cap'] - ut * 0.03 - fingers * 0.085 - palm * 0.03
+    p.shrug('L', fwd=8, up=4)
+    p.arm('L', wrist, pole=(1.0, 0.6, -0.1), hand=hand_q('L', fingers, palm))
+    return p
 
 
 def clip_work_kneel(t):
-    """Down on the right knee, left foot planted out to the side, both hands digging in front."""
-    w = TAU / 2.0
-    s2 = math.sin(2 * w * t)
-    p = Pose()
-    p.q['hips'] = Q(x=30 + 1.0 * s2, z=-5)
-    p.q['spine'] = Q(x=20)
-    p.q['chest'] = Q(x=17 + 2.0 * s2, z=5 + 3 * math.sin(w * t))
-    p.q['neck'] = Q(x=-16)
-    p.q['head'] = Q(x=-20 + 2 * math.sin(2 * w * t + 0.8), z=5 * math.sin(w * t + 0.5))
-    ank, fq, _ = foot_pose(-0.15, 0.42, KNEEL_FOOT, -4)      # right foot back on its toes
-    g = math.asin((ank.z - KNEE_DOWN) / L_SHIN)
-    knee = ank - Vector((0, math.cos(g), math.sin(g))) * L_SHIN   # right knee on the ground
-    a = rad(24)
-    p.pin('thigh_R', BONE_HEAD['thigh_R'], knee + Vector((0, math.sin(a), math.cos(a))) * L_THIGH)
-    p.leg('R', ank, fq, pole=(0, -1, -0.4), toe=-KNEEL_FOOT)
-    p.plant('L', 0.33, -0.25, yaw=24, pole=KNEEL_KNEE_L)
-    for side, sx in SIDES:
-        p.shrug(side, fwd=12, up=-4)
-        ph = 2 * w * t + (0 if side == 'R' else math.pi)
-        c = Vector((sx * 0.105 - 0.075, -0.40, 0.262))
-        wr = c + Vector((0.015 * math.sin(ph), -0.05 * math.cos(ph), 0.04 * math.sin(ph)))
-        p.arm(side, wr, pole=KNEEL_ELBOW[side], hand=hand_q(side, (-sx * 0.12, -0.35 - 0.2 * math.cos(ph), -1), (0, 1, -0.3)))
+    return kneel_pose(t)
+
+
+KNEEL_T = 0.45
+
+
+def kneel_move(s):
+    """The way down from Idle's stance (s = 0, Idle at time 0) to the kneel (s = 1, WorkKneel at
+    time 0), and read backwards the way up. A cross-fade cannot do this: half-way between a
+    straight leg and a folded one the leg is 9 cm too long and both feet go through the ground.
+    Here the left foot never leaves Idle's footprint. The right heel peels, the foot steps back
+    clear of the ground and lands on its toes, and the knee comes down behind the left heel as
+    the hips sink and go back; the trunk and arms go over with it, the left hand arriving on the
+    knee from above."""
+    a, b = idle_pose(0.0), kneel_pose(0.0)
+    p = mix(a, b, s)
+    # the hips: over the left foot while the right one is off the ground, back only once it has landed
+    p.root = Vector((lerp(a.root.x, b.root.x, s) + 0.035 * math.sin(math.pi * min(s / 0.7, 1.0)) ** 2,
+                     lerp(a.root.y, b.root.y, smooth01((s - 0.15) / 0.85)),
+                     lerp(a.root.z, b.root.z, s ** 1.25)))
+    Fa, Pb = a.frames()[0], b.frames()[1]
+    p.plant('L', pole=Vector(IDLE_KNEE['L']).normalized().lerp(Vector(KNEEL['knee_l']).normalized(), s), **IDLE_FEET['L'])
+    # the right foot
+    f0 = IDLE_FEET['R']
+    off = foot_pose(0.0, 0.0, KNEEL_FOOT, KNEEL['yaw_r'])[0]
+    x1, y1 = Pb['foot_R'].x - off.x, Pb['foot_R'].y - off.y          # where it would stand flat at the end
+    peel, land = 0.18, 0.62
+    u = smooth01((s - peel) / (land - peel))                          # the step back
+    if s < peel:
+        pitch = 25.0 * smooth01(s / peel)
+    elif s < land:
+        pitch = lerp(25.0, 42.0, u)
+    else:
+        pitch = lerp(42.0, KNEEL_FOOT, smooth01((s - land) / (1 - land)))
+    lift = 0.05 * math.sin(math.pi * min(max((s - peel) / (land - peel), 0.0), 1.0))
+    ankle, fq, _ = foot_pose(lerp(f0['x'], x1, u), lerp(f0['y'], y1, u), pitch, lerp(f0['yaw'], KNEEL['yaw_r'], u), lift)
+    pole = (Fa['hips'] @ FWD).lerp((Pb['shin_R'] - Pb['thigh_R']).normalized(), s)
+    p.leg('R', ankle, fq, pole=pole, toe=-pitch)
     return p
+
+
+def clip_kneel_down(t):
+    return kneel_move(smooth01(t / KNEEL_T))
+
+
+def clip_kneel_up(t):
+    return kneel_move(smooth01(1.0 - t / KNEEL_T))
 
 
 def clip_drive(t):
@@ -2340,22 +2467,49 @@ def clip_stagger(t):
     return p
 
 
+def turned(p, yaw, shift=(0.0, 0.0, 0.0)):
+    """The same pose turned `yaw` degrees about the vertical through the model's origin, then moved by `shift`."""
+    rz = Quaternion(Z_AX, rad(yaw))
+    q = copy_pose(p)
+    q.root = rz @ (BONE_HEAD['hips'] + p.root) - BONE_HEAD['hips'] + Vector(shift)
+    q.q['hips'] = rz @ p.q['hips']
+    return q
+
+
+def _collapse_frame():
+    """He drops onto both knees and falls square across them. Idle stands with the left foot ahead
+    and turned out, so the line through the two knees is not square to the model. Returns that
+    line's angle (degrees), its middle on the ground, and half the distance between the knees."""
+    ank = {s: foot_pose(f['x'], f['y'], KNEEL_FOOT, f['yaw'])[0] for s, f in IDLE_FEET.items()}      # the ankles once he is on his toes
+    d = ank['L'] - ank['R']
+    return math.degrees(math.atan2(d.y, d.x)), Vector(((ank['L'].x + ank['R'].x) / 2, (ank['L'].y + ank['R'].y) / 2, 0.0)), d.to_2d().length / 2
+
+
 def clip_collapse(t):
-    """Stands, knees give way, drops onto both knees, tips forward and ends face down, still."""
+    """Stands as Idle does, knees give way, drops onto both knees, tips forward and ends face down, still.
+    The feet stay in Idle's footprints and only come up onto their toes. Everything is worked out
+    in the frame of _collapse_frame (in which the kneeling and the fall are symmetric) and turned
+    back at the end: he falls about seven degrees to the right of straight ahead."""
+    yaw, mid, hw = _collapse_frame()
+    rz = Quaternion(Z_AX, rad(-yaw))
+    feet = {s: (rz @ (Vector((f['x'], f['y'], 0.0)) - mid), f['yaw'] - yaw) for s, f in IDLE_FEET.items()}   # Idle's footprints in that frame
+    idle = turned(idle_pose(0.0), -yaw, -(rz @ mid))
+    Fi = idle.frames()[0]
+    idle_knee = {'R': Fi['hips'] @ FWD, 'L': rz @ Vector(IDLE_KNEE['L']).normalized()}
     kA = smooth01(t / 0.80) ** 1.25                         # 0 standing .. 1 on the knees
     tc = min(max((t - 1.02) / 0.72, 0.0), 1.0)
     fall = tc * tc * (3 - 2 * tc) * tc ** 0.4               # slow tip, then a quick drop
     rebound = 3.0 * math.sin(math.pi * min(max((t - 1.74) / 0.2, 0.0), 1.0)) ** 2
+    go = smooth01(t / 0.35)                                 # how far the trunk and arms have left Idle's pose
     pitch_foot = KNEEL_FOOT * kA ** 1.2
-    x0 = STANCE_X
-    ank_k, _, _ = foot_pose(x0, 0.0, KNEEL_FOOT, 0.0)       # where the ankles end up (on the toes)
+    ank_k = foot_pose(feet['L'][0].x, feet['L'][0].y, KNEEL_FOOT, feet['L'][1])[0]      # (hw, 0, height): the same on the right, mirrored
     gam = math.asin(min(1.0, (ank_k.z - KNEE_DOWN) / L_SHIN))
-    knee_k = ank_k - Vector((0, math.cos(gam), math.sin(gam))) * L_SHIN
+    knee_y = ank_k.y - math.cos(gam) * L_SHIN               # both knees come down on this line, hw either side of the middle
+    l_thigh = math.sqrt(L_THIGH ** 2 - (hw - HIP.x) ** 2)   # the thighs splay a little: this is their length seen from the side
     a_kneel = rad(-5)                                       # hips just behind the knees when kneeling
     a_end = rad(79.5)
-    hip_s = Vector((0.0, 0.012, HIP.z - 0.012))
-    hip_k = Vector((0.0, knee_k.y - math.sin(a_kneel) * L_THIGH, knee_k.z + math.cos(a_kneel) * L_THIGH))
-    p = Pose()
+    hip_s = idle.point('hips', (0, 0, HIP.z))
+    hip_k = Vector((0.0, knee_y - math.sin(a_kneel) * l_thigh, KNEE_DOWN + math.cos(a_kneel) * l_thigh))
     if t < 0.80:
         hip = hip_s.lerp(hip_k, kA)
         hip.y = lerp(hip_s.y, hip_k.y, smooth01(t / 0.80) ** 0.9)
@@ -2363,27 +2517,32 @@ def clip_collapse(t):
         slump = 9.0 * kA
     else:
         a = lerp(a_kneel, a_end, fall) - rad(rebound) * 0.6 + rad(2.0) * math.sin(TAU * (t - 0.8) / 0.9) * (1 - tc)
-        hip = Vector((0.0, knee_k.y - math.sin(a) * L_THIGH, knee_k.z + math.cos(a) * L_THIGH))
+        hip = Vector((0.0, knee_y - math.sin(a) * l_thigh, KNEE_DOWN + math.cos(a) * l_thigh))
         lean = lerp(7.0, 73.0, smooth01(tc * 1.04)) - rebound
         slump = lerp(9.0, 5.0, fall)
     wob = math.sin(TAU * t / 0.9) * (1 - fall) * min(t / 0.3, 1.0)
+    p = Pose()
     p.q['hips'] = Q(x=lean, y=1.5 * wob)
     p.q['spine'] = Q(x=slump + 1.5, y=-1.0 * wob + 3.0 * fall, z=5.0 * fall)
     p.q['chest'] = Q(x=slump * 0.8 + 1.0)
     p.q['neck'] = Q(x=lerp(-1.5 + 12 * kA, -6, fall), z=22 * fall)
     p.q['head'] = Q(x=lerp(-2 + 14 * kA, -6, fall), z=30 * fall, y=-6 * fall)
-    p.pin('hips', (0, 0, HIP.z), hip)
-    for side, sx in SIDES:
-        ankle, fq, _ = foot_pose(sx * x0, 0.0, pitch_foot, sx * TOE_OUT * (1 - kA))
-        p.leg(side, ankle, fq, pole=(sx * 0.12, -1, -0.7), toe=-pitch_foot)
-    # arms: hang, come forward as he tips, and end flat on the ground beside the helmet
     for side, sx in SIDES:
         p.shrug(side, fwd=12 * tc, up=8 * tc)
-        q = Pose()
-        q.root, q.q = p.root.copy(), dict(p.q)
+    p = mix(idle, p, go)                                    # out of Idle's pose over the first third of a second
+    p.pin('hips', (0, 0, HIP.z), hip)
+    Pp = p.frames()[1]
+    for side, sx in SIDES:
+        ankle, fq, _ = foot_pose(feet[side][0].x, feet[side][0].y, pitch_foot, feet[side][1])
+        down = Vector((sx * hw, knee_y, KNEE_DOWN)) - Pp['thigh_' + side]                # from the hip joint to where that knee rests
+        p.leg(side, ankle, fq, pole=idle_knee[side].lerp(down.normalized(), smooth01(t / 0.80)), toe=-pitch_foot)
+    # arms: hang, come forward as he tips, and end flat on the ground beside the helmet
+    for side, sx in SIDES:
+        q = copy_pose(p)
         q.arm_fk(side, fwd=3 + 10 * kA + 55 * smooth01(tc * 1.6), out=11 + 14 * tc, bend=20 + 28 * kA * (1 - tc) + 40 * tc, twist=8 + 30 * tc)
         if tc <= 0.0:
-            p.q.update({k: q.q[k] for k in ('upper_arm_' + side, 'forearm_' + side, 'hand_' + side)})
+            for b in ('upper_arm_', 'forearm_', 'hand_'):
+                p.q[b + side] = idle.q[b + side].slerp(q.q[b + side], go)
         else:
             Pq = q.frames()[1]
             if side == 'L':
@@ -2397,31 +2556,34 @@ def clip_collapse(t):
             p.arm(side, tgt, pole=pole)
             gh = smooth01((tc - 0.2) / 0.6)
             p.q['hand_' + side] = Quaternion().slerp(p.frames()[0]['forearm_' + side].inverted() @ hq, gh)
-    return p
+    return turned(p, yaw, mid)
 
 
 WAVE_K = Keys([0.0, 0.55, 1.45, 2.0], up=[0, 1, 1, 0])
 
 
 def clip_wave(t):
-    """Raises the right arm and gives a big slow wave (two and a half sweeps), then lowers it."""
+    """From Idle's stance: raises the right arm and gives a big slow wave (two and a half sweeps),
+    then lowers it and is back in Idle's stance. The feet and knees stay as Idle has them; the
+    hips ease a centimetre off the standing leg and the trunk bends away as the arm goes up."""
     up = min(max(WAVE_K(t)['up'], 0.0), 1.0)
     sw = math.sin(TAU * (t - 0.5) / 0.6) * smooth01((t - 0.42) / 0.25) * smooth01((1.56 - t) / 0.25)
-    p = stand_pose(arms=False)
-    p.root.x += 0.014 * up
-    p.q['hips'] = p.q['hips'] @ Q(y=1.5 * up)
+    p = idle_pose(0.0)
+    knees = {s: knee_flex(p, s) for s in 'LR'}
+    pitch, _, turn = (math.degrees(v) for v in p.q['hips'].to_euler('YXZ'))
+    p.root.x += 0.012 * up
+    stand_on(p, {s: foot_pose(f['x'], f['y'], 0.0, f['yaw'])[0] for s, f in IDLE_FEET.items()}, knees, pitch=pitch, turn=turn)
+    on_idle_feet(p)
     p.q['spine'] = p.q['spine'] @ Q(y=1.5 * up)
     p.q['chest'] = p.q['chest'] @ Q(y=2.0 * up + 1.5 * sw, z=-5 * up)
-    p.q['neck'] = Q(x=-1.5, z=-4 * up)
-    p.q['head'] = Q(x=-2 - 5 * up, z=-8 * up, y=-3 * up + 2.0 * sw)
-    for side, sx in SIDES:
-        p.plant(side, sx * STANCE_X, 0.0, yaw=sx * TOE_OUT)
-    p.arm_fk('L', fwd=3 - 3 * up, out=11 + 4 * up, bend=20 + 6 * up, twist=8)
-    q = Pose()
-    q.root, q.q = p.root.copy(), dict(p.q)
-    q.arm_fk('R', fwd=3, out=11, bend=20, twist=8)
-    Pq = q.frames()[1]
-    p.shrug('R', up=14 * up, fwd=-2 * up)
+    p.q['neck'] = p.q['neck'] @ Q(z=-4 * up)
+    p.q['head'] = p.q['head'] @ Q(x=-5 * up, z=-8 * up, y=-3 * up + 2.0 * sw)
+    a = copy_pose(p)                                      # the left arm hangs a little wider to balance him
+    hang_arm(a, 'L', fwd=-6.0, out=17.0, bend=18.0, twist=10.0, flex=10.0, roll=2.0)
+    blend_arm(p, 'L', a, up)
+    Pq = p.frames()[1]                                    # where the right arm hangs before it is raised
+    hang_sh, hang_hand = p.q['shoulder_R'].copy(), p.q['hand_R'].copy()
+    p.q['shoulder_R'] = hang_sh.slerp(Quaternion(Y_AX, rad(14.0)) @ Quaternion(Z_AX, rad(-2.0)), up)
     F, P = p.frames()
     sh = P['upper_arm_R']
     elbow = sh + (F['chest'] @ Vector((-0.84, -0.26, 0.48)).normalized()) * L_UPPER
@@ -2432,7 +2594,7 @@ def clip_wave(t):
     pole = (Pq['forearm_R'] - Pq['upper_arm_R']).normalized().lerp((elbow - sh).normalized(), g)
     p.arm('R', tgt, pole=pole)
     Ff = p.frames()[0]['forearm_R']
-    p.q['hand_R'] = Quaternion().slerp(Ff.inverted() @ hand_q('R', fd + Vector((-0.35 * sw, 0, 0)), (0, -1, 0.0)), g)
+    p.q['hand_R'] = hang_hand.slerp(Ff.inverted() @ hand_q('R', fd + Vector((-0.35 * sw, 0, 0)), (0, -1, 0.0)), g)
     return p
 
 
@@ -2441,23 +2603,23 @@ def clip_test(t):
     k = int(t)
     f = smooth01(t - k) if t < 5.99 else 1.0
     poses = [stand_pose()]
-    a = stand_pose(crouch=0.36, lean=34, back=0.14, arms=False)
+    a = stand_pose(crouch=0.36, lean=34, back=0.14)
     relaxed_arms(a, fwd=70, out=14, bend=20)
     poses.append(a)
-    b = stand_pose(arms=False)
+    b = stand_pose()
     for side, sx in SIDES:
         b.shrug(side, up=16)
         b.arm_fk(side, fwd=10, out=150, bend=10, twist=20)
     poses.append(b)
-    c = stand_pose(arms=False)
+    c = stand_pose()
     relaxed_arms(c, fwd=35, out=14, bend=120, twist=10)
     c.q['head'] = Q(x=-12, z=40)
     poses.append(c)
-    d = stand_pose(lean=30, arms=False)
+    d = stand_pose(lean=30)
     d.q['chest'] = d.q['chest'] @ Q(z=25, y=8)
     relaxed_arms(d, fwd=-45, out=20, bend=30)
     poses.append(d)
-    e = clip_work_kneel(0.0)
+    e = kneel_pose(0.0)
     poses.append(e)
     poses.append(stand_pose())
     return mix(poses[min(k, 5)], poses[min(k + 1, 6)], f)
@@ -2465,17 +2627,24 @@ def clip_test(t):
 
 # Notes for whoever plays these clips in the game:
 #   * Idle is eight seconds and stands on the right leg with the left foot 35 mm ahead (see
-#     idle_pose). WorkStand keeps nearly the same feet. JumpStart, Land, Wave and Collapse still
-#     begin or end in the square stance of stand_pose(): the cross-fade to or from Idle moves the
-#     feet about 4 cm, which reads as settling.
-#   * Idle stands upright by itself (knees 5 and 7 degrees, hips over the ankles, trunk 1.5
-#     degrees forward, arms at the sides): play it without any added spine rotation. stand_pose()
-#     is still the older ready stance (knees 19.5 degrees, hips 12 mm low, hands ahead of the
-#     thighs), so a clip that starts in it (JumpStart, Wave, Collapse) dips about 9 mm out of Idle
-#     and Land rises the same 9 mm into it.
-#   * Idle to WorkKneel and back: the left hand crosses the left knee pad in the middle third of
-#     the cross-fade (it hangs outside the thigh in Idle and works inside the raised knee in
-#     WorkKneel). A plain cross-fade cannot avoid that; it wants a shorter fade or a clip of its own.
+#     idle_pose). It stands upright by itself (knees 5 and 7 degrees, hips over the ankles, trunk
+#     1.5 degrees forward, arms at the sides): play it without any added spine rotation.
+#   * Every clip that starts or ends standing does it in Idle's pose at time 0, exactly (see
+#     stand_pose): JumpStart, Wave, Collapse and KneelDown start in it; Land, Wave and KneelUp end
+#     in it. So restart Idle at time 0 when fading to it. WorkStand stands in Idle's footprints
+#     too, and WorkKneel keeps the left foot in its footprint: none of these fades moves a foot.
+#   * Kneeling: do not cross-fade between Idle and WorkKneel. Half-way between a straight leg and
+#     a folded one a leg is 9 cm too long, so in any cross-fade both feet go 8 to 10 cm into the
+#     ground (the hands and arms do clear the body in it now, so it is a fallback, not a pose).
+#     Going down: play KneelDown (0.45 s, once, clamped) with a fade-in of about 0.1 s, and when
+#     it has finished play WorkKneel from time 0 (KneelDown ends in WorkKneel's pose at time 0,
+#     so any short fade is seamless). Getting up: play KneelUp (0.45 s, once, clamped) with a
+#     fade-in of about 0.1 s, and when it has finished play Idle from time 0 (KneelUp ends in
+#     Idle's pose at time 0). KneelUp is KneelDown backwards: KneelUp(t) = KneelDown(0.45 - t).
+#     To turn round part-way (he is told to get up while still going down, or the reverse), start
+#     the other clip at 0.45 minus the time the first had reached.
+#   * WorkKneel: the left hand rests on the left knee and the right hand works the ground about
+#     0.3 m in front of the model's origin and 0.2 m to its right; the hips sit 0.3 m behind it.
 #   * Above the neck ring there are two groups, told apart by material name, and the game shows
 #     one: the helmet (helmet_white, helmet_dark, helmet_metal, helmet_light, visor_gold) and the
 #     bare head (head_skin, head_cap, head_dark). Each fits inside the other's space, so nothing
@@ -2502,6 +2671,8 @@ CLIPS = [  # name, seconds, samples, loop, function
     ('Stagger', 1.4, 56, True, clip_stagger),
     ('Collapse', 2.2, 110, False, clip_collapse),
     ('Wave', 2.0, 80, False, clip_wave),
+    ('KneelDown', KNEEL_T, 27, False, clip_kneel_down),
+    ('KneelUp', KNEEL_T, 27, False, clip_kneel_up),
 ]
 TREADMILL = {'Walk': WALK['speed'], 'Run': RUN['speed']}
 

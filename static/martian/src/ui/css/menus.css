@@ -105,6 +105,8 @@
 /* new game: three cards */
 .brief { columns: 2; column-gap: 2rem; margin-bottom: 1.25rem; font-size: .9375rem; line-height: 1.55; color: var(--ink-2); }
 .brief p { break-inside: avoid; }
+/* (the premise in one line, for a phone, where the two paragraphs above do not fit) */
+.brief-1 { display: none; }
 .brief b { color: var(--ink); }
 .diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .875rem; }
 .diff { position: relative; display: flex; flex-direction: column; align-items: stretch; text-align: left; padding: 1.125rem 1.125rem 1rem; cursor: pointer;
@@ -256,6 +258,7 @@
 .mg-compact .sheet-ft { padding: .4375rem 1rem; }
 .mg-compact .sheet-ft .mg-btn, .mg-compact .dlg .mg-btn, .mg-compact .comms-ft .mg-btn { min-height: 2.5rem; font-size: .875rem; padding: 0 1.125rem; }
 .mg-compact .brief { display: none; }
+.mg-compact .brief-1 { display: block; margin-bottom: .5rem; font-size: .8125rem; line-height: 1.35; color: var(--ink-2); }
 .mg-compact .diffs { gap: .5rem; }
 .mg-compact .diff { padding: .625rem .75rem .5625rem; }
 .mg-compact .diff .dn { font-size: 1.25rem; margin-top: .4375rem; }
@@ -264,7 +267,8 @@
 .mg-compact .diff dt { font-size: .625rem; }
 .mg-compact .diff dd { font-size: .8125rem; }
 .mg-compact .diff p { margin-top: .4375rem; font-size: .75rem; line-height: 1.35; }
-.mg-compact .diff .go { display: none; }
+.mg-compact .diff .go { margin-top: .4375rem; justify-content: center; min-height: 1.875rem; border: 1px solid var(--line); border-radius: .125rem; color: var(--ink); font-size: .75rem; }
+.mg-compact .diff.rec .go { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .mg-compact .set-grid { gap: .75rem 1.5rem; }
 @media (max-width: 760px) {
   .set-grid { grid-template-columns: minmax(0, 1fr); }
@@ -315,7 +319,7 @@
 .mg-compact .choice { padding: .4375rem .625rem; row-gap: .125rem; }
 .mg-compact .choice .ch-l { font-size: 1rem; }
 .mg-compact .choice .ch-s { font-size: .6875rem; }
-.mg-compact .choice .ch-t { display: none; }
+.mg-compact .choice .ch-t { font-size: .6875rem; line-height: 1.25; }
 .mg-compact .dlg.pick .btns { margin-top: .625rem; }
 .inv-row.morale.high .ct, .inv-row.morale.high .ic { color: var(--ok); }
 .inv-row.morale.low .ct, .inv-row.morale.low .ic { color: var(--accent); }
@@ -324,6 +328,10 @@
 .mg-compact #mg-overlay.k-pause .menu-item { min-height: 2.25rem; padding-top: .125rem; padding-bottom: .125rem; }
 .mg-compact #mg-overlay.k-pause .menu-col h1.pz { font-size: 1.875rem; margin-top: .25rem; }
 .mg-compact #mg-overlay.k-pause .menu-col .tag { margin-top: .3125rem; }
+/* (six entries of 44 px on a phone: the heading gives up its second line to make the room) */
+.mg-touch.mg-compact #mg-overlay.k-pause .menu-col .tag { display: none; }
+.mg-touch.mg-compact #mg-overlay.k-pause .menu { margin-top: .375rem; }
+.mg-touch.mg-compact #mg-overlay.k-pause .menu-col { padding-top: .25rem; padding-bottom: .25rem; }
 
 /* the night's account: readable notes and a way to start the day */
 .sleep .notes { margin-top: 1.25rem; display: grid; gap: .375rem; font-size: 1rem; line-height: 1.4; color: var(--ink); }
@@ -334,3 +342,19 @@
 .mg-compact .sleep .delta b { font-size: 1.0625rem; }
 .mg-compact .sleep .notes { margin-top: .625rem; font-size: .8125rem; gap: .1875rem; }
 .mg-compact .sleep .wake { margin-top: .75rem; }
+
+/* the guide to the bars */
+.dlg.wide { width: 46rem; }
+.guide { list-style: none; display: grid; gap: .5rem; margin-top: 1rem; }
+.guide li { display: grid; grid-template-columns: 1.25rem 6.5rem 1fr; gap: .75rem; align-items: baseline; font-size: .9375rem; line-height: 1.4; color: var(--ink-2); }
+.guide li .ic { width: 1.125rem; height: 1.125rem; align-self: start; margin-top: .125rem; color: var(--accent); }
+.guide li b { font: 600 .875rem/1.4 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.guide li sub, .dlg h1 sub { font-size: .7em; }
+.guide-n { margin-top: .875rem; font-size: .875rem; color: var(--ink-3); }
+.pause-side .side-btn { margin-top: .875rem; width: 100%; }
+.mg-compact .dlg.wide { width: 44rem; }
+.mg-compact .guide { gap: .3125rem; margin-top: .5rem; }
+.mg-compact .guide li { grid-template-columns: 1rem 4.5rem 1fr; gap: .5rem; font-size: .75rem; line-height: 1.3; }
+.mg-compact .guide li b { font-size: .6875rem; }
+.mg-compact .guide-n { margin-top: .375rem; font-size: .6875rem; }
+.mg-compact .pause-side .side-btn { margin-top: .5rem; }

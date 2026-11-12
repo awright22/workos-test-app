@@ -94,17 +94,22 @@ let _slope = 0;
 let _lava = 0;
 /** How nearly it lies on the edge of a lava flow, 0..1: where a flow's rubble gathers (set by _flows). */
 let _edge = 0;
+/** How much of it is the top of a flow, 0..1, the same at every level of detail (set by _flows). */
+let _cover = 0;
+/** How far it lies inside a levelled building site, 0..1 (set by _pad). */
+let _padW = 0;
 /**
  * Lava flows come in sizes: broad old sheets, the lobes that ran over them, and the last thin
- * tongues. Each row: metres of flank per unit of noise along the flow, units of noise round the
- * cone, thickness in metres, half-width of the flow's edge in noise units, and how much of the
- * flank the flow leaves bare.
+ * tongues. Each row: metres per unit of noise along the flow and across it, thickness in metres,
+ * half-width of the flow's edge in noise units, and how much of the flank the flow leaves bare.
  */
 const LOBES = [
-  [300, 5, 4.5, 0.06, 0.02],
-  [110, 13, 2.2, 0.035, 0.0],
-  [48, 30, 0.9, 0.035, 0.08],
+  [320, 130, 4.5, 0.06, 0.02],
+  [120, 46, 2.4, 0.04, 0.0],
+  [52, 21, 1.0, 0.04, 0.08],
 ];
+/** The cone is cut into this many sectors, each with its own field of flows (see _flows). */
+const SECTORS = 8;
 /** Lava channels down each volcano's flank. */
 const CHANNELS = 9;
 function locate(x, y, z) {
@@ -166,6 +171,7 @@ export class Planet {
       if (d >= p.r + p.blend) continue;
       let w = d <= p.r ? 1 : 1 - (d - p.r) / p.blend;
       w = w * w * (3 - 2 * w);
+      if (w > _padW) _padW = w;
       r0 += (p.h - r0) * w;
     }
     return r0;
@@ -191,6 +197,7 @@ export class Planet {
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
     const r = R + base + flows + this._detail(x, y, z, rough, minW);
+    _padW = 0;
     return this.pads.length ? this._pad(x, y, z, r) : r;
   }
 
@@ -198,6 +205,12 @@ export class Planet {
   lava(x, y, z) { this._flows(x, y, z, 1e9); return _lava; }
   /** For the place last asked about with radius() or radiusFace(): how nearly it lies on a lava flow's edge, 0..1. */
   flowEdge() { return _edge; }
+  /** Likewise: how much of it is the top of a lava flow, how steep the land itself is there (rise over run of
+   *  the real elevation, before ledges and small relief: the same whatever mesh asks), and how far inside a
+   *  levelled building site it lies. */
+  flowCover() { return _cover; }
+  baseSlope() { return _slope; }
+  padWeight() { return _padW; }
 
   /**
    * A shield volcano is flow laid on flow. Each flow is a tongue running down the flank with a
@@ -207,7 +220,7 @@ export class Planet {
    * Returns the height to add, and leaves the share of lava in _lava.
    */
   _flows(x, y, z, minW) {
-    _lava = 0; _edge = 0;
+    _lava = 0; _edge = 0; _cover = 0;
     let h = 0;
     for (let i = 0; i < LAVA_FIELDS.length; i++) {
       const v = LAVA_FIELDS[i];
@@ -221,28 +234,52 @@ export class Planet {
       let m = t > 0.8 ? (1 - t) * 5 : 1;                   // the field thins out over its last fifth
       m = m * m * (3 - 2 * m);
       if (m > _lava) _lava = m;
-      if (minW >= 60 || s < 1e-9) continue;
-      // the angle round the cone as a point on a circle: nothing breaks where the angle wraps
+      if (minW >= 400 || s < 1e-9) continue;
       const ca = a / s, sa = b / s;
-      const k0 = m * (t < 0.1 ? t * 10 : 1);               // at the summit the coordinates pinch: no forms there
+      const k0 = m * (d < 30 ? d / 30 : 1);                // (the angle means nothing at the very top)
       const warp = gnoise3(x * R / 85 + 3.3, y * R / 85 - 1.7, z * R / 85 + 9.1) * 0.55;
+      // Coordinates on the cone: metres down the flank, and metres round it measured from the middle of
+      // the sector the place is in. Each sector has its own field of flows and neighbours are blended
+      // across their shared half, so a tongue is the same width at the top of the mountain as at its
+      // foot, and nothing breaks where the angle wraps. (Measured as an angle, the tongues pinched into
+      // ribs toward the summit.)
+      const turn = Math.atan2(sa, ca) * (SECTORS / (2 * Math.PI)) + SECTORS;
+      const j0 = Math.floor(turn), ft = turn - j0;
+      let w1 = ft * ft * (3 - 2 * ft), w0 = 1 - w1;
+      const wn = 1 / Math.sqrt(w0 * w0 + w1 * w1);
+      w0 *= wn; w1 *= wn;
+      const arc0 = ft * (2 * Math.PI / SECTORS) * d, arc1 = (ft - 1) * (2 * Math.PI / SECTORS) * d;
+      const s0 = (j0 % SECTORS) * 17.3 + i * 5.1, s1 = ((j0 + 1) % SECTORS) * 17.3 + i * 5.1;
+      let cover = 0;
       for (let k = 0; k < 3; k++) {
         const L = LOBES[k];
-        // a flow's edge is drawn no narrower than two cells of the mesh asking (see _ledges): with
-        // distance it widens, and the flow swells and then goes
-        const band = Math.max(L[3], 0.95 * minW * L[1] / d);
+        // (the colour: the broad old sheets a little, the tongues that ran over them most, and those only where
+        // the lava was thickest, so that they stand as dark tongues on dusty ground)
+        const share = k === 0 ? 0.3 : k === 1 ? 0.7 : 0, mean = k === 0 ? 0.5 : 0.35;
+        if (minW >= L[1] * 3) { cover += mean * share; continue; }              // too coarse to say where the flows are: their average
+        const along = d / L[0] + warp + k * 4.3;
+        const n = gnoise3(arc0 / L[1] + s0, along, k * 13.7 + s0) * w0 + gnoise3(arc1 / L[1] + s1, along, k * 13.7 + s1) * w1;
+        // what colours the ground: the flow as it is, whatever mesh asks (fading to its average where a mesh is too coarse to place it)
+        let c = (n - L[4] - (k === 1 ? 0.1 : 0) + L[3]) / (2 * L[3]);
+        c = c <= 0 ? 0 : c >= 1 ? 1 : c * c * (3 - 2 * c);
+        const sure = minW <= L[1] ? 1 : (L[1] * 3 - minW) / (L[1] * 2);
+        cover += (mean + (c - mean) * sure) * share;
+        // what shapes the ground: a flow's edge is drawn no narrower than two cells of the mesh asking
+        // (see _ledges); with distance it widens, and the flow swells and then goes
+        const band = Math.max(L[3], 0.95 * minW / L[1]);
         if (band >= 0.4) continue;
         const w = band <= 0.2 ? 1 : (0.4 - band) * 5;
-        const n = gnoise3(ca * L[1] + k * 13.7 + i * 5.1, sa * L[1] - k * 4.3, d / L[0] + warp + i * 2.9);
         let e = (n - L[4] + band) / (2 * band);            // 0 off the flow .. 1 on it
         e = e <= 0 ? 0 : e >= 1 ? 1 : e * e * (3 - 2 * e);
         h += e * L[2] * w * k0;
         const ed = 4 * e * (1 - e) * w * k0 * Math.min(1, L[2] / 2.2);
         if (ed > _edge) _edge = ed;
       }
+      cover *= m;
+      if (cover > _cover) _cover = cover;
       // channels: each keeps to its own slice of the cone, wanders in it, and comes and goes down the flank
       if (minW < 8 && t > 0.2 && t < 0.92) {
-        const az = Math.atan2(sa, ca) * (CHANNELS / (2 * Math.PI)) + i * 0.37 + CHANNELS;
+        const az = (turn - SECTORS) * (CHANNELS / SECTORS) + i * 0.37 + CHANNELS;
         const ki = Math.floor(az);
         const run = gnoise3(d / 260 + ki * 3.1, ki * 5.7 + i * 1.3, 0.5);
         if (run > -0.1) {
@@ -289,7 +326,10 @@ export class Planet {
       let u = (f - bench) / riser;
       u = u * u * (3 - 2 * u);
       const step = f < bench ? f * (0.26 / 0.64) : top + u * (1 - top);
-      out += (step - f) * H * (i ? 0.9 : 0.5) * w;
+      // (0.297 * bench is what the step takes off the slope on average: put back, a mesh that draws the
+      // ledges and a coarser neighbour that has melted them stand at the same mean height, and no wall
+      // shows where the two meet)
+      out += (step - f + 0.297 * bench) * H * (i ? 0.9 : 0.5) * w;
     }
     return out;
   }
@@ -301,6 +341,7 @@ export class Planet {
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
     const r = R + base + flows + this._detail(x, y, z, rough, minW);
+    _padW = 0;
     return this.pads.length ? this._pad(x, y, z, r) : r;
   }
 

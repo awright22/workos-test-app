@@ -86,6 +86,7 @@ async function snap() {
   if (!shot) { toast('PHOTO', 'Could not save the picture', 'The browser refused the image.'); return; }
   flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
   Snd.click();
+  for (const name of shot.subjects) toast('PHOTOGRAPHED', name, 'One for NASA\u2019s archive · +4 science');
   const file = typeof File === 'function' ? new File([shot.blob], shot.name, { type: 'image/png' }) : null;
   // a phone's share sheet can put it in the photo library; anything else downloads it
   if (file && navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {

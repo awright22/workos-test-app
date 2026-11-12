@@ -24,9 +24,14 @@ import { layout, onLayout } from './layout.js';
 const habDist = () => groundDist(player.pos, World.hab.position);
 export const OBJECTIVES = [
   { id: 'reach', pos: () => habPoint(0, 1.3, 11.7),  why: 'The suit is losing air. The airlock door will let you reseal it.',  text: () => 'Suit breach — get to the Hab', dist: habDist, shown: () => true, done: () => S.flags.suitSealed, urgent: true },
+  // out of doors with a quarter of a tank left: nothing else is the mission until he is breathing something else
+  { id: 'air', urgent: true, why: 'A dry tank is minutes from the end.', text: () => 'Suit air low — get to air',
+    pos: () => { const door = habPoint(0, 1.3, 11.7); return S.roverO2 > 6 && World.rover.group.position.distanceTo(player.pos) < door.distanceTo(player.pos) ? _way.copy(World.rover.group.position).addScaledVector(_wup.copy(player.pos).normalize(), 1.6) : door; },
+    shown: () => !S.flags.coldOpen && S.mode === 'walk' && !S.inside && !S.inAirlock && S.suit < suitCap() * 0.25, done: () => false },
   { id: 'systems', pos: () => (S.checkedSystems.oxy ? habPoint(5.9, 1.4, -0.4) : habPoint(5.6, 1.4, -3.6)),  why: 'They make the air and the water. Know what keeps you alive.',  text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
   { id: 'math', pos: () => habPoint(0, 1.3, -6.6),  why: 'How long will the food last?',  text: () => 'Run the numbers at the comms desk', shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
-  { id: 'panels', pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? p.group.getWorldPosition(_way).addScaledVector(_wup.copy(World.hab.position).normalize(), 1.2) : null; },  why: 'Dust on the panels starves the Hab of power.',  text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed, done: () => S.stats.panels >= 3 },
+  // (after the first bed is in: "farm or starve" is the premise, and the list must not say otherwise)
+  { id: 'panels', pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? p.group.getWorldPosition(_way).addScaledVector(_wup.copy(World.hab.position).normalize(), 1.2) : null; },  why: 'Dust on the panels starves the Hab of power.',  text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, shown: () => S.flags.suitSealed && (plantedPlots() > 0 || S.sol > 1 || S.power < 55), done: () => S.stats.panels >= 3 },
   { id: 'farm', pos: () => { const p = World.plots.find((x) => x.state === 'empty' || x.state === 'soil'); return p ? _way.copy(p.worldPos).addScaledVector(_wup.copy(p.worldPos).normalize(), 0.9) : null; },  why: 'Ten rations will not last until the rescue.',  text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
   { id: 'water', pos: () => { const p = World.plots.find((x) => x.state === 'growing' && x.growth >= 0.42 && x.watered < (CROPS[x.crop] || CROPS.potato).waterings); return p ? _way.copy(p.worldPos).addScaledVector(_wup.copy(p.worldPos).normalize(), 0.9) : null; },  why: 'A bed stalls at half grown until it is watered again.',  text: () => 'Water the farm beds: they have stopped growing', shown: () => World.plots.some((p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings), done: () => false },
   { id: 'hydra', pos: () => habPoint(4.2, 1.3, 2.6),  why: 'The farm drinks more than the reclaimer makes.',  text: () => 'Make water: burn hydrazine (carefully)', shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
@@ -39,7 +44,7 @@ export const OBJECTIVES = [
   { id: 'survive', why: 'The Hermes is coming back for you.',  text: () => `Survive to Sol ${S.rescueSol}`, shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
   { id: 'mav', why: 'It is the only rocket on the planet.',  text: () => 'Get to the MAV — Schiaparelli', dist: () => groundDist(player.pos, World.mav.position), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
-const _way = new THREE.Vector3(), _wup = new THREE.Vector3(), _wv = new THREE.Vector3(), _wc = new THREE.Vector3();
+const _way = new THREE.Vector3(), _wup = new THREE.Vector3(), _wv = new THREE.Vector3(), _wc = new THREE.Vector3(), _door = new THREE.Vector3();
 /** A point in the Hab, given in its own frame (metres; y above the floor). */
 function habPoint(x, y, z) { return siteLocalToWorld(World.hab, x, y, z, _way); }
 export const objDone = new Set();
@@ -83,8 +88,11 @@ export function updateWaypoint(camera) {
   _wv.copy(target).project(camera);
   let x = _wv.x, y = _wv.y;
   if (behind) { x = -x; y = -y; const m = Math.max(Math.abs(x), Math.abs(y), 1e-3); x /= m; y = Math.min(y / m, -0.2); }
-  const off = behind || Math.abs(x) > 0.86 || y > 0.62 || y < -0.7;
-  const cx = Math.max(-0.86, Math.min(0.86, x)), cy = Math.max(-0.7, Math.min(0.62, y));
+  // (on a phone the left third is the bars, the cards and the stick, and the right the mission and the buttons: the
+  // marker keeps to the middle, and points out of it)
+  const x0 = layout.compact ? -0.24 : -0.86, x1 = layout.compact ? 0.40 : 0.86, y1 = layout.compact ? 0.56 : 0.62;
+  const off = behind || x < x0 || x > x1 || y > y1 || y < -0.7;
+  const cx = Math.max(x0, Math.min(x1, x)), cy = Math.max(-0.7, Math.min(y1, y));
   const w = window.innerWidth, h = window.innerHeight;
   const key = `${Math.round((cx * 0.5 + 0.5) * w)},${Math.round((-cy * 0.5 + 0.5) * h)},${off ? Math.round(Math.atan2(-(y - cy), x - cx) * 20) : 'on'},${Math.round(d)},${urgent}`;
   if (!wayShown) { wayShown = true; wayEl.style.display = ''; }
@@ -157,7 +165,11 @@ export function updateObjectivesHud() {
     let cls = d ? 'done' : o.urgent ? 'urgent' : '';
     if (!d && !primary) { primary = true; cls = o.urgent ? 'urgent first' : 'primary'; }
     // the one thing to do next carries its reason
-    rows.push({ key: o.id, text: o.text(), dist: !d && o.dist ? fmtDist(o.dist()) : '', cls, why: /primary|first/.test(cls) ? (o.why || '') : '' });
+    // (the distance is to the very point the marker stands on, where there is one: the mission line, the marker and the
+    // compass once gave three different numbers for the Hab)
+    let dist = '';
+    if (!d) { const p = o.pos ? o.pos() : null; dist = p ? fmtDist(p.distanceTo(S.mode === 'rover' ? World.rover.group.position : player.pos)) : o.dist ? fmtDist(o.dist()) : ''; }
+    rows.push({ key: o.id, text: o.text(), dist, cls, why: /primary|first/.test(cls) ? (o.why || '') : '' });
     shown++;
   }
   // on a phone the reason for a new first objective is said once, as it takes over
@@ -249,7 +261,7 @@ function compassTargets(pp) {
   if (S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected) add('pf', 'dish', 'Pathfinder', World.pathfinder.position, { cls: 'main', pin: true });
   if (S.pf.loaded && !S.pf.connected) add('up', 'dish', 'Uplink', World.uplink.position, { cls: 'main', pin: true });
   if (S.flags.mavRevealed && !S.won) add('mav', 'rocket', 'MAV', World.mav.position, { cls: 'main', pin: true });
-  add('hab', 'hab', 'Hab', World.hab.position, { pin: true, cls: S.flags.coldOpen ? 'main' : '' });
+  if (!S.inside) add('hab', 'hab', 'Hab', siteLocalToWorld(World.hab, 0, 1.3, 11.7, _door), { pin: true, cls: S.flags.coldOpen ? 'main' : '' });
   if (!S.flags.coldOpen && S.mode !== 'rover') add('rover', 'rover', 'Rover', World.rover.group.position);
   const act = QUEST_DEFS.filter(q => S.quests[q.id] === 'active' && questTargetPos(q))
     .map(q => ({ q, d: groundDist(pp, questTargetPos(q)) }))
@@ -424,10 +436,16 @@ export function updateHud() {
   const suitCls = filling ? 'fill' : sf < 0.12 ? 'crit' : (sf < 0.25 || S.flags.coldOpen) ? 'warn' : '';
   if (hud.cls.suit !== suitCls) { hud.cls.suit = suitCls; UI.suit.className = 'suit' + (suitCls ? ' ' + suitCls : ''); }
   let st;
+  if (filling || safeAir || S.mode === 'rover') hud.left = Infinity;
   if (filling) st = 'Refilling';
   else if (S.mode === 'rover') st = S.roverO2 > 0 ? 'Rover air' : 'Tank empty';
   else if (safeAir) st = 'Hab air';
-  else if (suitRate < -0.02) st = `${fmtLeft(S.suit / -suitRate)} left`;
+  else if (suitRate < -0.02) {
+    // (at the rate the tank is going down now; but shown, it only ever counts down: a time left that climbed as he
+    // stood still read as broken)
+    hud.left = Math.min((hud.left === undefined ? Infinity : hud.left) - dt, S.suit / -suitRate);
+    st = `${fmtLeft(hud.left)} left`;
+  }
   else st = S.flags.coldOpen ? 'Leaking' : 'EVA';
   setText('suitSt', UI.suitState, st);
 
@@ -466,7 +484,7 @@ export function updateHud() {
 
   // --- rover ---
   if (S.mode === 'rover') {
-    setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed))));
+    setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed) * 3.6)));
     const pf = S.roverPower / roverPowerCap(), of = S.roverO2 / BAL.roverO2Cap;
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
     a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`;
@@ -487,6 +505,8 @@ export function updateHud() {
   if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge']);
   if (S.storm.i > 0.15) al.push(['warn', 'storm', 'Dust storm', 'solar output is down']);
   if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Extreme cold', 'the suit heater is drawing <span class="chem">O<sub>2</sub></span>']);
+  const critical = al.some((a) => a[0] === 'crit');
+  if (critical !== UI.critical) { UI.critical = critical; root.classList.toggle('is-critical', critical); }
   const alKey = al.slice(0, 2).map((a) => a[2]).join('|');
   if (alKey !== hud.alerts) {
     hud.alerts = alKey;

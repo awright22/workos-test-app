@@ -97,12 +97,12 @@ export function showNewGame(o, back) {
     const pips = [0, 1, 2].map((n) => `<i${n <= i ? ' class="on"' : ''}></i>`).join('');
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''}>` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Drain</dt><dd>× ${d.drain.toFixed(2)}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
+      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies</dt><dd>${d.drain < 0.995 ? `Last ${Math.round((1 / d.drain - 1) * 100)}% longer` : d.drain > 1.005 ? `Go ${Math.round((1 - 1 / d.drain) * 100)}% sooner` : 'As rated'}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
     '<div class="sheet wide"><header class="sheet-hd"><div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div></header>' +
-    '<div class="sheet-bd mg-scroll"><div class="brief">' +
+    '<div class="sheet-bd mg-scroll"><p class="brief-1">Stranded somewhere on the real Mars. Farm, make water, find Pathfinder, call home, drive to the rocket.</p><div class="brief">' +
     '<p>The storm hit. The crew evac\'d. Your bio-monitor said you were dead. It exaggerated. You are stranded <b>somewhere on Mars</b> — a real Mars: Olympus Mons, Valles Marineris, both ice caps, and every probe humanity ever threw at this planet, rusting exactly where history left it.</p>' +
     '<p>Grow food. Make water. Salvage the dead landers. Find Pathfinder in Ares Vallis. Call home. Then drive to Schiaparelli crater and fly out.</p></div>' +
     `<div class="diffs">${cards}</div></div>` +
@@ -113,6 +113,34 @@ export function showNewGame(o, back) {
   UI.overlay.classList.add('over-title');
   on(p, '[data-act="back"]', back);
   on(p, '[data-diff]', (b) => { hideOverlay(); o.onNewGame(b.dataset.diff); });
+}
+
+// ------------------------------------------------------------------------------------------
+// What the bars are
+// ------------------------------------------------------------------------------------------
+/**
+ * What each bar on the HUD is and what moves it. Opened from the pause menu, and on a phone by tapping
+ * the bars themselves. (The premise card points at "the six bars"; nothing said what any of them was.)
+ */
+export function showBarsGuide(onDone) {
+  const o2 = 'O<sub>2</sub>';
+  const rows = [
+    ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains whenever you are outside, and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long it lasts at the rate it is going. Empty, you start to die.`],
+    ['hab', `Hab ${o2}`, 'The air in the Hab. The oxygenator keeps it up while there is power; a breach lets it out.'],
+    ['water', 'Water', 'Litres in the tank. You drink some every sol and the farm drinks more. Burning hydrazine makes it.'],
+    ['food', 'Food', 'Meals left: rations, potatoes and everything in the pantry. Breakfast takes one each dawn.'],
+    ['power', 'Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night empty it.'],
+    ['vitals', 'Vitals', 'Your body. It falls when you go without air, water, food or sleep, and mends when you have them. At nothing, the run is over.'],
+    ['mood', 'Morale', 'Your spirits, out of 100. Variety on the plate, a cooked dinner, music, sights and comforts lift them; every sol alone lowers them. High, work goes a fifth faster; low, a fifth slower.'],
+  ];
+  showOverlay({
+    kicker: 'Field notes', title: 'What keeps you alive',
+    extra: `<ul class="guide">${rows.map(([ic, name, text]) => `<li>${icon(ic)}<b>${name}</b><span>${text}</span></li>`).join('')}</ul>` +
+      '<p class="guide-n">A small arrow beside a number means it is rising or falling now.</p>',
+    onEscape: () => { hideOverlay(); if (onDone) onDone(); },
+    buttons: [{ label: 'Got it', fn: onDone }],
+  });
+  UI.panel.querySelector('.dlg').classList.add('wide', 'mg-scroll');
 }
 
 // ------------------------------------------------------------------------------------------
@@ -135,7 +163,8 @@ export function showPauseMenu(o) {
     '<aside class="pause-side"><div class="kv">' +
     `<span>Rescue</span><b>Sol ${o.rescueSol}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
     `<h3>Field notes</h3><p>Survive to Sol ${o.rescueSol}. Watch the six bars.</p>` +
-    '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab. Keep the chain alive.</p></aside>',
+    '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab. Keep the chain alive.</p>' +
+    '<button type="button" class="mg-btn side-btn" data-act="bars">What the bars mean</button></aside>',
     { label: 'Paused', onEscape: resume });
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;
@@ -143,6 +172,7 @@ export function showPauseMenu(o) {
     else if (a === 'photo') { hideOverlay(); o.onPhoto(); }
     else if (a === 'settings') showSettings(again, false);
     else if (a === 'controls') showControls(again);
+    else if (a === 'bars') showBarsGuide(again);
     else if (a === 'quit') o.onQuit();
     else if (a === 'restart') {
       showOverlay({

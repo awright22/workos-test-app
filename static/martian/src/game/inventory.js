@@ -14,7 +14,7 @@ export const ITEM_NAMES = {
   kitBeacon: 'Nav Beacon Kit', kitCache: 'O2 Cache Kit',
 };
 export const RECIPES = [
-  { id: 'candle', name: 'O2 Candle', desc: '+40 suit O2 in the field: press X, or the O2 button on a touch screen', cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
+  { id: 'candle', name: 'O2 Candle', desc: '+40 suit O2 in the field', how: ['press X to crack one', 'tap the O2 button to crack one'], cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
   { id: 'meltIce', name: 'Melt Ice', desc: '+10L water (uses 2% Hab power)', cost: { ice: 1 }, run: () => {
       if (S.power < 2) return 'Not enough hab power';
       S.power -= 2; S.water = clamp(S.water + BAL.iceWater, 0, BAL.waterMax);
@@ -26,8 +26,8 @@ export const RECIPES = [
   { id: 'kitCache', name: 'O2 Cache', desc: 'Deployable: 3 suit-O2 refills in the field', cost: { scrap: 3, candle: 1 }, gives: { kitCache: 1 } },
 ];
 export const UPGRADES = [
-  { id: 'drive1', name: 'Rover Drivetrain I', desc: 'Top speed 35 → 45 m/s', cost: { scrap: 6, circuit: 1 } },
-  { id: 'drive2', name: 'Rover Drivetrain II', desc: 'Top speed 45 → 55 m/s', cost: { scrap: 10, circuit: 2 }, bp: 'drive2', needs: 'drive1' },
+  { id: 'drive1', name: 'Rover Drivetrain I', desc: 'Top speed 125 → 160 km/h', cost: { scrap: 6, circuit: 1 } },
+  { id: 'drive2', name: 'Rover Drivetrain II', desc: 'Top speed 160 → 200 km/h', cost: { scrap: 10, circuit: 2 }, bp: 'drive2', needs: 'drive1' },
   { id: 'roverBattery', name: 'Rover Battery Bank', desc: 'Rover power 100 → 160, night drain −25%', cost: { scrap: 8, circuit: 1 } },
   { id: 'tank1', name: 'Suit Tank I', desc: 'Suit O2 100 → 150', cost: { scrap: 4 } },
   { id: 'tank2', name: 'Suit Tank II', desc: 'Suit O2 150 → 200', cost: { scrap: 8, circuit: 1 }, bp: 'tank2', needs: 'tank1' },

@@ -100,6 +100,8 @@ export function buildHabColony(spawn) {
   World.beaconMats = ownMaterials(hab.part('beacon'));
   World.oxyMats = ownMaterials(hab.part('status_oxy'));
   World.commsMats = ownMaterials(hab.part('comms_screen'));
+  // what shows through the portholes from inside: daylight, so it goes with the day and the weather
+  World.habViewMats = hab.part('window_view') ? ownMaterials(hab.part('window_view')) : null;
   World.hydFlame = hab.part('hydrazine_flame');
   World.breachHole = hab.part('breach_hole');
   World.breachPos = siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2);       // where a breach is sealed from: the far wall
@@ -143,7 +145,7 @@ export function buildHabColony(spawn) {
   }
   // outside: the porch lamps and the work light by the tanks come on as it gets dark
   const outside = () => dark() * (S.power > 0.5 ? 1 : 0);
-  for (const [n, power, range] of [['lamp_door_L', 13, 24], ['lamp_door_R', 13, 24], ['lamp_tanks', 10, 18]]) {
+  for (const [n, power, range] of [['lamp_door_L', 5, 20], ['lamp_door_R', 5, 20], ['lamp_tanks', 5, 16]]) {
     const a = hab.part(n);
     if (a) addLamp(a, { color: 0xffe2bd, power, range, level: outside });
   }
@@ -482,7 +484,8 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     g.position.addScaledVector(g.userData.up, -GREENHOUSE.floor);       // the deck is the ground you walk on
     const gm = addSiteModel(g, 'greenhouse', { stain: 6.8, stainOpacity: 0.5 });
     // its lights: white from the apex, pink from the grow strips; they carry the dome at night
-    const lit = () => 0.3 + 0.7 * (World.dark || 0);
+    // (hardly brighter by night than by day: the eye is wide open then, and what lit the dome at noon floods it)
+    const lit = () => 0.3 + 0.12 * (World.dark || 0);
     // (kept modest: the dome's own floor and trays are white and a metre or two from these, and blow out long
     //  before the ground outside is lit)
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 20, decay: 1.25, level: lit });

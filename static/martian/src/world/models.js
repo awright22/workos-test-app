@@ -37,7 +37,7 @@ const GROUND = /^ground_dust/;
 /** Parts that are indoors, whatever their model's dust. */
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
-export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) } };
+export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 } };
 
 let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
@@ -65,6 +65,7 @@ function setUpPlain(plain, ground) {
         uniform highp sampler3D uDustGrain;
         uniform samplerCube uDustAlbedo;
         uniform vec3 uDustHere;
+        uniform float uFill;
         #ifndef USE_NORMALMAP_OBJECTSPACE
         uniform mat3 normalMatrix;
         #endif
@@ -107,6 +108,7 @@ function setUpPlain(plain, ground) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x * (0.86 + 0.28 * surfGrain), 0.05, 1.0), 0.96, dustAmount);')
       // soil has no sheen (the terrain's own material has none): with one, an apron pales at a low angle and shows
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n if (vPbr.z > 1.5) { material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16; }')
+      .replace('#include <lights_fragment_maps>', 'irradiance *= uFill;\n#include <lights_fragment_maps>\niblIrradiance *= uFill; radiance *= uFill;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
   plain.customProgramCacheKey = () => 'plain-pbr-dust7' + (ground ? 'G' : '');
@@ -280,8 +282,9 @@ function prepare(gltf, name) {
         if (dust >= 0.45) { m.color.lerp(_dustTint, dust * 0.75); m.roughness = Math.max(m.roughness, 0.7); m.metalness *= 0.4; }   // decades of dust on the old landers
       } else if (name === 'ice') {
         // water ice: cold, a little glossy, and never quite as dark as rock in shadow
-        m.color.setRGB(0.74, 0.88, 1.0); m.roughness = 0.24; m.metalness = 0; m.envMapIntensity = 1.5;
-        m.emissive.setRGB(0.035, 0.06, 0.095); m.emissiveIntensity = 1;
+        // (blue enough to read as ice under a butterscotch sky, which turns anything white to cream)
+        m.color.setRGB(0.52, 0.74, 1.0); m.roughness = 0.14; m.metalness = 0; m.envMapIntensity = 2.2;
+        m.emissive.setRGB(0.03, 0.075, 0.15); m.emissiveIntensity = 1;
       } else if (name.startsWith('visor')) {
         // the gold visor is a mirror: it shows the sky, the horizon and the sun
         m.color.setRGB(0.80, 0.50, 0.14); m.metalness = 1; m.roughness = 0.07; m.envMapIntensity = 1.9;

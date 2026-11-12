@@ -57,6 +57,19 @@ library should gain.
 - Ambient occlusion is baked by `export_model`; a vertex buried inside another piece is handled
   (rays that start inside a piece carry on), so kit-bashing from intersecting pieces is fine.
   Long plain walls need an edge loop near each end, because occlusion is sampled at vertices.
+- Painted wear. The game folds every plain material into one single-sided material: the colour it
+  draws is the material's colour times the vertex colour (all three channels), and roughness and
+  metalness are the material's own. So a model that is seen close up indoors, where the game's
+  dust shader does nothing, may carry more than occlusion in its vertex colours: tone steps
+  between panels, grime, soiling, worn paint (`paint_wear` in `hab.py` does this for the inside
+  of the Hab, per face corner, after the bake). Three rules follow. Paint can only darken, so a
+  material that must also go lighter in places is defined lighter than it reads (`hab_tile`,
+  `hab_liner`), and so that the room as a whole stays as light as it was, the palette materials
+  that get painted are a tenth lighter in `hab.glb` than in `lib.py` while their unpainted faces
+  (the outside of the Hab) carry a vertex colour a tenth darker: `LIFT` in `hab.py`. A change
+  of sheen needs a material of its own (`hab_tile_worn`, `worn_edge`: paint rubbed through to
+  metal). And a plain face is only drawn from its front, so wind every open face toward the
+  viewer (`face_to`). Still no image textures.
 - Scale reference: the astronaut is 1.86 m tall in the suit. Hardware is real-world size.
 
 ## Art direction
@@ -123,7 +136,9 @@ bob vertically; loops must match first and last frame):
 | `JumpStart` | 0.25 s | crouch and push off |
 | `Air` | 1.0 s loop | airborne, knees slightly tucked, arms out for balance |
 | `Land` | 0.35 s | absorb and recover to standing |
-| `WorkKneel` | 2.0 s loop | on one knee, both hands working at ground level in front (digging, planting, salvage) |
+| `WorkKneel` | 2.0 s loop | on the right knee, the left foot where Idle has it; the left hand braced on the left knee, the right working at ground level in front (digging, planting, salvage) |
+| `KneelDown` | 0.45 s, once | from Idle's pose at time 0 down to WorkKneel's at time 0: the right foot steps back and the knee comes down. The game plays it before `WorkKneel` (a cross-fade from standing to kneeling puts the feet through the floor) |
+| `KneelUp` | 0.45 s, once | `KneelDown` backwards, ending in Idle's pose at time 0 |
 | `WorkStand` | 2.0 s loop | standing, hands working at chest height in front (consoles, wiping a panel, patching a wall) |
 | `Drive` | 3.0 s loop | seated, hands on a yoke, small steering motion |
 | `Stagger` | 1.4 s loop | hurt or out of air: hunched, uneven, one hand to the chest unit |
@@ -169,7 +184,8 @@ front (−Y), a reactor and ion engine cluster at the back (`light_blue` glow).
 
 All in the Hab's own frame: origin at the centre of the floor, the door faces −Y.
 
-`hab.glb`, ≤ 95,000 triangles in total. The crew habitat: an inflatable dome on a rigid base
+`hab.glb`, ≤ 102,000 triangles in total (95,000 before the interior art pass, whose brief
+allowed 15 % more). The crew habitat: an inflatable dome on a rigid base
 ring with an airlock module. The pressure wall is a circle of radius 8.4 m (the game collides
 with that circle; keep the inner surface there and the wall no thicker than 0.5 m). Interior
 clear height at least 3 m at the wall, rising to the middle.
@@ -187,6 +203,20 @@ clear height at least 3 m at the wall, rising to the middle.
 - Interior shell: floor panels with cable trenches, the wall with equipment racks and conduit,
   roof ribs, light fixtures (`light_white`) with anchors `light_0` … `light_3`, a ring of
   ventilation ducting.
+- The liner's surface is fixed: `hab_comforts.glb` is fitted to the very triangles the exporter
+  writes for the quads of `IN_WALL` × `IN_ROOF`. `liner_for_paint` only cuts those triangles
+  (two level loops for paint, a hole hidden inside each window frame); it never moves them.
+- Lamps. The game hangs a point light at every `light_*` and `lamp_*` anchor it uses, often a
+  hand's breadth from the fitting, so the lit part of a fitting is a small bright core in a
+  housing and what faces the anchor at close range is dark: tubes in `light_white` in front of
+  a diffuser in `light_white_dif` (the game drives every `light_white*` under `interior` with
+  the Hab's power) on a dark baffle; over the farm an emitter strip in `light_grow` in a
+  reflector that only glows, `light_grow_soft`.
+- Portholes from inside: the frame, a gasket, a pane of `glass_clear`, a reveal through the wall
+  and at its end the view, which is the part `window_view` (under `interior`): a sky in
+  `window_glow_sky` over a ground in `window_glow_ground`, both emissive so that it reads as
+  daylight whatever the room's lamps do. The game can dim it at night
+  (`ownMaterials(hab.part('window_view'))`, then `setGlow`).
 - Stations at fixed places (x, y) on the floor; the player stands within about 2.4 m to use
   each one, so leave their fronts reachable from the middle of the room:
   oxygenator (5.6, 3.6): a tall machine with tanks, a fan grille and a status light that is a

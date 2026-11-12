@@ -15,6 +15,7 @@ import { startDeploy } from '../game/interactables.js';
 import { ACHIEVEMENTS, QUEST_DEFS, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
 import { sightList } from '../game/sights.js';
+import { layout } from './layout.js';
 import { OBJECTIVES } from './hud.js';
 import { initMap, openMap, renderMap as drawMap } from './map.js';
 // The three full screens: the map (ui/map.js), the colony (inventory, fabrication, upgrades)
@@ -176,7 +177,7 @@ export function renderColony() {
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
     craft += `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
       (ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '') + '</div>' +
-      `<p class="ds">${chem(esc(r.desc))}</p><div class="cost">${costChips(r.cost)}</div>` +
+      `<p class="ds">${chem(esc(r.desc + (r.how ? ': ' + r.how[layout.touch ? 1 : 0] : '')))}</p><div class="cost">${costChips(r.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
       // a kit he is carrying can be set down from here too, without a trip to the Inventory tab
       (/^kit/.test(r.id) && have > 0 ? `<button type="button" class="mg-btn small" data-deploy="${r.id.slice(3).toLowerCase()}">Deploy</button>` : '') +
@@ -220,7 +221,8 @@ export function renderColony() {
   home = `<div class="pane-hd">Home <span>${madeN} of ${COMFORTS.length} made · morale +${comfortCheer()} a sol</span></div>` +
     '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home;
 
-  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}">${icon(ic)}${label}${n ? `<em>${n}</em>` : ''}</button>`;
+  // (the number is how many things on that tab can be made now, and says so: bare, it read as a total and disagreed with the tab's own heading)
+  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}">${icon(ic)}${label}${n ? `<em>${n}<i> ready</i></em>` : ''}</button>`;
   body.innerHTML = '<div class="colony">' +
     `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
     `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +
@@ -295,12 +297,17 @@ const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.
 function tasksHtml() {
   let h = '<div class="pane-hd">Mission</div><div class="obj-list">';
   let primary = false, open = '', closed = '', nDone = 0;
-  for (const o of OBJECTIVES) {
-    if (!o.shown()) continue;
+  // as on the HUD: an emergency leads, and each thing still to do says why and how far
+  const todo = OBJECTIVES.filter((o) => o.shown());
+  todo.sort((a, b) => (b.urgent && !b.done() ? 1 : 0) - (a.urgent && !a.done() ? 1 : 0));
+  const from = S.mode === 'rover' ? World.rover.group.position : player.pos;
+  for (const o of todo) {
     const d = o.done();
     let cls = d ? 'done' : o.urgent ? 'urgent' : '';
     if (!d && !primary) { primary = true; if (!o.urgent) cls = 'primary'; }
-    const row = `<div class="obj ${cls}"><i class="mk"></i><span class="tx">${esc(o.text())}</span><span class="ds t-num">${!d && o.dist ? fmtDist(o.dist()) : ''}</span></div>`;
+    let dist = '';
+    if (!d) { const p = o.pos ? o.pos() : null; dist = p ? fmtDist(p.distanceTo(from)) : o.dist ? fmtDist(o.dist()) : ''; }
+    const row = `<div class="obj ${cls}"><i class="mk"></i><span class="tx">${esc(o.text())}${!d && o.why ? `<small>${esc(o.why)}</small>` : ''}</span><span class="ds t-num">${dist}</span></div>`;
     if (d) { closed += row; nDone++; } else open += row;
   }
   h += (open || '<div class="obj"><i class="mk"></i><span class="tx">Stay alive.</span></div>') + '</div>';
@@ -330,10 +337,12 @@ function discoveriesHtml() {
   // (what is still to find is one card with a count: a card apiece was a wall of identical padlocks)
   const more = (n, one, many, line) => (n ? `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>${n} more ${n === 1 ? one : many}</h4></div><p>${line}</p></article>` : '');
   const landers = World.landers, found = landers.filter((r) => S.discovered[r.data.name]);
-  let h = `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found</span></div><div class="jr-grid">`;
+  const album = S.album || {}, shot = found.filter((r) => album[r.data.name]).length;
+  let h = `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found · ${shot} photographed</span></div><div class="jr-grid">`;
   for (const rec of found.sort((x, y) => x.data.year - y.data.year)) {
     h += `<article class="card got"><div class="card-hd">${icon('lander')}<h4>${esc(rec.data.name)}<small>${rec.data.year}</small></h4>` +
-      `${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}</div><p>${esc(rec.data.note)}</p></article>`;
+      `${album[rec.data.name] ? `<span class="badge done">${icon('camera')}Photographed</span>` : ''}${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}</div>` +
+      `<p>${esc(rec.data.note)}${album[rec.data.name] ? '' : ' <i class="todo">NASA would like a photograph: stand near it and open photo mode.</i>'}</p></article>`;
   }
   h += more(landers.length - found.length, 'lander', 'landers', S.flags.mapRevealed ? 'Their signals are on the map. Go and find them.' : 'Every machine sent to Mars is still where it stopped. Find them out there.');
   const places = FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
@@ -374,9 +383,9 @@ function statsHtml() {
     tile(S.sol, '', 'Sols survived') + tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue') +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes, '', 'Potatoes harvested') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
-    tile(st.mined, '', 'Ice chunks mined') + tile(st.discoveries, '', 'Discoveries') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
-    tile(World.builtMeshes.length, '', 'Structures deployed') + tile(st.booms, '', 'Hydrazine burns') + tile(st.closeCalls, '', 'Close calls') +
-    tile(Math.round(st.stormOut), 's', 'Out in storms') + tile(Math.round(st.discoTime), 's', 'Disco endured') +
+    tile(st.mined, '', 'Ice chunks mined') + tile(st.discoveries, '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
+    tile(World.builtMeshes.length, '', World.builtMeshes.length === 1 ? 'Structure deployed' : 'Structures deployed') + tile(st.booms, '', 'Hydrazine burns') + tile(st.closeCalls, '', 'Close calls') +
+    tile(Math.round(st.stormOut), 's', 'Out in storms') + (st.discoTime >= 1 ? tile(Math.round(st.discoTime), 's', 'Disco endured') : '') +
     '</div>';
 }
 function logHtml() {
@@ -391,16 +400,21 @@ function logHtml() {
 }
 function samplesHtml() {
   const s = scienceSummary(), list = catalogue();
-  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science${s.nextGrant ? ` · next NASA grant at ${s.nextGrant}` : ''}</span></div>`;
+  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science${s.nextGrant ? (s.points >= s.nextGrant ? ' · a NASA grant is waiting on your next analysis' : ` · next NASA grant at ${s.nextGrant}`) : ''}</span></div>`;
   if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder, or bag soil where you dig. The analyser on the Hab work table says what it is. What you find depends on where on Mars you are standing.</div>`;
   else if (s.bagged) h += `<p class="jr-note">${s.bagged} of ${s.limit} sample bags are full and waiting for the analyser in the Hab.</p>`;
   h += '<div class="jr-grid">';
-  for (const m of list.slice().sort((a, b) => (b.count > 0) - (a.count > 0) || b.value - a.value)) {
-    h += m.count
-      ? `<article class="card got"><div class="card-hd">${icon('layers')}<h4>${esc(m.name)}<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4><span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span></div><p>${chem(esc(m.text))}</p></article>`
-      : `<article class="card locked"><div class="card-hd">${icon('question')}<h4>Not yet found<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4></div><p>${chem(esc(m.text))}</p></article>`;
+  for (const m of list.filter((x) => x.count).sort((a, b) => b.value - a.value)) {
+    h += `<article class="card got"><div class="card-hd">${icon('layers')}<h4>${esc(m.name)}<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4><span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span></div><p>${chem(esc(m.text))}</p></article>`;
   }
-  return h + '</div>';
+  h += '</div>';
+  // what is still to find: one list of leads (a card apiece was a wall of identical question marks)
+  const leads = list.filter((x) => !x.count);
+  if (leads.length) {
+    h += `<div class="pane-hd">Still to find <span>${leads.length} material${leads.length > 1 ? 's' : ''}: where to look</span></div><ul class="leads">` +
+      leads.map((m) => `<li><b>${m.kind === 'soil' ? 'Soil' : 'Rock'}</b><span>${chem(esc(m.text))}</span></li>`).join('') + '</ul>';
+  }
+  return h;
 }
 const JOURNAL_TABS = [['tasks', 'target', 'Tasks', tasksHtml], ['disc', 'pin', 'Discoveries', discoveriesHtml], ['samples', 'layers', 'Samples', samplesHtml], ['ach', 'trophy', 'Achievements', achievementsHtml],
   ['stats', 'chart', 'Statistics', statsHtml], ['log', 'list', 'Log', logHtml]];

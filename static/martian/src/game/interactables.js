@@ -246,7 +246,7 @@ addI({
         S.o2 = clamp(S.o2 - 7, 0, 100);
         flashScreen('rgba(255,180,80,0.75)', 500);
         Snd.play('hydrazineBoom');
-        log('So. Small fireball. Eyebrows: gone. Water: acquired. Science!');
+        log('So. Small fireball. It ate 7% of the Hab\'s air and both my eyebrows. Water: acquired. Science!');
       }, 1200);
       log('Burning rocket fuel indoors. What could possibly go wrong?');
     } else {

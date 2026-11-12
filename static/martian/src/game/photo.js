@@ -16,6 +16,8 @@ import { input } from './input.js';
 import { tangentBasis, vecToLl } from '../planet/geo.js';
 import { surfaceAt } from '../planet/surface.js';
 import { clamp } from '../core/math.js';
+import { addCredit } from './science.js';
+import { cheer } from './farm.js';
 
 /** Looks: settings of the final pass. `natural` is the game's own grade. */
 export const LOOKS = {
@@ -128,6 +130,27 @@ export function photoName() {
  * Take the picture: draw one frame at the screen's full resolution and hand back the PNG.
  * `drawFrame` draws the scene once (the main loop's draw). Resolves to { blob, name }.
  */
+/** The landers a picture taken now would show: near enough to be more than a speck, and inside the frame. */
+export function photoSubjects() {
+  const cam = ctx.engine.camera, out = [];
+  cam.updateMatrixWorld();
+  for (const rec of World.landers) {
+    if (!rec.group.visible || cam.position.distanceTo(rec.group.position) > 60) continue;
+    _d.copy(rec.group.position).project(cam);
+    if (_d.z < 1 && Math.abs(_d.x) < 0.8 && Math.abs(_d.y) < 0.8) out.push(rec.data.name);
+  }
+  return out;
+}
+/** NASA has pictures of every lander from orbit and none from the ground. Each first photograph of one
+ *  goes into the album (kept in the save) and earns a little science credit. Returns the names newly added. */
+export function recordPhoto() {
+  if (!S.album) S.album = {};
+  const fresh = photoSubjects().filter((name) => !S.album[name]);
+  for (const name of fresh) { S.album[name] = S.sol; addCredit(4); cheer(1); }
+  if (fresh.length) S.stats.photographed = Object.keys(S.album).length;
+  return fresh;
+}
+
 export function takePhoto(drawFrame) {
   const e = ctx.engine;
   const scaleWas = e.dynScale, qScaleWas = e.q.scale;
@@ -137,7 +160,7 @@ export function takePhoto(drawFrame) {
   return new Promise((resolve) => {
     const done = (blob) => {
       e.dynScale = scaleWas; e.q.scale = qScaleWas; e.resize();
-      resolve(blob ? { blob, name: photoName() } : null);
+      resolve(blob ? { blob, name: photoName(), subjects: recordPhoto() } : null);
     };
     try { canvas.toBlob(done, 'image/png'); } catch (err) { done(null); }
   });

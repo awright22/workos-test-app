@@ -26,7 +26,7 @@ export function serializeState() {
     machines: S.machines ? { ...S.machines } : null,
     mail: { ...(S.mail || {}) },
     pantry: { ...farm().pantry }, seeds: { ...S.seeds }, morale: S.morale, diet: { ...S.diet },
-    comforts: { ...(S.comforts || {}) }, sights: { ...(S.sights || {}) },
+    comforts: { ...(S.comforts || {}) }, sights: { ...(S.sights || {}) }, album: { ...(S.album || {}) },
     breach: { ...S.breach }, pf: { ...S.pf },
     stormCells: S.storm.cells.map(c => ({ ...c })),
     plots: World.plots.map(p => ({ state: p.state, growth: p.growth, watered: p.watered, crop: p.crop || 'potato' })),
@@ -62,6 +62,7 @@ export function applyState(d) {
   farm();
   S.comforts = { ...(d.comforts || {}) };
   S.sights = { ...(d.sights || {}) };
+  S.album = { ...(d.album || {}) };
   S.storm.cells = d.stormCells.map(c => ({ ...c }));
   S.storm.i = 0;
   // rebuild deployed structures FIRST so greenhouse plots exist before plot restore

@@ -5,6 +5,7 @@ import { UI } from '../ui/dom.js';
 import { log } from '../ui/dom.js';
 import { perf } from '../core/math.js';
 import { screenOpen, closeScreens, toggleScreen } from '../ui/screens.js';
+import { showBarsGuide } from '../ui/menus.js';
 import { screenUnlocked } from '../ui/hud.js';
 import { showPause } from './flow.js';
 import { exitRover } from './rover.js';
@@ -213,6 +214,8 @@ function initTouch(canvas) {
   press(UI.tCam, () => { if (playing()) S.firstPerson = !S.firstPerson; });
   press(UI.tCandle, () => { if (playing()) useCandle(); });
   press(UI.tPause, () => { if (screenOpen()) closeScreens(); showPause(); });
+  // the bars, tapped, say what they are
+  UI.vitals.addEventListener('click', () => { if (playing() && !S.uiOpen && !screenOpen() && !S.flags.coldOpen) showBarsGuide(); });
   UI.tRow.querySelectorAll('[data-t]').forEach((btn) => {
     press(btn, () => { if (playing() && !S.flags.coldOpen && screenUnlocked(btn.dataset.t)) toggleScreen(btn.dataset.t); });
   });

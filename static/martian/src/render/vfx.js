@@ -164,7 +164,7 @@ export class Vfx {
           mv.w = 1.0;
           gl_Position = projectionMatrix * mv;
           vQ = position.xy;
-          vA = smoothstep(0.25, 1.0, uStorm) * 0.5 * smoothstep(1.2, 4.5, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
+          vA = smoothstep(0.25, 1.0, uStorm) * 0.26 * smoothstep(1.2, 4.5, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.5, d));
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uLight;

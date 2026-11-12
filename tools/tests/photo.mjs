@@ -77,6 +77,27 @@ t = await ev((G) => ({ on: G.photoMode.photo.on, ui: G.S.uiOpen }));
 check('the pause menu offers photo mode and opens it', item && t.on && t.ui === false, { item, ...t });
 await ev((G) => { document.querySelector('#mg-photo [data-act="done"]').click(); });
 
+// ---- a photograph with a lander in the frame goes into NASA's album, once
+const album = await ev(async (G) => {
+  const rec = G.World.landers.find((r) => r.data.name === 'Viking 1');
+  const p = rec.group.position.clone().normalize();
+  const lat = Math.asin(p.y) * 180 / Math.PI, lon = ((Math.atan2(-p.z, p.x) * 180 / Math.PI) + 360) % 360;
+  await G.tp(lat - (14 / 12000) * 180 / Math.PI, lon, 0);                 // 14 m south of it, facing north
+  G.setLocalTime(11); G.tick(0.05, 20); await G.settle();
+  const before = { album: { ...(G.S.album || {}) }, pts: G.S.science ? G.S.science.points : 0 };
+  G.photoMode.enterPhoto();
+  G.tick(0.05, 2);
+  const first = await G.photoMode.takePhoto();
+  const subjects = G.photoMode.photoSubjects();          // (asked after a frame has been drawn from the photo camera)
+  const second = await G.photoMode.takePhoto();
+  G.photoMode.exitPhoto();
+  const saved = G.serializeState();
+  return { before, subjects, first: first && first.subjects, second: second && second.subjects, album: { ...G.S.album }, pts: G.S.science.points, saved: saved.album };
+});
+check('a photograph with a lander in frame goes into the album once, for science credit, and is saved',
+  album.first && album.first.includes('Viking 1') && album.second && album.second.length === 0 &&
+  album.album['Viking 1'] >= 1 && album.pts === album.before.pts + 4 && album.saved && album.saved['Viking 1'] >= 1, album);
+
 const errors = g.errors.filter((e) => !/favicon/.test(e));
 const passed = results.filter(Boolean).length;
 console.log(`${passed}/${results.length} photo mode checks passed; console errors: ${errors.length}`, errors.slice(0, 5));

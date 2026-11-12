@@ -92,7 +92,7 @@ UI.log.setAttribute('role', 'log');
 UI.log.setAttribute('aria-live', 'polite');
 
 UI.rover = el('div', 'mg-rover', null, UI.hud,
-  '<div class="spd"><b class="t-num">0</b><span>M/S</span></div>' +
+  '<div class="spd"><b class="t-num">0</b><span>KM/H</span></div>' +
   '<div class="rv">' +
   `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">POWER</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   `<div class="row" data-k="o2">${icon('suit')}<span class="lb"><span class="chem">O<sub>2</sub></span> TANK</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
@@ -133,13 +133,14 @@ UI.tEVerb = UI.tE.querySelector('.vb');
 UI.tJump = tbtn('mg-tJump', 'sec', 'Jump', `${icon('jump')}<span>JUMP</span>`);
 UI.tExit = tbtn('mg-tExit', 'sec', 'Exit the rover', `${icon('exit')}<span>EXIT</span>`);
 UI.tSprint = tbtn('mg-tSprint', 'sec', 'Run', `${icon('run')}<span>RUN</span>`);
-UI.tCam = tbtn('mg-tCam', 'mini', 'Switch camera', icon('camera'));
+UI.tCam = tbtn('mg-tCam', 'mini', 'Switch camera', `${icon('camera')}<span>VIEW</span>`);
 UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle', '<span class="chem">O<sub>2</sub></span><b>0</b>');
 UI.tCandle.style.display = 'none';
 UI.tRow = el('div', 'mg-trow', null, UI.touch);
-UI.tPause = tbtn('mg-tPause', 'top', 'Pause and menu', icon('pause'), UI.tRow);
+UI.tPause = tbtn('mg-tPause', 'top', 'Pause and menu', `${icon('pause')}<span>MENU</span>`, UI.tRow);
 for (const [k, label] of [['map', 'Map'], ['colony', 'Colony and fabrication'], ['journal', 'Journal']]) {
-  tbtn(null, 'top', label, icon(k), UI.tRow).dataset.t = k;
+  // (each has its word under it: an icon alone has to be guessed at)
+  tbtn(null, 'top', label, `${icon(k)}<span>${k.toUpperCase()}</span>`, UI.tRow).dataset.t = k;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -332,6 +333,8 @@ function nextToast() {
   }, life);
 }
 export function toast(kicker, title, note) {
+  // while his life is in the balance (the banner at the top says how), only what bears on it is said
+  if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
   toastQueue.push({ kicker, title, note });
   if (!toastBusy) nextToast();
 }
@@ -453,7 +456,7 @@ function syncChrome() {
   requestAnimationFrame(syncChrome);
   const modal = S.uiOpen || anyScreenOpen();
   // (their contents change under them, so the regions on screen are looked at again a few times a second)
-  if ((modal || !S.started) && ++cueTick % 12 === 0) for (const n of root.querySelectorAll('.mg-scroll')) if (n.offsetParent) scrollCue(n);
+  if ((modal || !S.started) && ++cueTick % 2 === 0) for (const n of root.querySelectorAll('.mg-scroll')) if (n.offsetParent) scrollCue(n);
   flag('is-playing', S.started);
   flag('is-modal', modal);
   flag('is-rover', S.mode === 'rover');

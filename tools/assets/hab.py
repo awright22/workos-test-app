@@ -21,11 +21,23 @@ How hab.glb is put together (each function is one assembly; see its docstring):
   hab_breach        breach_hole and breach_patch, inside and outside faces
 Everything seen only from inside hangs under the part `interior`. Anchors named lamp_* are optional
 extra light positions; only light_0..3 are the ones the spec asks for.
+
+The inside is then painted (see "Painted wear" near the end, and SPEC.md):
+  porthole, grow_light           the lit things: a pane and the view behind it (the part `window_view`),
+                                 an emitter strip in a reflector
+  liner_for_paint                more vertices on the liner without moving its surface (hab_comforts
+                                 is fitted to it)
+  floor_wear, FLOOR_STAINS, boot_prints   where the floor is walked on, stained and trodden with dust
+  panelize                       a border band and an inner field on each large flat face of a housing
+  paint_wear                     after the occlusion bake: tints per face corner (floor_paint,
+                                 liner_paint, kit_paint), and worn chamfers moved to `worn_edge`
 """
 import math
 import os
 import random
 import sys
+
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *  # noqa: E402,F401,F403
@@ -184,11 +196,51 @@ def pol(r, th, z=0.0):
     return (r * math.cos(th), r * math.sin(th), z)
 
 
+def smooth01(t):
+    """Smoothstep of t clamped to 0..1 (numbers or arrays)."""
+    t = np.clip(t, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def lattice(ix, iy, iz, seed=0):
+    """A repeatable random number in 0..1 for each integer point (arrays of int64)."""
+    h = (ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791) ^ (seed * 40503 + 977)
+    h = (h ^ (h >> 13)) * 1274126177
+    h = h ^ (h >> 16)
+    return (h & 0xFFFFF) / float(0x100000)
+
+
+def vnoise(p, scale=1.0, seed=0):
+    """Smooth value noise, 0..1, at the points p (n x 3); `scale` is in cells per metre."""
+    q = np.asarray(p, dtype=np.float64) * scale
+    i = np.floor(q).astype(np.int64)
+    f = q - i
+    f = f * f * (3.0 - 2.0 * f)
+    out = np.zeros(len(q))
+    for dx in (0, 1):
+        wx = f[:, 0] if dx else 1.0 - f[:, 0]
+        for dy in (0, 1):
+            wy = f[:, 1] if dy else 1.0 - f[:, 1]
+            for dz in (0, 1):
+                wz = f[:, 2] if dz else 1.0 - f[:, 2]
+                out += wx * wy * wz * lattice(i[:, 0] + dx, i[:, 1] + dy, i[:, 2] + dz, seed)
+    return out
+
+
+def fbm(p, scale=1.0, seed=0, octaves=3):
+    out, amp, total = 0.0, 1.0, 0.0
+    for k in range(octaves):
+        out = out + amp * vnoise(p, scale * 2 ** k, seed + 17 * k)
+        total += amp
+        amp *= 0.5
+    return out / total
+
+
 class Kit:
     """Builds one assembly in its own local frame (front faces local -Y) and drops it into the
     model at `loc`, turned by `yaw`. Geometry is collected in buckets, one per material and bevel,
     so a machine made of two hundred pieces still costs a handful of objects."""
-    TUBE, OPEN = 75.0, 37.0
+    TUBE, OPEN, STREAK = 75.0, 37.0, 36.0          # (STREAK: faces tagged for paint_wear, see streaks())
 
     def __init__(self, name, parent, loc=(0, 0, 0), yaw=0.0):
         self.name, self.parent, self.loc, self.yaw = name, parent, Vector(loc), yaw
@@ -289,6 +341,9 @@ class Kit:
             o = mesh_obj(f'{self.name}.{m}.{i}', bm, m, parent=self.parent, loc=tuple(self.loc), rot=(0, 0, self.yaw),
                          bevel=bevel, bevel_segments=seg, smooth_angle=smooth)
             o['kit'] = self.name
+            if smooth == self.STREAK:
+                tag = o.data.attributes.new('streak', 'INT', 'FACE')
+                tag.data.foreach_set('value', [1] * len(o.data.polygons))
             made.append(o)
         self.b = {}
         return made
@@ -325,14 +380,31 @@ def lib_descendants(o):
 def ensure_mats():
     """One-off materials this family adds to the shared palette."""
     mat('window_glow', color=(0.10, 0.06, 0.03), metallic=0.0, roughness=0.2, emissive=(1.0, 0.55, 0.22), strength=0.4)
-    mat('hab_liner', color=(0.70, 0.69, 0.65), metallic=0.0, roughness=0.9)
-    mat('hab_liner_b', color=(0.36, 0.36, 0.355), metallic=0.0, roughness=0.9)
+    # (the liner and the floor tiles are lighter than they read: painted wear only darkens, and these
+    # values keep the room, on average, as light as it was before it was painted)
+    mat('hab_liner', color=(0.855, 0.845, 0.80), metallic=0.0, roughness=0.92)
+    mat('hab_liner_b', color=(0.47, 0.47, 0.465), metallic=0.0, roughness=0.92)
     mat('hab_skin_b', color=(0.60, 0.565, 0.50), metallic=0.0, roughness=0.9)
     mat('tarp', color=(0.62, 0.56, 0.42), metallic=0.0, roughness=0.55)
     mat('hab_strap', color=(0.115, 0.11, 0.105), metallic=0.0, roughness=0.85)
     mat('torn_liner', color=(0.70, 0.69, 0.65), metallic=0.0, roughness=0.9)
     mat('torn_skin', color=(0.72, 0.68, 0.60), metallic=0.0, roughness=0.9)
-    mat('light_grow', color=(0.9, 0.25, 0.6), metallic=0.0, roughness=0.4, emissive=(1.0, 0.16, 0.55), strength=1.6)
+    # grow lights: the emitter strip is the bright core, the reflector round it only glows
+    mat('light_grow', color=(0.9, 0.45, 0.7), metallic=0.0, roughness=0.4, emissive=(1.0, 0.50, 0.80), strength=2.4)
+    mat('light_grow_soft', color=(0.45, 0.10, 0.28), metallic=0.0, roughness=0.5, emissive=(1.0, 0.16, 0.55), strength=0.6)
+    # the diffuser of a ceiling fixture (the tubes in front of it are light_white); the game drives both
+    # (dark under its glow: the game hangs a point light a hand's breadth below each fixture)
+    mat('light_white_dif', color=(0.10, 0.095, 0.085), metallic=0.0, roughness=0.6, emissive=(1.0, 0.90, 0.74), strength=0.62)
+    # what a porthole shows from inside: daylight on the sky and the ground (the part `window_view`)
+    mat('window_glow_sky', color=(0.10, 0.07, 0.05), metallic=0.0, roughness=0.6, emissive=(0.92, 0.60, 0.33), strength=0.9)
+    mat('window_glow_ground', color=(0.08, 0.05, 0.03), metallic=0.0, roughness=0.8, emissive=(0.60, 0.28, 0.13), strength=0.8)
+    # floor tiles: the base colour is the dust that gets trodden in; paint darkens it to the coating
+    mat('hab_tile', color=(0.36, 0.31, 0.27), metallic=0.1, roughness=0.72)
+    mat('hab_tile_worn', color=(0.36, 0.31, 0.27), metallic=0.25, roughness=0.44)
+    mat('worn_edge', color=(0.50, 0.50, 0.49), metallic=0.55, roughness=0.40)      # paint rubbed through to metal
+    mat('painted_board', color=(0.105, 0.12, 0.135), metallic=0.1, roughness=0.6)   # the tool board: dark, the task light is close
+    # door glazing: dark and not mirror-smooth (as polished metal it reflected the sky as a white disc)
+    mat('glass_dark', color=(0.012, 0.017, 0.024), metallic=0.0, roughness=0.5)
     mat('hab_floor', color=(0.215, 0.22, 0.225), metallic=0.1, roughness=0.7)
     mat('hab_floor_b', color=(0.15, 0.155, 0.16), metallic=0.1, roughness=0.7)
     mat('painted_green', color=(0.08, 0.34, 0.14), metallic=0.1, roughness=0.5)
@@ -398,9 +470,10 @@ def roof_z_in(rho):
     return Z0_IN + C_IN * math.sqrt(max(0.0, 1 - (rho / A_IN) ** 2))
 
 
-def lobed_shell(bm, rows, amps, cols, sign=1.0, offset=0.0, skip=None, mat_fn=None, flip=False):
+def lobed_shell(bm, rows, amps, cols, sign=1.0, offset=0.0, skip=None, mat_fn=None, flip=False, skip_cell=None):
     """A surface of revolution made of N_GORE gores that bulge between the ribs.
-    rows: [(r, z, nr, nz)] along the meridian at a rib; amps: bulge at mid-gore for each row."""
+    rows: [(r, z, nr, nz)] along the meridian at a rib; amps: bulge at mid-gore for each row.
+    skip(g, i) leaves out band i of gore g; skip_cell(g, i, c) leaves out one column of it."""
     n = N_GORE * cols
     grid = []
     for (r, z, nr, nz), amp in zip(rows, amps):
@@ -416,6 +489,8 @@ def lobed_shell(bm, rows, amps, cols, sign=1.0, offset=0.0, skip=None, mat_fn=No
         for j in range(n):
             g = j // cols
             if skip and skip(g, i):
+                continue
+            if skip_cell and skip_cell(g, i, j % cols):
                 continue
             quad = (grid[i][j], grid[i][(j + 1) % n], grid[i + 1][(j + 1) % n], grid[i + 1][j])
             f = bm.faces.new(tuple(reversed(quad)) if flip else quad)
@@ -789,6 +864,52 @@ def handwheel(K, loc, r=0.07, facing=(0, -1, 0), m='painted_red', stem=0.06):
     K.tube('steel', [Vector(loc), c + f * 0.012], r * 0.16, seg=4)
 
 
+def label(K, loc, w=0.14, h=0.08, m='plastic_white', ink='painted_dark', lines=2, facing=0.0):
+    """A stuck-on label or data plate on a face that looks along local -Y (turned by `facing`
+    about Z): a plate and a few bars of print. `loc` is its centre, a couple of millimetres proud."""
+    x, y, z = loc
+    rot = (math.pi / 2, 0, facing)
+    c, s = math.cos(facing), math.sin(facing)
+    K.plate(m, w, h, loc, rot)
+    for i in range(lines):
+        lw = w * (0.76 if i % 2 == 0 else 0.5)
+        dx = (lw - w * 0.76) / 2
+        zz = z + h * 0.8 * (0.5 - (i + 0.5) / lines)
+        K.plate(ink, lw, h * 0.6 / lines * 0.42, (x + dx * c + 0.0015 * s, y + dx * s - 0.0015 * c, zz), rot)
+
+
+def streaks(K, m, at, toward, u0, u1, z, n=3, length=0.2, seed=0):
+    """Dirt that has run down a flat face from under a vent or a bezel: n thin wedges hanging from
+    the line u0..u1 at height z. at(u, v) gives the point of the face at u across and v up, a
+    couple of millimetres proud; `m` is the material of that face. A wedge is one triangle in
+    the face's own material: paint_wear darkens its upper edge and leaves its tip alone, so it
+    fades into the face."""
+    rng = random.Random(seed)
+    bm = K.bm(m, 0.0, 1, K.STREAK)
+    for i in range(n):
+        uc = u0 + (u1 - u0) * (i + rng.uniform(0.2, 0.8)) / n
+        w, ln = rng.uniform(0.010, 0.024), length * rng.uniform(0.45, 1.0)
+        face_to(bm, [at(uc - w, z), at(uc + w, z), at(uc + rng.uniform(-0.4, 0.4) * w, z - ln)], toward)
+
+
+def hazard_band(K, x0, x1, y, z, h=0.05, pitch=0.11, facing=0.0, origin=(0.0, 0.0)):
+    """A yellow band with black diagonals on a face that looks along local -Y (turned by `facing`
+    about the point `origin`), from x0 to x1 at height z."""
+    c, s = math.cos(facing), math.sin(facing)
+
+    def P(px, py, pz):
+        return (origin[0] + px * c - py * s, origin[1] + px * s + py * c, pz)
+    toward = (s, -c, 0)
+    face_to(K.open('painted_yellow'), [P(x0, y, z - h / 2), P(x1, y, z - h / 2), P(x1, y, z + h / 2), P(x0, y, z + h / 2)], toward)
+    bm = K.open('painted_dark')
+    n = max(1, round((x1 - x0) / pitch))
+    for k in range(n):
+        xa = x0 + (x1 - x0) * k / n
+        w = (x1 - x0) / n
+        face_to(bm, [P(xa + w * 0.10, y - 0.0015, z - h / 2), P(xa + w * 0.55, y - 0.0015, z - h / 2),
+                     P(xa + w * 0.90, y - 0.0015, z + h / 2), P(xa + w * 0.45, y - 0.0015, z + h / 2)], toward)
+
+
 def crate(K, size, loc, body='painted_white', lid='painted_orange', yaw=0.0, bevel=0.016):
     """A latched equipment case sitting on z = loc.z."""
     w, d, h = size
@@ -801,6 +922,9 @@ def crate(K, size, loc, body='painted_white', lid='painted_orange', yaw=0.0, bev
     for sx in (-0.28, 0.28):
         px, py = sx * w, -d / 2 - 0.008
         add_box(K.bm('steel', 0.0), (0.05, 0.016, 0.085), (x + px * c - py * s, y + px * s + py * c, z + h * 0.74), rot=rot)
+    if h > 0.25:                                    # a contents label on the front
+        py = -d / 2 - 0.003
+        label(K, (x - py * s, y + py * c, z + h * 0.36), w=min(0.2, w * 0.3), h=min(0.11, h * 0.26), facing=yaw)
 
 
 def ctb(K, size, loc, yaw=0.0, label=None, m='suit_white', tilt=0.0):
@@ -849,8 +973,10 @@ def door_leaf(root, name, x_c, y_c, side, accent):
         rot = (0, 0, 0) if fy > 0 else (0, 0, math.pi)
         D.lathe('painted_grey', [(0.215, 0.0), (0.215, 0.022), (0.195, 0.03), (0.165, 0.03), (0.155, 0.012)],
                 loc=(cx, yf, cz), seg=14, axis='Y', rot=rot, cap_start=False, cap_end=False)
-        D.lathe('glass_dark', [(0.0, 0.012), (0.158, 0.012)], loc=(cx, yf, cz), seg=14, axis='Y', rot=rot,
-                cap_start=False, cap_end=False, smooth=30.0)
+        face_to(D.open('glass_dark'), [(cx + 0.158 * math.cos(TAU * k / 14), yf + fy * 0.012, cz + 0.158 * math.sin(TAU * k / 14))
+                                       for k in range(14)], (0, fy, 0))
+        streaks(D, 'painted_white', lambda u, v: (cx + u, yf + fy * 0.0025, v), (0, fy, 0), -0.16, 0.16, cz - 0.21, n=3, length=0.25,
+                seed=int(3 + side + 5 * fy + 11 * abs(y_c)))
         D.handle('painted_grey', (xm + side * 0.23, yf, 0.92), (xm + side * 0.23, yf, 1.30), (0, fy * 0.065, 0), r=0.014)
         add_box(D.bm('painted_dark', 0.0), (0.16, 0.008, 0.07), (side * 0.30, yf + fy * 0.003, 1.33))
     D.finish()
@@ -942,8 +1068,12 @@ def hab_airlock(root, interior):
         for i in range(4):
             add_box(K.bm('painted_grey', 0.0), (0.03, 0.46, 0.012), (sx * (AXI - 0.022), yc + sx * 0.9, 2.37 + i * 0.035))
     for y in (yc - 0.75, yc + 0.75):
+        # a tube under a white reflector plate: the tube is the lit part
         K.box('painted_grey', (1.3, 0.24, 0.05), (0, y, ACEIL - 0.025), bevel=0.008)
-        add_box(K.bm('light_white', 0.0), (1.2, 0.16, 0.012), (0, y, ACEIL - 0.055))
+        add_box(K.bm('painted_white', 0.0), (1.2, 0.17, 0.008), (0, y, ACEIL - 0.054))
+        for sx in (-0.56, 0.56):
+            add_box(K.bm('painted_dark', 0.0), (0.03, 0.04, 0.04), (sx, y, ACEIL - 0.07))
+        K.cyl('light_white', 0.017, 1.1, (0, y, ACEIL - 0.078), seg=6, axis='X', caps=False)
     anchor('lamp_airlock', root, loc=(0, yc, ACEIL - 0.25))
     # inner-door control panel and a pressure gauge on the Hab-end wall, inside the airlock
     K.box('painted_grey', (0.34, 0.05, 0.5), (1.55, y_b - 0.025, 1.35), bevel=0.012)
@@ -1055,7 +1185,11 @@ def hab_airlock(root, interior):
 # ----------------------------------------------------------------------------------------------
 IN_WALL = ((-0.02, 0), (0.80, 1), (1.56, 0), (2.14, 1), (HEAD_Z, 0), (Z0_IN, 0))
 IN_ROOF = ((10, 1), (20, 0), (30, 1), (40, 0), (49, 1), (58, 0), (65, 1), (72, 0), (77, 1), (82, 0))
+LINER_EXTRA_Z = (0.30, 1.18)         # two more edge loops on the wall, lying on the same surface: they carry paint
+LINER_BANDS_Z = (1.56, HEAD_Z, Z0_IN)    # the pinched rows of the wall: a quilt panel lies between two of them
+LINER_BANDS_DEG = (20, 40, 58, 72)       # ... and those of the roof
 TRUSS_R, TRUSS_Z = 3.8, 5.0
+PORT_R_GLASS, PORT_R_VIEW = 8.262, 8.60  # a porthole's pane and the view behind it, as radii from the Hab's axis
 
 
 def hab_interior_shell(interior):
@@ -1066,7 +1200,7 @@ def hab_interior_shell(interior):
     amps = [in_amp(r, z) * b for (r, z, _, _), b in zip(rows, [b for _, b in IN_WALL] + [b for _, b in IN_ROOF])]
     bm = bm_new()
     lobed_shell(bm, rows, amps, 4, sign=-1.0, skip=lambda g, i: g == 0 and i < 4, flip=True, mat_fn=lambda g, i: 1 if i < 2 else 0)
-    o = mesh_obj('liner', bm, ['hab_liner', 'hab_liner_b'], parent=interior, smooth_angle=30.0)
+    o = mesh_obj('liner', liner_for_paint(bm), ['hab_liner', 'hab_liner_b'], parent=interior, smooth_angle=30.0)
     o['kit'] = 'liner'
     # seam tapes at the pinched rows
     bm = bm_new()
@@ -1149,9 +1283,20 @@ def hab_interior_shell(interior):
         mid = (a + b) / 2
         rot = (0, 0, ang + math.pi / 2)
         if i % 2 == 0:
-            # main fixture: housing, diffuser, end caps
+            # main fixture: a housing with a soft diffuser let into its underside, and in front of
+            # that two tubes in end holders: the tubes are the bright part, the panel only glows
+            # (its underside is a dark baffle: the game's light for this fixture hangs just below it,
+            # and a white underside so close to it burns out)
             K.box('painted_white', (1.7, 0.46, 0.10), mid + Vector((0, 0, TRUSS_Z - 0.10)), rot=rot, bevel=0.02)
-            K.box('light_white', (1.56, 0.34, 0.03), mid + Vector((0, 0, TRUSS_Z - 0.16)), rot=rot, bevel=0.008)
+            K.box('painted_dark', (1.72, 0.48, 0.018), mid + Vector((0, 0, TRUSS_Z - 0.157)), rot=rot, bevel=0.0)
+            tv, ov = Vector((-math.sin(ang), math.cos(ang), 0)), Vector((math.cos(ang), math.sin(ang), 0))
+            zd = Vector((0, 0, TRUSS_Z - 0.1675))
+            face_to(K.open('light_white_dif'), [mid + tv * a + ov * b + zd for a, b in ((-0.78, -0.17), (0.78, -0.17), (0.78, 0.17), (-0.78, 0.17))],
+                    (0, 0, -1))
+            for s in (-0.085, 0.085):
+                K.cyl('light_white', 0.019, 1.44, mid + ov * s + Vector((0, 0, TRUSS_Z - 0.19)), seg=6, axis='X', rot=rot, caps=False)
+            for s in (-0.735, 0.735):
+                K.box('painted_dark', (0.045, 0.30, 0.05), mid + tv * s + Vector((0, 0, TRUSS_Z - 0.188)), rot=rot, bevel=0.0)
             for s in (-0.6, 0.6):
                 off = Vector((-math.sin(ang), math.cos(ang), 0)) * s
                 K.tube('steel', [mid + off + Vector((0, 0, TRUSS_Z - 0.05)), mid + off + Vector((0, 0, TRUSS_Z))], 0.008, seg=4)
@@ -1242,22 +1387,261 @@ def hab_interior_shell(interior):
     for y in (3.2, 0.8, -1.6):
         for x in (-5.2, -3.2):
             for dy in (-0.42, 0.42):
-                K.box('painted_grey', (1.46, 0.13, 0.05), (x, y + dy, GZ + 0.03), bevel=0.008)
-                add_box(K.bm('light_grow', 0.0), (1.38, 0.085, 0.012), (x, y + dy, GZ))
+                grow_light(K, x, y + dy, GZ)
             anchor(f'lamp_grow_{gi}', interior, loc=(x, y, GZ - 0.15))
             gi += 1
     K.tube('plastic_black', sag((-5.2, 4.25, GZ + 0.11), (-6.95, 4.02, 2.58), 0.2, 5), 0.012, seg=4)
 
     # --- inside faces of the windows ------------------------------------------------------------
+    view = K.part('window_view')                    # what is seen through them: a part, so the game can dim it
+    for g in WINDOWS:
+        porthole(K, view, g)
+    view.finish()
+    K.finish()
+
+
+def liner_for_paint(quads):
+    """The liner with more vertices to carry paint and a hole behind each porthole, without moving
+    its surface: it is first cut into the very triangles the exporter would write (hab_comforts
+    is fitted to those by ray casting), and every cut after that lies in them. Two level cuts
+    round the wall hold the soiling near the floor; each porthole's hole ends inside the window
+    frame, where its edge cannot be seen."""
+    me = bpy.data.meshes.new('liner_quads')
+    quads.to_mesh(me)
+    quads.free()
+    me.calc_loop_triangles()
+    bm = bm_new()
+    vs = [bm.verts.new(v.co) for v in me.vertices]
+    for t in me.loop_triangles:
+        bm.faces.new([vs[i] for i in t.vertices]).material_index = t.material_index
+    bpy.data.meshes.remove(me)
+    for z in LINER_EXTRA_Z:
+        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-5, plane_co=(0, 0, z), plane_no=(0, 0, 1))
+    n, hole = 10, 0.305
     for g in WINDOWS:
         th = gore_mid(g)
-        R0 = 8.30
-        rot = (0, rad(-90), th)
-        K.lathe('painted_grey', [(0.37, -0.16), (0.37, 0.05), (0.35, 0.075), (0.30, 0.075), (0.275, 0.035)],
-                loc=pol(R0, th, WIN_Z), seg=12, rot=rot, cap_start=False, cap_end=False, smooth=50.0)
-        K.lathe('glass_dark', [(0.0, 0.035), (0.277, 0.035)], loc=pol(R0, th, WIN_Z), seg=12, rot=rot,
-                cap_start=False, cap_end=False, smooth=30.0)
-    K.finish()
+        er, et = Vector((math.cos(th), math.sin(th), 0)), Vector((-math.sin(th), math.cos(th), 0))
+        axis = lambda p: Vector((p.dot(et), p.z - WIN_Z))  # noqa: E731  (where p is, seen along the window's axis)
+        planes = [(et * math.cos(TAU * k / n) + Vector((0, 0, math.sin(TAU * k / n)))) for k in range(n)]
+        near = lambda f: f.calc_center_median().dot(er) > 4.0 and axis(f.calc_center_median()).length < 0.85  # noqa: E731
+        for nrm in planes:
+            faces = [f for f in bm.faces if near(f)]
+            geom = set(faces) | {e for f in faces for e in f.edges} | {v for f in faces for v in f.verts}
+            bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-5, plane_co=Vector((0, 0, WIN_Z)) + nrm * hole, plane_no=nrm)
+        inside = [f for f in bm.faces if near(f) and all((f.calc_center_median() - Vector((0, 0, WIN_Z))).dot(nrm) < hole for nrm in planes)]
+        bmesh.ops.delete(bm, geom=inside, context='FACES')
+        faces = [f for f in bm.faces if near(f)]
+        bmesh.ops.dissolve_limit(bm, angle_limit=rad(0.05), verts=list({v for f in faces for v in f.verts}),
+                                 edges=list({e for f in faces for e in f.edges}), delimit={'MATERIAL'})
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    return bm
+
+
+def grow_light(K, x, y, z, length=1.46):
+    """One LED grow bar along X, its rim at height z: a shallow reflector housing, and slung just
+    under it the emitter strip between two end holders. The strip is the bright core (light_grow);
+    the inside of the reflector and the lip only glow (light_grow_soft)."""
+    sec = ((-0.070, 0.004), (-0.036, 0.052), (0.036, 0.052), (0.070, 0.004),       # outside, left to right over the top
+           (0.058, 0.004), (0.026, 0.034), (-0.026, 0.034), (-0.058, 0.004))       # the trough, right to left
+    h = length / 2
+    P = lambda k, sx: Vector((x + sx * h, y + sec[k % 8][0], z + sec[k % 8][1]))  # noqa: E731
+    shell, glow = K.open('painted_grey'), K.open('light_grow_soft')
+    for k in range(8):
+        a, b = sec[k], sec[(k + 1) % 8]
+        mid = Vector((0, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2))
+        inside = k in (3, 4, 5, 6, 7)                # the lip and the trough look down into the light
+        toward = Vector((0, -mid.y, -0.02 - mid.z)) if k in (4, 5, 6) else (Vector((0, 0, -1)) if inside else mid - Vector((0, 0, 0.03)))
+        face_to(glow if inside else shell, [P(k, -1), P(k, 1), P(k + 1, 1), P(k + 1, -1)], toward)
+    for sx in (-1, 1):
+        face_to(shell, [P(k, sx) for k in range(8)], (sx, 0, 0))
+        add_box(K.bm('painted_dark', 0.0), (0.035, 0.034, 0.05), (x + sx * (h - 0.05), y, z + 0.011))
+    K.cyl('light_grow', 0.008, length - 0.13, (x, y, z - 0.002), seg=6, axis='X', caps=False)
+
+
+def porthole(K, V, g):
+    """The inside of the window in gore g: the frame standing proud of the liner, a gasket and a
+    pane (glass_clear), a reveal running out through the wall, and at its end the view: Mars in
+    daylight, a sky and a ground with a different skyline in each window. The view is built into
+    the kit V (the part `window_view`), in two emissive materials."""
+    th = gore_mid(g)
+    er, et, ez = Vector((math.cos(th), math.sin(th), 0)), Vector((-math.sin(th), math.cos(th), 0)), Vector((0, 0, 1))
+    inward = -er
+
+    def at(r, u, v):
+        return er * r + et * u + ez * (WIN_Z + v)
+
+    def ring(r, rad_, n=12, phase=0.0):
+        return [at(r, rad_ * math.cos(phase + TAU * k / n), rad_ * math.sin(phase + TAU * k / n)) for k in range(n)]
+    K.lathe('painted_grey', [(0.37, -0.16), (0.37, 0.05), (0.35, 0.075), (0.30, 0.075), (0.275, 0.035)],
+            loc=pol(8.30, th, WIN_Z), seg=12, rot=(0, rad(-90), th), cap_start=False, cap_end=False, smooth=50.0)
+    n = 12
+    # reveal: the tube through the wall, seen from inside it
+    r0, r1 = ring(PORT_R_GLASS + 0.004, 0.276, n), ring(PORT_R_VIEW, 0.264, n)
+    bm = K.open('painted_white', smooth=51.0)
+    for k in range(n):
+        c = (r0[k] + r0[(k + 1) % n]) / 2
+        face_to(bm, [r0[k], r0[(k + 1) % n], r1[(k + 1) % n], r1[k]], at(PORT_R_GLASS, 0, 0) - c)
+    # gasket and pane
+    g0, g1 = ring(PORT_R_GLASS - 0.004, 0.284, n), ring(PORT_R_GLASS - 0.004, 0.250, n)
+    bm = K.open('rubber')
+    for k in range(n):
+        face_to(bm, [g0[k], g0[(k + 1) % n], g1[(k + 1) % n], g1[k]], inward)
+    face_to(K.open('glass_clear'), ring(PORT_R_GLASS, 0.262, n), inward)
+    # the view: a disc at the outer end of the reveal, split along a skyline
+    rng = random.Random(40 + g)
+    rv = 0.266
+    h0 = -0.045 + rng.uniform(-0.015, 0.02)
+    mesa = rng.uniform(-0.12, 0.12)
+    sky_line = []
+    for k in range(1, 6):
+        u = -rv * 0.86 + rv * 1.72 * (k - 1) / 4
+        bump = 0.034 * max(0.0, 1 - abs(u - mesa) / 0.13) + rng.uniform(0.0, 0.012)
+        sky_line.append((u, h0 + bump))
+    aR, aL = math.asin(h0 / rv), math.pi - math.asin(h0 / rv)
+    arc = lambda a0, a1, m: [(rv * math.cos(a0 + (a1 - a0) * k / m), rv * math.sin(a0 + (a1 - a0) * k / m)) for k in range(m + 1)]  # noqa: E731
+    sky = arc(aR, aL, 7) + sky_line
+    ground = arc(aL, aR + TAU, 6) + sky_line[::-1]
+    face_to(V.open('window_glow_sky'), [at(PORT_R_VIEW, u, v) for u, v in sky], inward)
+    face_to(V.open('window_glow_ground'), [at(PORT_R_VIEW, u, v) for u, v in ground], inward)
+
+
+TILE_GAP, TILE_BORDER = 0.011, 0.17      # half the joint between two tiles; the band along a tile's edge where grime lies
+
+# Where feet go: (centre line, half width, how much) for the ways across the floor, and discs
+# (centre, radius, how much) for the places people stand about. Paint and roughness follow them.
+WEAR_PATHS = (
+    (((0.0, -8.3), (0.0, -0.4)), 1.30, 1.0),                    # door to the hub: the main aisle
+    (((0.0, -0.4), (0.0, 5.2)), 0.95, 0.85),                    # hub to the comms desk
+    (((1.2, 0.3), (4.3, 2.75)), 0.75, 0.8),                     # oxygenator
+    (((1.5, -0.2), (4.5, 0.3)), 0.70, 0.8),                     # water reclaimer
+    (((1.3, -1.0), (4.2, -2.0)), 0.70, 0.7),                    # hydrazine rig
+    (((0.8, -3.0), (3.3, -3.9)), 0.70, 0.8),                    # food shelf
+    (((-0.6, 2.4), (-2.6, 4.2), (-3.4, 4.3)), 0.70, 0.7),       # bunk
+    (((-2.0, -3.0), (-2.0, 4.4)), 0.62, 0.9),                   # along the farm trays
+    (((-0.9, -1.6), (-3.3, -3.0)), 0.70, 0.75),                 # workbench
+    (((0.6, -6.6), (2.2, -6.9)), 0.60, 0.6),                    # lockers
+    (((-0.6, -6.6), (-2.3, -6.8)), 0.60, 0.7),                  # suit rack
+)
+WEAR_DISCS = (((0.0, -0.4), 2.1, 0.9), ((1.75, 2.35), 1.5, 0.5))
+# Stains, each inside one tile: (x, y, radius, kind, phase). See floor_paint for what the kinds look like.
+FLOOR_STAINS = (
+    (4.74, -2.14, 0.27, 'scorch', 0.4), (4.72, 0.34, 0.28, 'water', 2.1), (-3.74, -3.16, 0.24, 'oil', 1.3),
+    (-1.80, 1.26, 0.23, 'soil', 3.0), (2.76, 1.30, 0.21, 'spill', 0.9), (4.70, 2.78, 0.20, 'water', 4.4),
+    (3.72, -4.12, 0.18, 'spill', 5.2), (0.78, -3.18, 0.15, 'oil', 2.7), (-1.76, -1.2, 0.2, 'soil', 0.2),
+)
+# Marks where cases were dragged: (from, to, width)
+FLOOR_SCRATCHES = (
+    ((-2.75, -5.85), (-1.15, -7.05), 0.024), ((-2.5, -5.6), (-0.95, -6.8), 0.02), ((0.52, -7.5), (0.9, -6.3), 0.02),
+    ((2.9, -3.55), (2.2, -2.5), 0.022), ((3.1, -3.6), (2.45, -2.6), 0.018), ((-0.9, -2.2), (-0.45, -1.0), 0.02),
+    ((3.4, 0.9), (2.7, 1.9), 0.018), ((-0.8, 3.2), (-0.5, 4.3), 0.02),
+)
+
+
+# Boot prints in tracked-in dust: the ways walked from the airlock door, as (points, how far they go on)
+FOOT_TRAILS = ((((0.92, -7.95), (0.95, -5.0), (1.25, -3.3)), 4.9), (((-0.55, -7.9), (-1.05, -7.35), (-2.3, -6.95)), 2.2),
+               (((0.5, -7.9), (1.6, -7.3), (2.3, -6.95)), 1.6))
+BOOT_SOLE = ((-0.050, 0.020), (-0.057, 0.090), (-0.040, 0.150), (0.0, 0.165), (0.040, 0.150), (0.057, 0.090), (0.050, 0.020), (0.0, 0.0))
+BOOT_HEEL = ((-0.042, -0.140), (0.042, -0.140), (0.046, -0.060), (0.0, -0.035), (-0.046, -0.060))
+
+
+def boot_prints():
+    """Where each print lies: (x, y, heading). Alternate feet along FOOT_TRAILS, a little unevenly;
+    a print that would straddle a joint between tiles is left out."""
+    xs, ys = floor_grid()
+    rng = random.Random(77)
+    out = []
+    for pts, reach in FOOT_TRAILS:
+        pts = [Vector((x, y, 0)) for x, y in pts]
+        seg, done, d, side = 0, 0.0, 0.12, 1
+        while seg < len(pts) - 1 and done + d < reach + 1e-6:
+            a, b = pts[seg], pts[seg + 1]
+            ln = (b - a).length
+            if d > ln:
+                d -= ln
+                done += ln
+                seg += 1
+                continue
+            u = (b - a) / ln
+            p = a + u * d + Vector((u.y, -u.x, 0)) * (side * 0.13) + Vector((rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03), 0))
+            if min(abs(p.x - v) for v in xs) > 0.085 and min(abs(p.y - v) for v in ys) > 0.19:
+                out.append((p.x, p.y, math.atan2(u.y, u.x) - math.pi / 2 - side * rad(7) + rng.uniform(-0.08, 0.08)))
+            d += 0.40 + rng.uniform(-0.04, 0.05)
+            side = -side
+    return out
+
+
+def floor_grid():
+    """The joint lines of the floor tiles, in x and in y."""
+    def lines(lo, hi, fixed):
+        out = sorted(set(fixed))
+        while out[0] > lo:
+            out.insert(0, round(out[0] - 1.0, 3))
+        while out[-1] < hi:
+            out.append(round(out[-1] + 1.0, 3))
+        return out
+    return lines(-8.3, 8.3, [-0.25, 0.25]), lines(-8.3, 8.3, [-0.65, -0.15, 0.8, 1.75, 2.25])
+
+
+def floor_wear(xy):
+    """How worn the floor is at each point of xy (an n x 2 array), 0..1."""
+    xy = np.asarray(xy, dtype=np.float64).reshape(-1, 2)
+    out = np.zeros(len(xy))
+    for pts, hw, k in WEAR_PATHS:
+        d = np.full(len(xy), 1e9)
+        for a, b in zip(pts, pts[1:]):
+            a, b = np.array(a), np.array(b)
+            t = np.clip(((xy - a) @ (b - a)) / ((b - a) @ (b - a)), 0.0, 1.0)
+            d = np.minimum(d, np.linalg.norm(xy - (a + t[:, None] * (b - a)), axis=1))
+        out = np.maximum(out, k * smooth01((1.0 - d / hw) / 0.65))
+    for c, r, k in WEAR_DISCS:
+        d = np.linalg.norm(xy - np.array(c), axis=1)
+        out = np.maximum(out, k * smooth01((1.0 - d / r) / 0.5))
+    return out
+
+
+def stain_radius(st, ang):
+    """The ragged outline of a stain: its radius in the direction ang."""
+    _, _, r, _, ph = st
+    return r * (1.0 + 0.2 * np.sin(2 * ang + ph) + 0.11 * np.sin(3 * ang + 2.3 * ph))
+
+
+def tile_top(bm, x0, x1, y0, y1, z, stain=None):
+    """The top of a whole tile: a border band round an inner field, so that paint can lie along
+    the joints. A stained tile carries the stain's outline as two more rings of vertices.
+    Returns the outer corners (the skirt hangs from them)."""
+    ox0, ox1, oy0, oy1 = x0 + TILE_GAP, x1 - TILE_GAP, y0 + TILE_GAP, y1 - TILE_GAP
+    b = min(TILE_BORDER, (ox1 - ox0) * 0.3, (oy1 - oy0) * 0.3)
+    if stain:
+        b = min(b, 0.07)
+    ov = [bm.verts.new(p + (z,)) for p in ((ox0, oy0), (ox1, oy0), (ox1, oy1), (ox0, oy1))]
+    ic = [(ox0 + b, oy0 + b), (ox1 - b, oy0 + b), (ox1 - b, oy1 - b), (ox0 + b, oy1 - b)]
+    if not stain:
+        iv = [bm.verts.new(p + (z,)) for p in ic]
+        for k in range(4):
+            bm.faces.new((ov[k], ov[(k + 1) % 4], iv[(k + 1) % 4], iv[k]))
+        bm.faces.new(iv)
+        return ov
+    ring = []
+    for k in range(4):
+        (ax, ay), (bx, by) = ic[k], ic[(k + 1) % 4]
+        ring += [(ax, ay), ((ax + bx) / 2, (ay + by) / 2)]
+    iv = [bm.verts.new(p + (z,)) for p in ring]
+    for k in range(4):
+        bm.faces.new((ov[k], ov[(k + 1) % 4], iv[(2 * k + 2) % 8], iv[2 * k + 1], iv[2 * k]))
+    cx, cy = stain[0], stain[1]
+    edge, core = [], []
+    for px, py in ring:
+        d = math.hypot(px - cx, py - cy)
+        r = min(float(stain_radius(stain, math.atan2(py - cy, px - cx))), 0.88 * d)
+        edge.append(bm.verts.new((cx + (px - cx) / d * r, cy + (py - cy) / d * r, z)))
+        core.append(bm.verts.new((cx + (px - cx) / d * r * 0.55, cy + (py - cy) / d * r * 0.55, z)))
+    c = bm.verts.new((cx, cy, z))
+    for k in range(8):
+        n = (k + 1) % 8
+        bm.faces.new((iv[k], iv[n], edge[n], edge[k]))
+        bm.faces.new((edge[k], edge[n], core[n], core[k]))
+        bm.faces.new((core[k], core[n], c))
+    return ov
 
 
 def hab_floor(interior):
@@ -1266,19 +1650,9 @@ def hab_floor(interior):
     circle = [(8.14 * math.cos(TAU * i / 72), 8.14 * math.sin(TAU * i / 72)) for i in range(72)]
     # sub-floor seen through the seams and the grates
     add_poly(K.open('void'), [(x, y, z - 0.03) for x, y in circle])
-
-    def lines(lo, hi, fixed):
-        out = sorted(set(fixed))
-        while out[0] > lo:
-            out.insert(0, round(out[0] - 1.0, 3))
-        while out[-1] < hi:
-            out.append(round(out[-1] + 1.0, 3))
-        return out
-    xs = lines(-8.3, 8.3, [-0.25, 0.25])
-    ys = lines(-8.3, 8.3, [-0.65, -0.15, 0.8, 1.75, 2.25])
-    rng = random.Random(5)
-    tiles = K.open('hab_floor', smooth=30.0)
-    tiles_b = K.open('hab_floor_b', smooth=30.0)
+    xs, ys = floor_grid()
+    tiles = K.open('hab_tile', smooth=30.0)
+    tiles_worn = K.open('hab_tile_worn', smooth=30.0)
     trench = []
     for i in range(len(xs) - 1):
         for j in range(len(ys) - 1):
@@ -1296,11 +1670,17 @@ def hab_floor(interior):
             if spine or ew:
                 trench.append((x0, x1, y0, y1, spine, poly))
                 continue
-            top = inset_poly(poly, 0.011)
-            bm = tiles_b if rng.random() < 0.14 else tiles
-            tv = [bm.verts.new((x, y, z)) for x, y in top]
+            # a tile on one of the ways across the room is worn smooth (its own material: roughness
+            # is per material); the colour of every tile is painted afterwards (floor_paint)
+            bm = tiles_worn if floor_wear([(cx, cy)])[0] > 0.5 else tiles
+            whole = len(poly) == 4 and area > 0.999 * (x1 - x0) * (y1 - y0)
+            if whole:
+                stain = next((st for st in FLOOR_STAINS if x0 < st[0] < x1 and y0 < st[1] < y1), None)
+                tv = tile_top(bm, x0, x1, y0, y1, z, stain)
+            else:
+                tv = [bm.verts.new((x, y, z)) for x, y in inset_poly(poly, TILE_GAP)]
+                bm.faces.new(tv)
             bv = [bm.verts.new((x, y, z - 0.02)) for x, y in poly]
-            bm.faces.new(tv)
             n = len(tv)
             for k in range(n):
                 bm.faces.new((tv[k], bv[k], bv[(k + 1) % n], tv[(k + 1) % n]))
@@ -1352,10 +1732,13 @@ def hab_floor(interior):
         bpy.data.meshes.remove(me)
         bmt.verts.ensure_lookup_table()
         xform(bmt, bmt.verts[n0:], (px, py, z + 0.003), rot=(0, 0, yaw))
-    # aisle lines from the door to the middle, and a ring with ticks where the trenches cross
+    # aisle lines from the door to the middle (in short lengths: the paint wears unevenly), and a
+    # ring with ticks where the trenches cross
     white = K.open('plastic_white', smooth=33.0)
     for sx in (-0.62, 0.62):
-        add_quad(white, (sx - 0.025, -7.45, z + 0.003), (sx + 0.025, -7.45, z + 0.003), (sx + 0.025, -2.35, z + 0.003), (sx - 0.025, -2.35, z + 0.003))
+        for k in range(12):
+            ya, yb = -7.45 + 0.425 * k, -7.45 + 0.425 * (k + 1)
+            add_quad(white, (sx - 0.025, ya, z + 0.003), (sx + 0.025, ya, z + 0.003), (sx + 0.025, yb, z + 0.003), (sx - 0.025, yb, z + 0.003))
     cy, n = -0.4, 72
     for i in range(n):
         a0, a1 = TAU * i / n, TAU * (i + 1) / n
@@ -1373,6 +1756,20 @@ def hab_floor(interior):
         f.normal_update()
         if f.normal.z < 0:
             f.normal_flip()
+    # boot prints in the dust that comes in through the airlock (painted to fade out: floor_paint)
+    prints = K.open('hab_tile', smooth=35.0)
+    for px, py, yaw in boot_prints():
+        c, s = math.cos(yaw), math.sin(yaw)
+        for shape in (BOOT_SOLE, BOOT_HEEL):
+            face_to(prints, [(px + u * c - v * s, py + u * s + v * c, z + 0.001) for u, v in shape], (0, 0, 1))
+    # drag marks: the coating scored through to the panel
+    scratch = K.open('hab_tile_worn', smooth=34.0)
+    for (ax, ay), (bx, by), w in FLOOR_SCRATCHES:
+        d = Vector((bx - ax, by - ay, 0)).normalized()
+        nrm = Vector((-d.y, d.x, 0)) * (w / 2)
+        a, b = Vector((ax, ay, z + 0.0014)), Vector((bx, by, z + 0.0014))
+        m = (a + b) / 2 + nrm * 0.6
+        face_to(scratch, [a, m - nrm, b, m + nrm], (0, 0, 1))
     # cables lying in the trenches
     for off, m, rr in ((-0.13, 'painted_orange', 0.018), (-0.02, 'painted_blue', 0.014), (0.1, 'painted_yellow', 0.016)):
         K.tube(m, [(off, -8.0, z - 0.012), (off, 5.6, z - 0.012)], rr, seg=4)
@@ -1494,6 +1891,11 @@ def st_oxygenator(interior):
     K.box('painted_yellow', (0.46, 0.012, 0.30), (fx, yf - 0.004, 0.72), bevel=0.0)
     K.text('painted_dark', 'O2', 0.24, (fx, yf - 0.012, 0.72))
     add_box(K.bm('painted_dark', 0.0), (0.46, 0.013, 0.03), (fx, yf - 0.004, 0.52))
+    label(K, (cx - 0.52, yf - 0.003, 1.90), w=0.12, h=0.07, m='aluminium', lines=3)       # data plate, clear of the fan bezel
+    label(K, (fx, yf - 0.003, 0.94), w=0.3, h=0.05, m='painted_red', ink='plastic_white', lines=1)
+    hazard_band(K, cx - W / 2 + 0.03, cx + W / 2 - 0.03, yf - 0.009, 0.30, h=0.07)
+    streaks(K, 'painted_white', lambda u, v: (u, yf - 0.0025, v), (0, -1, 0), cx - 0.48, cx - 0.12, 1.31, n=4, length=0.2, seed=2)
+    streaks(K, 'painted_white', lambda u, v: (cx - W / 2 - 0.0025, yb + u, v), (-1, 0, 0), -0.22, 0.22, 1.438, n=3, length=0.23, seed=5)
     # the exposed left flank: a vent, a seam and a service plate
     xl = cx - W / 2
     for i in range(6):
@@ -1639,6 +2041,9 @@ def st_reclaimer(interior):
         K.pipe(m, [(xx, by + 0.05 * i, 1.6), (xx, by + 0.05 * i, 2.42 + 0.09 * i), (xx, wy, 2.42 + 0.09 * i), (xx, wy, 0.75 + 0.2 * i)], r, seg=6, bend=0.09)
     K.box('painted_grey', (0.34, 0.05, 0.05), (bx + 0.05, yb + 1.2, 2.36), bevel=0.0)
     K.tube('steel', [(bx + 0.05, yb + 1.2, 2.38), (bx + 0.05, yb + 1.2, 3.25)], 0.008, seg=4)
+    hazard_band(K, -0.9, 0.9, yb - 0.583, 0.105, h=0.05, pitch=0.12)
+    label(K, (cxb + 0.12, cyb - 0.078, 1.63), w=0.16, h=0.036, m='aluminium', lines=2)
+    label(K, (fx, fy - 0.073, 1.66), w=0.3, h=0.06, lines=2)
     # sign on the top rail, a jerrycan and floor marks
     K.box('painted_blue', (0.74, 0.02, 0.2), (0.35, yb - 0.535, 2.0), bevel=0.004)
     K.text('plastic_white', 'WATER', 0.115, (0.35, yb - 0.548, 2.0))
@@ -1965,6 +2370,8 @@ def st_food(interior):
     for z in decks:
         K.box('painted_white', (W + 0.02, D + 0.02, 0.035), (0, yb, z), bevel=0.006)
         add_box(K.bm('painted_grey', 0.0), (W + 0.03, 0.015, 0.07), (0, yb - D / 2 - 0.012, z + 0.012))
+        for sx in (-0.62, -0.12, 0.38, 0.8):
+            K.plate('plastic_white', 0.13, 0.04, (sx, yb - D / 2 - 0.0215, z + 0.012), rot=(rad(90), 0, 0))
     for sx in (-1, 1):
         K.tube('steel', [(sx * 0.02, yb + D / 2, decks[0]), (sx * W / 2, yb + D / 2, decks[-1])], 0.01, seg=4)
         K.box('aluminium', (0.02, D, 0.05), (sx * W / 2, yb, 1.3), bevel=0.0)
@@ -2044,12 +2451,18 @@ def st_fabricator(interior):
         K.handle('steel', (0.5, Y0 + 0.04, bz - 0.52 + i * 0.18), (0.74, Y0 + 0.04, bz - 0.52 + i * 0.18), (0, -0.03, 0), r=0.007, seg=4)
     crate(K, (0.6, 0.45, 0.36), (-0.5, yb, 0.215), lid='painted_grey')
     # tool board behind, with a top shelf and a task light strip
-    K.box('painted_white', (W, 0.03, 0.95), (0, Y1 - 0.02, bz + 0.5), bevel=0.006)
+    # (the board and the shelf over it are dark, not white: the game's task light hangs a hand's
+    # breadth in front of the one and under the other)
+    K.box('painted_board', (W, 0.03, 0.95), (0, Y1 - 0.02, bz + 0.5), bevel=0.006)
     for sx in (-W / 2 + 0.03, W / 2 - 0.03):
         K.box('painted_grey', (0.05, 0.05, 1.05), (sx, Y1 - 0.02, bz + 0.5), bevel=0.0)
-    K.box('painted_grey', (W + 0.04, 0.26, 0.03), (0, Y1 - 0.12, bz + 1.0), bevel=0.006)
-    K.box('painted_grey', (1.2, 0.07, 0.035), (-0.2, Y1 - 0.2, bz + 0.965), bevel=0.0)
-    add_box(K.bm('light_white', 0.0), (1.1, 0.05, 0.01), (-0.2, Y1 - 0.2, bz + 0.944))
+    K.box('painted_dark', (W + 0.04, 0.26, 0.03), (0, Y1 - 0.12, bz + 1.0), bevel=0.006)
+    # task light: a tube in a channel under the shelf, shielded from the room by the channel's lip
+    K.box('painted_dark', (1.2, 0.07, 0.035), (-0.2, Y1 - 0.2, bz + 0.965), bevel=0.0)
+    add_box(K.bm('painted_dark', 0.0), (1.2, 0.008, 0.05), (-0.2, Y1 - 0.239, bz + 0.958))
+    for sx in (-0.57, 0.57):
+        add_box(K.bm('painted_dark', 0.0), (0.03, 0.03, 0.03), (-0.2 + sx, Y1 - 0.2, bz + 0.94))
+    K.cyl('light_white', 0.011, 1.1, (-0.2, Y1 - 0.2, bz + 0.938), seg=6, axis='X', caps=False)
     K.anchor('lamp_bench', (-0.2, Y1 - 0.25, bz + 0.85))
     ty = Y1 - 0.04
     # spanners (three sizes), hammer, screwdrivers, pliers, hacksaw, tape rolls
@@ -2187,6 +2600,7 @@ def wm_rack(K, seed=1, w=1.15, h=2.25):
     add_box(K.bm('void', 0.0), (w - 0.14, 0.012, h - 0.16), (0, -0.152, 0.1 + h / 2))
     z = 0.2
     yf = -0.16
+    below = None
     while z < h - 0.12:
         uh = rng.choice((0.18, 0.26, 0.26, 0.36))
         if z + uh > h + 0.02:
@@ -2194,8 +2608,12 @@ def wm_rack(K, seed=1, w=1.15, h=2.25):
         kind = rng.randrange(4)
         m = ('painted_grey', 'painted_white', 'painted_dark', 'painted_grey')[kind]
         add_box(K.bm(m, 0.0), (w - 0.16, 0.03, uh - 0.025), (0, yf, z + uh / 2))
+        if kind == 1 and below in ('painted_grey', 'painted_white'):          # a vented unit: dust runs onto the one below
+            streaks(K, below, lambda u, v: (u, yf - 0.0162, v), (0, -1, 0), -0.3, 0.3, z - 0.014, n=3, length=0.13, seed=seed * 7 + int(z * 50))
+        below = m
         for sx in (-1, 1):
             add_box(K.bm('steel', 0.0), (0.018, 0.03, uh - 0.08), (sx * (w / 2 - 0.13), yf - 0.03, z + uh / 2))
+        K.plate('plastic_white' if kind != 1 else 'painted_yellow', 0.07, 0.022, (w / 2 - 0.19, yf - 0.0165, z + uh - 0.035), rot=(rad(90), 0, 0))
         if kind == 0:
             add_box(K.bm('screen', 0.0), (0.3, 0.006, uh - 0.09), (-0.12, yf - 0.017, z + uh / 2))
             for i in range(3):
@@ -2252,6 +2670,9 @@ def wm_panel(K):
     for i in range(3):
         add_box(K.bm(('light_green', 'light_green', 'light_amber')[i], 0.0), (0.025, 0.012, 0.025), (-0.5 + i * 0.06, 0.006, 1.38))
     K.handle('steel', (-0.57, 0.012, 1.3), (-0.57, 0.012, 1.6), (0, -0.04, 0), r=0.008, seg=4)
+    label(K, (-0.12, 0.009, 1.84), w=0.3, h=0.09, lines=3)
+    label(K, (-0.38, 0.009, 1.1), w=0.34, h=0.04, lines=1)
+    streaks(K, 'painted_grey', lambda u, v: (u, 0.0105, v), (0, -1, 0), -0.53, -0.2, 1.18, n=3, length=0.17, seed=9)
     for i, x in enumerate((-0.5, -0.36, -0.22, -0.08)):
         K.tube('painted_grey', [(x, 0.14, 2.0), (x, 0.14, 2.46)], 0.02, seg=5)
     K.tube('painted_orange', [(-0.25, 0.14, 0.9), (-0.25, 0.14, 0.2)], 0.028, seg=5)
@@ -2292,6 +2713,8 @@ def wm_medical(K):
         K.handle('steel', (-0.3 + sx * 0.05, 0.01, 1.4), (-0.3 + sx * 0.05, 0.01, 1.6), (0, -0.03, 0), r=0.007, seg=4)
     K.box('painted_green', (0.2, 0.008, 0.06), (-0.3, 0.006, 1.2), bevel=0.0)
     K.box('painted_green', (0.06, 0.008, 0.2), (-0.3, 0.006, 1.2), bevel=0.0)
+    label(K, (-0.5, 0.007, 1.68), w=0.18, h=0.07, lines=2)
+    label(K, (-0.1, 0.007, 1.68), w=0.18, h=0.07, lines=2)
     for sx in (0.28, 0.58):
         K.tube('painted_orange', [(sx, 0.16, 0.45), (sx, 0.16, 2.1)], 0.02, seg=5)
     K.box('canvas', (0.26, 0.05, 1.5), (0.43, 0.16, 1.28), bevel=0.012)
@@ -2360,6 +2783,7 @@ def wm_tools(K):
     for i in range(4):
         add_box(K.bm('painted_red', 0.0), (0.64, 0.012, 0.15), (-0.2, -0.166, 0.22 + i * 0.18))
         add_box(K.bm('steel', 0.0), (0.5, 0.02, 0.022), (-0.2, -0.176, 0.27 + i * 0.18))
+        K.plate('plastic_white', 0.09, 0.03, (-0.43, -0.1735, 0.19 + i * 0.18), rot=(rad(90), 0, 0))
     K.box('steel', (0.72, 0.44, 0.02), (-0.2, 0.05, 0.90), bevel=0.0)
     for sx in (-0.48, 0.08):
         K.cyl('rubber', 0.05, 0.035, (sx, 0.05, 0.05), seg=8, axis='X')
@@ -2482,6 +2906,9 @@ def set_dressing(interior):
                 add_box(K.bm('painted_dark', 0.0), (0.3, 0.008, 0.018), (x, -0.142, z + k * 0.04))
         K.handle('steel', (x + 0.2, -0.14, 1.0), (x + 0.2, -0.14, 1.2), (0, -0.035, 0), r=0.008, seg=4)
         add_box(K.bm(('painted_orange', 'painted_blue', 'painted_yellow')[i], 0.0), (0.2, 0.008, 0.07), (x - 0.08, -0.142, 1.5))
+        label(K, (x - 0.08, -0.144, 1.39), w=0.2, h=0.08, lines=2)
+        streaks(K, 'painted_white', lambda u, v, x=x: (x + u, -0.1435, v), (0, -1, 0), -0.14, 0.14, 1.765, n=3, length=0.2, seed=20 + i)
+        streaks(K, 'painted_white', lambda u, v, x=x: (x + u, -0.1435, v), (0, -1, 0), -0.14, 0.14, 0.405, n=2, length=0.15, seed=30 + i)
     K.box('painted_dark', (1.82, 0.46, 0.1), (0, 0.12, 0.05), bevel=0.0)
     ctb(K, (0.55, 0.36, 0.26), (-0.5, 0.12, 2.05), label='painted_orange')
     crate(K, (0.5, 0.38, 0.28), (0.4, 0.12, 2.05), lid='painted_blue', yaw=0.05)
@@ -2769,14 +3196,404 @@ def liner_ao(co):
     return a * (0.80 + 0.20 * min(1.0, max(0.0, co.z / 0.9)))
 
 
-def finish(root, name, soften=None, paint=None, samples=40, distance=1.1):
+# ----------------------------------------------------------------------------------------------
+# Painted wear (the inside of the Hab). The game shades every model with one material: the colour
+# is the material's colour times the vertex colour, and roughness and metalness are those of the
+# material. So wear is painted into the vertex colour on top of the baked occlusion. Paint can
+# only darken, which is why the liner and the tiles start lighter than they read, and a change of
+# sheen is a change of material (a worn tile, an edge rubbed to metal). Colours are kept per face
+# corner, so one face can step in tone from the next. Everything is a function of position: it
+# needs no bookkeeping in the kits and survives any change to them.
+# ----------------------------------------------------------------------------------------------
+PAINTED = ('painted_white', 'painted_grey', 'painted_dark', 'painted_orange', 'painted_yellow', 'painted_red',
+           'painted_blue', 'painted_green', 'painted_board', 'plastic_white')
+LIGHT_PAINT = ('painted_white', 'painted_yellow', 'painted_board', 'plastic_white')
+METALS = ('aluminium', 'steel', 'copper', 'gold_foil', 'tape')
+SOFT = ('suit_white', 'suit_orange', 'suit_grey', 'canvas', 'canvas_dark', 'foam', 'tarp')
+UNPAINTED = ('light_', 'screen', 'flame', 'window_glow', 'glass_', 'void', 'visor', 'worn_edge')
+# Paint darkens what it touches by about a tenth on average. So that the room stays as light as it
+# was, the materials that get painted are defined that much lighter in this file (lift_materials),
+# and every face of them that is NOT painted (the outside of the Hab) has its vertex colour
+# divided by the same factor: it is drawn exactly as before.
+LIFT = 1.10
+LIFTED = tuple(n for n in PAINTED + METALS + SOFT if n not in ('painted_board', 'gold_foil'))
+
+
+def lift_materials():
+    """Make the LIFTED materials lighter by LIFT. Call before anything is built with them."""
+    for name in LIFTED:
+        m = mat(name)
+        bsdf = next(n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+        c = tuple(min(1.0, v * LIFT) for v in bsdf.inputs['Base Color'].default_value[:3])
+        bsdf.inputs['Base Color'].default_value = (*c, 1.0)
+        m.diffuse_color = (*c, m.diffuse_color[3])
+
+
+class Canvas:
+    """A mesh opened for painting: a colour for every face corner, starting from the occlusion."""
+
+    def __init__(self, o):
+        me = self.me = o.data
+        nv, nl, nf, ne = len(me.vertices), len(me.loops), len(me.polygons), len(me.edges)
+
+        def get(seq, name, n, dtype):
+            a = np.empty(n, dtype)
+            seq.foreach_get(name, a)
+            return a
+        mw = np.array(o.matrix_world, dtype=np.float64)
+        vpos = get(me.vertices, 'co', nv * 3, np.float32).reshape(-1, 3).astype(np.float64) @ mw[:3, :3].T + mw[:3, 3]
+        self.lv = lv = get(me.loops, 'vertex_index', nl, np.int32)
+        le = get(me.loops, 'edge_index', nl, np.int32)
+        self.ls = ls = get(me.polygons, 'loop_start', nf, np.int32)
+        self.lt = lt = get(me.polygons, 'loop_total', nf, np.int32)
+        assert (ls == np.concatenate(([0], np.cumsum(lt)[:-1]))).all()
+        self.mat = get(me.polygons, 'material_index', nf, np.int32)
+        self.names = [m.name if m else '' for m in me.materials]
+        self.lf = lf = np.repeat(np.arange(nf), lt)                  # the face of each corner
+        self.pos = pos = vpos[lv]                                    # where each corner is
+        self.centre = np.add.reduceat(pos, ls, axis=0) / lt[:, None]
+        nrm = get(me.polygons, 'normal', nf * 3, np.float32).reshape(-1, 3).astype(np.float64) @ np.linalg.inv(mw[:3, :3])
+        self.normal = nrm / np.maximum(np.linalg.norm(nrm, axis=1), 1e-9)[:, None]
+        self.area = area = get(me.polygons, 'area', nf, np.float32).astype(np.float64)
+        # a face whose every edge is a crease or a border is a flat panel: it may take a tone of its own
+        sharp = get(me.edges, 'use_edge_sharp', ne, bool)
+        used = np.bincount(le, minlength=ne)
+        self.flat = np.logical_and.reduceat(sharp[le] | (used[le] < 2), ls)
+        # the face across each corner's edge (-1 at a border), and the length of that edge
+        order = np.argsort(le, kind='stable')
+        pair = (le[order][:-1] == le[order][1:]) & (used[le[order][:-1]] == 2)
+        across = np.full(nl, -1)
+        across[order[:-1][pair]] = lf[order[1:][pair]]
+        across[order[1:][pair]] = lf[order[:-1][pair]]
+        nxt = np.arange(nl) + 1
+        nxt[ls + lt - 1] = ls
+        elen = np.linalg.norm(pos[nxt] - pos, axis=1)
+        # a chamfer: a narrow flat quad between two much larger faces (the bevel of a box edge), or
+        # the small triangle where three of them meet
+        self.chamfer = np.zeros(nf, bool)
+        q = np.nonzero((lt == 4) & self.flat)[0]
+        e = elen[ls[q][:, None] + np.arange(4)]
+        a = np.where(across[ls[q][:, None] + np.arange(4)] >= 0, area[across[ls[q][:, None] + np.arange(4)]], 0.0)
+        long02 = e[:, 0] + e[:, 2] > e[:, 1] + e[:, 3]
+        width = np.where(long02, e[:, 1] + e[:, 3], e[:, 0] + e[:, 2]) / 2
+        length = np.where(long02, e[:, 0] + e[:, 2], e[:, 1] + e[:, 3]) / 2
+        beside = np.where(long02, np.minimum(a[:, 0], a[:, 2]), np.minimum(a[:, 1], a[:, 3]))
+        self.chamfer[q] = (width < 0.034) & (length > 2.2 * width) & (beside > 2.5 * area[q])
+        self.chamfer |= (lt == 3) & self.flat & (area < 4e-4)
+        # panels made by panelize(): which panel a face belongs to, and which corners lie on its edge
+        tag = me.attributes.get('panel')
+        self.panel = get(tag.data, 'value', nf, np.int32) if tag is not None else np.zeros(nf, np.int32)
+        tag = me.attributes.get('streak')
+        self.streak = get(tag.data, 'value', nf, np.int32) > 0 if tag is not None else np.zeros(nf, bool)
+        self.chamfer &= ~self.streak
+        hard = sharp[le] | (used[le] < 2)
+        prv = np.arange(nl) - 1
+        prv[ls] = ls + lt - 1
+        self.rim = hard | hard[prv]
+        attr = me.color_attributes.get('Col')
+        if attr is None:                                              # HAB_FAST: no occlusion was baked
+            self.col = np.ones((nl, 3))
+        else:
+            self.col = get(attr.data, 'color', nv * 4, np.float32).reshape(-1, 4)[:, :3].astype(np.float64)[lv]
+        self.ao = self.col[:, 0].copy()
+        self.done = np.zeros(nf, bool)                                # faces that already have their paint
+        self.painted = np.zeros(nf, bool)                             # ... as opposed to faces merely set aside
+
+    def faces(self, *names):
+        """Mask of the faces whose material is one of `names` (a name ending in _ is a prefix)."""
+        ok = [any(n == k or (k.endswith('_') and n.startswith(k)) for k in names) for n in self.names]
+        return np.array(ok + [False], bool)[np.minimum(self.mat, len(ok))]
+
+    def slot(self, name):
+        if name not in self.names:
+            self.me.materials.append(mat(name))
+            self.names.append(name)
+        return self.names.index(name)
+
+    def write(self):
+        me = self.me
+        me.polygons.foreach_set('material_index', self.mat.astype(np.int32))
+        old = me.color_attributes.get('Col')
+        if old is not None:
+            me.color_attributes.remove(old)
+        attr = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+        buf = np.ones((len(self.lv), 4), np.float32)
+        buf[:, :3] = np.clip(self.col, 0.0, 1.0)
+        attr.data.foreach_set('color', buf.ravel())
+        me.color_attributes.active_color = attr
+        me.color_attributes.render_color_index = list(me.color_attributes).index(attr)
+        me.update()
+
+
+def mix(a, b, t):
+    """a where t is 0, b where t is 1; t is one number per row."""
+    return a + (np.asarray(b) - a) * np.asarray(t)[:, None]
+
+
+def floor_dust(xy):
+    """Mars on the floor, 0..1: trodden in from the airlock, shed by the suits, spilt by the soil bins."""
+    x, y = xy[:, 0], xy[:, 1]
+    d = 0.95 * np.exp(-np.maximum(y + 8.2, 0.0) / 2.3) * smooth01((1.9 - np.abs(x)) / 1.3)
+    for (cx, cy), r, k in (((-2.5, -6.75), 1.2, 0.55), ((-6.4, -3.7), 1.3, 0.6), ((2.4, -6.8), 0.9, 0.3)):
+        d = np.maximum(d, k * np.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (r * r)))
+    return np.clip(d, 0.0, 1.0)
+
+
+TILE_COAT, TILE_WORN, TILE_DUST = (0.68, 0.80, 0.93), (0.78, 0.88, 0.99), (0.95, 0.85, 0.72)   # as tints of hab_tile
+STAIN_TINT = {'oil': (0.56, 0.54, 0.53), 'scorch': (0.46, 0.43, 0.43), 'water': (0.74, 0.76, 0.78), 'spill': (0.72, 0.63, 0.55),
+              'soil': (0.76, 0.62, 0.50)}
+
+
+def floor_paint(c):
+    """The tiles: each a tone of its own, grime along the joints, the coating rubbed pale where
+    people walk, dust near the airlock, stains, and the painted marks worn where they are trodden."""
+    xs, ys = (np.array(a) for a in floor_grid())
+    tile = c.faces('hab_tile', 'hab_tile_worn') & ~c.done
+    if tile.any():
+        L = tile[c.lf]
+        p, f = c.pos[L], c.lf[L]
+        up = c.normal[f, 2] > 0.9
+        raised = up & (p[:, 2] > FLOOR_Z + 0.0005)                      # not a tile: something lying on one
+        scored, trodden = raised & c.faces('hab_tile_worn')[f], raised & c.faces('hab_tile')[f]
+        fc = c.centre[f]
+        ix, iy = np.searchsorted(xs, fc[:, 0]) - 1, np.searchsorted(ys, fc[:, 1]) - 1
+        x0, x1, y0, y1 = xs[ix] + TILE_GAP, xs[ix + 1] - TILE_GAP, ys[iy] + TILE_GAP, ys[iy + 1] - TILE_GAP
+        inside = np.minimum(np.minimum(p[:, 0] - x0, x1 - p[:, 0]), np.minimum(p[:, 1] - y0, y1 - p[:, 1]))
+        border = 1.0 - smooth01(inside / TILE_BORDER)
+        tone = (0.85 + 0.15 * lattice(ix, iy, ix * 0, 7)) * np.where(lattice(ix, iy, ix * 0, 11) < 0.13, 0.72, 1.0)
+        wear = floor_wear(p[:, :2]) * (0.65 + 0.35 * vnoise(p, 1.3, 5))
+        dust = floor_dust(p[:, :2]) * (0.55 + 0.45 * vnoise(p, 1.9, 6))
+        col = np.array(TILE_COAT)[None, :] * tone[:, None]
+        col = mix(col, TILE_WORN, 0.9 * wear * (1.0 - 0.65 * border))          # the middle of a tile wears first
+        col *= (1.0 - 0.24 * border * (1.0 - 0.5 * wear))[:, None]              # grime keeps to the joints
+        col = mix(col, TILE_DUST, dust * (0.4 + 0.6 * border))
+        for st in FLOOR_STAINS:
+            dx, dy = p[:, 0] - st[0], p[:, 1] - st[1]
+            q = np.hypot(dx, dy) / stain_radius(st, np.arctan2(dy, dx))
+            k = np.clip((1.0 - q) / 0.45, 0.0, 1.0)
+            if st[3] in ('water', 'spill'):                                    # a tide mark: darkest at its rim
+                k *= 0.5 + 0.5 * np.clip(q / 0.55, 0.0, 1.0)
+            col = mix(col, col * np.array(STAIN_TINT[st[3]]), k)
+        col[~up] = np.array(TILE_COAT) * 0.5
+        col[scored] = (0.86, 0.96, 1.0)
+        # a boot print is the tile under it with more dust on it, less with every step from the door
+        fade = np.clip(1.1 * np.exp(-(p[:, 1] + 8.0) / 2.6), 0.0, 0.85) * (0.7 + 0.3 * vnoise(p, 9.0, 3))
+        col = np.where(trodden[:, None], mix(col, TILE_DUST, fade), col)
+        c.col[L] *= col
+        c.done |= tile
+        c.painted |= tile
+    # painted marks on the floor wear with it
+    r = np.hypot(c.centre[:, 0], c.centre[:, 1])
+    mark = c.faces('painted_yellow', 'plastic_white', 'painted_red') & ~c.done & (c.normal[:, 2] > 0.9) \
+        & (c.centre[:, 2] < FLOOR_Z + 0.012) & (c.centre[:, 2] > FLOOR_Z - 0.001) & (r < 8.2)
+    if mark.any():
+        L = mark[c.lf]
+        p = c.pos[L]
+        rub = np.clip(floor_wear(p[:, :2]) * 1.15, 0.0, 1.0) * (0.35 + 0.65 * vnoise(p, 2.6, 9))
+        dust = floor_dust(p[:, :2])
+        c.col[L] *= mix(np.ones((len(p), 3)) * (0.9 + 0.1 * vnoise(p, 3.7, 4))[:, None], (0.42, 0.42, 0.44), rub) * \
+            mix(np.ones((len(p), 3)), (0.86, 0.72, 0.60), 0.7 * dust)
+        c.done |= mark
+        c.painted |= mark
+
+
+def liner_paint(c):
+    """The fabric liner: every quilt panel a little different in tone and age, pillowed between
+    its seams, soiled toward the floor and rubbed where shoulders and hands reach it."""
+    liner = c.faces('hab_liner', 'hab_liner_b') & ~c.done
+    if not liner.any():
+        return
+    L = liner[c.lf]
+    p, fc = c.pos[L], c.centre[c.lf[L]]
+    g = np.floor(((np.arctan2(fc[:, 1], fc[:, 0]) - TH0) % TAU) / (GORE / 2)).astype(np.int64)   # a fabric width: half a gore
+
+    def up_roof(z):
+        return np.degrees(np.arcsin(np.clip((z - Z0_IN) / C_IN, 0.0, 1.0)))
+    wall = fc[:, 2] < Z0_IN - 1e-3
+    band = np.where(wall, np.searchsorted(LINER_BANDS_Z, fc[:, 2]), len(LINER_BANDS_Z) + np.searchsorted(LINER_BANDS_DEG, up_roof(fc[:, 2])))
+    h1, h2 = lattice(g, band, g * 0, 3), lattice(g, band, g * 0, 8)
+    col = np.ones((len(p), 3)) * (0.83 + 0.17 * h1)[:, None]
+    col *= np.stack([np.ones(len(p)), 1.0 - 0.035 * h2, 1.0 - 0.11 * h2], axis=1)           # some panels have yellowed
+    # pillowing: darker into the seams at the top and bottom of each panel
+    lo = np.array((-0.02,) + LINER_BANDS_Z)[np.minimum(band, len(LINER_BANDS_Z))]
+    hi = np.array(LINER_BANDS_Z + (Z0_IN,))[np.minimum(band, len(LINER_BANDS_Z))]
+    v_wall = (p[:, 2] - lo) / np.maximum(hi - lo, 1e-6)
+    rb = np.array((0.0,) + LINER_BANDS_DEG + (82.0,))
+    k = np.clip(band - len(LINER_BANDS_Z), 0, len(rb) - 2)
+    v_roof = (up_roof(p[:, 2]) - rb[k]) / (rb[k + 1] - rb[k])
+    v = np.clip(np.where(wall, v_wall, v_roof), 0.0, 1.0)
+    col *= (1.0 - 0.10 * (2.0 * v - 1.0) ** 2)[:, None]
+    z = p[:, 2]
+    n1, n2 = vnoise(p, 0.9, 21), vnoise(p * np.array((1.0, 1.0, 2.2)), 1.7, 33)
+    col = mix(col, col * np.array((0.80, 0.71, 0.61)), (1.0 - smooth01((z - 0.02) / 0.8)) * (0.5 + 0.5 * n1))
+    reach = smooth01((z - 0.7) / 0.3) * (1.0 - smooth01((z - 1.5) / 0.35))
+    col *= (1.0 - 0.24 * reach * np.clip((n2 - 0.42) * 2.4, 0.0, 1.0))[:, None]
+    col *= (0.90 + 0.10 * fbm(p, 0.42, 5, 2))[:, None]                                       # the fabric has aged unevenly
+    c.col[L] *= col
+    c.done |= liner
+    c.painted |= liner
+
+
+def kit_paint(c):
+    """Everything else that is plain: panels step in tone, dirt gathers where the occlusion is,
+    what stands near the floor is soiled, and the chamfers of painted boxes are rubbed (to bare
+    metal where hands and boots reach them)."""
+    todo = ~c.done & ~c.faces(*UNPAINTED)
+    if not todo.any():
+        return
+    L = todo[c.lf]
+    p, f = c.pos[L], c.lf[L]
+    z = p[:, 2] - FLOOR_Z
+    broad, fine = fbm(p, 0.8, 1, 3), vnoise(p, 6.0, 2)
+    cq = np.round(c.centre * 23.0).astype(np.int64)
+    fh = lattice(cq[:, 0], cq[:, 1], cq[:, 2] + np.round(c.normal[:, 2] * 3).astype(np.int64) * 7919, 5)
+    pid = c.panel.astype(np.int64)
+    step = np.where(c.panel > 0, lattice(pid, pid * 0, pid * 0, 19), np.where(c.flat, fh, 0.5))[f]
+    painted, metal, soft = (c.faces(*grp)[f] for grp in (PAINTED, METALS, SOFT))
+    tone = 1.0 - np.select([painted, metal, soft], [0.085, 0.06, 0.0], 0.03) * step
+    tone *= 1.0 - np.select([painted, metal, soft], [0.05, 0.06, 0.13], 0.04) * (1.0 - broad)
+    col = np.ones((len(p), 3)) * tone[:, None]
+    # dirt lies where the occlusion is, and it is brown rather than grey
+    occ = 1.0 - c.ao[L]
+    col = mix(col, col * np.array((0.70, 0.56, 0.42)), np.clip(occ * np.select([painted, metal, soft], [0.65, 0.5, 0.8], 0.4), 0.0, 1.0))
+    # soiling near the floor, and a film of handling at the height hands work at
+    low = (1.0 - smooth01(z / 0.42)) * (0.35 + 0.65 * fine)
+    col = mix(col, col * np.array((0.80, 0.70, 0.60)), low * np.where(soft, 0.75, 0.5))
+    hand = smooth01((z - 0.7) / 0.25) * (1.0 - smooth01((z - 1.45) / 0.3))
+    col *= (1.0 - 0.13 * hand * np.clip((broad - 0.45) * 3.0, 0.0, 1.0) * np.where(painted | soft, 1.0, 0.4))[:, None]
+    # a large panel is grimy along its edges and clean in the middle, more so lower down
+    edge = c.rim[L] & (c.panel[f] > 0)
+    grime = (0.13 + 0.50 * fbm(p, 1.5, 31, 2)) * (1.0 + 0.5 * (1.0 - smooth01(z / 1.1)))
+    col = mix(col, col * np.array((0.66, 0.56, 0.46)), np.where(edge, grime, 0.0))
+    # a streak (see streaks()) is dark along its upper edge and nothing at its tip, the lowest corner
+    run = c.streak[f]
+    if run.any():
+        zmin = np.minimum.reduceat(c.pos[:, 2], c.ls)[f]
+        col[run] = (1.0 - 0.085 * 0.5) * (0.95 + 0.05 * broad[run])[:, None]
+        col[run & (p[:, 2] > zmin + 1e-4)] *= np.array((0.60, 0.52, 0.44))
+    c.col[L] *= col
+    # chamfers
+    cham = todo & c.chamfer & c.faces(*PAINTED) & (c.centre[:, 2] > FLOOR_Z + 0.012)
+    zc = c.centre[:, 2] - FLOOR_Z
+    reach = 0.16 + 0.30 * smooth01((zc - 0.65) / 0.25) * (1.0 - smooth01((zc - 1.5) / 0.3)) + 0.34 * (1.0 - smooth01(zc / 0.4))
+    reach *= np.where(zc > 2.5, 0.3, 1.0) * (0.6 + 0.8 * vnoise(c.centre, 0.7, 12))
+    bare = cham & (lattice(cq[:, 0], cq[:, 1], cq[:, 2], 13) < reach)
+    c.mat[bare] = c.slot('worn_edge')
+    c.col[bare[c.lf]] = (c.ao[bare[c.lf]] * (0.82 + 0.18 * vnoise(c.pos[bare[c.lf]], 5.0, 14)))[:, None]
+    dull = cham & ~bare & c.faces(*LIGHT_PAINT)
+    c.col[dull[c.lf]] *= 0.84
+    c.done |= todo
+    c.painted |= todo
+
+
+def painted_meshes(root):
+    """The meshes that take paint, as (object, where): 'interior' for what hangs under that part,
+    'door' for a door leaf, 'airlock' for the root's own mesh, of which only the room inside the
+    airlock is painted (see in_airlock)."""
+    out = []
+    for o in [root] + lib_descendants(root):
+        if o.type != 'MESH':
+            continue
+        above = []
+        q = o.parent
+        while q is not None:
+            above.append(q.name)
+            q = q.parent
+        if 'interior' in above:
+            out.append((o, 'interior'))
+        elif any(n.startswith('door_') for n in above):
+            out.append((o, 'door'))
+        elif above == [root.name]:
+            out.append((o, 'airlock'))
+    return out
+
+
+def in_airlock(x, y, z):
+    """Is a point inside the airlock's room (between its two end walls, under its ceiling)?"""
+    return (abs(x) < AXI + 0.02) & (y > Y_ROOM1 - 0.03) & (y < Y_ROOM0 + 0.03) & (z > FLOOR_Z - 0.03) & (z < ACEIL + 0.02)
+
+
+def panelize(root):
+    """Give each large flat face of a housing a border band and an inner field (a few more
+    vertices), so that paint has somewhere to lie: grime along the edges of a panel, a cleaner
+    middle. The band's faces keep the panel's own edges whole, so nothing opens between it and
+    its neighbours. Faces that look at the wall or the floor are left as they are."""
+    count = 0
+    for o, where in painted_meshes(root):
+        me = o.data
+        ok = {i for i, m in enumerate(me.materials) if m and (m.name in PAINTED or m.name == 'canvas')}
+        rot = o.matrix_world.to_3x3()
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        tag = bm.faces.layers.int.new('panel')
+        for f in list(bm.faces):
+            if len(f.verts) != 4 or f.material_index not in ok or any(e.smooth and len(e.link_faces) > 1 for e in f.edges):
+                continue
+            V = list(f.verts)
+            P = [v.co.copy() for v in V]
+            eu, ev = ((P[1] - P[0]).length + (P[2] - P[3]).length) / 2, ((P[3] - P[0]).length + (P[2] - P[1]).length) / 2
+            if min(eu, ev) < 0.2 or f.calc_area() < 0.09:
+                continue
+            c, n = o.matrix_world @ f.calc_center_median(), rot @ f.normal
+            rho = math.hypot(c.x, c.y)
+            if where == 'airlock':
+                if not in_airlock(c.x, c.y, c.z) or c.z < FLOOR_Z + 0.03:
+                    continue
+            elif n.z < -0.4 or c.z > 2.9 or c.z < FLOOR_Z + 0.03 or (rho > 6.6 and (n.x * c.x + n.y * c.y) / rho > 0.5):
+                continue
+            b = min(0.06, 0.2 * min(eu, ev))
+            du, dv = b / eu, b / ev
+            nu, nv = (1 if eu < 0.9 else 2 if eu < 1.7 else 3), (1 if ev < 0.9 else 2 if ev < 1.7 else 3)
+
+            def Q(u, v):
+                return P[0] * ((1 - u) * (1 - v)) + P[1] * (u * (1 - v)) + P[2] * (u * v) + P[3] * ((1 - u) * v)
+            g = [[bm.verts.new(Q(du + (1 - 2 * du) * i / nu, dv + (1 - 2 * dv) * j / nv)) for j in range(nv + 1)] for i in range(nu + 1)]
+            new = [bm.faces.new((g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1])) for i in range(nu) for j in range(nv)]
+            new.append(bm.faces.new([V[0], V[1]] + [g[i][0] for i in range(nu, -1, -1)]))
+            new.append(bm.faces.new([V[1], V[2]] + [g[nu][j] for j in range(nv, -1, -1)]))
+            new.append(bm.faces.new([V[2], V[3]] + [g[i][nv] for i in range(nu + 1)]))
+            new.append(bm.faces.new([V[3], V[0]] + [g[0][j] for j in range(nv + 1)]))
+            count += 1
+            for nf in new:
+                nf.material_index, nf.smooth, nf[tag] = f.material_index, f.smooth, count
+            bm.faces.remove(f)
+        bm.to_mesh(me)
+        bm.free()
+    print('PANELS', count)
+
+
+def paint_wear(root):
+    """Paint the inside of the Hab (everything under `interior`), the door leaves and the room
+    inside the airlock; everywhere else, undo the lift of the LIFTED materials."""
+    where = dict(painted_meshes(root))
+    for o in [root] + lib_descendants(root):
+        if o.type != 'MESH':
+            continue
+        c = Canvas(o)
+        if where.get(o) == 'interior':
+            floor_paint(c)
+            liner_paint(c)
+        elif where.get(o) == 'airlock':                             # the rest of the root's mesh is the outside
+            c.done = ~in_airlock(c.centre[:, 0], c.centre[:, 1], c.centre[:, 2])
+        if o in where:
+            kit_paint(c)
+        plain = ~c.painted & c.faces(*LIFTED)
+        c.col[plain[c.lf]] /= LIFT
+        c.write()
+
+
+def finish(root, name, soften=None, paint=None, wear=None, prepare=None, samples=40, distance=1.1):
     collapse(root)
+    if prepare:
+        prepare(root)
     if not FAST:
         bake_ao(root, samples=samples, distance=distance)
         if soften:
             soften_ao(root, soften)
         if paint:
             paint_ao(root, paint)
+    if wear:
+        wear(root)
     return export_model(root, name, ao=False, do_collapse=False)
 
 
@@ -2785,6 +3602,7 @@ def finish(root, name, soften=None, paint=None, samples=40, distance=1.1):
 # ----------------------------------------------------------------------------------------------
 def build_hab():
     ensure_mats()
+    lift_materials()
     root = part('hab')
     interior = part('interior', parent=root)
     hab_exterior(root)
@@ -2799,8 +3617,9 @@ def build_hab():
     hab_breach(root)
     anchor('floor', root, loc=(0, 0, FLOOR_Z), height=FLOOR_Z)
     tally(root, 'hab')
-    return finish(root, 'hab', soften={'tarp': 0.5, 'hab_floor': 0.85, 'hab_floor_b': 0.85},
-                  paint={'canvas': skin_ao, 'hab_skin_b': skin_ao, 'hab_liner': liner_ao, 'hab_liner_b': liner_ao})
+    return finish(root, 'hab', soften={'tarp': 0.5, 'hab_floor': 0.85, 'hab_floor_b': 0.85, 'hab_tile': 0.85, 'hab_tile_worn': 0.85},
+                  paint={'canvas': skin_ao, 'hab_skin_b': skin_ao, 'hab_liner': liner_ao, 'hab_liner_b': liner_ao},
+                  prepare=panelize, wear=paint_wear)
 
 
 # ----------------------------------------------------------------------------------------------

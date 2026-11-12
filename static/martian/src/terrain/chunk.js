@@ -29,7 +29,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   const minW = Math.max(planet.finest, spacing * 1.25);
   const W = G + 3;                                   // one extra ring for normals
   const px = new Float64Array(W * W), py = new Float64Array(W * W), pz = new Float64Array(W * W), rad = new Float64Array(W * W);
-  const flowEdge = new Float32Array(W * W);
+  const geoIn = new Uint8Array(W * W * 4);
   let minR = Infinity, maxR = -Infinity;
   // global vertex indices across the whole face, so shared edges get bit-identical coordinates
   const T = G << level, unit = 2 / T, gx0 = ix * G - 1, gy0 = iy * G - 1;
@@ -44,7 +44,10 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
       // (the same goes for the extra ring that reaches past the face, used only for normals)
       const edge = gi <= 0 || gi >= T || gj <= 0 || gj >= T;
       const r = edge ? planet.radius(d[0], d[1], d[2], minW) : planet.radiusFace(face, s, t, d[0], d[1], d[2], minW);
-      px[k] = d[0] * r; py[k] = d[1] * r; pz[k] = d[2] * r; rad[k] = r; flowEdge[k] = planet.flowEdge();
+      px[k] = d[0] * r; py[k] = d[1] * r; pz[k] = d[2] * r; rad[k] = r;
+      // (asked for now: they describe the place radius() was last called for)
+      geoIn[k * 4] = Math.min(255, planet.baseSlope() * 127.5); geoIn[k * 4 + 1] = planet.flowCover() * 255;
+      geoIn[k * 4 + 2] = Math.min(255, planet.flowEdge() * 255); geoIn[k * 4 + 3] = planet.padWeight() * 255;
       if (i > 0 && j > 0 && i < W - 1 && j < W - 1) { if (r < minR) minR = r; if (r > maxR) maxR = r; }
     }
   }
@@ -59,10 +62,12 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   // flat-ground texture coordinates: metres across this cube face, less a whole number of
   // periods (for precision), and how close the vertex is to the face's edge (where the next
   // face's coordinates run another way, so the shader falls back to the 3D detail there).
-  // The fourth number is how nearly the vertex lies on a lava flow's edge.
   const us0 = Math.floor(((-1 + (gx0 + G / 2 + 1) * unit) * FACE_M) / TEX_PERIOD) * TEX_PERIOD;
   const vs0 = Math.floor(((-1 + (gy0 + G / 2 + 1) * unit) * FACE_M) / TEX_PERIOD) * TEX_PERIOD;
-  const uv = new Float32Array((N + S) * 4);
+  const uv = new Float32Array((N + S) * 3);
+  // what the place is, a byte each: the land's own slope (rise over run, halved), how much of it is the top of a
+  // lava flow, how near a flow's edge, how far inside a levelled site
+  const geo = new Uint8Array((N + S) * 4);
   const pos = new Float32Array((N + S) * 3);
   const nor = new Int8Array((N + S) * 3);
   const tex = new Float32Array((N + S) * 3);
@@ -75,9 +80,9 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
       pos[v * 3] = lx; pos[v * 3 + 1] = ly; pos[v * 3 + 2] = lz;
       const fs = -1 + (gx0 + i + 1) * unit, ft = -1 + (gy0 + j + 1) * unit;
       const toEdge = (1 - Math.max(Math.abs(fs), Math.abs(ft))) * FACE_M * 0.7;
-      uv[v * 4] = fs * FACE_M - us0; uv[v * 4 + 1] = ft * FACE_M - vs0;
-      uv[v * 4 + 2] = toEdge >= 16 ? 0 : toEdge <= 5 ? 1 : 1 - (toEdge - 5) / 11;
-      uv[v * 4 + 3] = flowEdge[k];
+      uv[v * 3] = fs * FACE_M - us0; uv[v * 3 + 1] = ft * FACE_M - vs0;
+      uv[v * 3 + 2] = toEdge >= 16 ? 0 : toEdge <= 5 ? 1 : 1 - (toEdge - 5) / 11;
+      geo[v * 4] = geoIn[k * 4]; geo[v * 4 + 1] = geoIn[k * 4 + 1]; geo[v * 4 + 2] = geoIn[k * 4 + 2]; geo[v * 4 + 3] = geoIn[k * 4 + 3];
       tex[v * 3] = DF[0] * x + DF[1] * y + DF[2] * z - tx; tex[v * 3 + 1] = DF[3] * x + DF[4] * y + DF[5] * z - ty; tex[v * 3 + 2] = DF[6] * x + DF[7] * y + DF[8] * z - tz;
       const r2 = lx * lx + ly * ly + lz * lz;
       if (r2 > radius2) radius2 = r2;
@@ -100,7 +105,8 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
     pos[sv * 3] = pos[v * 3] - px[k] * f; pos[sv * 3 + 1] = pos[v * 3 + 1] - py[k] * f; pos[sv * 3 + 2] = pos[v * 3 + 2] - pz[k] * f;
     nor[sv * 3] = nor[v * 3]; nor[sv * 3 + 1] = nor[v * 3 + 1]; nor[sv * 3 + 2] = nor[v * 3 + 2];
     tex[sv * 3] = tex[v * 3]; tex[sv * 3 + 1] = tex[v * 3 + 1]; tex[sv * 3 + 2] = tex[v * 3 + 2];
-    uv[sv * 4] = uv[v * 4]; uv[sv * 4 + 1] = uv[v * 4 + 1]; uv[sv * 4 + 2] = uv[v * 4 + 2]; uv[sv * 4 + 3] = uv[v * 4 + 3];
+    uv[sv * 3] = uv[v * 3]; uv[sv * 3 + 1] = uv[v * 3 + 1]; uv[sv * 3 + 2] = uv[v * 3 + 2];
+    geo[sv * 4] = geo[v * 4]; geo[sv * 4 + 1] = geo[v * 4 + 1]; geo[sv * 4 + 2] = geo[v * 4 + 2]; geo[sv * 4 + 3] = geo[v * 4 + 3];
     sv++;
   };
   for (let i = 0; i < G; i++) skirt(i, 0);          // top edge, left to right
@@ -120,7 +126,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
       }
     }
   }
-  const out = { pos, nor, tex, uv, idx, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
+  const out = { pos, nor, tex, uv, geo, idx, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
   if (rocks) out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz);
   return out;
 }
@@ -172,7 +178,8 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
   const patch = Math.min(1, Math.max(0, (field + 0.15) * 1.8));
   const lat = Math.abs(d[1]);
   let density = kind === 'big' ? (0.0010 + 0.0085 * rough * rough) * (0.15 + 0.85 * patch) : (0.05 + 0.16 * rough) * (0.35 + 0.65 * patch);
-  if (lat > 0.97) density *= 0.15;                                                           // the ice caps are nearly bare
+  // the ice caps are nearly bare, and stones thin out toward them
+  if (lat > 0.93) density *= lat > 0.985 ? 0.03 : lat > 0.97 ? 0.12 : 1 - 0.88 * (lat - 0.93) / 0.04;
   const lava = planet.lava(d[0], d[1], d[2]);
   density *= 1 + (kind === 'big' ? 3.4 : 1.6) * lava;                                        // a lava field is strewn with its own rubble
   // the first landing sites were rock gardens, and look it in every picture sent home
@@ -198,6 +205,9 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
     if (!clear) continue;
     const size = kind === 'big' ? Math.min(4.2, 0.48 * Math.pow(1 - u * 0.985, -0.6)) : 0.09 + 0.36 * u * u;
     let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], planet.finest);
+    // nothing lies on a cliff: a stone there has rolled to the foot of it
+    const steep = planet.baseSlope();
+    if (steep > 0.8 || (steep > 0.5 && rnd() < (steep - 0.5) / 0.3)) continue;
     // (most of it along the edges of the flows, where the crust broke up as the flow crept)
     if (lava > 0 && rnd() > 1 - lava * 0.68 * (1 - Math.min(1, planet.flowEdge() * 1.6))) continue;
     // sit it in the ground: a little always, and on a slope by enough that its downhill side is not left in the air

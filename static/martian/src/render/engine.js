@@ -26,12 +26,27 @@ const FINAL_FRAGMENT = /* glsl */`
   #include <common>
   #include <tonemapping_pars_fragment>
   uniform sampler2D tDiffuse;
-  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono;
-  uniform vec3 uTint;
+  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil;
+  uniform vec3 uTint, uVeilCol;
+  uniform vec2 uVeilDir;
   varying vec2 vUv;
   float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+  float vn(vec2 p) {
+    vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
   void main() {
-    vec3 col = texture2D(tDiffuse, vUv).rgb * uExposure;
+    vec3 col = texture2D(tDiffuse, vUv).rgb;
+    // A dust storm is between the eye and everything, the nearest things too: sheets of it blow across the
+    // visor, thicker and thinner, and the whole frame dims and clears with the gusts. (Fog alone leaves a man
+    // five metres off as crisp as on a clear day.)
+    if (uVeil > 0.002) {
+      vec2 p = vUv * vec2(2.6, 1.5) - uVeilDir * (uTime * 0.55);
+      float sheet = vn(p) * 0.55 + vn(p * 2.7 + 7.1) * 0.3 + vn(p * 6.1 - 3.3) * 0.15;
+      float gust = 0.6 + 0.4 * sin(uTime * 0.8 + vn(vec2(uTime * 0.17, 3.0)) * 6.0);
+      col = mix(col, uVeilCol, uVeil * (0.14 + 0.46 * smoothstep(0.25, 0.8, sheet) * gust));
+    }
+    col *= uExposure;
     // scene-referred grade
     float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
     col = mix(vec3(lum), col, uSaturation) * uTint;
@@ -79,6 +94,7 @@ class FinalPass extends Pass {
       tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
+      uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -240,7 +256,7 @@ export class Engine {
     // a full storm closes visibility to a few tens of metres
     // ... and it comes in gusts: the murk thickens and thins every few seconds
     const gust = 1 + dust * (0.22 * Math.sin(this.time * 0.9) + 0.14 * Math.sin(this.time * 2.3 + 1.7) + 0.08 * Math.sin(this.time * 5.1));
-    fog.density = (0.00085 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-alt / 500) + 0.0000015;
+    fog.density = (0.0012 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-alt / 500) + 0.0000015;
     // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
     // light at a low angle), wider still at night, and steady indoors
     // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one
@@ -255,6 +271,13 @@ export class Engine {
     const fu = this.final.uniforms;
     fu.uExposure.value = this.exposure;
     fu.uTime.value = this.time;
+    // the storm's veil: the colour everything fades into, blown across the screen the way the wind goes
+    fu.uVeil.value = p.inside ? 0 : smoothstep(0.3, 0.9, dust) * Math.exp(-alt / 500);
+    fu.uVeilCol.value.copy(sky.fogColor);
+    if (p.wind) { _v.copy(p.wind).transformDirection(cam.matrixWorldInverse); const l = Math.hypot(_v.x, _v.y); if (l > 0.2) fu.uVeilDir.value.set(_v.x / l, _v.y / l); }
+    /** How much of the sky's fill light things men built take, out of doors: by day all of it, at night under half (white
+     *  fabric under starlight was as bright as a lit porch). Indoors it is the room's own bounce and is left alone. */
+    this.modelAmbient = lerp(lerp(0.4, 1, sky.day), 1, io);
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
     const near = alt > 400 ? 2 : 0.12;

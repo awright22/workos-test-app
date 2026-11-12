@@ -250,3 +250,18 @@
 .pane.on { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 0 1.5rem; align-content: start; }
 .pane.on > .pane-hd, .pane.on > .empty, .pane.on > .pane-note { grid-column: 1 / -1; }
 .mg-compact .pane.on > .pane-note { margin-bottom: .5rem; font-size: .75rem; }
+
+/* what is still wanted of a thing already found */
+.card .todo { display: block; margin-top: .375rem; font-style: normal; color: var(--ink-3); font-size: .8125rem; }
+.card-hd .badge .ic { width: .75rem; height: .75rem; margin-right: .25rem; vertical-align: -.0625rem; }
+
+/* leads: the materials not yet found, as one list */
+.leads { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: .375rem 1.5rem; margin-bottom: 1rem; }
+.leads li { display: grid; grid-template-columns: 2.75rem 1fr; gap: .625rem; align-items: baseline; font-size: .875rem; line-height: 1.35; color: var(--ink-2); }
+.leads b { font: 600 .6875rem/1.35 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.mg-compact .leads { grid-template-columns: 1fr 1fr; gap: .25rem 1rem; }
+.mg-compact .leads li { font-size: .75rem; grid-template-columns: 2.25rem 1fr; gap: .375rem; }
+
+.tabs button em i { font-style: normal; }
+.mg-compact .tabs button em i { display: none; }
+.mg-compact .tabs button em::before { content: ""; display: inline-block; width: .375rem; height: .375rem; margin-right: .1875rem; border-radius: 50%; background: var(--accent); vertical-align: .0625rem; }

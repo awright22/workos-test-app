@@ -77,3 +77,23 @@
 /* nothing has the keyboard's focus on a touch screen: no ring round whatever was opened first */
 .mg-touch :focus-visible { outline: none !important; }
 .mg-touch .diff:focus-visible, .mg-touch .menu-item:focus-visible, .mg-touch .choice:focus-visible { border-color: var(--line-2); background: transparent; box-shadow: none; }
+
+/* ---------------------------------------------------------------- touch targets
+   Forty-four real pixels, whatever the interface scale has made of a rem (sized in rem, the top-right
+   buttons came out at 42 and menu rows at 35). */
+.mg-touch #mg-trow .mg-tbtn, .mg-touch #mg-tCam, .mg-touch #mg-tCandle { min-width: 44px; min-height: 44px; }
+.mg-touch .mg-btn, .mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .colony .tabs button, .mg-touch .journal .tabs button { min-height: 44px; }
+.mg-touch .menu-item, .mg-touch.mg-compact #mg-overlay.k-pause .menu-item { min-height: 44px; }
+.mg-touch .mg-switch { min-width: 52px; min-height: 30px; }
+/* (a switch is small to look at; its row is what is pressed) */
+.mg-touch .set-row { min-height: 44px; }
+.mg-touch .map-info .x, .mg-touch .choice, .mg-touch .x { min-width: 44px; min-height: 44px; }
+
+/* the bars can be tapped: they open the guide to what each one is */
+.mg-touch.is-playing:not(.is-modal) #mg-vitals { pointer-events: auto; }
+
+/* the words under the top-right buttons and the camera button */
+#mg-trow .mg-tbtn, #mg-tCam { gap: .0625rem; }
+#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 .625rem/1 var(--f-cond); letter-spacing: .04em; color: var(--ink-2); }
+#mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
+.mg-touch #mg-trow .mg-tbtn { min-width: 46px; }

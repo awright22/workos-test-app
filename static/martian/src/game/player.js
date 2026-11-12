@@ -148,6 +148,7 @@ export let astro = null;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
+const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
 
 export function buildAstronaut() {
   const m = model('astronaut', { face: true });
@@ -156,14 +157,17 @@ export function buildAstronaut() {
   anim.mixer = new THREE.AnimationMixer(m.inner);
   for (const clip of m.clips) {
     const a = anim.mixer.clipAction(clip);
-    if (['JumpStart', 'Land', 'Collapse', 'Wave'].includes(clip.name)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    if (['JumpStart', 'Land', 'Collapse', 'Wave', 'KneelDown', 'KneelUp'].includes(clip.name)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     anim.actions[clip.name] = a;
   }
   for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
   anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
   // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 50, 0.66, 1.0, 1.25);
+  // (and a short reach: carried to fifty metres it floodlit the whole Hab from across the yard, and nothing was dark)
+  // (and no brighter than this: white things three metres off, a dome's floor or an airlock wall, burn out long before
+  // the ground at his feet looks lit)
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 26, 0.52, 0.85, 1.8);
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
   tgt.position.set(0, -1.1, 8);
@@ -226,20 +230,37 @@ export function updateAstronaut(dt) {
   player.bare = bare;
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
+  if (driving || !player.onGround || S.over) anim.kneel = 0;
   if (S.over && S.dead) play('Collapse', 0.25);
   else if (driving) play('Drive', 0.3);
   else if (!player.onGround) {
     if (player.airT < 0.12 && player.vy > 0 && anim.name !== 'Air') play('JumpStart', 0.08);
     else play('Air', 0.18);
   } else if (player.landT < 0.3 && player.speed < 2.5) play('Land', 0.06);
-  // (down to a knee and up again quickly: half-way between standing and kneeling is not a pose a man holds)
-  else if (working) play(workPose(), workPose() === 'WorkKneel' ? 0.18 : 0.25);
-  else if (player.speed > 0.6) {
+  // Kneeling has clips of its own. Half-way between a straight leg and a folded one the leg is nine centimetres too
+  // long, so a cross-fade from standing to kneeling puts the feet through the floor: KneelDown takes him to a knee,
+  // WorkKneel is the work, KneelUp stands him up again. anim.kneel: 0 standing, 1 going down, 2 down, 3 getting up.
+  else if (working && (workPose() === 'WorkStand' || !anim.actions.KneelDown)) { anim.kneel = 0; play(workPose(), 0.25); }
+  else if (working) {
+    if (!anim.kneel || anim.kneel === 3) {
+      // (KneelUp is KneelDown backwards: turning round part-way starts the other where this one had got to)
+      const from = anim.kneel === 3 ? clamp(KNEEL_T - anim.actions.KneelUp.time, 0, KNEEL_T) : 0;
+      play('KneelDown', 0.1, true); anim.actions.KneelDown.time = from; anim.kneel = 1;
+    } else if (anim.kneel === 1 && anim.actions.KneelDown.time >= KNEEL_T - 0.02) { play('WorkKneel', 0.1); anim.kneel = 2; }
+    if (anim.kneel === 1) ts = KNEEL_PACE;
+  } else if (player.speed > 0.6) {
+    anim.kneel = 0;                                      // off at once: he is already moving
     const hurt = S.health < 35 || S.suit < 6;
     if (hurt && player.speed < 4) { play('Stagger', 0.3); ts = clamp(player.speed / 2.4, 0.6, 1.3); }
     else if (player.speed > 7.0) { play('Run', 0.2); ts = clamp(player.speed / RUN_SPEED, 0.7, 1.25); }
     else { play('Walk', 0.22); ts = clamp(player.speed / WALK_SPEED, 0.45, 1.3); }
-  } else play('Idle', anim.name === 'WorkKneel' ? 0.18 : 0.3);
+  } else if (anim.kneel === 1 || anim.kneel === 2) {
+    const from = anim.kneel === 1 ? clamp(KNEEL_T - anim.actions.KneelDown.time, 0, KNEEL_T) : 0;
+    play('KneelUp', 0.1, true); anim.actions.KneelUp.time = from; anim.kneel = 3; ts = KNEEL_PACE;
+  } else if (anim.kneel === 3) {
+    ts = KNEEL_PACE;
+    if (anim.actions.KneelUp.time >= KNEEL_T - 0.02) { anim.kneel = 0; play('Idle', 0.15); }
+  } else play('Idle', 0.3);
   if (anim.current) anim.current.setEffectiveTimeScale(ts);
   // the look-at below is added on top of the clip each frame, so start from the rest pose
   anim.bones.chest.quaternion.copy(anim.rest.chest);
@@ -267,7 +288,7 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 40 : lerp(anim.lamp.intensity, lampOn * 40, damp(0.25, dt));
+  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 38 : lerp(anim.lamp.intensity, lampOn * 38, damp(0.25, dt));
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };

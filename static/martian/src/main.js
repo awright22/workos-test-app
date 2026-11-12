@@ -2,7 +2,7 @@
 import * as farmApi from './game/farm.js';
 import { FINEST } from './planet/height.js';
 import { chunkSpacing } from './terrain/chunk.js';
-import { photo, photoCamera, updatePhoto, enterPhoto, exitPhoto, takePhoto } from './game/photo.js';
+import { photo, photoCamera, updatePhoto, enterPhoto, exitPhoto, takePhoto, photoSubjects } from './game/photo.js';
 import { initPhotoUi, togglePhoto } from './ui/photo.js';
 import { inputHooks } from './game/input.js';
 import * as comfortsApi from './game/comforts.js';
@@ -136,11 +136,12 @@ function draw(dt, focus) {
   updateSites(e.camera.position);
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;
-  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus, exposureBias,
+  e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus, exposureBias, wind: ctx.vfx && ctx.vfx.streakU ? ctx.vfx.streakU.uWind.value : null,
     roof: sealed ? _roof.copy(World.hab.position).addScaledVector(World.hab.userData.up, 2.8) : null });
   ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
+  dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
   if (ctx.terrainUniforms) { ctx.terrainUniforms.uDust.value = S.started ? S.storm.i : 0; ctx.terrainUniforms.uDay.value = e.sky.day; }
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
@@ -181,6 +182,7 @@ function tick(dt) {
   if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
   if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
   if (World.habLampMats) setGlow(World.habLampMats, S.power > 0.5 ? 0.04 + 0.96 * World.dark : 0.02);
+  if (World.habViewMats) setGlow(World.habViewMats, Math.max(0.02, ctx.engine.sky.day * (1 - 0.75 * (S.started ? S.storm.i : 0))));
   const strobe = Math.sin(blinkT * 6) > 0.7 ? 1 : 0;
   for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }
   for (const b of World.builtMeshes) {
@@ -236,7 +238,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, photoSubjects, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },

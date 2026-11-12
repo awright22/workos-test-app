@@ -39,9 +39,10 @@ const GLSL_SKY = /* glsl */`
     float day = smoothstep(-0.16, 0.10, sunE);
     float low = 1.0 - smoothstep(0.0, 0.45, sunE);           // 1 at the horizon, 0 high sun
     // base dome: zenith to horizon
-    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 3.0);
-    vec3 zen = mix(vec3(0.290, 0.172, 0.088), vec3(0.135, 0.115, 0.105), low);
-    vec3 hor = mix(vec3(0.760, 0.470, 0.235), vec3(0.34, 0.25, 0.20), low);
+    // (butterscotch overhead, not khaki: more red than a first guess says, and a clearly paler band at the horizon)
+    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 2.5);
+    vec3 zen = mix(vec3(0.345, 0.182, 0.080), vec3(0.135, 0.115, 0.105), low);
+    vec3 hor = mix(vec3(0.860, 0.560, 0.300), vec3(0.34, 0.25, 0.20), low);
     vec3 col = mix(zen, hor, h);
     // the dust is not even: slow broad bands of thicker and thinner haze
     float band = vnoise(v * vec3(2.2, 7.0, 2.2) + vec3(uTime * 0.004, 0.0, uTime * 0.002)) - 0.5;
@@ -56,7 +57,7 @@ const GLSL_SKY = /* glsl */`
     float sunUp = smoothstep(-0.10, 0.04, sunE);
     // near the horizon the sun shines through far more dust: the glow shrinks and dims with it
     // (kept tight: a broad white aureole veils the whole frame when he looks toward the sun, and Mars turns beige)
-    col += aur * (hg * mix(0.25, 0.045, sqrt(low)) + wide * mix(0.13, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    col += aur * (hg * mix(0.17, 0.045, sqrt(low)) + wide * mix(0.07, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
     // ... and what is left of it close to a low sun is blue: fine dust scatters blue light forward
     float ang0 = acos(clamp(cosT, -1.0, 1.0));
     col += vec3(0.20, 0.40, 0.95) * exp(-ang0 * 6.5) * 0.55 * smoothstep(0.38, 0.04, sunE) * smoothstep(-0.10, 0.02, sunE);
@@ -168,7 +169,8 @@ export class Sky {
           // star and less than a star: they are drawn four times that, so that one is a moon and the other a moonlet.
           // Both can be seen by day, palely.
           float moonVis = (1.0 - uDust * 0.95) * mix(0.25, 1.0, max(night, airless)) * smoothstep(-0.01, 0.05, dot(v, uUp) + airless);
-          col += (moon(v, uPhobos, 0.0075, 1.0) * 2.0 + moon(v, uDeimos, 0.0030, 0.5) * 2.4) * moonVis;
+          // (kept under what the bloom picks up: a moon is lit rock, not a lamp)
+          col += (moon(v, uPhobos, 0.0075, 1.0) * 0.85 + moon(v, uDeimos, 0.0030, 0.5) * 1.3) * moonVis;
           // the Earth: the brightest star in the evening sky, and blue-white. It shows as soon as the sun is down.
           float earthVis = (1.0 - uDust) * max(1.0 - smoothstep(-0.12, -0.02, sunE), airless) * smoothstep(0.0, 0.10, dot(v, uUp) + airless);
           col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.999975, 0.999996, dot(v, uEarth)) * 3.2 * earthVis);
@@ -176,7 +178,7 @@ export class Sky {
           float cosT = dot(v, uSun);
           float ang = acos(clamp(cosT, -1.0, 1.0));
           float disc = smoothstep(0.0052, 0.0036, ang);
-          float halo = exp(-ang * 70.0) * 0.5 + exp(-ang * 16.0) * 0.06;
+          float halo = exp(-ang * 70.0) * 0.5 + exp(-ang * 16.0) * 0.03;
           float lowDim = mix(1.0, 0.16, smoothstep(0.40, 0.02, sunE));        // through a long path of dust the sun is a pale disc
           float through = (1.0 - uDust * 0.90) * smoothstep(-0.03, 0.03, sunE);
           vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
