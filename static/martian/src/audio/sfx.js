@@ -184,7 +184,7 @@ def('pfPing', { gap: 0.1, hall: 0.45 }, (E, v, t) => {
 });
 
 // ---- farming ------------------------------------------------------------------------------------------
-def('dig', { bus: 'world', gap: 0.2, gain: 2.2 }, (E, v, t) => {
+def('dig', { bus: 'world', gap: 0.2, gain: 1.6 }, (E, v, t) => {
   E.burst(v, t, { table: 'grit', bp: 950, bp1: 420, bglide: 0.22, q: 0.9, a: 0.012, d: 0.3, g: 1.6 });
   E.burst(v, t, { table: 'pink', bp: 800, bp1: 500, bglide: 0.2, q: 0.8, a: 0.008, d: 0.24, g: 0.7 });
   E.thud(v, t, { f: 95, d: 0.13, g: 0.15 });
@@ -197,7 +197,7 @@ def('fillBed', { bus: 'world', gap: 0.2, gain: 1.25 }, (E, v, t) => {
   E.burst(v, t, { table: 'pink', bp: 520, q: 0.6, a: 0.08, h: 0.3, d: 0.36, g: 0.2 });
   for (let i = 0; i < 3; i++) E.thud(v, t + E.rr(0.1, 0.6), { f: E.rr(80, 120), d: 0.08, g: 0.1 });
 });
-def('plant', { bus: 'world', gap: 0.2, gain: 1.4 }, (E, v, t, o, K) => {
+def('plant', { bus: 'world', gap: 0.2, gain: 0.9 }, (E, v, t, o, K) => {
   E.thud(v, t, { f: 140, f1: 90, d: 0.09, g: 0.12 }); crunch(E, v, t, 0.24, 1000, 0.1);
   E.thud(v, t + 0.28, { f: 112, d: 0.09, g: 0.13 }); E.burst(v, t + 0.28, { table: 'pink', bp: 600, q: 0.8, a: 0.005, d: 0.09, g: 0.4 });
   E.thud(v, t + 0.5, { f: 104, d: 0.08, g: 0.09 }); E.burst(v, t + 0.5, { table: 'pink', bp: 600, q: 0.8, a: 0.005, d: 0.08, g: 0.28 });
@@ -217,7 +217,7 @@ def('harvest', { bus: 'world', gap: 0.2, gain: 1.5 }, (E, v, t) => {
     E.burst(v, tt, { table: 'pink', bp: 900, q: 1.2, a: 0.001, d: 0.04, g: 0.25 });
   }
 });
-def('clearBed', { bus: 'world', gap: 0.2, gain: 3.5 }, (E, v, t) => {
+def('clearBed', { bus: 'world', gap: 0.2, gain: 1.1 }, (E, v, t) => {
   for (const dt of [0, 0.15, 0.33]) E.burst(v, t + dt, { bp: E.rr(2400, 3200), q: 1, a: 0.01, d: 0.13, g: 0.09 });
   crunch(E, v, t + 0.05, 0.14, 900, 0.2); crunch(E, v, t + 0.4, 0.12, 700, 0.2);
 });
@@ -265,7 +265,7 @@ def('drill', { bus: 'world', gap: 0.3, gain: 0.7 }, (E, v, t) => {
   E.clank(v, t + 0.9, { f: 2100, ratios: [1, 1.47, 2.09, 2.56], d: 0.28, g: 0.08 });
   E.thud(v, t + 1.0, { f: 110, d: 0.11, g: 0.22 });
 });
-def('rtg', { bus: 'world', gap: 0.5, gain: 2.2 }, (E, v, t) => {
+def('rtg', { bus: 'world', gap: 0.5, gain: 1.6 }, (E, v, t) => {
   SFX.dig.fn(E, v, t);
   for (let i = 0; i < 12; i++) E.burst(v, t + 0.5 + Math.pow(E.rand(), 0.7) * 1.4, { hp: 1200, a: 0.0003, d: 0.008, g: 0.2 });
 });
@@ -411,7 +411,7 @@ def('roverExit', { gap: 0.8, room: 0.2 }, (E, v, t) => {
   E.thud(v, t + 0.3, { f: 90, d: 0.13, g: 0.28 }); E.clank(v, t + 0.3, { f: 360, d: 0.2, g: 0.05 });
   E.thud(v, t + 0.58, { f: 70, f1: 45, d: 0.11, g: 0.22 }); crunch(E, v, t + 0.58, 0.12, 900, 0.13);
 });
-def('roverThud', { bus: 'world', gap: 0.09, prio: 1, gain: 1.5 }, (E, v, t, o) => {
+def('roverThud', { bus: 'world', gap: 0.09, prio: 1 }, (E, v, t, o) => {
   const g = o.g || 0.5;
   E.thud(v, t, { f: E.rr(55, 80), f1: 40, d: E.rr(0.09, 0.15), g: 0.3 * g });
   E.tone(v, t, { f: E.rr(150, 210), a: 0.002, d: 0.08, g: 0.12 * g });
@@ -496,8 +496,8 @@ def('o2Warn', { gap: 0.8, prio: 3, hall: 0.05 }, (E, v, t, o) => {
 });
 def('work_dig', { bus: 'world', gap: 0.25, prio: 1, gain: 1.7 }, (E, v, t) => {
   E.burst(v, t, { table: 'grit', bp: E.rr(800, 1000), bp1: 480, bglide: 0.2, q: 0.9, a: 0.02, d: 0.24, g: 1.1 });
-  E.burst(v, t, { table: 'pink', bp: 650, q: 0.7, a: 0.015, d: 0.18, g: 0.2 });
-  E.thud(v, t, { f: E.rr(85, 105), d: 0.1, g: 0.13 });
+  E.burst(v, t, { table: 'pink', bp: 750, q: 0.7, a: 0.015, d: 0.3, g: 0.55 });
+  E.thud(v, t, { f: E.rr(85, 105), d: 0.1, g: 0.08 });
 });
 def('work_wipe', { bus: 'world', gap: 0.25, prio: 1, gain: 1.5 }, (E, v, t) => {
   const up = E.rand() < 0.5, a = up ? 1500 : 2900, b = up ? 2900 : 1500;

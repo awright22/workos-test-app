@@ -48,6 +48,7 @@ const PENT = [0, 2, 4, 7, 9], DARK = [4, 9, 11, 14, 17];
 /** The theme, as steps on the pentatonic ladder: do, sol, la, mi. */
 const MOTIF = [[0, 1.5], [3, 1], [4, 0.5], [2, 2]];
 const LOOKAHEAD = 0.4;
+const TOP = 7;                                    // highest step the bells climb to on the ladder
 
 function buildPad(E, L) {
   const out = E.gain(L, 0), lp = E.filter(L, 'lowpass', 1200, 0.5), wet = E.gain(L, 0.55);
@@ -74,7 +75,7 @@ export class Music {
     this.state = 'silence'; this.cand = 'silence'; this.candSince = 0;
     this.chord = CH.I; this.chordIdx = -1; this.chordUntil = -1;
     this.playing = false; this.sectionUntil = -1; this.presence = 0; this.duck = 1;
-    this.noteNext = -1; this.phraseLeft = 0; this.step = 4; this.motifAt = -1; this.beat = 1.8;
+    this.noteNext = -1; this.phraseLeft = 0; this.step = 4; this.motifAt = -1; this.beat = 1.8; this.octave = 0;
     this.pulseNext = -1; this.pulseStep = 0; this.pulseAmt = 0; this.mask = [1, 0, 0.6, 0, 0.9, 0.2, 0.5, 0];
     this.tollNext = -1;
     this.triumphUntil = -1; this.driveTime = 0; this.danger = 0;
@@ -100,7 +101,7 @@ export class Music {
     if (p.scene === 'won') return 'triumph';
     if (p.scene === 'cutscene') return 'silence';     // the launch has no score: roar, then nothing, then the rescue
     if (this.E.now < this.triumphUntil) return 'triumph';
-    this.driveTime = p.place === 'rover' && Math.abs(p.roverSpeed) > 3 ? this.driveTime + dt : Math.max(0, this.driveTime - dt * 0.5);
+    this.driveTime = p.place === 'rover' && Math.abs(p.roverSpeed) > 3 ? Math.min(14, this.driveTime + dt) : Math.max(0, this.driveTime - dt * 0.5);
     const d = Math.max(p.breach ? 1 : 0, smooth(0.26, 0.08, p.o2), smooth(0.34, 0.1, p.health),
       p.place === 'hab' ? 0 : smooth(0.4, 0.8, p.storm), p.leak ? 0.7 : 0);
     this.danger = d;
@@ -187,7 +188,7 @@ export class Music {
     if (st.dark && now >= this.tollNext) {
       const v = E.voice('mToll', { bus: 'music', hall: 0.6, prio: 1 });
       E.bell(v, now + 0.02, { f: mtof(this.K + this.chord.root - 12), ratio: 1.41, index: 1.3, bite: 0.5, d: 7, g: 0.055 * level });
-      if (E.rand() < 0.5) E.bell(v, now + E.rr(1.5, 3), { f: mtof(this.K + this.chord.root + 24 + E.pick([0, 1, 7])), index: 0.5, d: 5, g: 0.014 * level });
+      if (E.rand() < 0.5) E.bell(v, now + E.rr(1.5, 3), { f: mtof(this.K + this.chord.root + 12 + E.pick([0, 1, 7])), index: 0.5, d: 5, g: 0.016 * level });
       E.seal(v);
       this.tollNext = now + E.rr(7, 13) / (0.6 + this.danger * 0.6);
     }
@@ -199,24 +200,31 @@ export class Music {
     else if (pool.length > 1) { let i; do { i = Math.floor(E.rand() * pool.length); } while (i === this.chordIdx); this.chordIdx = i; }
     this.chord = CH[pool[this.chordIdx]];
     this.chordUntil = now + E.rr(st.chord[0], st.chord[1]);
-    const c = this.pad.c, tones = this.chord.tones, K = this.K, used = [], fast = fresh || st.dark;
-    const order = [0, 1, 2, 3];
-    for (let i = 3; i > 0; i--) { const j = Math.floor(E.rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const c = this.pad.c, tones = this.chord.tones, root = this.chord.root, fifth = (root + 7) % 12;
+    const K = this.K, used = [], picked = [], fast = fresh || st.dark;
+    // Voice leading: each voice takes the chord note nearest to where it already is. The bottom
+    // voice goes first and only ever takes the root or the fifth; the others avoid doubling,
+    // clusters, and close intervals low down, where they turn to mud.
+    const order = [1, 2, 3];
+    for (let i = 2; i > 0; i--) { const j = Math.floor(E.rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    order.unshift(0);
     let off = 0;
     for (const i of order) {
       const vc = c.voices[i], lo = RANGES[i][0] - (st.low ? 2 : 0), hi = RANGES[i][1] - (st.low ? 3 : 0);
       let best = lo, bestCost = 1e9, bestPc = 0;
       for (let m = lo; m <= hi; m++) {
-        const pc = (((m - K) % 12) + 12) % 12, ti = tones.indexOf(pc);
-        if (ti < 0) continue;
+        const pc = (((m - K) % 12) + 12) % 12;
+        if (i === 0 ? (pc !== root && pc !== fifth) : !tones.includes(pc)) continue;
         let cost = vc.midi ? Math.abs(m - vc.midi) : Math.abs(m - (lo + hi) / 2) * 0.3;
         if (used.includes(pc)) cost += 5;
-        if (i === 0 && pc !== this.chord.root) cost += pc === (this.chord.root + 7) % 12 ? 2 : 6;
-        if (i > 0 && ti === 0) cost += 1.5;
+        if (i === 0 && pc === fifth) cost += 2.5;
+        if (i > 0 && pc === root) cost += 1.5;
+        for (const q of picked) { const d = Math.abs(m - q); if (d < 3) cost += Math.min(m, q) < 60 ? 12 : 4; else if (d < 5 && Math.min(m, q) < 57) cost += 3; }
+        if (i > 0 && m < picked[0]) cost += 8;                     // nothing dips under the bottom voice
         cost += E.rand() * 1.5;
         if (cost < bestCost) { bestCost = cost; best = m; bestPc = pc; }
       }
-      used.push(bestPc);
+      used.push(bestPc); picked.push(best);
       this.retune(vc, best, 0, now + off, VOICE_LEVEL[i] * E.rr(0.8, 1.1), fast);
       off += fast ? E.rr(0.7, 1.5) : E.rr(2.2, 4.2);
     }
@@ -247,18 +255,20 @@ export class Music {
       const ok = [];
       for (let i = 1; i <= 7; i++) if (this.chord.tones.includes(PENT[i % 5])) ok.push(i);
       this.step = ok.length ? E.pick(ok) : 4;
+      this.octave = st.dark || (st.low && E.rand() < 0.6) ? -12 : 0;   // a whole phrase sits in one register
     }
     if (this.motifAt >= 0) { const m = MOTIF[this.motifAt++]; this.step = m[0]; dur = m[1]; }
     else {
-      this.step = clamp(this.step + E.pick([-2, -1, -1, 1, 1, 2]), 0, 8);
+      let s = this.step + E.pick([-2, -1, -1, 1, 1, 2]);
+      if (s < 0) s = -s; else if (s > TOP) s = 2 * TOP - s;     // turn round at the ends of the range rather than repeat
+      this.step = s;
       dur = E.pick([0.5, 1, 1, 1.5, 2]);
       if (this.phraseLeft === 1) {                 // come to rest on a chord note
-        for (const d of [0, -1, 1, -2, 2]) { const s = this.step + d; if (s >= 0 && s <= 8 && this.chord.tones.includes(PENT[s % 5])) { this.step = s; break; } }
+        for (const d of [0, -1, 1, -2, 2]) { const s = this.step + d; if (s >= 0 && s <= TOP && this.chord.tones.includes(PENT[s % 5])) { this.step = s; break; } }
       }
     }
     const ladder = st.dark ? DARK : PENT, s = this.step;
-    let midi = this.K + 12 + ladder[s % 5] + 12 * Math.floor(s / 5);
-    if (st.low && E.rand() < 0.6) midi -= 12;
+    const midi = this.K + 12 + ladder[s % 5] + 12 * Math.floor(s / 5) + this.octave;
     const vel = E.rr(0.6, 1) * (this.phraseLeft === 1 ? 0.8 : 1);
     const v = E.voice('mBell', { bus: 'music', hall: 0.6, pan: E.rr(-0.45, 0.45), prio: 1 });
     E.bell(v, t, { f: mtof(midi), ratio: midi < 72 ? 2 : 3, index: 0.3 + 0.45 * vel, d: lerp(7, 4.5, smooth(60, 96, midi)), g: 0.06 * vel * st.bells * level });

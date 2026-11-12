@@ -10,7 +10,7 @@ function buildRover(E, L) {
   // drivetrain: a harmonic-rich motor note through a filter that opens under load
   const m = E.osc(L, 'motor', 58), mlp = E.filter(L, 'lowpass', 400, 1.3), gm = E.gain(L, 0);
   m.connect(mlp); mlp.connect(gm); gm.connect(out);
-  E.wobble(L, m.frequency, 0.5, 0.7);
+  E.wobble(L, m.frequency, 1.6, 0.6);
   // inverter whine a little over two octaves up
   const wh = E.osc(L, 'sine', 236), gw = E.gain(L, 0);
   wh.connect(gw); gw.connect(out);
@@ -52,11 +52,11 @@ export class Vehicle {
     const load = this.load, f = 58 + 300 * sp + 9 * load;
     const awake = smooth(0, 0.8, v + load * 2);
     c.level.to(0.32, 0.2);
-    c.motorF.to(f, 0.09); c.motorCut.to(f * (2.4 + 3 * load + 2 * sp), 0.12);
-    c.motor.to((0.035 + 0.1 * sp + 0.09 * load * (0.45 + sp)) * awake, 0.1);
+    c.motorF.to(f, 0.09); c.motorCut.to(f * (1.8 + 1.6 * load + 1.2 * sp), 0.12);
+    c.motor.to((0.022 + 0.06 * sp + 0.055 * load * (0.45 + sp)) * awake, 0.1);
     c.whineF.to(f * 4.07, 0.09); c.whine.to((0.004 + 0.014 * sp) * (0.5 + load) * awake, 0.12);
     c.crunch.to(2.4 * smooth(0.3, 10, v), 0.12); c.crunchF.to(520 + 900 * sp, 0.2); c.crunchRate.to(0.35 + 1.4 * sp, 0.2);
-    c.rumble.to(0.3 + 0.75 * sp, 0.2); c.rumbleCut.to(240 + 260 * sp, 0.3);
+    c.rumble.to(0.3 + 0.95 * sp, 0.2); c.rumbleCut.to(240 + 260 * sp, 0.3);
     c.hum.to(0.04, 0.3);
     // suspension: the rougher the ground and the faster the rover, the more it knocks
     const rough = clamp(p.rough || 0, 0, 1);

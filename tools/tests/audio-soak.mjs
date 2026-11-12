@@ -19,9 +19,9 @@ await sleep(300);
 const began = await g.eval((G) => {
   const Snd = G.Snd;
   if (!Snd || !Snd.sys) return { ok: false, why: 'audio did not start', has: !!Snd };
-  const W = window, T = (W.__soak = { samples: [], updMs: 0, updN: 0, updMax: 0, plays: 0, load: [], t0: performance.now(), a0: Snd.ctx.currentTime, sim: 0, script: '' });
+  const W = window, T = (W.__soak = { samples: [], upd: [], plays: 0, load: [], t0: performance.now(), a0: Snd.ctx.currentTime, sim: 0, script: '' });
   const update = Snd.update.bind(Snd), play = Snd.play.bind(Snd);
-  Snd.update = (p) => { const t = performance.now(); update(p); const d = performance.now() - t; T.updMs += d; T.updN++; if (d > T.updMax) T.updMax = d; };
+  Snd.update = (p) => { const t = performance.now(); update(p); T.upd.push(performance.now() - t); };
   Snd.play = (n, o) => { T.plays++; return play(n, o); };
   if (Snd.ctx.renderCapacity) {
     try {
@@ -80,17 +80,18 @@ await sleep(SECONDS * 1000);
 const r = await g.eval((G) => {
   const T = window.__soak, Snd = G.Snd;
   clearInterval(T.timer); clearInterval(T.sampler);
-  return { samples: T.samples, updAvg: T.updMs / T.updN, updMax: T.updMax, updN: T.updN, plays: T.plays, load: T.load, sim: T.sim,
+  const u = T.upd.slice().sort((a, b) => a - b), at = (q) => u[Math.min(u.length - 1, Math.floor(u.length * q))];
+  return { samples: T.samples, updAvg: u.reduce((a, b) => a + b, 0) / u.length, updMed: at(0.5), upd95: at(0.95), updMax: u[u.length - 1], updN: u.length, plays: T.plays, load: T.load, sim: T.sim,
     wall: (performance.now() - T.t0) / 1000, audio: Snd.ctx.currentTime - T.a0, errors: Snd.errors, stats: Snd.stats(), over: G.S.over };
 });
 console.log('\n   t   nodes voices  made   score     doing');
 for (const s of r.samples) console.log(`${String(s.t).padStart(6)} ${String(s.live).padStart(6)} ${String(s.voices).padStart(5)} ${String(s.made).padStart(6)}   ${String(s.music).padEnd(8)}  ${s.what}`);
 const live = r.samples.map((s) => s.live), voices = r.samples.map((s) => s.voices);
-const first = r.samples.filter((s) => s.t > 3 && s.t < 9).map((s) => s.live), last = r.samples.slice(-3).map((s) => s.live);
+const last = r.samples.slice(-3).map((s) => s.live);
 const avg = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
 console.log(`\nwall ${r.wall.toFixed(1)} s, audio clock ${r.audio.toFixed(1)} s, simulated ${r.sim.toFixed(1)} s; ${r.updN} audio updates, ${r.plays} one-shots requested, ${r.stats.made} nodes created in all`);
-console.log(`live nodes: min ${Math.min(...live)}, max ${Math.max(...live)}, walking at the start ${avg(first).toFixed(0)}, standing at the end ${avg(last).toFixed(0)}; voices max ${Math.max(...voices)}`);
-console.log(`audio update: ${(r.updAvg * 1000).toFixed(0)} microseconds on average, ${r.updMax.toFixed(2)} ms worst (main thread, software-rendered headless Chromium)`);
+console.log(`live nodes: min ${Math.min(...live)}, max ${Math.max(...live)}, standing still at the end ${avg(last).toFixed(0)}; voices max ${Math.max(...voices)}`);
+console.log(`audio update on the main thread: median ${(r.updMed * 1000).toFixed(0)} us, mean ${(r.updAvg * 1000).toFixed(0)} us, 95th percentile ${(r.upd95 * 1000).toFixed(0)} us, worst ${r.updMax.toFixed(1)} ms (headless Chromium; the worst case includes being descheduled on a busy machine)`);
 if (r.load.length) {
   const a = avg(r.load.map((l) => l[0])), p = Math.max(...r.load.map((l) => l[1])), u = Math.max(...r.load.map((l) => l[2]));
   console.log(`audio thread load (renderCapacity): average ${(a * 100).toFixed(1)}%, peak ${(p * 100).toFixed(1)}%, worst underrun ratio ${u}`);
@@ -99,9 +100,9 @@ if (r.load.length) {
 const fails = [];
 const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (d !== undefined ? '  ' + d : '')); if (!ok) fails.push(name); };
 check('live nodes stay bounded', Math.max(...live) < 420, 'max ' + Math.max(...live));
-check('nodes return to the idle level (no leak)', avg(last) < avg(first) + 25, `${avg(first).toFixed(0)} -> ${avg(last).toFixed(0)}`);
+check('nodes return to the idle level (no leak)', avg(last) < Math.min(...live) + 45 && avg(last) < 130, `idle ${Math.min(...live)}, end ${avg(last).toFixed(0)}`);
 check('voices stay limited', Math.max(...voices) <= 36, 'max ' + Math.max(...voices));
-check('the audio update is cheap', r.updAvg < 0.5 && r.updMax < 25, `${(r.updAvg * 1000).toFixed(0)} us avg, ${r.updMax.toFixed(2)} ms max`);
+check('the audio update is cheap', r.updMed < 0.4 && r.upd95 < 4, `median ${(r.updMed * 1000).toFixed(0)} us, p95 ${(r.upd95 * 1000).toFixed(0)} us`);
 check('the audio clock keeps pace', r.audio > r.wall * 0.97, `${r.audio.toFixed(1)} of ${r.wall.toFixed(1)} s`);
 check('no audio errors', r.errors === 0 && r.stats.state === 'running', `errors ${r.errors}, context ${r.stats.state}`);
 check('no console errors', g.errors.length === 0, JSON.stringify(g.errors.slice(0, 3)).slice(0, 600));
