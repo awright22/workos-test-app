@@ -36,7 +36,8 @@ export async function openGame(o = {}) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   const t0 = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
+  // (quality 'auto': no preset in the address, so the game chooses as it would for a player; and then nothing is fixed)
+  await page.goto(o.quality === 'auto' ? `http://127.0.0.1:${port}/${o.query ? '?' + o.query : ''}` : `http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
   const loadMs = Date.now() - t0;
   const game = {

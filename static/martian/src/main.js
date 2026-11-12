@@ -19,7 +19,7 @@ import { clamp, perf, smoothstep } from './core/math.js';
 import { _v1, _v2, _v3 } from './core/scratch.js';
 import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
-import { root, UI, log, showOverlay, hideOverlay } from './ui/dom.js';
+import { root, UI, log, toast, showOverlay, hideOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
 import { MATERIALS, analyseAll, catalogue, identify, scienceSummary, takeSample } from './game/science.js';
 import { updateAudio } from './audio/driver.js';
@@ -49,12 +49,25 @@ import { showStart, newGame, continueGame } from './game/flow.js';
 import { syncAllVisuals } from './game/visuals.js';
 import { showLoading as loading } from './ui/menus.js';
 
+/** Set when the graphics preset was neither asked for in the address nor chosen in Settings: the game may then step
+ *  a phone down by itself (see frame()). */
+let autoQuality = false;
+const AUTO_KEY = 'stranded2-quality-auto';
+/**
+ * The phone is the machine this game is made for, and a recent one draws "medium" (bloom, fine ground, the
+ * full rock field) comfortably; so a phone starts there, not on "low". One that cannot hold the frame rate
+ * with the resolution traded down as far as it goes is noted, and starts on "low" from its next launch.
+ */
 function pickQuality() {
   const q = new URLSearchParams(location.search).get('q');
   if (q) return q;
-  try { const saved = localStorage.getItem('stranded2-quality'); if (saved) return saved; } catch (e) { /* private mode */ }
+  try {
+    const saved = localStorage.getItem('stranded2-quality'); if (saved) return saved;
+    if (localStorage.getItem(AUTO_KEY)) return 'low';
+  } catch (e) { /* private mode */ }
   const mobile = input.isTouch && Math.min(screen.width, screen.height) < 900;
-  return mobile ? 'low' : 'high';
+  autoQuality = mobile;
+  return mobile ? 'medium' : 'high';
 }
 
 async function boot() {
@@ -221,7 +234,20 @@ function frame() {
   lastT = now;
   // hold the frame rate by trading resolution (checked about once a second)
   fpsAcc += rawDt; fpsN++;
-  if (fpsAcc > 1) { if (!window.__MG.fixedResolution) ctx.engine.adaptResolution((fpsAcc / fpsN) * 1000, 1000 / 55); window.__MG.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+  if (fpsAcc > 1) {
+    if (!window.__MG.fixedResolution) ctx.engine.adaptResolution((fpsAcc / fpsN) * 1000, 1000 / 55);
+    window.__MG.fps = fpsN / fpsAcc;
+    // ten seconds in a row under 27 frames a second at the lowest resolution, in play: this phone wants the lighter preset
+    if (autoQuality && S.started && !S.over && !window.__MG.paused && !document.hidden) {
+      slowFrames = window.__MG.fps < 27 && ctx.engine.dynScale <= 0.56 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
+      if (slowFrames >= 10) {
+        autoQuality = false;
+        try { localStorage.setItem(AUTO_KEY, 'low'); } catch (e) { /* private mode */ }
+        toast('GRAPHICS', 'Lighter graphics from next time', 'This phone is working hard to keep up. The game will open on its lighter setting from now on. Settings has the choice.');
+      }
+    }
+    fpsAcc = 0; fpsN = 0;
+  }
   if (!window.__MG.paused) lastFocus = tick(dt);
   draw(window.__MG.paused ? 0 : dt, lastFocus);
 }

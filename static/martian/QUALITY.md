@@ -4,6 +4,29 @@ This file is the bar the game is held to, what has been measured against it, and
 open. A session that changes the game updates it. "Measured" always says how: a number from
 headless Chromium with software rendering (SwiftShader) is not a real frame rate.
 
+## Direction from the owner
+
+Said on 12 November, after the fifth review round, in the owner's words:
+
+- "Desktop is a bonus but I think this should be optimized for my iphone (probably landscape?)"
+- "you can either play through the books storyline", or "build a base you start basically at the
+  beginning of the book but can build a whole mars base (lots more resources things to build etc)":
+  "a build-a-base mode where you never get rescued", "sorta like valheim-style game (but no enemies
+  I guess)".
+- "Finish the storyline mode first though."
+
+What follows from it:
+
+1. **The iPhone in landscape is the target; desktop is a bonus.** Phones start on the "medium"
+   preset (they started on "low", so the owner had been seeing a plainer picture than the one being
+   reviewed), and step themselves down if they cannot hold the frame rate. Review pictures are taken
+   at iPhone size with touch on. A fault on the phone outranks any fault on the desktop.
+2. **Story mode is finished first.** It is finished when the picture and interface bars below are
+   met on the phone and the owner has played it on the iPhone.
+3. **Base mode comes after.** The same opening, no rescue and no end: gather far more kinds of
+   resource and build a whole base from them. Not started. Keep story-mode systems (crafting,
+   deployables, pads, saves) general enough that a second mode can reuse them.
+
 ## How to check
 
 ```
@@ -277,7 +300,9 @@ desktop-only review is owed.
 | --- | --- | --- |
 | 21 | Act on the fifth picture review (X1–X15 above) | in progress: landmarks, lighting, storm, ice, blast marks and the camera are acted on and wait for a sixth review; the rocks pass (X6) and the outcrop and wreck models are in hand; interior light pools, paths worn into the ground and region-specific landmarks are open |
 | 22 | Act on the third interface review (Y1–Y19 above) | in hand |
-| 23 | A desktop-only interface review (the third review could read only four desktop pictures) | owed, after 22 |
+| 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
+| 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
+| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | after story mode is finished |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | blocked on hardware |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |
