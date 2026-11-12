@@ -1,0 +1,72 @@
+// Wires game events to visual effects: dust from boots, wheels, landings and the rocket,
+// boot prints and tyre tracks.
+import * as THREE from 'three';
+import { ctx } from './ctx.js';
+import { S } from './state.js';
+import { on } from '../core/events.js';
+import { player } from './player.js';
+import { roverF } from './rover.js';
+import { World } from '../world/build.js';
+import { surfaceAt } from '../planet/surface.js';
+import { Y_AXIS } from '../core/scratch.js';
+
+const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _q = new THREE.Quaternion(), _d = new THREE.Vector3();
+let trackDist = 0, plumeT = 0, launchT = 0;
+
+function onGround(pos) { return pos.normalize().multiplyScalar(surfaceAt(pos)); }
+
+export function initEffects() {
+  on('footstep', (e) => {
+    if (S.inside || S.inAirlock || S.mode !== 'walk') return;
+    _q.copy(player.q).multiply(new THREE.Quaternion().setFromAxisAngle(Y_AXIS, player.face));
+    _f.set(0, 0, -1).applyQuaternion(_q);
+    _r.set(1, 0, 0).applyQuaternion(_q);
+    _p.copy(player.pos).addScaledVector(_r, e.foot ? 0.12 : -0.12);
+    onGround(_p);
+    ctx.vfx.mark('boot', _p, _f);
+    ctx.vfx.puff(_p, { count: e.run ? 4 : 2, speed: e.run ? 0.9 : 0.5, up: 0.35, spread: 0.12, size: e.run ? 0.34 : 0.24, life: 1.3, dir: _d.copy(_f).multiplyScalar(-0.5) });
+  });
+  on('land', (e) => {
+    if (S.inside || S.inAirlock) return;
+    ctx.vfx.puff(player.pos, { count: Math.min(16, 5 + Math.round(e.speed * 2)), speed: 1.2 + e.speed * 0.25, up: 0.5, spread: 0.25, size: 0.5, life: 1.9 });
+  });
+  on('dust', (e) => { ctx.vfx.puff(e.pos, e); });
+}
+
+/** Per-frame effects that follow continuous motion (the rover's wheels, the rocket's exhaust). */
+export function updateEffects(dt) {
+  if (S.mode === 'rover' && World.rover) {
+    const v = Math.abs(roverF.speed);
+    if (v > 0.8) {
+      const G = World.rover.group;
+      _f.set(0, 0, -1).applyQuaternion(roverF.q);
+      _r.set(1, 0, 0).applyQuaternion(roverF.q);
+      // tyre tracks: a pair of marks every 0.85 m
+      trackDist += v * dt;
+      if (trackDist > 0.85) {
+        trackDist = 0;
+        for (const side of [-1.22, 1.22]) {
+          _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -1.9 * Math.sign(roverF.speed));
+          ctx.vfx.mark('tyre', onGround(_p), _f);
+        }
+      }
+      // dust plumes off the rear wheels, heavier with speed
+      plumeT += dt * Math.min(40, 6 + v * 1.2);
+      while (plumeT > 1) {
+        plumeT -= 1;
+        const side = Math.random() < 0.5 ? -1.22 : 1.22;
+        _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -2.2 * Math.sign(roverF.speed));
+        ctx.vfx.puff(onGround(_p), { count: 1, speed: 0.6 + v * 0.04, up: 0.5 + v * 0.03, spread: 0.3, size: 0.6 + v * 0.03, life: 2.2 + v * 0.03, dir: _d.copy(_f).multiplyScalar(-v * 0.18 * Math.sign(roverF.speed)) });
+      }
+    }
+  }
+  if (S.mode === 'cutscene' && World.mavFlame && World.mavFlame.visible && World.mavRocket) {
+    // the ascent engine scours the pad for the first seconds of the climb
+    const alt = World.mavRocket.position.y - (World.mavRocketY || 0);
+    launchT += dt;
+    if (alt < 60 && launchT > 0.03) {
+      launchT = 0;
+      ctx.vfx.puff(World.mav.position, { count: 6, speed: 9 + Math.random() * 6, up: 1.5, spread: 2.5, size: 2.6, life: 4.5, tone: 0.5 });
+    }
+  }
+}

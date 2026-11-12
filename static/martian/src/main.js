@@ -16,6 +16,8 @@ import { Snd } from './audio/sound.js';
 import { World, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
 import { RockField } from './world/rocks.js';
+import { Vfx } from './render/vfx.js';
+import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
 import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, initRoverAt } from './game/rover.js';
@@ -61,6 +63,8 @@ async function boot() {
     shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0 });
+  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600 });
+  initEffects();
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
@@ -107,6 +111,7 @@ function draw(dt, focus) {
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;
   e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
+  ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height });
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();
@@ -120,6 +125,7 @@ function tick(dt) {
   if ((S.uiOpen || screenOpen()) && !S.sleeping) return focus;
   if (S.mode === 'cutscene') {
     if (World.launchAnim) World.launchAnim(dt);
+    updateEffects(dt);
     updateSunDir();
     return World.mav.position;
   }
@@ -132,6 +138,7 @@ function tick(dt) {
     updateInteract(dt);
     updateDiscoveries(dt);
     updatePing();
+    updateEffects(dt);
   }
   Snd.wind((S.inside ? 0.05 : 0.16) + S.storm.i * 0.65 + (S.breach.active && S.inside ? 0.4 : 0));
   blinkT += dt;

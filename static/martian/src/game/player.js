@@ -150,10 +150,10 @@ export function buildAstronaut() {
   for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
   anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 38, 0.62, 0.6, 1.4);
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 34, 0.5, 0.7, 1.2);
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
-  tgt.position.set(0, -0.35, 6);
+  tgt.position.set(0, -1.1, 8);
   lamp.position.set(0, 0.12, 0.1);
   at.add(lamp, tgt);
   lamp.target = tgt;
@@ -234,8 +234,8 @@ export function updateAstronaut(dt) {
   }
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
-  const lampOn = driving ? 0 : Math.max(dark, S.inside ? 0 : S.storm.i > 0.6 ? 0.6 : 0);
-  anim.lamp.intensity = lerp(anim.lamp.intensity, lampOn * 260, damp(0.25, dt));
+  const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
+  anim.lamp.intensity = lerp(anim.lamp.intensity, lampOn * 42, damp(0.25, dt));
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };

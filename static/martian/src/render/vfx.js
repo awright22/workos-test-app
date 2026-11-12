@@ -1,0 +1,280 @@
+/*
+ * Dust and marks: the things that make the ground feel loose and the air feel real.
+ *
+ *   - Air dust: motes that drift past on the wind; in a storm they become a streaming blizzard.
+ *     Their motion is computed entirely in the vertex shader from a seed and the clock.
+ *   - Puffs: short-lived dust kicked up by boots, wheels, landings, digging and rocket exhaust.
+ *     A fixed pool, written only when something is emitted.
+ *   - Marks: boot prints and tyre tracks pressed into the regolith, in a ring buffer that
+ *     slowly fills and overwrites its oldest entries.
+ */
+import * as THREE from 'three';
+import { R } from '../planet/constants.js';
+
+function softSprite(size = 64) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+function markTexture(kind) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, 64, 128);
+  if (kind === 'boot') {
+    // a lugged sole: a soft outline with heel block and forefoot bars pressed deeper
+    g.fillStyle = '#555';
+    g.beginPath(); g.ellipse(32, 44, 19, 36, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(32, 104, 15, 19, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff';
+    for (let y = 16; y < 76; y += 11) g.fillRect(17, y, 30, 5);
+    g.fillRect(20, 94, 24, 6); g.fillRect(20, 106, 24, 6);
+  } else {
+    // a tyre: a faint band with chevron grousers, feathered at the edges
+    const band = g.createLinearGradient(0, 0, 64, 0);
+    band.addColorStop(0, '#000'); band.addColorStop(0.18, '#3a3a3a'); band.addColorStop(0.82, '#3a3a3a'); band.addColorStop(1, '#000');
+    g.fillStyle = band; g.fillRect(0, 0, 64, 128);
+    g.lineWidth = 6; g.strokeStyle = '#d0d0d0';
+    for (let y = -10; y < 140; y += 32) { g.beginPath(); g.moveTo(10, y + 16); g.lineTo(32, y); g.lineTo(54, y + 16); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
+const _s = new THREE.Vector3(), _y = new THREE.Vector3(0, 1, 0), _e = new THREE.Vector3(), _n = new THREE.Vector3();
+
+export class Vfx {
+  /** @param {THREE.Scene} scene  @param {{air?: number, puffs?: number, marks?: number}} [o] */
+  constructor(scene, o = {}) {
+    this.scene = scene;
+    this.time = 0;
+    this.sprite = softSprite();
+    this._initAir(o.air === undefined ? 1400 : o.air);
+    this._initPuffs(o.puffs || 500);
+    this._initMarks(o.marks || 500);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  _initAir(n) {
+    const seeds = new Float32Array(n * 3), rnd = new Float32Array(n);
+    for (let i = 0; i < n; i++) { seeds[i * 3] = Math.random(); seeds[i * 3 + 1] = Math.random(); seeds[i * 3 + 2] = Math.random(); rnd[i] = Math.random(); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(seeds, 3));
+    g.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
+    this.airU = {
+      uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector3(1, 0, 0) }, uUp: { value: new THREE.Vector3(0, 1, 0) },
+      uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uPx: { value: 600 }, uMap: { value: this.sprite }, uAmount: { value: 1 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.airU, transparent: true, depthWrite: false, fog: false, blending: THREE.NormalBlending,
+      vertexShader: /* glsl */`
+        attribute float aRnd;
+        uniform float uTime, uStorm, uPx, uAmount;
+        uniform vec3 uCam, uWind, uUp;
+        varying float vA;
+        void main() {
+          const float BOX = 70.0;
+          // a box of motes that wraps around the camera: each stays put in the world as you move
+          float speed = mix(1.5, 26.0, uStorm) * (0.6 + 0.8 * aRnd);
+          vec3 world = position * BOX + uWind * (uTime * speed) - uUp * (uTime * (0.15 + uStorm * 1.2) * (0.5 + aRnd));
+          vec3 rel = mod(world - uCam, BOX) - BOX * 0.5;
+          vec4 mv = viewMatrix * vec4(rel, 0.0);
+          mv.w = 1.0;
+          gl_Position = projectionMatrix * mv;
+          float d = length(rel);
+          float size = mix(0.035, 0.22, uStorm) * (0.5 + aRnd);
+          gl_PointSize = clamp(size * uPx / max(-mv.z, 0.3), 1.0, 90.0);
+          float show = step(aRnd, mix(0.42, 1.0, uStorm) * uAmount);
+          vA = show * smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(BOX * 0.32, BOX * 0.5, d)) * mix(0.16, 0.42, uStorm);
+        }`,
+      fragmentShader: /* glsl */`
+        uniform sampler2D uMap; uniform vec3 uLight;
+        varying float vA;
+        void main() {
+          float a = texture2D(uMap, gl_PointCoord).a * vA;
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(uLight, a);
+        }`,
+    });
+    this.air = new THREE.Points(g, mat);
+    this.air.frustumCulled = false;
+    this.air.renderOrder = 20;
+    this.scene.add(this.air);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  _initPuffs(n) {
+    this.puffN = n; this.puffI = 0;
+    const g = new THREE.BufferGeometry();
+    this.pStart = new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+    this.pVel = new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+    this.pInfo = new THREE.BufferAttribute(new Float32Array(n * 4), 4);       // birth, life, size, tone
+    for (const a of [this.pStart, this.pVel, this.pInfo]) a.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < n; i++) this.pInfo.setXYZW(i, -100, 1, 0, 0);
+    g.setAttribute('position', this.pStart);
+    g.setAttribute('aVel', this.pVel);
+    g.setAttribute('aInfo', this.pInfo);
+    this.puffAnchor = new THREE.Vector3();
+    this.puffU = { uTime: { value: 0 }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uPx: { value: 600 }, uMap: { value: this.sprite },
+      // the renderer fills these in for materials that take fog
+      fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 }, fogNear: { value: 1 }, fogFar: { value: 2000 } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.puffU, transparent: true, depthWrite: false, fog: true,
+      vertexShader: /* glsl */`
+        #include <fog_pars_vertex>
+        attribute vec3 aVel; attribute vec4 aInfo;
+        uniform float uTime, uPx; uniform vec3 uUp;
+        varying float vA; varying float vTone;
+        void main() {
+          float age = uTime - aInfo.x;
+          float k = clamp(age / aInfo.y, 0.0, 1.0);
+          // fast at first, then hanging in the thin air
+          float travel = (1.0 - exp(-age * 2.2)) / 2.2;
+          vec3 p = position + aVel * travel - uUp * (0.35 * age * age * 0.5);
+          vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = clamp(aInfo.z * (0.6 + 1.9 * k) * uPx / max(-mvPosition.z, 0.3), 1.0, 220.0);
+          vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k) * 0.34;
+          vTone = aInfo.w;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: /* glsl */`
+        #include <fog_pars_fragment>
+        uniform sampler2D uMap; uniform vec3 uLight;
+        varying float vA; varying float vTone;
+        void main() {
+          float a = texture2D(uMap, gl_PointCoord).a * vA;
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(uLight * mix(vec3(0.62, 0.34, 0.20), vec3(1.0, 0.9, 0.8), vTone), a);
+          #include <fog_fragment>
+        }`,
+    });
+    this.puffs = new THREE.Points(g, mat);
+    this.puffs.frustumCulled = false;
+    this.puffs.renderOrder = 21;
+    this.scene.add(this.puffs);
+  }
+
+  /**
+   * Kick up dust at a world position.
+   * @param {THREE.Vector3} pos
+   * @param {{count?: number, speed?: number, up?: number, spread?: number, size?: number, life?: number, tone?: number, dir?: THREE.Vector3}} [o]
+   */
+  puff(pos, o = {}) {
+    const count = o.count || 6, speed = o.speed === undefined ? 1.2 : o.speed, up = o.up === undefined ? 0.8 : o.up;
+    const spread = o.spread === undefined ? 0.25 : o.spread, size = o.size || 0.5, life = o.life || 1.6;
+    // re-anchor when the action has moved far, so positions stay exact in single precision
+    if (pos.distanceToSquared(this.puffAnchor) > 400 * 400) {
+      for (let i = 0; i < this.puffN; i++) this.pInfo.setX(i, -100);
+      this.puffAnchor.copy(pos);
+      this.puffs.position.copy(pos);
+    }
+    _n.copy(pos).normalize();
+    _e.set(-_n.z, 0, _n.x).normalize();
+    _v.crossVectors(_n, _e);
+    for (let i = 0; i < count; i++) {
+      const k = this.puffI; this.puffI = (this.puffI + 1) % this.puffN;
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random());
+      const ox = Math.cos(a) * r * spread, oz = Math.sin(a) * r * spread;
+      this.pStart.setXYZ(k, pos.x - this.puffAnchor.x + _e.x * ox + _v.x * oz, pos.y - this.puffAnchor.y + _e.y * ox + _v.y * oz, pos.z - this.puffAnchor.z + _e.z * ox + _v.z * oz);
+      const s = speed * (0.4 + Math.random() * 0.9), u = up * (0.5 + Math.random());
+      let vx = _e.x * Math.cos(a) * s + _v.x * Math.sin(a) * s + _n.x * u, vy = _e.y * Math.cos(a) * s + _v.y * Math.sin(a) * s + _n.y * u, vz = _e.z * Math.cos(a) * s + _v.z * Math.sin(a) * s + _n.z * u;
+      if (o.dir) { vx += o.dir.x; vy += o.dir.y; vz += o.dir.z; }
+      this.pVel.setXYZ(k, vx, vy, vz);
+      this.pInfo.setXYZW(k, this.time, life * (0.7 + Math.random() * 0.6), size * (0.6 + Math.random() * 0.8), o.tone || 0);
+    }
+    this.pStart.needsUpdate = true; this.pVel.needsUpdate = true; this.pInfo.needsUpdate = true;
+  }
+
+  // ---------------------------------------------------------------------------------------
+  _initMarks(n) {
+    this.markN = n;
+    const mk = (kind, w, l) => {
+      const geo = new THREE.PlaneGeometry(w, l);
+      geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x1c0d06, alphaMap: markTexture(kind), transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, fog: true });
+      const m = new THREE.InstancedMesh(geo, mat, n);
+      m.count = 0; m.frustumCulled = false; m.renderOrder = 2;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      this.scene.add(m);
+      return { mesh: m, i: 0, used: 0, world: new Float64Array(n * 3), quat: new Float32Array(n * 4), anchor: new THREE.Vector3() };
+    };
+    this.boots = mk('boot', 0.16, 0.34);
+    this.tyres = mk('tyre', 0.46, 0.9);
+  }
+
+  /** Press a mark into the ground. `forward` is the direction of travel (world). */
+  mark(kind, pos, forward) {
+    const set = kind === 'boot' ? this.boots : this.tyres;
+    const k = set.i; set.i = (set.i + 1) % this.markN; set.used = Math.min(this.markN, set.used + 1);
+    _n.copy(pos).normalize();
+    _q.setFromUnitVectors(_y, _n);
+    // heading within the tangent plane
+    _e.copy(forward).addScaledVector(_n, -forward.dot(_n)).normalize();
+    _v.set(0, 0, -1).applyQuaternion(_q);
+    let ang = Math.atan2(_v.clone().cross(_e).dot(_n), _v.dot(_e));
+    _q2.setFromAxisAngle(_y, ang);
+    _q.multiply(_q2);
+    set.world[k * 3] = pos.x; set.world[k * 3 + 1] = pos.y; set.world[k * 3 + 2] = pos.z;
+    set.quat[k * 4] = _q.x; set.quat[k * 4 + 1] = _q.y; set.quat[k * 4 + 2] = _q.z; set.quat[k * 4 + 3] = _q.w;
+    if (set.used === 1 || _v.set(pos.x, pos.y, pos.z).distanceToSquared(set.anchor) > 300 * 300) this._reanchor(set, pos);
+    else this._write(set, k);
+    set.mesh.count = set.used;
+    set.mesh.instanceMatrix.needsUpdate = true;
+  }
+  _write(set, k) {
+    _v.set(set.world[k * 3] - set.anchor.x, set.world[k * 3 + 1] - set.anchor.y, set.world[k * 3 + 2] - set.anchor.z);
+    // lift a hair off the surface along the normal
+    _n.set(set.world[k * 3], set.world[k * 3 + 1], set.world[k * 3 + 2]).normalize();
+    _v.addScaledVector(_n, 0.025);
+    _q.set(set.quat[k * 4], set.quat[k * 4 + 1], set.quat[k * 4 + 2], set.quat[k * 4 + 3]);
+    _m.compose(_v, _q, _s.set(1, 1, 1));
+    set.mesh.setMatrixAt(k, _m);
+  }
+  _reanchor(set, pos) {
+    set.anchor.copy(pos);
+    set.mesh.position.copy(pos);
+    for (let k = 0; k < set.used; k++) this._write(set, k);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  /**
+   * @param {number} dt
+   * @param {THREE.Camera} camera
+   * @param {{storm:number, sunColor:THREE.Color, sunIntensity:number, ambient:THREE.Color, inside:boolean, pixelHeight:number}} p
+   */
+  update(dt, camera, p) {
+    this.time += dt;
+    const up = _n.copy(camera.position).normalize();
+    // the wind blows roughly east, veering slowly
+    _e.set(-up.z, 0, up.x).normalize();
+    _v.crossVectors(up, _e);
+    const veer = Math.sin(this.time * 0.013) * 0.6;
+    const px = (p.pixelHeight || 720) / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const lit = Math.min(1.6, 0.25 + p.sunIntensity * 0.32);
+    const a = this.airU;
+    a.uTime.value = this.time; a.uCam.value.copy(camera.position); a.uUp.value.copy(up);
+    a.uWind.value.copy(_e).multiplyScalar(Math.cos(veer)).addScaledVector(_v, Math.sin(veer));
+    a.uStorm.value = p.storm; a.uPx.value = px;
+    a.uAmount.value = p.inside ? 0 : Math.max(0, 1 - (camera.position.length() - R) / 900);
+    a.uLight.value.setRGB(0.86 * lit + p.ambient.r * 0.4, 0.62 * lit + p.ambient.g * 0.4, 0.44 * lit + p.ambient.b * 0.4);
+    this.air.visible = a.uAmount.value > 0.01;
+    const u = this.puffU;
+    u.uTime.value = this.time; u.uUp.value.copy(up); u.uPx.value = px;
+    u.uLight.value.setRGB(lit * 0.75 + p.ambient.r * 0.8, lit * 0.72 + p.ambient.g * 0.8, lit * 0.7 + p.ambient.b * 0.8);
+  }
+}

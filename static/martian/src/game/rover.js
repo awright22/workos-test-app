@@ -171,7 +171,7 @@ export function updateRover(dt) {
   if (rv.steer.FL) { rv.steer.FL.rotation.y = RV.steer; rv.steer.FR.rotation.y = RV.steer; }
   if (rv.steer.RL) { rv.steer.RL.rotation.y = -RV.steer * 0.45; rv.steer.RR.rotation.y = -RV.steer * 0.45; }
   const lightsOn = night || S.storm.i > 0.5;
-  rv.headlight.intensity = lerp(rv.headlight.intensity, lightsOn ? 2600 : 0, damp(0.15, dt));
+  rv.headlight.intensity = lerp(rv.headlight.intensity, lightsOn ? 320 : 0, damp(0.15, dt));
   for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (lightsOn ? 1.6 : 0.12);
   if (rv.dish) rv.dish.rotation.y += dt * 0.15;
 
