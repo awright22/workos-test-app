@@ -86,6 +86,8 @@ export function faceToDir(face, s, t, out) {
 
 // scratch for the current sample: face, equi-angular coords, gnomonic coords
 let _f = 0, _s = 0, _t = 0, _sc = 0, _tc = 0;
+// slope (rise over run, exaggerated like the heights) of the elevation data at the last sample
+let _slope = 0;
 function locate(x, y, z) {
   const ax = x < 0 ? -x : x, ay = y < 0 ? -y : y, az = z < 0 ? -z : z;
   if (ax >= ay && ax >= az) {
@@ -101,6 +103,13 @@ function locate(x, y, z) {
 const CRATER_D = [64, 32, 16, 8];
 /** World metres per unit of the face coordinate s at a face centre. */
 const S_METRES = R * PI_4;
+
+/** Cube face and equi-angular face coordinates of a unit direction: writes [face, s, t]. */
+export function dirToFace(x, y, z, out) {
+  locate(x, y, z);
+  out[0] = _f; out[1] = _s; out[2] = _t;
+  return out;
+}
 
 export class Planet {
   constructor(data) {
@@ -156,16 +165,33 @@ export class Planet {
    *  minW is the finest wavelength to include (FINEST for collision; larger for far meshes). */
   radius(x, y, z, minW = FINEST) {
     locate(x, y, z);
-    const base = this._mola();
+    const base = this._ledges(this._mola(), x, y, z, minW);
     const rough = this._rough();
     const r = R + base + this._detail(x, y, z, rough, minW);
     return this.pads.length ? this._pad(x, y, z, r) : r;
   }
 
+  /**
+   * Steep ground is layered rock, and layered rock weathers into benches and risers. Where
+   * the real surface is steeper than loose material can lie, the height is re-shaped into wide
+   * ledges with short steep faces between them. Gentle ground is left alone.
+   */
+  _ledges(base, x, y, z, minW) {
+    if (_slope < 0.42 || minW > 6) return base;
+    let w = _slope >= 0.85 ? 1 : (_slope - 0.42) / 0.43;
+    w = w * w * (3 - 2 * w) * (minW > 3 ? (6 - minW) / 3 : 1);
+    // the layers are neither level nor evenly thick: tilt and swell them with broad noise
+    const H = 7.0;
+    const q = (base + gnoise3(x * R / 210 + 4.1, y * R / 210, z * R / 210 - 8.3) * 7) / H;
+    const f = q - Math.floor(q);
+    const step = f < 0.64 ? f * (0.26 / 0.64) : 0.26 + (f - 0.64) * (0.74 / 0.36);    // a wide bench, then a riser
+    return base + (step - f) * H * 0.9 * w;
+  }
+
   /** As radius(), for a direction given as face coordinates; faster for mesh grids. */
   radiusFace(face, s, t, x, y, z, minW) {
     _f = face; _s = s; _t = t; _sc = Math.tan(s * PI_4); _tc = Math.tan(t * PI_4);
-    const base = this._mola();
+    const base = this._ledges(this._mola(), x, y, z, minW);
     const rough = this._rough();
     const r = R + base + this._detail(x, y, z, rough, minW);
     return this.pads.length ? this._pad(x, y, z, r) : r;
@@ -186,6 +212,16 @@ export class Planet {
     const r1 = g[k] * wx0 + g[k + 1] * wx1 + g[k + 2] * wx2 + g[k + 3] * wx3; k += size;
     const r2 = g[k] * wx0 + g[k + 1] * wx1 + g[k + 2] * wx2 + g[k + 3] * wx3; k += size;
     const r3 = g[k] * wx0 + g[k + 1] * wx1 + g[k + 2] * wx2 + g[k + 3] * wx3;
+    // the same sixteen samples give the slope: differentiate the weights
+    const dx0 = (-3 * u2 + 4 * u - 1) * 0.5, dx1 = (9 * u2 - 10 * u) * 0.5, dx2 = (-9 * u2 + 8 * u + 1) * 0.5, dx3 = (3 * u2 - 2 * u) * 0.5;
+    const dy0 = (-3 * v2 + 4 * v - 1) * 0.5, dy1 = (9 * v2 - 10 * v) * 0.5, dy2 = (-9 * v2 + 8 * v + 1) * 0.5, dy3 = (3 * v2 - 2 * v) * 0.5;
+    k = (iy - 1) * size + ix - 1;
+    let du = (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy0; k += size;
+    du += (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy1; k += size;
+    du += (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy2; k += size;
+    du += (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy3;
+    const dv = r0 * dy0 + r1 * dy1 + r2 * dy2 + r3 * dy3;
+    _slope = Math.sqrt(du * du + dv * dv) * this.unit / (S_METRES * 2 / n);
     return (r0 * wy0 + r1 * wy1 + r2 * wy2 + r3 * wy3) * this.unit;
   }
 

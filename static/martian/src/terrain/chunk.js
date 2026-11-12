@@ -8,9 +8,16 @@ import { DETAIL_FRAME as DF, R } from '../planet/constants.js';
 import { gnoise3, hashU } from '../core/math.js';
 
 const PI_4 = Math.PI / 4;
+/** Metres across half a cube face, measured along its middle (face coordinate 1). */
+const FACE_M = R * PI_4;
 /** Detail-texture coordinates wrap every TEX_PERIOD metres; all texture scales divide it. */
 export const TEX_PERIOD = 64;
-const d = [0, 0, 0];
+const d = [0, 0, 0], d2 = [0, 0, 0];
+// rock gardens: [x, y, z of the site, reach in metres, how many times denser at the centre]
+const ROCK_GARDENS = [[19.13, 326.79, 420, 4], [22.48, 312.05, 420, 3.5], [47.97, 134.26, 420, 4.5], [-14.57, 175.47, 260, 1.5]].map(([lat, lon, reach, boost]) => {
+  const la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+  return [Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo), reach, boost];
+});
 
 /** Approximate distance between neighbouring vertices of a chunk at `level` (world metres). */
 export function chunkSpacing(level, G) { return (2 / (1 << level)) * R * PI_4 / G; }
@@ -48,6 +55,12 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   const ty = Math.floor((DF[3] * ox + DF[4] * oy + DF[5] * oz) / TEX_PERIOD) * TEX_PERIOD;
   const tz = Math.floor((DF[6] * ox + DF[7] * oy + DF[8] * oz) / TEX_PERIOD) * TEX_PERIOD;
   const N = (G + 1) * (G + 1), S = 4 * G;            // grid vertices + skirt vertices
+  // flat-ground texture coordinates: metres across this cube face, less a whole number of
+  // periods (for precision), and how close the vertex is to the face's edge (where the next
+  // face's coordinates run another way, so the shader falls back to the 3D detail there)
+  const us0 = Math.floor(((-1 + (gx0 + G / 2 + 1) * unit) * FACE_M) / TEX_PERIOD) * TEX_PERIOD;
+  const vs0 = Math.floor(((-1 + (gy0 + G / 2 + 1) * unit) * FACE_M) / TEX_PERIOD) * TEX_PERIOD;
+  const uv = new Float32Array((N + S) * 3);
   const pos = new Float32Array((N + S) * 3);
   const nor = new Int8Array((N + S) * 3);
   const tex = new Float32Array((N + S) * 3);
@@ -58,6 +71,10 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
       const x = px[k], y = py[k], z = pz[k];
       const lx = x - ox, ly = y - oy, lz = z - oz;
       pos[v * 3] = lx; pos[v * 3 + 1] = ly; pos[v * 3 + 2] = lz;
+      const fs = -1 + (gx0 + i + 1) * unit, ft = -1 + (gy0 + j + 1) * unit;
+      const toEdge = (1 - Math.max(Math.abs(fs), Math.abs(ft))) * FACE_M * 0.7;
+      uv[v * 3] = fs * FACE_M - us0; uv[v * 3 + 1] = ft * FACE_M - vs0;
+      uv[v * 3 + 2] = toEdge >= 16 ? 0 : toEdge <= 5 ? 1 : 1 - (toEdge - 5) / 11;
       tex[v * 3] = DF[0] * x + DF[1] * y + DF[2] * z - tx; tex[v * 3 + 1] = DF[3] * x + DF[4] * y + DF[5] * z - ty; tex[v * 3 + 2] = DF[6] * x + DF[7] * y + DF[8] * z - tz;
       const r2 = lx * lx + ly * ly + lz * lz;
       if (r2 > radius2) radius2 = r2;
@@ -80,13 +97,14 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
     pos[sv * 3] = pos[v * 3] - px[k] * f; pos[sv * 3 + 1] = pos[v * 3 + 1] - py[k] * f; pos[sv * 3 + 2] = pos[v * 3 + 2] - pz[k] * f;
     nor[sv * 3] = nor[v * 3]; nor[sv * 3 + 1] = nor[v * 3 + 1]; nor[sv * 3 + 2] = nor[v * 3 + 2];
     tex[sv * 3] = tex[v * 3]; tex[sv * 3 + 1] = tex[v * 3 + 1]; tex[sv * 3 + 2] = tex[v * 3 + 2];
+    uv[sv * 3] = uv[v * 3]; uv[sv * 3 + 1] = uv[v * 3 + 1]; uv[sv * 3 + 2] = uv[v * 3 + 2];
     sv++;
   };
   for (let i = 0; i < G; i++) skirt(i, 0);          // top edge, left to right
   for (let j = 0; j < G; j++) skirt(G, j);          // right edge, top to bottom
   for (let i = G; i > 0; i--) skirt(i, G);          // bottom edge, right to left
   for (let j = G; j > 0; j--) skirt(0, j);          // left edge, bottom to top
-  const out = { pos, nor, tex, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
+  const out = { pos, nor, tex, uv, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
   if (rocks) out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz);
   return out;
 }
@@ -132,9 +150,14 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
   const field = gnoise3(d[0] * R / 260 + 7.7, d[1] * R / 260, d[2] * R / 260 - 3.1);       // patchy boulder fields
   const patch = Math.min(1, Math.max(0, (field + 0.15) * 1.8));
   const lat = Math.abs(d[1]);
-  let density = kind === 'big' ? (0.0008 + 0.0075 * rough * rough) * (0.15 + 0.85 * patch) : (0.03 + 0.13 * rough) * (0.35 + 0.65 * patch);
+  let density = kind === 'big' ? (0.0010 + 0.0085 * rough * rough) * (0.15 + 0.85 * patch) : (0.05 + 0.16 * rough) * (0.35 + 0.65 * patch);
   if (lat > 0.97) density *= 0.15;                                                           // the ice caps are nearly bare
-  const n = Math.min(kind === 'big' ? 120 : 230, Math.floor(side * side * density));
+  // the first landing sites were rock gardens, and look it in every picture sent home
+  for (const g of ROCK_GARDENS) {
+    const away = Math.acos(Math.min(1, d[0] * g[0] + d[1] * g[1] + d[2] * g[2])) * R;
+    if (away < g[3]) density *= 1 + g[4] * (1 - away / g[3]);
+  }
+  const n = Math.min(kind === 'big' ? 160 : 300, Math.floor(side * side * density));
   const out = new Float32Array(n * 8);
   let seed = hashU(ix, iy, face, level * 7 + (kind === 'big' ? 1 : 2));
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
@@ -151,7 +174,16 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
     }
     if (!clear) continue;
     const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.5)) : 0.09 + 0.36 * u * u;
-    const r = planet.radiusFace(face, s, t, d[0], d[1], d[2], FINEST) - size * 0.08;
+    let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], FINEST);
+    // sit it in the ground: a little always, and on a slope by enough that its downhill side is not left in the air
+    let sink = size * (0.10 + 0.16 * v);
+    if (size > 0.5) {
+      const e = size * 0.6 / FACE_M;
+      faceToDir(face, s + e, t, d2); const ra = planet.radiusFace(face, s + e, t, d2[0], d2[1], d2[2], FINEST);
+      faceToDir(face, s, t + e, d2); const rb = planet.radiusFace(face, s, t + e, d2[0], d2[1], d2[2], FINEST);
+      sink += Math.min(size * 0.45, Math.hypot(ra - r, rb - r) * 0.8);
+    }
+    r -= sink;
     out[k++] = d[0] * r - ox; out[k++] = d[1] * r - oy; out[k++] = d[2] * r - oz;
     out[k++] = d[0]; out[k++] = d[1]; out[k++] = d[2];
     out[k++] = size; out[k++] = v;

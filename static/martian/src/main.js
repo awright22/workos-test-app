@@ -56,7 +56,7 @@ async function boot() {
   engine.scene.add(ctx.world);
   const data = await loadPlanet(loading, { maxColorFace: engine.q.scale < 0.7 ? 512 : 1024 });
   ctx.planet = data.planet;
-  const material = makeTerrainMaterial(data.albedoCube, { fine: engine.q.fine });
+  const material = makeTerrainMaterial(data.albedoCube, { fine: engine.q.fine, anisotropy: Math.min(engine.q.scale < 0.7 ? 4 : 8, engine.renderer.capabilities.getMaxAnisotropy()) });
   ctx.terrainMaterial = material;
   ctx.outdoor = new THREE.Group();                 // terrain and rocks: skipped while sealed inside the Hab
   engine.scene.add(ctx.outdoor);

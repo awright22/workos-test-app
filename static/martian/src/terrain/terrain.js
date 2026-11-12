@@ -145,6 +145,7 @@ export class Terrain {
     g.setAttribute('position', new THREE.BufferAttribute(c.pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(c.nor, 3, true));
     g.setAttribute('aTex', new THREE.BufferAttribute(c.tex, 3));
+    g.setAttribute('aUv', new THREE.BufferAttribute(c.uv, 3));
     g.setIndex(this.index);
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), c.radius);
     const mesh = new THREE.Mesh(g, this.material);

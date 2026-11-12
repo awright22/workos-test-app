@@ -14,7 +14,7 @@ self.onmessage = (e) => {
     const c = buildChunk(planet, m.face, m.level, m.ix, m.iy, m.G, m.rocks);
     c.type = 'chunk';
     c.id = m.id;
-    const transfer = [c.pos.buffer, c.nor.buffer, c.tex.buffer];
+    const transfer = [c.pos.buffer, c.nor.buffer, c.tex.buffer, c.uv.buffer];
     if (c.rocks) transfer.push(c.rocks.buffer);
     self.postMessage(c, transfer);
   }

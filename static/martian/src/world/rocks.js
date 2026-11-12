@@ -11,6 +11,9 @@ import { mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeomet
 import { gnoise3 } from '../core/math.js';
 import { detailTextures } from '../render/noise3d.js';
 import { GLSL_GROUND_GRADE } from '../render/terrain-material.js';
+import { dirToFace, faceToDir } from '../planet/height.js';
+import { R } from '../planet/constants.js';
+import { hashU } from '../core/math.js';
 
 /** Colliders for large rocks near the player: { v: unit direction, r: metres }. */
 export const rockColliders = [];
@@ -21,7 +24,7 @@ export const rockColliders = [];
  * smooth. Each vertex carries a tint: pale dust settled on what faces up, and a dark rim where
  * the rock meets the ground.
  */
-function rockGeometry(detail, seed, squash, cuts) {
+function rockGeometry(detail, seed, squash, cuts, crease = 0.8) {
   let g = new THREE.IcosahedronGeometry(1, detail);
   g.deleteAttribute('normal'); g.deleteAttribute('uv');
   g = mergeVertices(g, 1e-4);
@@ -45,7 +48,7 @@ function rockGeometry(detail, seed, squash, cuts) {
     if (y < -0.2) y = -0.2 + (y + 0.2) * 0.3;               // the buried part is flattened
     p.setXYZ(i, x, y, z);
   }
-  g = toCreasedNormals(g, 0.62);
+  g = toCreasedNormals(g, crease);
   // per vertex: how much dust has settled (what faces up), and the shade where rock meets ground
   const pos = g.attributes.position, nor = g.attributes.normal;
   const mix = new Float32Array(pos.count * 2);
@@ -145,11 +148,12 @@ export class RockField {
       return m;
     };
     // boulders close by get the detailed shapes and a shadow; the rest are cheap
-    this.near = [rockGeometry(2, 1.7, 0.74, 7), rockGeometry(2, 5.3, 0.62, 9)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
-    this.far = [rockGeometry(1, 9.2, 0.6, 4), rockGeometry(1, 4.4, 0.82, 5)].map((g) => mk(g, Math.round(700 * this.density), false));
+    this.near = [rockGeometry(3, 1.7, 0.74, 4, 0.85), rockGeometry(3, 5.3, 0.62, 5, 0.85)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
+    this.far = [rockGeometry(1, 9.2, 0.6, 3, 1.1), rockGeometry(1, 4.4, 0.82, 4, 1.1)].map((g) => mk(g, Math.round(700 * this.density), false));
     // stones: a rounder shape underfoot, the simplest one beyond
-    this.smallNear = mk(rockGeometry(1, 2.6, 0.66, 4), Math.round(260 * this.density), this.shadowRange > 0);
-    this.small = mk(rockGeometry(0, 6.1, 0.62, 0), Math.round(3200 * this.density), false);
+    this.smallNear = mk(rockGeometry(2, 2.6, 0.66, 3, 1.0), Math.round(260 * this.density), this.shadowRange > 0);
+    this.small = mk(rockGeometry(0, 6.1, 0.62, 0, 3.2), Math.round(3600 * this.density), false);
+    this.gravel = new GravelField(parent, terrain.planet, mat, { reach: this.density < 0.7 ? 9 : 14, cap: Math.round(2600 * Math.min(1, this.density)) });
     this.smallCap = this.small.instanceMatrix.count;
     terrain.onChunk = (node, c) => { if (c.rocks && c.rocks.length) { this.sets.set(node, { kind: node.level === terrain.rockLevels.big ? 'big' : 'small', data: c.rocks, origin: c.origin }); this.dirty = true; } };
     terrain.onDispose = (node) => { if (this.sets.delete(node)) this.dirty = true; };
@@ -158,6 +162,7 @@ export class RockField {
   /** Call once a frame after terrain.update(). */
   update(camPos) {
     this.material.userData.uniforms.uHere.value.copy(camPos).normalize();
+    this.gravel.update(camPos);
     if (!this.dirty && camPos.distanceToSquared(this.lastCam) < 18 * 18) return;
     this.dirty = false;
     this.lastCam.copy(camPos);
@@ -189,10 +194,10 @@ export class RockField {
         _s.set(size * (0.75 + ((rnd * 7) % 1) * 0.6), size * (0.6 + ((rnd * 13) % 1) * 0.7), size * (0.75 + ((rnd * 29) % 1) * 0.6));
         _m.compose(_p.set(x - this.anchor.x, y - this.anchor.y, z - this.anchor.z), _q2, _s);
         // tone of the bare stone: weathered brown through to dark basalt (dust is added on top by the shape's own tint)
-        const dark = (rnd * 3.7) % 1;
-        _c.setRGB(0.62 - dark * 0.30, 0.60 - dark * 0.30, 0.60 - dark * 0.28);
+        const dark = (rnd * 3.7) % 1, pale = (rnd * 11.3) % 1 > 0.86 ? 0.25 : 0;     // most are dark basalt; a few are pale and dusty
+        _c.setRGB(0.56 - dark * 0.34 + pale, 0.54 - dark * 0.33 + pale, 0.55 - dark * 0.31 + pale);
         if (big) {
-          const close = dist < 60 && size > 0.5;
+          const close = dist < 40 && size > 0.5;            // the detailed, shadow-casting shapes: only where the detail can be seen
           const nv = rnd < 0.5 ? 0 : 1;
           if (close && nNear[nv] < this.near[nv].instanceMatrix.count) {
             this.near[nv].setMatrixAt(nNear[nv], _m); this.near[nv].setColorAt(nNear[nv], _c); nNear[nv]++;
@@ -218,5 +223,96 @@ export class RockField {
     flush(this.near[0], nNear[0]); flush(this.near[1], nNear[1]); flush(this.far[0], nFar[0]); flush(this.far[1], nFar[1]);
     flush(this.smallNear, nSmallNear); flush(this.small, nSmall);
     this.counts = { big: nNear[0] + nNear[1] + nFar[0] + nFar[1], near: nNear[0] + nNear[1], small: nSmall + nSmallNear, colliders: rockColliders.length };
+  }
+}
+
+/*
+ * Gravel: loose pebbles on the ground around the camera, as geometry. Texture alone cannot give
+ * the near ground stones that stand up and catch the light. The pebbles are placed by a hash
+ * of a grid laid across the cube face, so each one is always in the same place; cells come and
+ * go as the camera moves. They lie in patches, not evenly.
+ */
+const CELL = 1.6;                           // metres
+const FACE_M = R * Math.PI / 4;
+const _fc = [0, 0, 0], _fd = [0, 0, 0];
+class GravelField {
+  constructor(parent, planet, material, o = {}) {
+    this.planet = planet;
+    this.reach = o.reach || 14;
+    this.cap = o.cap || 2600;
+    this.cells = new Map();                  // key -> Float64Array of pebbles: x, y, z, up xyz, size, rnd
+    this.at = [NaN, NaN, NaN];
+    this.mesh = new THREE.InstancedMesh(rockGeometry(0, 3.3, 0.6, 0, 3.2), material, this.cap);
+    this.mesh.castShadow = false; this.mesh.receiveShadow = true; this.mesh.frustumCulled = false; this.mesh.count = 0;
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    parent.add(this.mesh);
+  }
+
+  _cell(face, ci, cj) {
+    const h0 = hashU(ci, cj, face, 71);
+    // patches: a slow field decides how stony this cell is
+    faceToDir(face, (ci + 0.5) * CELL / FACE_M, (cj + 0.5) * CELL / FACE_M, _fd);
+    const patch = gnoise3(_fd[0] * R / 9 + 3.3, _fd[1] * R / 9, _fd[2] * R / 9 - 5.1) + 0.5 * gnoise3(_fd[0] * R / 31, _fd[1] * R / 31 + 9.2, _fd[2] * R / 31);
+    const n = Math.max(0, Math.round((0.6 + patch * 3.2) * 4 + ((h0 & 255) / 255 - 0.5) * 3));
+    const out = new Float64Array(n * 8);
+    let seed = h0, k = 0;
+    const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    const pads = this.planet.pads;
+    for (let i = 0; i < n; i++) {
+      const s = (ci + rnd()) * CELL / FACE_M, t = (cj + rnd()) * CELL / FACE_M, u = rnd(), v = rnd();
+      if (s <= -1 || s >= 1 || t <= -1 || t >= 1) continue;
+      faceToDir(face, s, t, _fd);
+      // keep the middle of a levelled site clear: that is where the buildings stand
+      let clear = true;
+      for (let p = 0; p < pads.length; p++) {
+        const pd = pads[p], keep = pd.r >= 40 ? 13.5 : pd.r >= 12 ? 6 : Math.min(pd.r, 4.5);
+        if (_fd[0] * pd.x + _fd[1] * pd.y + _fd[2] * pd.z > Math.cos(keep / R)) { clear = false; break; }
+      }
+      if (!clear) continue;
+      const size = 0.018 + 0.085 * u * u * u;                              // 2 to 10 cm, most of them small
+      const r = this.planet.radiusFace(face, s, t, _fd[0], _fd[1], _fd[2], 1.5) - size * 0.25;
+      out[k++] = _fd[0] * r; out[k++] = _fd[1] * r; out[k++] = _fd[2] * r;
+      out[k++] = _fd[0]; out[k++] = _fd[1]; out[k++] = _fd[2];
+      out[k++] = size; out[k++] = v;
+    }
+    return k === out.length ? out : out.subarray(0, k);
+  }
+
+  update(camPos) {
+    const len = camPos.length();
+    if (len - R > 400) { if (this.mesh.count) { this.mesh.count = 0; this.cells.clear(); this.at[0] = NaN; } return; }
+    dirToFace(camPos.x / len, camPos.y / len, camPos.z / len, _fc);
+    const face = _fc[0], ci0 = Math.floor(_fc[1] * FACE_M / CELL), cj0 = Math.floor(_fc[2] * FACE_M / CELL);
+    if (face === this.at[0] && ci0 === this.at[1] && cj0 === this.at[2]) return;
+    this.at[0] = face; this.at[1] = ci0; this.at[2] = cj0;
+    const span = Math.ceil(this.reach / CELL), keep = new Set();
+    for (let dj = -span; dj <= span; dj++) for (let di = -span; di <= span; di++) {
+      if (di * di + dj * dj > span * span) continue;
+      const key = face + ':' + (ci0 + di) + ':' + (cj0 + dj);
+      keep.add(key);
+      if (!this.cells.has(key)) this.cells.set(key, this._cell(face, ci0 + di, cj0 + dj));
+    }
+    for (const key of this.cells.keys()) if (!keep.has(key)) this.cells.delete(key);
+    // instance positions are stored relative to a point near the camera, to stay float32-exact
+    this.mesh.position.copy(camPos);
+    let n = 0;
+    for (const d of this.cells.values()) {
+      for (let i = 0; i < d.length && n < this.cap; i += 8) {
+        const size = d[i + 6], rnd = d[i + 7];
+        _up.set(d[i + 3], d[i + 4], d[i + 5]);
+        _q.setFromUnitVectors(_y, _up);
+        _q2.setFromAxisAngle(_y, rnd * 6.283).premultiply(_q);
+        _ax.set(Math.sin(rnd * 40), 0, Math.cos(rnd * 40));
+        _q2.multiply(_q.setFromAxisAngle(_ax, (rnd - 0.5) * 1.2));
+        _s.set(size * (0.8 + ((rnd * 7) % 1) * 0.7), size * (0.5 + ((rnd * 13) % 1) * 0.6), size * (0.8 + ((rnd * 29) % 1) * 0.7));
+        _m.compose(_p.set(d[i] - camPos.x, d[i + 1] - camPos.y, d[i + 2] - camPos.z), _q2, _s);
+        const dark = (rnd * 3.7) % 1;
+        _c.setRGB(0.50 - dark * 0.30, 0.48 - dark * 0.29, 0.49 - dark * 0.27);
+        this.mesh.setMatrixAt(n, _m); this.mesh.setColorAt(n, _c); n++;
+      }
+    }
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 }
