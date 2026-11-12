@@ -10,7 +10,7 @@ headless Chromium with software rendering (SwiftShader) is not a real frame rate
 cd tools && npm ci
 node build.mjs              # bundle src/ -> game.js, terrain-worker.js, game.css, sw.js
 node lint.mjs               # undefined names, bad imports
-node tests/run.mjs          # smoke, interface, story arc, saves, science, machines, farm, photo, audio wiring
+node tests/run.mjs          # smoke, interface, story arc, saves, science, machines, farm, photo, sights, audio wiring
 node tests/first-ten.mjs    # the first ten minutes on a phone, as numbered screenshots (--desktop)
 node tests/audio.mjs        # 129 offline audio renders measured for loudness and clicks (5 min)
 node tests/perf.mjs         # draw calls and triangles per frame against the budgets below
@@ -34,7 +34,7 @@ the local time and the weather, step the simulation without drawing, and place a
 | Load | Title screen interactive in under 5 s on a 20 Mbit connection; total download under 14 MB; works offline after first load | 13.0 MB precached (52 files); `game.js` is 1.09 MB. Headless load to title: 1.2–5.5 s from localhost. Not measured on a phone network |
 | Console | Zero errors or warnings in a full playthrough | Zero errors in every test and screenshot run |
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
-| Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, audio wiring 26/26 |
+| Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
 | Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 3: NEARLY. Washes to peach at high sun and toward the sun; the sky drifts to khaki (T5, T6) |
 | Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 3: NEARLY. Low sun, long shadows and the blue glow are right; pale slivers on dark hills remain |
@@ -138,15 +138,15 @@ phone.
 | U8 | Phone drops what the player needs: third mission line, crop descriptions, storm explanation, photo-mode hint | part fixed: the reason for each new objective is toasted on phones; the seed chooser's sub-line carries what planting costs. The phone still shows two mission lines (three collide with the touch buttons) |
 | U9 | Focus ring contradicts the selection (new game, colony tabs); a ring shown on touch | fixed for touch: no focus ring there |
 | U10 | Photo-mode bar takes 150 of 390 px on a phone, cannot be hidden; "Slide" and "Astronaut" unclear | fixed: starts minimised on phones (Controls / Take photo / Done); check marks on toggles; "Sideways" |
-| U11 | Map: unlabelled icon buttons over content on the phone, labels piling on the player marker, legend covering the corner | open |
+| U11 | Map: unlabelled icon buttons over content on the phone, labels piling on the player marker, legend covering the corner | fixed: on a phone the tools are three buttons with a word under each (You, Hab, Key; two fingers zoom, so no zoom buttons); markers that fall on one another show as one with a count ("Hab +6") and each tap steps through them; labels keep inside the map; the key lies along the bottom in two columns and goes when the map is touched. To re-review |
 | U12 | Suit number goes dark red on dark when critical | fixed: the ring pulses, the number stays lit |
 | U13 | Hold/tap labels disagree; the action button can read "RUN" beside the sprint button "RUN" | part fixed: the action button no longer reads RUN beside the sprint button |
-| U14–17 | Sliced section headers with no scroll cue; nine different status words; chips that read "1 tomato seeds"; thin win and sleep screens; nine identical "unknown lander" cards | open |
+| U14–17 | Sliced section headers with no scroll cue; nine different status words; chips that read "1 tomato seeds"; thin win and sleep screens; nine identical "unknown lander" cards | mostly fixed: every scrolling region fades toward an edge that hides more of it; the rescue screen is two columns with the run sol by sol (each objective's completion is dated from now on), new statistics and a closing line written from the run, in place of a quotation from the film; what is not yet found in the journal is one card with a count ("9 more landers"). Left as they are: the status words, each of which names a different thing (a task complete, an upgrade owned, a lander salvaged). To re-review |
 | O1 | The six bars are never named or explained; Morale appears and moves without a word | part fixed: named bars on phones; the premise card names the six bars; Morale is explained at the first dawn |
 | O2 | The premise and the goal ("10 rations, rescue Sol 25: farm or starve") are toasts that vanish | fixed: "the numbers" is a card he reads and dismisses (rations, earliest rescue, sols with nothing to eat, what to do) |
 | O3 | Objectives say what, never why or where; no marker for the current target | fixed: the current objective carries its reason, and a waypoint marks its place in the world (a machine, a bed, the airlock door), with an arrow at the screen edge when it is out of view |
 | O4 | Cold open: the Hab can be off-screen, no arrow, no countdown on the phone | fixed: the suit's time left shows on phones, and the waypoint's edge arrow points at the airlock when the Hab is off-screen |
-| O5 | Everything unlocks at once at the airlock | open |
+| O5 | Everything unlocks at once at the airlock | fixed: the three screens arrive one at a time, each with a line saying what it is for. Colony after the first system is inspected, Journal after the numbers, Map on first stepping outside after that. To re-review |
 | O6 | Farming's costs and care are silent (planting takes food; beds need a second watering) | part fixed: the seed chooser says potatoes use one of your food and what each crop yields; a "Water the farm beds" objective appears when beds stall |
 | O7 | Sleep: no cue that it is time, the bunk re-offered sleep at dawn (fixed: not offered in the morning), a Sol 2 line repeats | fixed: sleep is not offered in the morning; the Sol 2 line no longer repeats the premise |
 
@@ -161,9 +161,9 @@ phone.
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |
 | 15 | Listen to the audio on real speakers and a phone; retune by ear | blocked on a listener |
 | 8 | Play the first ten minutes as a new player at phone size; fix what confuses | open |
-| 17 | More depth: uses for a second greenhouse; visiting landers could do more than salvage | open |
+| 17 | More depth: uses for a second greenhouse; visiting landers could do more than salvage | part done: **sights**, eleven things to stop and watch (Phobos, Phobos going out in the planet's shadow, Deimos, the Earth in the evening, a blue sunset, sunrise, the Milky Way, a dust devil close to, the inside of a storm, the midnight sun, the sky above the weather on a volcano's summit). Each is logged once after a couple of seconds' looking, earns science credit and morale, and is listed in the journal with a hint until seen. Landers and the second greenhouse still open |
 | 13 | Shadow cost at the base: the rover (45k triangles) and Hab are drawn into both cascades; "low" is on its call budget there | open (simplified shadow models would halve it) |
-| 5 | Sky from orbit: thinner limb haze; Phobos and Deimos | open |
+| 5 | Sky from orbit: thinner limb haze; Phobos and Deimos | part done: both moons are in the sky on their real periods (Phobos rises in the west and crosses twice a sol; Deimos drifts the other way over days), lit by the sun so they show a phase, put out by Mars's shadow, and seen from where you stand. Drawn four times their true size, or they are a star and less than a star on a screen. Limb haze still open |
 | 6 | More variety between regions (dark basalt plains, bright dust, dune fields) | open |
 | 19 | Astronaut: feet dip up to 4 cm when clips cross-fade; JumpStart, Land, Wave and Collapse still start from the old bent-knee stance, and WorkStand has the same bent knees and an 11 degree forward lean; going from standing to kneeling the left hand passes through the knee pad for under a tenth of a second (the fade is shortened to 0.18 s; a short kneel-down clip is the proper fix); the face is plain under a metre | open |
 | 20 | Wreck blast patch still reads as a smooth mound at its rim; Pathfinder's airbags are faceted up close | open |
@@ -187,6 +187,11 @@ phone.
 - **Rocks, dust and soil take their colour from the ground.** Bare stone is a darker, greyer
   version of the local orbital colour; the dust on hardware and any heap or apron of soil
   (`ground_dust` in a model) is the local ground colour itself, ice included.
+- **East is east.** `tangentBasis` in `planet/geo.js` returns true east and north. It used to return
+  west and south, and every caller but two had quietly negated them; the two that had not were the
+  compass and the map, which read S facing north and showed the sun setting in the "east".
+  `tests/sights.mjs` now checks the compass against the pole and the sunset. `frameQuat` and saved
+  games are unchanged by the fix.
 - **Each terrain square is cut along its own grain.** A grid cut into triangles all one way draws
   any crest that crosses the cut as a row of teeth. Each chunk carries its own triangle list
   (about 14 kB at grid 32), with every square cut along the diagonal whose ends are nearer in

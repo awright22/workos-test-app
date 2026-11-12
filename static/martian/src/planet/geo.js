@@ -23,20 +23,23 @@ export function groundDist(aWorld, bWorld) {
   _a.copy(aWorld).normalize(); _b.copy(bWorld).normalize();
   return angDist(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z) * R;
 }
-/** Local east and north unit vectors at `up` (east is undefined exactly at the poles; a fixed one is used). */
+/** Local east and north unit vectors at `up` (east is undefined exactly at the poles; a fixed one is used).
+ *  They are the real thing: east is the way longitude grows, north the way latitude does. (Until the
+ *  compass was found reading S for north, this returned west and south, and every caller but the
+ *  compass and the map had quietly negated them.) */
 export function tangentBasis(up, east, north) {
-  east.set(-up.z, 0, up.x);
+  east.set(up.z, 0, -up.x);
   if (east.lengthSq() < 1e-10) east.set(1, 0, 0);
   east.normalize();
   north.crossVectors(up, east);
 }
 const _e = new THREE.Vector3(), _n = new THREE.Vector3(), _f = new THREE.Vector3(), _x = new THREE.Vector3();
 const _m = new THREE.Matrix4();
-/** Orientation whose +Y is `up` and whose +Z points `yaw` radians east of north.
- *  Bodies face along their -Z, so a body made with yaw 0 faces south. */
+/** Orientation whose +Y is `up`, for a body that faces `yaw` radians east of north.
+ *  (A body faces along its -Z, so its +Z points the opposite way.) */
 export function frameQuat(up, yaw, out = new THREE.Quaternion()) {
   tangentBasis(up, _e, _n);
-  _f.copy(_n).multiplyScalar(Math.cos(yaw)).addScaledVector(_e, Math.sin(yaw));
+  _f.copy(_n).multiplyScalar(-Math.cos(yaw)).addScaledVector(_e, -Math.sin(yaw));
   _x.crossVectors(up, _f);
   _m.makeBasis(_x, up, _f);
   return out.setFromRotationMatrix(_m);

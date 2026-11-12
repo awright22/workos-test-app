@@ -59,6 +59,7 @@
 .map-tools .mg-iconbtn { background: rgba(14, 12, 11, .82); }
 .map-tools .mg-iconbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .map-tools .gap { height: .375rem; }
+.map-tools .cap { display: none; }
 .map-legend { position: absolute; left: 1rem; bottom: 3.25rem; width: 13.5rem; padding: .75rem .875rem .8125rem; background: rgba(14, 12, 11, .86); border: 1px solid var(--line-2); border-radius: .1875rem; }
 .map-legend[hidden] { display: none; }
 .map-legend h3 { font: 600 .6875rem/1 var(--f-cond); letter-spacing: .2em; text-transform: uppercase; color: var(--accent); margin-bottom: .5rem; }
@@ -185,8 +186,14 @@
 .mg-compact .scr-body { top: calc(var(--sat) + 3rem); }
 .mg-compact .mg-iconbtn { width: 2.625rem; height: 2.625rem; }
 .mg-compact .map-tools { right: .5rem; top: .5rem; gap: .25rem; }
-.mg-compact .map-legend { left: .5rem; bottom: 2.5rem; width: 11.5rem; padding: .5rem .625rem; }
-.mg-compact .map-legend ul { gap: .1875rem; }
+.mg-compact .map-tools .mg-iconbtn { grid-template-rows: auto auto; align-content: center; gap: .1875rem; width: 2.75rem; height: 2.75rem; }
+.mg-compact .map-tools .mg-iconbtn .ic { width: 1rem; height: 1rem; }
+.mg-compact .map-tools .cap { display: block; font: 600 .625rem/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+/* two fingers zoom a touch screen: the buttons would only cover the map */
+.mg-touch.mg-compact .map-tools [data-a="in"], .mg-touch.mg-compact .map-tools [data-a="out"], .mg-touch.mg-compact .map-tools .gap { display: none; }
+/* the key lies along the bottom in two columns, clear of the tools, and goes when the map is touched */
+.mg-compact .map-legend { left: .5rem; right: 3.75rem; bottom: 2.5rem; width: auto; padding: .5rem .625rem; }
+.mg-compact .map-legend ul { gap: .1875rem 1rem; grid-template-columns: 1fr 1fr; }
 .mg-compact .map-legend li { font-size: .6875rem; gap: .4375rem; }
 .mg-compact .map-legend li i { width: 1rem; height: 1rem; }
 .mg-compact .map-legend li i .ic { width: .625rem; height: .625rem; }

@@ -17,6 +17,12 @@
 .dlg .bd p + p { margin-top: .75rem; }
 .dlg .bd b { color: var(--ink); font-weight: 600; }
 .dlg blockquote { margin-top: 1.25rem; padding-left: 1rem; border-left: 2px solid var(--line); color: var(--ink-2); font-size: .9375rem; line-height: 1.55; }
+/* the run, sol by sol: a dated list with a rule down its left like a logbook's margin */
+.dlg .steps { list-style: none; margin-top: 1.125rem; display: grid; gap: .3125rem; }
+.dlg .steps li { display: grid; grid-template-columns: 4.25rem 1fr; align-items: baseline; gap: .75rem; font-size: .9375rem; line-height: 1.35; color: var(--ink-2); }
+.dlg .steps b { font: 600 .8125rem/1.35 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.dlg .steps .last span { color: var(--ink); }
+.dlg .steps .last b { color: var(--ok); }
 .dlg blockquote cite { display: block; margin-top: .5rem; font: 500 .75rem/1.3 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
 .dlg .btns { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 1px; margin-top: 1.25rem; background: var(--line-2);
@@ -210,11 +216,23 @@
 .mg-compact .stat { padding: .4375rem .5rem; gap: .1875rem; }
 .mg-compact .stat b { font-size: 1.125rem; }
 .mg-compact .stat span { font-size: .5625rem; }
-.mg-compact #mg-overlay.k-win .dlg { width: 40rem; display: grid; grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; align-content: start; }
-.mg-compact #mg-overlay.k-win .dlg > * { grid-column: 1; }
-.mg-compact #mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 1 / span 6; margin-top: 0; align-self: center; }
+/* the rescue screen: the record of the run on the left, the numbers and the button on the right */
+#mg-overlay.k-win .dlg { width: 58rem; display: grid; grid-template-columns: 1fr 1fr; column-gap: 2.25rem; align-content: start; }
+#mg-overlay.k-win .dlg > * { grid-column: 1; }
+#mg-overlay.k-win .dlg .t-kicker { grid-column: 1 / -1; grid-row: 1; }
+#mg-overlay.k-win .dlg h1 { grid-row: 2; }
+#mg-overlay.k-win .dlg h2 { grid-row: 3; }
+#mg-overlay.k-win .dlg .steps { grid-row: 4; }
+#mg-overlay.k-win .dlg blockquote { grid-row: 5; }
+#mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 2 / span 3; margin-top: 0; align-self: start; }
+#mg-overlay.k-win .dlg .btns { grid-column: 2; grid-row: 5; align-self: end; }
+.mg-compact #mg-overlay.k-win .dlg { width: 40rem; grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; }
+.mg-compact #mg-overlay.k-win .dlg .btns { margin-top: .625rem; }
 .mg-compact #mg-overlay.k-win .dlg h1 { font-size: 2rem; }
 .mg-compact #mg-overlay.k-win .dlg blockquote { font-size: .75rem; line-height: 1.4; }
+.mg-compact .dlg .steps { margin-top: .5rem; gap: .125rem; }
+.mg-compact .dlg .steps li { grid-template-columns: 3.25rem 1fr; gap: .5rem; font-size: .75rem; line-height: 1.3; }
+.mg-compact .dlg .steps b { font-size: .6875rem; }
 .mg-compact .mg-wordmark { font-size: 3.25rem; }
 .mg-compact .loading .mg-wordmark { font-size: 2.75rem; }
 .mg-compact .ld-bar { margin-top: 1.5rem; }

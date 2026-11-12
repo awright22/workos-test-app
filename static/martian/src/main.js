@@ -24,6 +24,7 @@ import { Snd } from './audio/sound.js';
 import { MATERIALS, analyseAll, catalogue, identify, scienceSummary, takeSample } from './game/science.js';
 import { updateAudio } from './audio/driver.js';
 import { devils, spawnDevil, updateDevils } from './game/devils.js';
+import { SIGHTS, sights, updateSights } from './game/sights.js';
 import { MACHINES, dawnFaults, service, serviceCost, wearMachines, wearRover } from './game/machines.js';
 import { machineEff } from './game/state.js';
 import { initDiag } from './ui/diag.js';
@@ -172,6 +173,7 @@ function tick(dt) {
     updatePing();
     updateEffects(dt);
     updateDevils(dt);
+    updateSights(dt);
   }
   blinkT += dt;
   // how dark it is where the camera is: lamps come on with it (a storm counts as dusk)
@@ -234,7 +236,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
@@ -252,7 +254,7 @@ function installDebug() {
     },
     /** Skip the cold open (suit sealed, systems checked, numbers run). */
     skipIntro() {
-      Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true });
+      Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true, uiColony: true, uiJournal: true, uiMap: true });
       S.checkedSystems = { oxy: true, rec: true };
       S.suit = 100;
     },
@@ -339,6 +341,15 @@ function installDebug() {
     /** Pin the storm strength where the astronaut is (0..1); setStorm(null) gives the weather back to the game. */
     setStorm(i) { S.storm.hold = i; if (typeof i === 'number') S.storm.i = i; },
     look(pitch) { player.pitch = pitch; ctx.engine.snapLight = 3; },
+    /** Turn to face a direction in the world (a unit vector), and look up or down at it. */
+    lookAt(d) {
+      const up = _v1.copy(player.pos).normalize().clone();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      const v = new THREE.Vector3(d.x, d.y, d.z).normalize();
+      initPlayerAt(up, Math.atan2(v.dot(e), v.dot(n)) - Math.PI);
+      player.pitch = Math.asin(clamp(v.dot(up), -1, 1));
+      lastFocus = tick(0.001);
+    },
     async settle() { ctx.engine.camera.updateMatrixWorld(); return ctx.terrain.settle(ctx.engine.camera.position, 20000); },
     info() { return { fps: +this.fps.toFixed(1), ...ctx.engine.info(), ...ctx.terrain.stats(), rocks: ctx.rocks.counts }; },
   };

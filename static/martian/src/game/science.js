@@ -171,6 +171,9 @@ export function analyseAll() {
   while (s.grants < GRANTS.length && s.points >= GRANTS[s.grants].at) grants.push(GRANTS[s.grants++]);
   return { results, grants };
 }
+/** Science credit earned some other way than at the analyser (a sight logged, say). It counts toward
+ *  the next grant, which NASA sends when samples are next analysed. */
+export function addCredit(n) { sci().points += n; }
 /** The catalogue for the journal: every material, found or not. */
 export function catalogue() {
   const s = sci();

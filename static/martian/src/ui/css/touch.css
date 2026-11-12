@@ -57,6 +57,9 @@
 #mg-trow .mg-tbtn { position: static; width: 2.75rem; height: 2.75rem; border-radius: .375rem; }
 #mg-trow .mg-tbtn .ic { width: 1.3125rem; height: 1.3125rem; }
 .is-cold #mg-trow .mg-tbtn[data-t] { display: none; }
+/* each screen's button arrives when the screen first has something to show (ui/hud.js) */
+.no-map #mg-trow .mg-tbtn[data-t="map"], .no-colony #mg-trow .mg-tbtn[data-t="colony"], .no-journal #mg-trow .mg-tbtn[data-t="journal"] { display: none; }
+.no-map .scr-nav [data-screen="map"], .no-colony .scr-nav [data-screen="colony"], .no-journal .scr-nav [data-screen="journal"] { display: none; }
 
 .mg-compact #mg-trow .mg-tbtn { width: 2.625rem; height: 2.625rem; }
 /* tablets and other large touch screens: the clock and mission move below the buttons */

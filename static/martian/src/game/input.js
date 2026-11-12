@@ -5,6 +5,7 @@ import { UI } from '../ui/dom.js';
 import { log } from '../ui/dom.js';
 import { perf } from '../core/math.js';
 import { screenOpen, closeScreens, toggleScreen } from '../ui/screens.js';
+import { screenUnlocked } from '../ui/hud.js';
 import { showPause } from './flow.js';
 import { exitRover } from './rover.js';
 import { useCandle } from './inventory.js';
@@ -83,9 +84,9 @@ export function initInput() {
       log(S.firstPerson ? 'Helmet cam. Just you and the visor.' : 'Suit cam deployed. Looking good, Watney. Ish.', 'sys');
     }
     if (!S.uiOpen && !S.flags.coldOpen) {
-      if (k === 'm') toggleScreen('map');
-      if (k === 'c') toggleScreen('colony');
-      if (k === 'j') toggleScreen('journal');
+      if (k === 'm' && screenUnlocked('map')) toggleScreen('map');
+      if (k === 'c' && screenUnlocked('colony')) toggleScreen('colony');
+      if (k === 'j' && screenUnlocked('journal')) toggleScreen('journal');
       if ((k === 'm' || k === 'c' || k === 'j') && !screenOpen()) tryLock();     // closed a screen: take the mouse back
     }
   });
@@ -213,6 +214,6 @@ function initTouch(canvas) {
   press(UI.tCandle, () => { if (playing()) useCandle(); });
   press(UI.tPause, () => { if (screenOpen()) closeScreens(); showPause(); });
   UI.tRow.querySelectorAll('[data-t]').forEach((btn) => {
-    press(btn, () => { if (playing() && !S.flags.coldOpen) toggleScreen(btn.dataset.t); });
+    press(btn, () => { if (playing() && !S.flags.coldOpen && screenUnlocked(btn.dataset.t)) toggleScreen(btn.dataset.t); });
   });
 }

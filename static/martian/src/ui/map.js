@@ -147,17 +147,18 @@ function placeLabels(you, storms) {
     if (b.width) boxes.push([b.left - wr.left - 6, b.top - wr.top - 6, b.width + 12, b.height + 12]);
   }
   boxes.push([you.x - 13 * U, you.y - 13 * U, 26 * U, 26 * U]);
-  for (const m of markers) { const q = m.small ? 7 * U : r; boxes.push([m.x - q, m.y - q, q * 2, q * 2]); }
+  for (const m of markers) { if (m.under) continue; const q = m.small ? 7 * U : r; boxes.push([m.x - q, m.y - q, q * 2, q * 2]); }
   c.font = `600 ${12 * U}px "Barlow Condensed", sans-serif`;
   const byPri = markers.slice().sort((a, b) => a.pri - b.pri);
   for (const m of byPri) {
-    if (!m.label && m !== selected) continue;
+    if (m.under || (!m.label && m !== selected && !m.group)) continue;
     if (m.x < -40 || m.x > W + 40 || m.y < -20 || m.y > H + 20) continue;
-    const text = (m.label || m.title).toUpperCase();
+    const text = ((m.label || (m === selected ? m.title : '')) + (m.group ? ' +' + (m.group.length - 1) : '')).trim().toUpperCase();
     const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = 15 * U;
     const spots = [[m.x + r + 3 * U, m.y - h / 2], [m.x - r - 3 * U - w, m.y - h / 2], [m.x - w / 2, m.y + r + 2 * U], [m.x - w / 2, m.y - r - 2 * U - h]];
     for (const [x, y] of spots) {
-      if (free(x, y, w, h) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
+      // (a label keeps inside the map: at an edge it goes to the marker's other side)
+      if ((x >= 2 && x + w <= W - 2 && free(x, y, w, h)) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
     }
   }
   // storm cells are named where there is room
@@ -284,6 +285,14 @@ function draw() {
 
   markers = buildMarkers();
   for (const m of markers) { m.x = sx(m.lon); m.y = sy(m.lat); }
+  // Markers that fall on one another at this zoom are shown as one: the most important (or the one
+  // selected), with a count of the rest. Tapping it again steps through them.
+  const leads = [];
+  for (const m of markers.slice().sort((a, b) => (b === selected) - (a === selected) || a.pri - b.pri)) {
+    m.under = null; m.group = null;
+    for (const l of leads) if (Math.hypot(l.x - m.x, l.y - m.y) < 15 * U) { m.under = l; (l.group || (l.group = [l])).push(m); break; }
+    if (!m.under) leads.push(m);
+  }
   const pll = vecToLl(_v1.copy(player.pos).normalize());
   const you = { x: sx(pll.lon), y: sy(pll.lat) };
 
@@ -306,7 +315,7 @@ function draw() {
 
   // markers
   for (const m of markers) {
-    if (m.x < -20 || m.x > W + 20 || m.y < -20 || m.y > H + 20) continue;
+    if (m.under || m.x < -20 || m.x > W + 20 || m.y < -20 || m.y > H + 20) continue;
     const r = (m.unknown ? 8 : m.small ? 6 : 10) * U;
     c.globalAlpha = m.dim ? 0.6 : 1;
     c.beginPath(); c.arc(m.x, m.y, r, 0, Math.PI * 2);
@@ -369,7 +378,12 @@ function showInfo(s) {
 }
 function pick(x, y) {
   let best = null, bestD = 22 * U;
-  for (const m of markers) { const d = Math.hypot(m.x - x, m.y - y); if (d < bestD) { bestD = d; best = m; } }
+  for (const m of markers) { if (m.under) continue; const d = Math.hypot(m.x - x, m.y - y); if (d < bestD) { bestD = d; best = m; } }
+  // (a marker standing for several: each tap on it shows the next of them)
+  if (best && best.group && best === selected) {
+    const all = best.group.slice().sort((a, b) => a.pri - b.pri || (a.id < b.id ? -1 : 1));
+    return showInfo(all[(all.indexOf(best) + 1) % all.length]);
+  }
   if (best) return showInfo(best);
   if (y > H) return showInfo(null);
   const ll = unproject(x, y);
@@ -394,11 +408,12 @@ export function initMap(body) {
   cv.setAttribute('data-autofocus', '');
   c = cv.getContext('2d');
   const tools = el('div', null, 'map-tools', wrap,
-    `<button type="button" class="mg-iconbtn" data-a="in" aria-label="Zoom in">${icon('plus')}</button>` +
-    `<button type="button" class="mg-iconbtn" data-a="out" aria-label="Zoom out">${icon('minus')}</button><span class="gap"></span>` +
-    `<button type="button" class="mg-iconbtn" data-a="me" aria-label="Centre on your position">${icon('locate')}</button>` +
-    `<button type="button" class="mg-iconbtn" data-a="hab" aria-label="Centre on the Hab">${icon('hab')}</button><span class="gap"></span>` +
-    `<button type="button" class="mg-iconbtn" data-a="legend" aria-label="Legend" aria-pressed="false">${icon('layers')}</button>`);
+    // (each has a word under it on a phone, where nothing can be hovered to learn what an icon does)
+    `<button type="button" class="mg-iconbtn" data-a="in" aria-label="Zoom in" title="Zoom in">${icon('plus')}<span class="cap">In</span></button>` +
+    `<button type="button" class="mg-iconbtn" data-a="out" aria-label="Zoom out" title="Zoom out">${icon('minus')}<span class="cap">Out</span></button><span class="gap"></span>` +
+    `<button type="button" class="mg-iconbtn" data-a="me" aria-label="Centre on your position" title="Centre on your position">${icon('locate')}<span class="cap">You</span></button>` +
+    `<button type="button" class="mg-iconbtn" data-a="hab" aria-label="Centre on the Hab" title="Centre on the Hab">${icon('hab')}<span class="cap">Hab</span></button><span class="gap"></span>` +
+    `<button type="button" class="mg-iconbtn" data-a="legend" aria-label="Legend" title="Legend" aria-pressed="false">${icon('layers')}<span class="cap">Key</span></button>`);
   legend = el('div', null, 'map-legend', wrap,
     '<h3>Legend</h3><ul>' + LEGEND.map(([ic, colour, label]) => `<li style="color:var(--${colour})"><i>${icon(ic)}</i><span>${label}</span></li>`).join('') +
     '<li style="color:rgba(240,210,170,.9)"><i class="sw"></i><span>Dust storm</span></li><li><i class="night"></i><span>Night side</span></li></ul>');
@@ -432,6 +447,7 @@ export function initMap(body) {
     try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* synthetic events */ }
     pts.set(ev.pointerId, local(ev));
     if (pts.size === 1) { moved = 0; downAt = performance.now(); }
+    if (layout.compact && !legend.hidden) setLegend(false);       // (on a phone the key covers a third of the map)
     if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); moved = 99; }
     goal = null;
   });

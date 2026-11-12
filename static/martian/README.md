@@ -23,7 +23,8 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   and on the seven shield volcanoes lava flows with rubble at their edges and leveed channels.
 - **A whole sphere**, 75 km around at this scale (1:282), with relief exaggerated four times so
   that volcanoes and canyons read at walking pace. You can walk or drive all the way round.
-  Day and night depend on where you stand.
+  Day and night depend on where you stand. At night Phobos crosses the sky twice a sol, west to
+  east, and goes dark when it passes into Mars's shadow; Deimos drifts the other way for days.
 - **Fourteen historic landing sites**, from Mars 3 (1971) to Zhurong (2021), each with a model
   of the machine that landed there, each salvageable, each with a journal entry.
 - Pathfinder is in Ares Vallis. The ascent vehicle is in Schiaparelli. Your own crash site is
@@ -52,6 +53,9 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   turns out to be depends on where on the real Mars it came from (hematite spherules at
   Meridiani, sulfates in Valles Marineris, clays at Jezero: seventeen materials). The analyser
   in the Hab catalogues them; science credit earns NASA grants.
+- **Sights**: eleven things worth stopping to watch, from Phobos going out in the planet's shadow
+  to the blue sunset and the Earth in the evening sky. Look for a couple of seconds and it is
+  logged: a line in the journal, a little science, better spirits. The journal hints at the rest.
 - **Weather**: dust storms that close visibility to tens of metres, and dust devils that wander
   the plains on warm afternoons and sometimes sweep the solar array clean.
 - **Exploration**: a six-wheeled rover with its own power and air; a journal of landmarks,

@@ -97,7 +97,40 @@ export function updateWaypoint(camera) {
   wayEl.lastChild.textContent = fmtDist(d);
 }
 
+// ============================================================
+// THE THREE SCREENS ARRIVE ONE AT A TIME
+// ============================================================
+/**
+ * Colony, Journal and Map each appear when they first have something to show, with a line saying
+ * what they are for. (They used to arrive together the moment the airlock closed, unexplained.)
+ * A screen's flag, once set, is saved with the game.
+ */
+export const SCREEN_UNLOCKS = [
+  { id: 'colony', flag: 'uiColony', name: 'Colony', key: 'C', line: 'Your stores, the fabricator and upgrades.',
+    when: () => !S.flags.coldOpen && (Object.keys(S.checkedSystems).length >= 1 || S.flags.didMath || S.sol > 1) },
+  { id: 'journal', flag: 'uiJournal', name: 'Journal', key: 'J', line: 'NASA’s tasks, what you have found, and the log.',
+    when: () => !S.flags.coldOpen && (!!S.flags.didMath || S.sol > 1) },
+  { id: 'map', flag: 'uiMap', name: 'Map', key: 'M', line: 'The whole planet, and how far everything is.',
+    when: () => !S.flags.coldOpen && (!!S.flags.didMath || S.sol > 1) && (!S.inside || S.sol > 1 || !!S.flags.pfRevealed) },
+];
+export function screenUnlocked(id) { const s = SCREEN_UNLOCKS.find((x) => x.id === id); return !s || !!S.flags[s.flag]; }
+let unlocksSeeded = false;
+const shownScreens = {};
+function updateUnlocks() {
+  if (!S.started) return;
+  for (const s of SCREEN_UNLOCKS) {
+    if (!S.flags[s.flag] && s.when()) {
+      S.flags[s.flag] = true;
+      // (what a loaded game already had is not news)
+      if (unlocksSeeded) { toast('NEW', s.name, layout.touch ? s.line : `${s.line} Press ${s.key}.`); Snd.jingle(); }
+    }
+    if (shownScreens[s.id] !== !!S.flags[s.flag]) { shownScreens[s.id] = !!S.flags[s.flag]; root.classList.toggle('no-' + s.id, !S.flags[s.flag]); }
+  }
+  unlocksSeeded = true;
+}
+
 export function updateObjectivesHud() {
+  updateUnlocks();                    // (every frame: a screen's button must not lag the thing that earned it)
   const now = perf();
   if (now - objThrottle < 0.3) return;
   objThrottle = now;
@@ -112,7 +145,11 @@ export function updateObjectivesHud() {
     if (d && !objDone.has(o.id)) {
       objDone.add(o.id);
       // objectives already complete when a saved game loads are not news
-      if (objSeeded) { objDoneAt[o.id] = now; if (o.id !== 'reach') Snd.jingle(); }
+      if (objSeeded) {
+        objDoneAt[o.id] = now; if (o.id !== 'reach') Snd.jingle();
+        const marks = S.stats.marks || (S.stats.marks = {});      // (kept with the statistics, so it is saved with them)
+        if (!marks[o.id]) marks[o.id] = S.sol;
+      }
     } else if (!d && objDone.has(o.id)) objDone.delete(o.id);      // a checkpoint rewound it
     const justDone = d && objDoneAt[o.id] && now - objDoneAt[o.id] < 3.2;
     if (d && !justDone && o.id !== 'mav') continue;
@@ -473,7 +510,7 @@ export function updateHud() {
   // the first minute teaches moving; after that, the screens
   const keys = S.flags.coldOpen
     ? (layout.touch ? ':Left thumb moves|:Drag to look' : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
-    : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? 'M:Map|C:Colony|J:Journal|' : '') + 'Esc:Menu';
+    : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? SCREEN_UNLOCKS.filter((s) => S.flags[s.flag]).sort((a, b) => 'MCJ'.indexOf(a.key) - 'MCJ'.indexOf(b.key)).map((s) => `${s.key}:${s.name}|`).join('') : '') + 'Esc:Menu';
   if (keys !== hud.keys) {
     hud.keys = keys;
     UI.keys.innerHTML = keys.split('|').map((k) => {

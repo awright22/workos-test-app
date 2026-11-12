@@ -146,6 +146,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 /* scrolling regions */
 .mg-scroll { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
   scrollbar-width: thin; scrollbar-color: var(--ink-4) transparent; }
+.mg-scroll[data-more="down"] { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent); }
+.mg-scroll[data-more="up"] { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.75rem); mask-image: linear-gradient(to bottom, transparent, #000 1.75rem); }
+.mg-scroll[data-more="up down"] { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.75rem, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(to bottom, transparent, #000 1.75rem, #000 calc(100% - 2.5rem), transparent); }
 .mg-scroll::-webkit-scrollbar { width: 6px; }
 .mg-scroll::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 3px; }
 

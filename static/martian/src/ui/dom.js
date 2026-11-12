@@ -231,7 +231,7 @@ function paragraphs(text) {
 
 /**
  * A plain dialog: title, text and buttons.
- * opts: { title, subtitle, kicker, body (HTML; line breaks kept), stats: [[label, value]...],
+ * opts: { title, subtitle, kicker, body (HTML; line breaks kept), stats: [[label, value]...], extra (HTML, placed under the stats),
  *         quote, kind: 'dialog' | 'death' | 'win' | 'error', buttons: [{ label, fn, ghost, keep, danger }] }
  * A button closes the dialog unless it has keep: true.
  */
@@ -247,6 +247,7 @@ export function showOverlay(opts) {
     (opts.title ? `<h1 id="mg-dlg-title">${opts.title}</h1>` : '') +
     (opts.subtitle ? `<h2>${opts.subtitle}</h2>` : '') +
     (stats ? `<div class="stats">${stats}</div>` : '') +
+    (opts.extra || '') +
     (opts.body ? `<div class="bd">${paragraphs(opts.body)}</div>` : '') +
     (opts.quote ? `<blockquote>${opts.quote}</blockquote>` : '') +
     (btns ? `<div class="btns">${btns}</div>` : '') +
@@ -440,9 +441,19 @@ function flag(name, on) {
   flags[name] = on;
   root.classList.toggle(name, on);
 }
+// A scrolling region fades toward any edge that hides more of it. Without that, a list cut off by
+// the bottom of a phone's screen looks like the end of the list.
+function scrollCue(n) {
+  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 4 ? 'down' : '')).trim();
+  if (n.dataset.more !== more) n.dataset.more = more;
+}
+root.addEventListener('scroll', (ev) => { const t = ev.target; if (t && t.classList && t.classList.contains('mg-scroll')) scrollCue(t); }, true);
+let cueTick = 0;
 function syncChrome() {
   requestAnimationFrame(syncChrome);
   const modal = S.uiOpen || anyScreenOpen();
+  // (their contents change under them, so the regions on screen are looked at again a few times a second)
+  if ((modal || !S.started) && ++cueTick % 12 === 0) for (const n of root.querySelectorAll('.mg-scroll')) if (n.offsetParent) scrollCue(n);
   flag('is-playing', S.started);
   flag('is-modal', modal);
   flag('is-rover', S.mode === 'rover');

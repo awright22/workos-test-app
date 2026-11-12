@@ -552,7 +552,7 @@ addI({
     _v2.set(0, 0, -1).applyQuaternion(player.q);
     _v1.addScaledVector(_v2, (kind === 'greenhouse' ? 6.4 : 2.6) / R).normalize();
     tangentBasis(_v1, _fe, _fn);
-    buildDeployable(kind, _v1, Math.atan2(-_v2.dot(_fe), -_v2.dot(_fn)));
+    buildDeployable(kind, _v1, Math.atan2(_v2.dot(_fe), _v2.dot(_fn)));
     Snd.play('deploy');
     log(`${ITEM_NAMES[kitKey]} deployed. Mars: 0, engineering: 1.`);
     syncAllVisuals();

@@ -14,6 +14,7 @@ import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../gam
 import { startDeploy } from '../game/interactables.js';
 import { ACHIEVEMENTS, QUEST_DEFS, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
+import { sightList } from '../game/sights.js';
 import { OBJECTIVES } from './hud.js';
 import { initMap, openMap, renderMap as drawMap } from './map.js';
 // The three full screens: the map (ui/map.js), the colony (inventory, fabrication, upgrades)
@@ -326,23 +327,29 @@ function tasksHtml() {
   return h + '</div>' + doneHtml;
 }
 function discoveriesHtml() {
-  const landers = World.landers, known = landers.filter((r) => S.discovered[r.data.name]).length;
-  let h = `<div class="pane-hd">Landers <span>${known} of ${landers.length} found</span></div><div class="jr-grid">`;
-  for (const rec of landers.slice().sort((x, y) => !!S.discovered[y.data.name] - !!S.discovered[x.data.name] || x.data.year - y.data.year)) {
-    const k = S.discovered[rec.data.name];
-    h += k
-      ? `<article class="card got"><div class="card-hd">${icon('lander')}<h4>${esc(rec.data.name)}<small>${rec.data.year}</small></h4>` +
-        `${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}</div><p>${esc(rec.data.note)}</p></article>`
-      : `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>Unknown lander</h4></div><p>${S.flags.mapRevealed ? 'Its signal is on the map. Go and find it.' : 'Find it out there.'}</p></article>`;
+  // (what is still to find is one card with a count: a card apiece was a wall of identical padlocks)
+  const more = (n, one, many, line) => (n ? `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>${n} more ${n === 1 ? one : many}</h4></div><p>${line}</p></article>` : '');
+  const landers = World.landers, found = landers.filter((r) => S.discovered[r.data.name]);
+  let h = `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found</span></div><div class="jr-grid">`;
+  for (const rec of found.sort((x, y) => x.data.year - y.data.year)) {
+    h += `<article class="card got"><div class="card-hd">${icon('lander')}<h4>${esc(rec.data.name)}<small>${rec.data.year}</small></h4>` +
+      `${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}</div><p>${esc(rec.data.note)}</p></article>`;
   }
+  h += more(landers.length - found.length, 'lander', 'landers', S.flags.mapRevealed ? 'Their signals are on the map. Go and find them.' : 'Every machine sent to Mars is still where it stopped. Find them out there.');
   const places = FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
-  const pk = places.filter((f) => S.discovered[f.name]).length;
-  h += `</div><div class="pane-hd">Places <span>${pk} of ${places.length} visited</span></div><div class="jr-grid">`;
-  for (const f of places.slice().sort((x, y) => !!S.discovered[y.name] - !!S.discovered[x.name])) {
-    const k = S.discovered[f.name];
-    h += k
-      ? `<article class="card got"><div class="card-hd">${icon('pin')}<h4>${esc(f.name)}<small>${FEATURE_KIND[f.type] || ''}</small></h4></div><p>${esc(f.note)}</p></article>`
-      : `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>Uncharted</h4></div><p>${FEATURE_KIND[f.type] || 'A place'} you have not stood in yet.</p></article>`;
+  const seen = places.filter((f) => S.discovered[f.name]);
+  h += `</div><div class="pane-hd">Places <span>${seen.length} of ${places.length} visited</span></div><div class="jr-grid">`;
+  for (const f of seen) {
+    h += `<article class="card got"><div class="card-hd">${icon('pin')}<h4>${esc(f.name)}<small>${FEATURE_KIND[f.type] || ''}</small></h4></div><p>${esc(f.note)}</p></article>`;
+  }
+  h += more(places.length - seen.length, 'place', 'places', 'Volcanoes, canyons, basins and craters you have not stood in yet. Their names are on the map.');
+  // sights: each one not yet seen keeps its own card, because each has its own hint
+  const sl = sightList();
+  h += `</div><div class="pane-hd">Sights <span>${sl.filter((x) => x.sol).length} of ${sl.length} seen</span></div><div class="jr-grid">`;
+  for (const x of sl.slice().sort((p, q) => !!q.sol - !!p.sol)) {
+    h += x.sol
+      ? `<article class="card got"><div class="card-hd">${icon('eye')}<h4>${esc(x.name)}<small>Sol ${x.sol}</small></h4></div><p>${esc(x.text)}</p></article>`
+      : `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>${esc(x.name)}</h4></div><p>${esc(x.text)}</p></article>`;
   }
   return h + '</div>';
 }

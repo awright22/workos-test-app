@@ -28,6 +28,16 @@ export const SUN_DECLINATION = 14 * D2R;
 export function updateSunDir() {
   const a = S.tod * Math.PI * 2, c = Math.cos(SUN_DECLINATION);
   ctx.engine.sunDir.set(Math.cos(a) * c, Math.sin(SUN_DECLINATION), Math.sin(a) * c);
+  // The moons. Phobos goes round in 7.65 hours, faster than Mars turns, so it rises in the west and
+  // crosses the sky twice a sol; Deimos, at 30.3 hours, drifts the other way and takes days to set.
+  // Angles are in the ground's own frame, which the sun goes round once a sol.
+  const sky = ctx.engine.sky;
+  if (sky && sky.moons) {
+    const t = S.sol + (World.spawn ? colonyClock() : S.tod);
+    const ph = (0.31 + t * (SOL_HOURS / 7.654 - 1)) * Math.PI * 2, de = (0.62 + t * (SOL_HOURS / 30.31 - 1)) * Math.PI * 2;
+    sky.moons[0].set(Math.cos(ph) * 2.766, 0, -Math.sin(ph) * 2.766);
+    sky.moons[1].set(Math.cos(de) * 6.92, 0, -Math.sin(de) * 6.92);
+  }
 }
 /** The colony's clock: fraction of the sol elapsed since dawn (06:00 local) at the Hab.
  *  A new sol begins when this wraps, wherever on the planet the astronaut is. */
@@ -224,7 +234,8 @@ export function advanceStorms(dtSol) {
     const dist = c.drift * dtSol;
     const u = stormCellVec(c, _sv);
     tangentBasis(u, _pe, _pn);
-    u.addScaledVector(_pe, Math.cos(c.dir) * dist / R).addScaledVector(_pn, Math.sin(c.dir) * dist / R).normalize();
+    // (c.dir is measured from west toward south: saved games hold it, so it stays that way)
+    u.addScaledVector(_pe, -Math.cos(c.dir) * dist / R).addScaledVector(_pn, -Math.sin(c.dir) * dist / R).normalize();
     const ll = vecToLl(u);
     c.lat = ll.lat; c.lon = ll.lon;
     c.dir += (hash3(Math.floor(S.sol * 7), Math.floor(c.lon), 3) - 0.5) * dtSol * 2;

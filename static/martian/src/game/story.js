@@ -195,7 +195,7 @@ export function startLaunch() {
   closeScreens();
   const mavUp = _v1.copy(World.mav.position).normalize().clone();
   tangentBasis(mavUp, _pe, _pn);
-  const camGround = World.mav.position.clone().addScaledVector(_pe, -26).addScaledVector(_pn, 20);
+  const camGround = World.mav.position.clone().addScaledVector(_pe, 26).addScaledVector(_pn, -20);
   camGround.normalize().multiplyScalar(surfaceAt(camGround) + 2.2);
   log('Strapped into a rocket with no nose cone under a tarp. Countdown started. If this works, drinks are on NASA forever.');
   if (S.pf.connected) {
@@ -208,7 +208,7 @@ export function startLaunch() {
     hermes = h.root; World.hermesRing = h.part('ring'); hermes.scale.setScalar(30);
     ctx.world.add(hermes);
   }
-  hermes.position.copy(mavUp).multiplyScalar(R * 1.85).addScaledVector(_pe, R * 0.8);
+  hermes.position.copy(mavUp).multiplyScalar(R * 1.85).addScaledVector(_pe, -R * 0.8);
   const liftT = 5.2;
   let t = 0, alt = 0;
   World.launchAnim = (dt) => {
@@ -234,7 +234,7 @@ export function startLaunch() {
     } else {
       // pull out to orbit: watch the whole planet you survived
       const k = smoothstep(2200, 14000, alt);
-      _v3.copy(mavUp).multiplyScalar(R * (1.15 + k * 1.3)).addScaledVector(_pe, R * 0.55 * k);
+      _v3.copy(mavUp).multiplyScalar(R * (1.15 + k * 1.3)).addScaledVector(_pe, -R * 0.55 * k);
       ctx.engine.camera.position.lerp(_v3, 1 - Math.pow(0.02, dt));
       camLookAt(k > 0.6 ? hermes.position : rocketWorld, mavUp);
       Snd.rumble(clamp(1 - k, 0.1, 0.85));
@@ -252,18 +252,29 @@ export function winGame() {
   setTimeout(() => Snd.disco(false), 6000);
   wipeSave();
   const st = S.stats;
+  const grown = st.potatoes + (st.produce || 0), meals = (S.diet && S.diet.meals) || 0;
+  // the run as he would log it: what was done, and on which sol (only what this save saw happen)
+  const marks = st.marks || {};
+  const STEPS = [['reach', 'Reached the Hab on a holed suit'], ['farm', 'Planted the first beds'], ['hydra', 'Made water from rocket fuel'],
+    ['harvest', 'Brought in the first harvest'], ['dinner', 'Cooked a dinner worth the name'], ['pf', 'Raised Earth on Pathfinder’s radio'],
+    ['survive', 'Outlasted the wait for the Hermes']];
+  const steps = STEPS.filter(([id]) => marks[id]).map(([id, text]) => `<li><b class="t-num">Sol ${marks[id]}</b><span>${text}</span></li>`).join('') +
+    `<li class="last"><b class="t-num">Sol ${S.sol}</b><span>Lifted off from Schiaparelli</span></li>`;
+  const fed = grown >= 30 ? 'fed himself from Martian soil' : grown > 0 ? 'grew food where nothing grows' : 'lived on what the mission left behind';
+  const went = st.driven > 30000 ? 'drove further than any rover had gone' : 'crossed the plains to Schiaparelli';
+  const mood = S.morale >= 70 ? ' He left in better spirits than anyone had a right to expect.' : S.morale < 30 ? ' He left worn thin, and he left.' : '';
   showOverlay({
     kind: 'win',
     kicker: `Hermes intercept confirmed · Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}`,
     title: 'Rescued',
     subtitle: 'Watney is off the surface.',
     stats: [
-      ['Sols survived', S.sol], ['Potatoes farmed', st.potatoes], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
+      ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
       ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Landmarks discovered', st.discoveries],
-      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Indoor explosions', st.booms],
+      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
-    quote: '“Every human being has a basic instinct to help each other out. If a hiker gets lost, people organize a search party. This is why they came back for me.”' +
-      '<cite>M. Watney, space pirate, greatest botanist on two planets</cite>',
+    extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,
+    quote: `${S.sol} sols alone on a planet. He ${fed}, ${went}, and came home.${mood}<cite>Ares 3 mission record, closing entry</cite>`,
     buttons: [{ label: 'Play again (new random site)', keep: true, fn: () => tryReload() }],
   });
 }

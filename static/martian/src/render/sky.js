@@ -104,7 +104,7 @@ const GLSL_SKY = /* glsl */`
   }
 `;
 
-const _c = new THREE.Color();
+const _c = new THREE.Color(), _m = new THREE.Vector3();
 
 export class Sky {
   constructor() {
@@ -115,7 +115,12 @@ export class Sky {
       uDust: { value: 0 }, uFogCol: { value: new THREE.Color() },
       uTime: { value: 0 },
       uSunDisc: { value: 1 },
+      // the two moons: direction from the eye, and how much sunlight reaches each (Mars's shadow puts them out)
+      uPhobos: { value: new THREE.Vector4(1, 0, 0, 0) }, uDeimos: { value: new THREE.Vector4(1, 0, 0, 0) },
+      uEarth: { value: new THREE.Vector3(0, 0, 1) },         // the evening star
     };
+    /** Where the moons are, in planet radii from the centre (set by the simulation's clock). */
+    this.moons = [new THREE.Vector3(2.766, 0, 0), new THREE.Vector3(-6.92, 0, 0)];
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: true,
@@ -129,7 +134,24 @@ export class Sky {
       fragmentShader: /* glsl */`
         varying vec3 vDir;
         uniform float uSunDisc;
+        uniform vec4 uPhobos, uDeimos;
+        uniform vec3 uEarth;
         ${GLSL_SKY}
+        // A moon: a small lumpy body lit by the sun, so it shows a phase. rad is its angular radius.
+        vec3 moon(vec3 v, vec4 m, float rad, float lumpy) {
+          if (dot(v, m.xyz) < 0.9999) return vec3(0.0);        // (within 0.8 of a degree)
+          vec3 e1 = normalize(cross(m.xyz, vec3(0.0, 1.0, 0.0)));
+          vec3 e2 = cross(e1, m.xyz);
+          vec2 q = vec2(dot(v, e1), dot(v, e2)) / rad;                    // 1 at the limb
+          float phi = atan(q.y, q.x);
+          float limb = 1.0 + lumpy * (0.16 * sin(2.0 * phi + 0.9) + 0.07 * sin(3.0 * phi + 2.1) + 0.04 * sin(5.0 * phi));
+          float r2 = dot(q, q) / (limb * limb);
+          if (r2 >= 1.0) return vec3(0.0);
+          vec3 n = normalize(q.x * e1 + q.y * e2 - sqrt(1.0 - r2) * m.xyz);
+          // (a dark dent or two, so the bigger one is not a plain ball)
+          float dent = 1.0 - lumpy * 0.35 * smoothstep(0.34, 0.0, length(q - vec2(0.28, 0.22))) - lumpy * 0.2 * smoothstep(0.2, 0.0, length(q + vec2(0.4, 0.1)));
+          return vec3(1.0, 0.93, 0.84) * ((0.03 + max(dot(n, uSun), 0.0)) * dent * m.w * smoothstep(1.0, 0.72, r2));
+        }
         void main() {
           vec3 v = normalize(vDir);
           float space;
@@ -142,6 +164,14 @@ export class Sky {
           float starVis = max(night, airless) * (1.0 - uDust) * smoothstep(0.0, 0.38, dot(v, uUp) + airless)
             * (1.0 - 0.8 * smoothstep(-0.34, -0.04, sunE) * (1.0 - airless) * pow(max(dot(v, uSun) * 0.5 + 0.5, 0.0), 2.0));
           col += stars(v, starVis) * 0.9;
+          // Phobos and Deimos. Truly they are a fifth of a degree and a twentieth across, which on a screen is a
+          // star and less than a star: they are drawn four times that, so that one is a moon and the other a moonlet.
+          // Both can be seen by day, palely.
+          float moonVis = (1.0 - uDust * 0.95) * mix(0.25, 1.0, max(night, airless)) * smoothstep(-0.01, 0.05, dot(v, uUp) + airless);
+          col += (moon(v, uPhobos, 0.0075, 1.0) * 2.0 + moon(v, uDeimos, 0.0030, 0.5) * 2.4) * moonVis;
+          // the Earth: the brightest star in the evening sky, and blue-white. It shows as soon as the sun is down.
+          float earthVis = (1.0 - uDust) * max(1.0 - smoothstep(-0.12, -0.02, sunE), airless) * smoothstep(0.0, 0.10, dot(v, uUp) + airless);
+          col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.999975, 0.999996, dot(v, uEarth)) * 3.2 * earthVis);
           // the sun: a small hard disc (0.35 degrees across on Mars) with a tight halo
           float cosT = dot(v, uSun);
           float ang = acos(clamp(cosT, -1.0, 1.0));
@@ -182,6 +212,15 @@ export class Sky {
     u.uDust.value = dust;
     u.uTime.value = time;
     this.mesh.position.copy(camPos);
+    // Earth keeps east of the sun in this season, so it follows the sun down: an evening star (38 degrees behind it)
+    u.uEarth.value.set(sunDir.x * 0.788 + sunDir.z * 0.616, sunDir.y, -sunDir.x * 0.616 + sunDir.z * 0.788).normalize();
+    // the moons as seen from here (Phobos is so close that where you stand changes where it is in the sky)
+    for (let i = 0; i < 2; i++) {
+      const p = this.moons[i], m = (i ? u.uDeimos : u.uPhobos).value;
+      _m.copy(p).multiplyScalar(R).sub(camPos).normalize();
+      const along = p.dot(sunDir), off = Math.sqrt(Math.max(0, p.lengthSq() - along * along));
+      m.set(_m.x, _m.y, _m.z, along < 0 ? smoothstep(0.93, 1.07, off) : 1);       // behind the planet, in its shadow
+    }
     // --- values the rest of the renderer needs, consistent with the shader above ----------
     const sunE = sunDir.dot(u.uUp.value);
     const day = smoothstep(-0.16, 0.10, sunE);
