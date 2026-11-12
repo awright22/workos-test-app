@@ -97,8 +97,8 @@ export function applyRates(dt, sleeping) {
       S.suit = clamp(S.suit + 26 * dt, 0, suitCap());
     } else {
       const moving = moveInputMag().mag > 0.12;
-      let rate = moving ? (sprinting() ? 0.95 : 0.62) : 0.34;
-      if (S.inside) rate = 0.3;
+      let rate = moving ? (sprinting() ? BAL.suitRun : BAL.suitWalk) : BAL.suitRest;
+      if (S.inside) rate = BAL.suitIndoors;
       if (S.upgrades.recycler) rate *= 0.75;
       if (S.flags.coldOpen) rate *= 1.9;
       const t = localTempC(playerUnit(), playerSunEl);
@@ -242,7 +242,8 @@ export function newSol() {
   if (S.potatoes > 0) S.potatoes--;
   else if (S.food > 0) S.food--;
   else log('No breakfast. The stomach files a formal complaint.', 'sys');
-  if (SOL_LOGS[S.sol]) setTimeout(() => log(SOL_LOGS[S.sol]), 1200);
+  if (S.sol === S.rescueSol - 1) setTimeout(() => log(`Sol ${S.sol}. One more sol. Packing my potato. Singular. It's symbolic.`), 1200);
+  else if (SOL_LOGS[S.sol]) setTimeout(() => log(SOL_LOGS[S.sol]), 1200);
   if (S.sol === 4 && !S.flags.pfRevealed) {
     S.flags.pfRevealed = true;
     const d = groundDist(player.pos, World.pathfinder.position);

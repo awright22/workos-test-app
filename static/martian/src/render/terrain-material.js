@@ -130,7 +130,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec3 stoneCol = alb * vec3(0.60, 0.56, 0.57) * (1.0 + stoneTop * 0.10);
         col = mix(col, stoneCol, stones);
         // polar ice
-        col = mix(col, vec3(0.78, 0.84, 0.92) * (1.0 + tone * 0.22), ice);
+        // dusty water ice: far from white, paler in the hollows where frost collects
+        col = mix(col, vec3(0.47, 0.52, 0.60) * (1.0 + tone * 0.45 - coarse * 0.10), ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
         diffuseColor.rgb = col;

@@ -20,19 +20,20 @@ await g.page.waitForFunction(() => window.__MG && window.__MG.ready, null, { tim
 const title = await g.page.locator('#mg-panel').innerText();
 const fails = [];
 const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (d !== undefined ? '  ' + JSON.stringify(d) : '')); if (!ok) fails.push(name); };
-check('title offers to continue the old save at its sol', /CONTINUE — SOL 12/.test(title), title.split('\n').filter((l) => /CONTINUE|NEW GAME/.test(l)));
+// Sol 12 of 45 under the old, shorter sols is Sol 7 of 25 now
+check('title offers to continue the old save, its sol converted', /CONTINUE — SOL 7/.test(title), title.split('\n').filter((l) => /CONTINUE|NEW GAME/.test(l)));
 await g.page.locator('#mg-panel button', { hasText: 'CONTINUE' }).click();
 await sleep(600);
 const s = await g.eval(async (G) => { await G.settle(); return { sol: G.S.sol, potatoes: G.S.potatoes, scrap: G.S.inv.scrap, tank1: !!G.S.upgrades.tank1, pf: G.S.pf.connected, plots: G.World.plots.length, plot6: G.World.plots[6] && G.World.plots[6].state,
   built: G.World.builtMeshes.map((b) => b.kind), pods: G.World.pods.length, alt: +(G.player.pos.length() - G.surfaceAt(G.player.pos)).toFixed(3), started: G.S.started }; });
-check('progress carried over', s.started && s.sol === 12 && s.potatoes === 9 && s.scrap === 7 && s.tank1 && s.pf, s);
+check('progress carried over', s.started && s.sol === 7 && s.potatoes === 9 && s.scrap === 7 && s.tank1 && s.pf, s);
 check('greenhouse and its crops rebuilt', s.built[0] === 'greenhouse' && s.plots === 10 && s.plot6 === 'growing', s);
 check('astronaut stands on the new ground', Math.abs(s.alt) < 0.01, s.alt);
-await sleep(4200);
+await sleep(8200);
 const logText = await g.page.locator('#mg-log').innerText();
-check('player is told what changed', /real orbital elevation/.test(logText), logText.slice(0, 200));
+check('player is told what changed', /real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText), logText.slice(0, 300));
 const resaved = await g.eval((G) => { G.saveGame(); return JSON.parse(localStorage.getItem('stranded2-save')).v; });
-check('re-saved in the current format', resaved === 3, resaved);
+check('re-saved in the current format', resaved === 4, resaved);
 // an unreadable save is reported on the title screen
 await g.page.evaluate(() => localStorage.setItem('stranded2-save', JSON.stringify({ v: 99, nonsense: true })));
 await g.page.reload({ waitUntil: 'load' });

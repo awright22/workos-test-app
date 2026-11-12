@@ -96,6 +96,9 @@ export function continueGame(saved) {
   tryLock();
   Snd.wind(0.2);
   log(`Sol ${S.sol}. Still here. Still farming. Still winning, technically.`);
+  if (saved.migrated && saved.migrated.includes('pacing')) {
+    setTimeout(() => log(`Mission clock recalibrated: a sol now runs more than twice as long, and the rescue window moved to Sol ${S.rescueSol}. Your sol count was converted to match.`, 'nasa'), 6500);
+  }
   if (saved.migrated && saved.migrated.includes('terrain')) {
     setTimeout(() => log('Survey update: the planet is now built from real orbital elevation data. Same Mars, truer ground — your colony has been re-seated on it.', 'nasa'), 2500);
   }

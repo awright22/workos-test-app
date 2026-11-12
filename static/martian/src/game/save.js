@@ -1,4 +1,4 @@
-import { S, suitCap } from './state.js';
+import { DIFFICULTIES, OLD_RESCUE_SOL, S, suitCap } from './state.js';
 import { World, addSupplyPod, buildDeployable, placeAt } from '../world/build.js';
 import { llToVec, vecToLl } from '../planet/geo.js';
 import { _v1 } from '../core/scratch.js';
@@ -98,11 +98,16 @@ export function saveGame() {
  *    2  the first full-planet version (analytic terrain)
  *    3  real-elevation terrain; same fields. Positions are stored as directions on the sphere,
  *       so everything is simply re-seated on the new ground when an old save is loaded. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 /** Bring an older save up to the current format, or return null if it cannot be read. */
 export function migrateSave(d) {
   if (!d || typeof d !== 'object' || !d.spawn || !d.playerQ) return null;
   if (d.v === 2) d = { ...d, v: 3, migrated: ['terrain'] };
+  if (d.v === 3) {
+    // sols became longer and rescue came forward: keep the save the same fraction of the way there
+    const was = OLD_RESCUE_SOL[d.diff] || 45, now = (DIFFICULTIES[d.diff] || DIFFICULTIES.survival).rescueSol;
+    d = { ...d, v: 4, sol: Math.max(1, Math.round(d.sol * now / was)), migrated: [...(d.migrated || []), 'pacing'] };
+  }
   return d.v === SAVE_VERSION ? d : null;
 }
 export function loadSavedData() {

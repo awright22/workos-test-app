@@ -13,10 +13,7 @@ export const SOL_LOGS = {
   12: "Sol 12. Update: still the only person on an entire planet. The commute is unbeatable, though.",
   15: "Sol 15. I named a rock today. His name is Greg. This is fine.",
   20: "Sol 20. Told Greg about the potatoes. He was nonjudgmental, as usual.",
-  25: "Sol 25. Halfway-ish. The potatoes and I have an understanding: I water them, they keep me alive, nobody mentions the eating part.",
+  25: "Sol 25. The potatoes and I have an understanding: I water them, they keep me alive, nobody mentions the eating part.",
   30: "Sol 30. I've driven further on Mars than I ever commuted on Earth. Insurance would NOT cover this.",
   35: "Sol 35. Mars sunsets are blue. The universe has a sense of irony and excellent taste.",
-  40: "Sol 40. Soon. The word tastes like potatoes. Everything tastes like potatoes.",
-  44: "Sol 44. One more sol. Packing my potato. Singular. It's symbolic.",
-  59: "Sol 59. Tomorrow. Greg the rock is coming with me. Don't tell NASA about the mass budget.",
 };
