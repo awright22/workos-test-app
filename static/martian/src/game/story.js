@@ -4,7 +4,7 @@ import { Snd } from '../audio/sound.js';
 import { checkpoint, saveGame, wipeSave } from './save.js';
 import { angDist, fmtDist, groundDist, tangentBasis } from '../planet/geo.js';
 import { World, dropSupplyPod } from '../world/build.js';
-import { UI, hideOverlay, log, showOverlay, toast } from '../ui/dom.js';
+import { hideOverlay, log, setPrompt, showOverlay, toast } from '../ui/dom.js';
 import { revealMav } from './sim.js';
 import { camLookAt, player } from './player.js';
 import { _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
@@ -16,6 +16,7 @@ import { buildModel } from '../world/models.js';
 import { ctx } from './ctx.js';
 import { clamp, smoothstep } from '../core/math.js';
 import { tryReload } from './flow.js';
+import { showComms } from '../ui/menus.js';
 // The story: Pathfinder and NASA, survey quests, discoveries, achievements, the launch.
 export function connectPathfinder() {
   S.pf.connected = true;
@@ -42,13 +43,10 @@ export function connectPathfinder() {
       saveGame();
       return;
     }
-    const rows = convo.slice(0, i + 1).map(([who, t]) =>
-      `<div style="margin-bottom:10px"><span class="${who === 'n' ? 'n' : 'w'}">${who === 'n' ? '[HOUSTON]' : '[WATNEY]'}</span> ${t}</div>`).join('');
-    showOverlay({
-      title: 'PATHFINDER UPLINK',
-      subtitle: 'signal delay: 11 minutes, mercifully compressed',
-      body: `<div class="comms">${rows}</div>`,
-      buttons: [{ label: i < convo.length - 1 ? 'NEXT ▸' : 'CLOSE CHANNEL', keep: i < convo.length - 1, fn: () => { i++; Snd.click(); step(); } }],
+    showComms({
+      title: 'Pathfinder uplink', subtitle: 'Signal delay: 11 minutes, mercifully compressed',
+      lines: convo, index: i,
+      onNext: () => { i++; Snd.click(); step(); },
     });
     if (i === 0) Snd.ok();
   };
@@ -187,7 +185,7 @@ export let hermes = null;
 export function startLaunch() {
   S.mode = 'cutscene';
   S.uiOpen = false;
-  UI.prompt.style.display = 'none';
+  setPrompt(null);
   closeScreens();
   const mavUp = _v1.copy(World.mav.position).normalize().clone();
   tangentBasis(mavUp, _pe, _pn);
@@ -248,20 +246,17 @@ export function winGame() {
   wipeSave();
   const st = S.stats;
   showOverlay({
-    title: 'RESCUED',
-    subtitle: `HERMES INTERCEPT CONFIRMED · SOL ${S.sol} · ${DIFFICULTIES[S.diff].name}`,
-    body:
-      `<b>Watney is off the surface.</b>\n\n` +
-      `Sols survived: ${S.sol}\n` +
-      `Potatoes farmed: ${st.potatoes}\n` +
-      `Driven: ${(st.driven / 1000).toFixed(1)} km · Walked: ${(st.walked / 1000).toFixed(1)} km\n` +
-      `Landmarks discovered: ${st.discoveries} · Landers salvaged: ${Object.keys(S.salvaged).length}\n` +
-      `Achievements: ${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}\n` +
-      `Close calls: ${st.closeCalls} · Indoor explosions: ${st.booms}\n\n` +
-      `"Every human being has a basic instinct to help each other out.\n` +
-      `If a hiker gets lost, people organize a search party. This is why\n` +
-      `they came back for me." — M. Watney, space pirate, greatest botanist\n` +
-      `on two planets.`,
-    buttons: [{ label: 'PLAY AGAIN (new random site)', keep: true, fn: () => tryReload() }],
+    kind: 'win',
+    kicker: `Hermes intercept confirmed · Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}`,
+    title: 'Rescued',
+    subtitle: 'Watney is off the surface.',
+    stats: [
+      ['Sols survived', S.sol], ['Potatoes farmed', st.potatoes], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
+      ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Landmarks discovered', st.discoveries],
+      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Indoor explosions', st.booms],
+    ],
+    quote: '“Every human being has a basic instinct to help each other out. If a hiker gets lost, people organize a search party. This is why they came back for me.”' +
+      '<cite>M. Watney, space pirate, greatest botanist on two planets</cite>',
+    buttons: [{ label: 'Play again (new random site)', keep: true, fn: () => tryReload() }],
   });
 }

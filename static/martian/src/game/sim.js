@@ -4,7 +4,7 @@ import { ctx } from './ctx.js';
 import { _du, _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { clamp, hash3, lerp, smoothstep } from '../core/math.js';
 import { D2R, R, SOL_HOURS } from '../planet/constants.js';
-import { UI, flashScreen, hideOverlay, log } from '../ui/dom.js';
+import { flashScreen, hideOverlay, log } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { World, placeAt } from '../world/build.js';
 import { angDist, fmtDist, groundDist, llToVec, tangentBasis, vecToLl } from '../planet/geo.js';
@@ -16,6 +16,7 @@ import { syncAllVisuals } from './visuals.js';
 import { SOL_LOGS } from './text.js';
 import { checkpoint, saveGame } from './save.js';
 import { buildModel } from '../world/models.js';
+import { showSleep, showSleepSummary } from '../ui/menus.js';
 // The simulation: resources, time, storms, events, sleep.
 export function updateSunDir() {
   const a = S.tod * Math.PI * 2;
@@ -304,9 +305,7 @@ export function sleepToDawn(inRover) {
   if (S.sleeping) return;
   S.sleeping = true;
   const before = { o2: S.o2, water: S.water, power: S.power, potatoes: S.potatoes, food: S.food };
-  UI.overlay.style.display = 'flex';
-  S.uiOpen = true;
-  UI.panel.innerHTML = '<h2 style="margin-bottom:8px">SLEEPING…</h2><div class="bd" id="mg-sleepbd" style="min-height:120px"></div>';
+  showSleep();
   // advance until the LOCAL sun crosses the horizon rising (max 1.3 sols for polar nights)
   const u = _v1.copy(inRover ? World.rover.group.position : player.pos).normalize().clone();
   let advanced = 0, rolled = false;
@@ -328,21 +327,20 @@ export function sleepToDawn(inRover) {
   // a night slept is a sol lived, even when the global sun phase didn't wrap
   void rolled;   // the sol turns at the colony's dawn; camping far from home does not force it
   if (S.over) { S.sleeping = false; return; }
-  const bd = document.getElementById('mg-sleepbd');
-  const delta = (a, b, unit) => {
-    const d = b - a;
-    return `<span style="color:${d >= 0 ? '#7fca7f' : '#ff8f7f'}">${d >= 0 ? '+' : ''}${d.toFixed(1)}${unit}</span>`;
-  };
   const growing = World.plots.filter(p => p.state === 'growing').length;
   const ready = World.plots.filter(p => p.state === 'ready').length;
-  setTimeout(() => {
-    if (bd && !S.over) bd.innerHTML =
-      `HAB O2 ${delta(before.o2, S.o2, '%')} · H2O ${delta(before.water, S.water, 'L')} · PWR ${delta(before.power, S.power, '%')}\n` +
-      `Breakfast: ${S.potatoes < before.potatoes ? 'potato. again.' : (S.food < before.food ? '1 ration' : 'skipped')}\n` +
-      (growing + ready > 0 ? `Farm: ${growing} growing, ${ready} ready\n` : '') +
-      (inRover ? 'Slept curled around the driver seat. The chiropractor is 225 million km away.\n' : '') +
-      `\n<b style="font-size:22px;letter-spacing:4px">SOL ${S.sol}</b>`;
-  }, 500);
+  const notes = [`Breakfast: ${S.potatoes < before.potatoes ? 'potato. Again.' : (S.food < before.food ? 'one ration' : 'skipped')}`];
+  if (growing + ready > 0) notes.push(`Farm: ${growing} growing, ${ready} ready`);
+  if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
+  const summary = {
+    sol: S.sol, notes,
+    deltas: [
+      { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
+      { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
+      { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
+    ],
+  };
+  setTimeout(() => { if (!S.over) showSleepSummary(summary); }, 500);
   setTimeout(() => {
     if (S.over) { S.sleeping = false; return; }      // review finding: never dismiss a death screen
     hideOverlay();

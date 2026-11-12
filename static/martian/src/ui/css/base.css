@@ -1,0 +1,181 @@
+/*
+ * Design tokens and shared parts.
+ *
+ * The look: an EVA suit display. Warm off-white type, one amber accent, three semantic colours
+ * (danger, cold, success), thin rules, dark translucent plates so text reads over a bright
+ * orange landscape and over a black sky alike.
+ *
+ * Every size is in rem. ui/layout.js sets the root font size from the window size and the
+ * player's HUD-scale setting, so the interface keeps its proportions from a phone to a 4K screen.
+ */
+:root {
+  --ink: #f5f0e8;
+  --ink-2: rgba(245, 240, 232, .78);
+  --ink-3: rgba(245, 240, 232, .58);
+  --ink-4: rgba(245, 240, 232, .3);
+  --line: rgba(245, 240, 232, .24);
+  --line-2: rgba(245, 240, 232, .13);
+  --bg: #0b0a09;
+  --panel: #131110;
+  --panel-2: #1b1816;
+  --plate: rgba(14, 12, 11, .62);
+  --plate-strong: rgba(14, 12, 11, .8);
+  --accent: #ffb454;
+  --accent-2: #ffc87e;
+  --accent-ink: #1e1306;
+  --accent-wash: rgba(255, 180, 84, .12);
+  --danger: #ff6a5c;
+  --danger-wash: rgba(255, 106, 92, .14);
+  --cold: #8fd3ff;
+  --cold-wash: rgba(143, 211, 255, .12);
+  --ok: #8be0a4;
+  --ok-wash: rgba(139, 224, 164, .12);
+
+  --f-cond: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Barlow", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* iPhone safe areas; ?safe=top,right,bottom,left overrides these for tests (ui/layout.js) */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  /* distance from the screen edge to the interface */
+  --m: 1.25rem;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --shadow-text: 0 0 .5rem rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .75);
+}
+/* colour-blind-safe semantic colours: blue / yellow / vermilion separate by lightness as well as hue */
+.mg-cb {
+  --ok: #7cc4ff;
+  --ok-wash: rgba(124, 196, 255, .14);
+  --accent: #ffd84a;
+  --accent-2: #ffe584;
+  --accent-wash: rgba(255, 216, 74, .12);
+  --danger: #ff7a33;
+  --danger-wash: rgba(255, 122, 51, .16);
+  --cold: #c9b8ff;
+  --cold-wash: rgba(201, 184, 255, .14);
+}
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
+  overscroll-behavior: none; }
+:where(#mg-root, #mg-root *, #mg-root *::before, #mg-root *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+#mg-root { position: fixed; inset: 0; background: #000; overflow: hidden; color: var(--ink);
+  font-family: var(--f-body); font-size: .9375rem; line-height: 1.5; font-weight: 400;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none; touch-action: none; }
+#mg-root canvas.mg-three { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+:where(#mg-root) button, :where(#mg-root) input { font: inherit; color: inherit; }
+#mg-root [hidden] { display: none !important; }
+#mg-root sub { font-size: .72em; line-height: 0; vertical-align: baseline; position: relative; top: .22em; margin-left: .03em; }
+.chem { letter-spacing: 0; white-space: nowrap; }
+#mg-root b, #mg-root strong { font-weight: 600; }
+
+/* icons: one stroke weight everywhere */
+.ic { width: 1.25em; height: 1.25em; flex: none; display: inline-block; vertical-align: -.25em;
+  fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ic .f { fill: currentColor; stroke: none; }
+
+/* type */
+.t-kicker { font: 500 .75rem/1.2 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+.t-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.t-mono { font-family: var(--f-mono); font-weight: 500; font-size: .92em; letter-spacing: -.01em; }
+
+/* keyboard focus is always visible */
+:where(#mg-root) :focus { outline: none; }
+:where(#mg-root) :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* text for screen readers only */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* key caps */
+.mg-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6em; height: 1.6em;
+  padding: 0 .4em; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: .25em;
+  background: rgba(245, 240, 232, .06); font: 600 .8125em/1 var(--f-cond); letter-spacing: .04em;
+  color: var(--ink); text-transform: uppercase; white-space: nowrap; }
+
+/* buttons */
+.mg-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: .5em;
+  min-height: 2.75rem; padding: 0 1.5rem; border: 1px solid var(--line); border-radius: .1875rem;
+  background: rgba(245, 240, 232, .04); color: var(--ink); cursor: pointer;
+  font: 600 1rem/1 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, transform .15s var(--ease); }
+.mg-btn:hover, .mg-btn:focus-visible { background: rgba(245, 240, 232, .12); border-color: var(--ink-3); }
+.mg-btn:active { transform: translateY(1px); }
+.mg-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.mg-btn.primary:hover, .mg-btn.primary:focus-visible { background: var(--accent-2); border-color: var(--accent-2); }
+.mg-btn.danger { border-color: var(--danger); color: var(--danger); }
+.mg-btn.danger:hover, .mg-btn.danger:focus-visible { background: var(--danger); color: #1c0806; }
+.mg-btn.small { min-height: 2rem; padding: 0 .875rem; font-size: .8125rem; letter-spacing: .12em; }
+.mg-btn:disabled { cursor: default; color: var(--ink-4); border-color: var(--line-2); background: transparent; transform: none; }
+.mg-btn .ic { width: 1.1em; height: 1.1em; vertical-align: 0; }
+.mg-iconbtn { display: inline-grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 1px solid var(--line);
+  border-radius: .1875rem; background: rgba(14, 12, 11, .5); color: var(--ink); cursor: pointer;
+  transition: background .15s, border-color .15s; }
+.mg-iconbtn:hover, .mg-iconbtn:focus-visible { background: rgba(245, 240, 232, .14); border-color: var(--ink-3); }
+.mg-iconbtn .ic { width: 1.25rem; height: 1.25rem; }
+
+/* form controls (settings) */
+.mg-range { -webkit-appearance: none; appearance: none; width: 100%; height: 1.75rem; background: transparent; cursor: pointer; touch-action: pan-y; }
+.mg-range::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right, var(--ink) var(--fill, 50%), var(--line) var(--fill, 50%)); }
+.mg-range::-moz-range-track { height: 2px; background: var(--line); }
+.mg-range::-moz-range-progress { height: 2px; background: var(--ink); }
+.mg-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: .875rem; height: 1.25rem; margin-top: calc(-.625rem + 1px);
+  background: var(--ink); border: 0; border-radius: 1px; }
+.mg-range::-moz-range-thumb { width: .875rem; height: 1.25rem; background: var(--ink); border: 0; border-radius: 1px; }
+.mg-range:focus-visible { outline-offset: 2px; }
+.mg-range:hover::-webkit-slider-thumb, .mg-range:focus-visible::-webkit-slider-thumb { background: var(--accent); }
+.mg-seg { display: inline-flex; border: 1px solid var(--line); border-radius: .1875rem; overflow: hidden; }
+.mg-seg button { min-height: 2.25rem; padding: 0 .9rem; border: 0; border-right: 1px solid var(--line-2); background: transparent;
+  color: var(--ink-2); cursor: pointer; font: 600 .875rem/1 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; }
+.mg-seg button:last-child { border-right: 0; }
+.mg-seg button:hover { background: rgba(245, 240, 232, .08); color: var(--ink); }
+.mg-seg button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
+.mg-seg button:focus-visible { outline-offset: -3px; }
+.mg-switch { position: relative; width: 3rem; height: 1.625rem; border: 1px solid var(--line); border-radius: 1rem; background: transparent;
+  cursor: pointer; flex: none; transition: background .2s, border-color .2s; }
+.mg-switch::after { content: ""; position: absolute; left: .1875rem; top: 50%; width: 1.125rem; height: 1.125rem; margin-top: -.5625rem;
+  border-radius: 50%; background: var(--ink-3); transition: transform .2s var(--ease), background .2s; }
+.mg-switch[aria-checked="true"] { background: var(--accent-wash); border-color: var(--accent); }
+.mg-switch[aria-checked="true"]::after { transform: translateX(1.375rem); background: var(--accent); }
+
+/* scrolling regions */
+.mg-scroll { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+  scrollbar-width: thin; scrollbar-color: var(--ink-4) transparent; }
+.mg-scroll::-webkit-scrollbar { width: 6px; }
+.mg-scroll::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 3px; }
+
+/* the wordmark */
+.mg-wordmark { font: 600 5.5rem/.86 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink);
+  white-space: nowrap; }
+.mg-wordmark em { font-style: normal; color: var(--accent); margin-left: .12em; letter-spacing: .06em; }
+
+/* first paint, before the script has run (index.html) */
+#mg-boot { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.25rem;
+  background: #050403; color: var(--ink); z-index: 100; }
+#mg-boot .mg-wordmark { font-size: 3.25rem; }
+#mg-boot .mg-boot-sub { font: 500 .75rem/1 var(--f-cond); letter-spacing: .3em; text-transform: uppercase; color: var(--ink-3); }
+
+/* one-frame events: explosions, the suit seal */
+#mg-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 30; }
+
+/* portrait phones: the game is landscape only */
+#mg-rotate { position: absolute; inset: 0; z-index: 90; display: none; place-content: center; justify-items: center; gap: 1.25rem;
+  padding: 2rem; background: #070605; text-align: center; }
+.mg-portrait #mg-rotate { display: grid; }
+#mg-rotate .ic { width: 4.5rem; height: 4.5rem; color: var(--accent); stroke-width: 1.1; animation: mg-rotate-hint 2.6s var(--ease) infinite; }
+#mg-rotate h2 { font: 600 1.75rem/1.1 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; }
+#mg-rotate p { max-width: 17rem; color: var(--ink-2); font-size: .9375rem; }
+@keyframes mg-rotate-hint { 0%, 20% { transform: rotate(0); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+
+@keyframes mg-pulse { 50% { opacity: .35; } }
+@keyframes mg-fade-in { from { opacity: 0; } }
+@keyframes mg-rise-in { from { opacity: 0; transform: translateY(.5rem); } }
+
+/* reduced motion: the player's setting, or the system's when they have not chosen */
+.mg-reduced *, .mg-reduced *::before, .mg-reduced *::after {
+  animation-duration: .001s !important; animation-iteration-count: 1 !important;
+  transition-duration: .001s !important; scroll-behavior: auto !important; }

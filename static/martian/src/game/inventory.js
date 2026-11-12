@@ -58,13 +58,14 @@ export function gainLoot(loot) {
 }
 export function nearHab() { return World.hab && groundDist(player.pos, World.hab.position) < 120; }
 
-// O2 candle hotkey
-window.addEventListener('keydown', (ev) => {
-  if (ev.key.toLowerCase() !== 'x' || !S.started || S.uiOpen || screenOpen() || S.over) return;
+/** Crack an O2 candle in the field (the X key, or the touch button). */
+export function useCandle() {
+  if (!S.started || S.uiOpen || screenOpen() || S.over) return;
   if ((S.inv.candle || 0) > 0 && S.suit < suitCap() - 5) {
     S.inv.candle--;
     S.suit = clamp(S.suit + 40, 0, suitCap());
     Snd.ok();
     log('Cracked an O2 candle. Chemistry: still my favorite roommate.');
   }
-});
+}
+window.addEventListener('keydown', (ev) => { if (ev.key.toLowerCase() === 'x') useCandle(); });

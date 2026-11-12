@@ -11,7 +11,7 @@ import { clamp, perf } from './core/math.js';
 import { _v1, _v2, _v3 } from './core/scratch.js';
 import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
-import { root, UI, log, showOverlay } from './ui/dom.js';
+import { root, UI, log, showOverlay, hideOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
 import { World, siteLocalToWorld } from './world/build.js';
 import { input, initInput } from './game/input.js';
@@ -26,6 +26,7 @@ import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
 import { showStart, newGame, continueGame } from './game/flow.js';
 import { syncAllVisuals } from './game/visuals.js';
+import { showLoading as loading } from './ui/menus.js';
 
 function pickQuality() {
   const q = new URLSearchParams(location.search).get('q');
@@ -33,12 +34,6 @@ function pickQuality() {
   try { const saved = localStorage.getItem('stranded2-quality'); if (saved) return saved; } catch (e) { /* private mode */ }
   const mobile = input.isTouch && Math.min(screen.width, screen.height) < 900;
   return mobile ? 'low' : 'high';
-}
-
-function loading(fraction, label) {
-  UI.panel.innerHTML = `<h1>STRANDED II</h1><h2>${label || 'Loading'}</h2>` +
-    `<div style="height:6px;border:1px solid rgba(242,216,184,.4)"><div style="height:100%;width:${Math.round(fraction * 100)}%;background:#ffb45e"></div></div>`;
-  UI.overlay.style.display = 'flex';
 }
 
 async function boot() {
@@ -181,7 +176,7 @@ function installDebug() {
         Math.random = () => (q.length ? q.shift() : real());
         try { newGame(diff); } finally { Math.random = real; }
       } else newGame(diff);
-      UI.overlay.style.display = 'none'; S.uiOpen = false;
+      hideOverlay();
       await this.settle();
       return { lat: World.spawn.lat, lon: World.spawn.lon };
     },
@@ -247,5 +242,6 @@ function installDebug() {
 
 boot().catch((e) => {
   console.error(e);
-  showOverlay({ title: 'SOMETHING BROKE', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload the page to try again.`, buttons: [] });
+  showOverlay({ kind: 'error', title: 'Something broke', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload the page to try again.`,
+    buttons: [{ label: 'Reload', keep: true, fn: () => location.reload() }] });
 });
