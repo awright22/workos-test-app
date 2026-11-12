@@ -8,6 +8,8 @@ self.onmessage = (e) => {
   if (m.type === 'init') {
     planet = new Planet(m.data);
     self.postMessage({ type: 'ready' });
+  } else if (m.type === 'finest') {
+    planet.finest = m.finest;
   } else if (m.type === 'pads') {
     planet.pads = m.pads;
   } else if (m.type === 'build') {

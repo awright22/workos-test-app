@@ -119,6 +119,9 @@ export class Planet {
     this.faces = data.faces;
     /** world metres of height per stored unit */
     this.unit = data.q * HM;
+    /** The finest wavelength physics and placement include: that of the finest mesh this quality draws,
+     *  so feet, wheels and rocks rest on the ground that is shown and not on detail it leaves out. */
+    this.finest = FINEST;
     this.rough = data.rough;
     this.rsize = data.rough ? data.rough.m + 2 * data.rough.pad : 0;
     /** Levelled building sites: {x,y,z unit centre, r metres flat, blend metres, h radius, cos} */
@@ -163,7 +166,7 @@ export class Planet {
 
   /** World-space distance from the planet centre to the surface along a unit direction.
    *  minW is the finest wavelength to include (FINEST for collision; larger for far meshes). */
-  radius(x, y, z, minW = FINEST) {
+  radius(x, y, z, minW = this.finest) {
     locate(x, y, z);
     const base = this._ledges(this._mola(), x, y, z, minW);
     const rough = this._rough();

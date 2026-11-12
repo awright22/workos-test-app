@@ -344,7 +344,7 @@ export function revealMav() {
 export function sleepToDawn(inRover) {
   if (S.sleeping) return;
   S.sleeping = true;
-  const before = { o2: S.o2, water: S.water, power: S.power, sol: S.sol, morale: S.morale };
+  const before = { o2: S.o2, water: S.water, power: S.power, sol: S.sol, morale: S.morale, food: foodTotal() };
   showSleep();
   // advance until the LOCAL sun crosses the horizon rising (max 1.3 sols for polar nights)
   const u = _v1.copy(inRover ? World.rover.group.position : player.pos).normalize().clone();
@@ -380,10 +380,15 @@ export function sleepToDawn(inRover) {
       { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
       { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
       { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
+      { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: '', whole: true },
+      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', whole: true },
     ],
   };
-  setTimeout(() => { if (!S.over) showSleepSummary(summary); }, 500);
-  setTimeout(() => {
+  // the night's account stays up until he starts the day (or for a quarter of a minute), so it can be read
+  let woke = false;
+  const wake = () => {
+    if (woke) return;
+    woke = true;
     if (S.over) { S.sleeping = false; return; }      // review finding: never dismiss a death screen
     hideOverlay();
     S.sleeping = false;
@@ -391,5 +396,7 @@ export function sleepToDawn(inRover) {
     syncAllVisuals();
     checkpoint();
     saveGame();
-  }, 2900);
+  };
+  setTimeout(() => { if (!S.over) showSleepSummary(summary, wake); }, 500);
+  setTimeout(wake, 15000);
 }

@@ -439,7 +439,7 @@ def weathered():
     mat('solar_cell', color=(0.010, 0.022, 0.085), metallic=0.10, roughness=0.62)
     mat('cell_grid', color=(0.085, 0.10, 0.15), metallic=0.2, roughness=0.60)       # interconnects between cells
     mat('kapton_black', color=(0.028, 0.026, 0.026), metallic=0.0, roughness=0.60)  # black film, composite edges
-    mat('vectran', color=(0.34, 0.30, 0.245), metallic=0.0, roughness=0.95)         # airbag cloth, tan-grey
+    mat('vectran', color=(0.68, 0.65, 0.57), metallic=0.0, roughness=0.92)          # airbag cloth: pale straw, far lighter than the soil
     mat('paint_olive', color=(0.30, 0.31, 0.26), metallic=0.1, roughness=0.60)      # Viking's grey-olive body paint
     mat('blanket_white', color=(0.84, 0.84, 0.82), metallic=0.0, roughness=0.92)    # white thermal cloth
     mat('scorched', color=(0.040, 0.036, 0.034), metallic=0.0, roughness=0.95)      # burnt metal and soot
@@ -582,11 +582,6 @@ def blob(bm, M, rx, ry, h, seed=1, nu=18, pleats=7, rough=0.3, pleat_depth=0.45,
         bm.faces.new((rows[-1][i], rows[-1][(i + 1) % nu], top))
 
 
-def ridge(x, y, z, seed=0):
-    """Ridged noise in 0..1: sharp crests along the creases of crumpled cloth."""
-    return 1.0 - abs(2.0 * noise3(x, y, z, seed) - 1.0)
-
-
 def point_in_poly(o, x, y):
     """Signed margin of (x, y) inside a convex counter-clockwise outline (positive = inside)."""
     m = 1e9
@@ -599,56 +594,101 @@ def point_in_poly(o, x, y):
     return m
 
 
-def slumped_cloth(bm, outline_r, height, r_in=0.5, nu=96, nr=10, seed=1, limit=None, hem=0.022, pleats=22, top=0.23):
-    """A deflated, retracted airbag lying round a lander: one sheet of creased cloth over the
-    ring from r_in out to outline_r(theta), draped on the ground. height(x, y, rho) gives the
-    bulk of cloth there (rho = 0 at the inside, 1 at the edge). The cloth was gathered inward by
-    its cords, so its main folds are `pleats` radial gathers with sharp valleys; ridged noise adds
-    buckles across them. limit(x, y, z) -> z lets the caller press the cloth down under hardware.
-    The edge is a thin hem that tucks into the ground. Returns the grid of verts [ring][i]."""
+def smooth01(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / (b - a)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+# The section of one lobe of a deflated airbag from the ground up to its crown, as (radius, height)
+# fractions: one that still holds some shape, and one that has slumped over itself in a roll with a tuck
+# above it. Both bulge beyond their footing: steep cloth is what the dust leaves pale.
+_LOBE_PLUMP = ((0.90, -0.12), (0.975, 0.10), (1.00, 0.38), (0.965, 0.64), (0.86, 0.84), (0.66, 0.955), (0.38, 0.95))
+_LOBE_SLUMP = ((0.94, -0.12), (1.03, 0.08), (1.00, 0.24), (0.90, 0.30), (0.88, 0.56), (0.70, 0.74), (0.40, 0.78))
+
+
+def bag_lobe(bm, c, yaw, a, b, h, seed=1, seg=18, slump=0.5, cinch=0.35, sag=0.2, lean=0.12, limit=None, rings=7):
+    """One lobe of a deflated airbag lying on the ground at c = (x, y): a slack pillow a x b (half
+    lengths along and across the local x axis, which is turned `yaw` degrees) and h high, bulging at
+    its sides and sagging on top. `slump` (0..1) is how much of its rim has rolled over itself, `sag`
+    how far the middle of its top has sunk;
+    `cinch` is how deep its tether cord (lying along local x, over the crown) has drawn it in;
+    puckers at every 60 degrees are its panel seams. limit(x, y, z) -> z presses it down under
+    hardware. Open underneath. seg must be a multiple of 6; rings=6 leaves out the last ring before the
+    crown (for a lobe that is mostly hidden). Returns (rings of verts [ring][i], crown vert)."""
+    cy, sy = cos(rad(yaw)), sin(rad(yaw))
     rows = []
-    for j in range(nr + 1):
-        rho = j / nr
+    crown_f = 0.0
+    for j in range(rings):
         row = []
-        for i in range(nu):
-            th = TAU * (i + 0.5 * (j % 2)) / nu                      # staggered rings: no straight radial seams
-            R = outline_r(th)
-            r = r_in + (R - r_in) * (rho ** 0.85)
-            # the cloth was hauled inward: the creases wander, so warp the sampling point a little
-            wx = (noise3(r * cos(th) * 1.3 + 4, r * sin(th) * 1.3 + 4, 0.2, seed + 3) - 0.5) * 0.22
-            wy = (noise3(r * cos(th) * 1.3 + 9, r * sin(th) * 1.3 + 1, 0.7, seed + 4) - 0.5) * 0.22
-            x, y = r * cos(th), r * sin(th)
-            wob = noise3(x * 0.9 + 1, y * 0.9 + 5, 0.9, seed + 5)
-            gather = abs(sin(pleats * th / 2 + 5.0 * wob + 1.4 * rho)) ** 0.75   # V-shaped valleys between rounded folds
-            big = ridge((x + wx) * 2.6, (y + wy) * 2.6, 0.3, seed) ** 1.5
-            fine = ridge((x - wy) * 7.3, (y + wx) * 7.3, 1.9, seed + 1) ** 2
-            puck = noise3(x * 1.1 + 2, y * 1.1 + 7, 3.3, seed + 2)        # some parts heaped, some flat
-            edge = min(1.0, (1.0 - rho) / 0.22) ** 0.7
-            z = height(x, y, rho) * edge * (0.10 + 0.42 * gather + 0.26 * big + 0.22 * fine) * (0.5 + 1.0 * puck)
-            z = top * math.tanh(z / top)                                  # cloth slumps: no fold stands up in a peak
-            z *= 0.82 + 0.36 * _hash(i, j, 7, seed)                       # crumple: no two neighbouring facets alike
-            z = hem * min(1.0, (1.0 - rho) * nr) + z
-            if rho >= 1.0:
-                z = -0.012
-            if limit is not None:
-                z = limit(x, y, z)
-            row.append(bm.verts.new((x, y, z)))
+        for i in range(seg):
+            ang = TAU * i / seg
+            ca, sa = cos(ang), sin(ang)
+            s = smooth01(0.25, 0.75, noise3(1.2 * ca + 3, 1.2 * sa + 3, 0.5, seed) + slump - 0.5)
+            rf = _LOBE_PLUMP[j][0] + (_LOBE_SLUMP[j][0] - _LOBE_PLUMP[j][0]) * s
+            zf = _LOBE_PLUMP[j][1] + (_LOBE_SLUMP[j][1] - _LOBE_PLUMP[j][1]) * s
+            sq = (abs(ca) ** 2.25 + abs(sa) ** 2.25) ** (-1 / 2.25)              # a pillow in plan, not a disc
+            rf *= sq * (1.0 + 0.26 * (noise3(1.1 * ca + 7, 1.1 * sa + 7, 0.2, seed + 1) - 0.5))
+            seam = max(0.0, cos(6 * ang)) ** 4                                # 1 on a panel seam
+            rf *= 1.0 - 0.035 * seam * (1.0 if 0 < j < 5 else 0.3)
+            end = math.exp(-(sa / 0.30) ** 2)                                 # 1 at the two ends the cord comes over
+            rf *= 1.0 - 0.15 * cinch * end * (0.4 + 0.6 * smooth01(0.0, 0.6, zf))
+            x, y = a * rf * ca, b * rf * sa
+            z = h * zf
+            if zf > 0.0:
+                z *= 1.0 - lean * ca * rf                                      # heaped toward the lander
+                z *= 0.86 + 0.28 * noise3(x * 3.6 + 2, y * 3.6 + 5, 1.3, seed + 2)   # the slack lies unevenly
+                z *= 1.0 - sag * smooth01(0.80, 0.30, _LOBE_PLUMP[j][0])       # ... and the top has sunk in
+                z *= 1.0 - cinch * math.exp(-(y / (0.22 * b)) ** 2) * smooth01(0.30, 0.85, zf)
+            wx, wy = c[0] + x * cy - y * sy, c[1] + x * sy + y * cy
+            if limit is not None and z > 0.0:
+                z = limit(wx, wy, z)
+            row.append(bm.verts.new((wx, wy, z)))
         rows.append(row)
-    for j in range(nr):
-        a, b = rows[j], rows[j + 1]
-        for i in range(nu):
-            i2 = (i + 1) % nu
-            if j % 2 == 0:                                            # ring j+1 is shifted half a step on
-                bm.faces.new((a[i], a[i2], b[i]))
-                bm.faces.new((a[i2], b[i2], b[i]))
-            else:
-                bm.faces.new((a[i], b[i2], b[i]))
-                bm.faces.new((a[i], a[i2], b[i2]))
-    skirt = [bm.verts.new((v.co.x * 1.01, v.co.y * 1.01, -0.30)) for v in rows[nr]]      # the hem hangs on down, for ground that falls away
-    for i in range(nu):
-        i2 = (i + 1) % nu
-        bm.faces.new((rows[nr][i], rows[nr][i2], skirt[i2], skirt[i]))
-    return rows
+    z = h * (0.90 - 0.14 * slump) * (1.0 - cinch) * (1.0 - sag) * (0.86 + 0.28 * noise3(2, 5, 1.3, seed + 2))
+    crown = bm.verts.new((c[0], c[1], limit(c[0], c[1], z) if limit is not None else z))
+    for ra, rb in zip(rows, rows[1:]):
+        for i in range(seg):
+            bm.faces.new((ra[i], ra[(i + 1) % seg], rb[(i + 1) % seg], rb[i]))
+    for i in range(seg):
+        bm.faces.new((rows[-1][i], rows[-1][(i + 1) % seg], crown))
+    return rows, crown
+
+
+def welt(bm, pts, out, w=0.010, h=0.008):
+    """A stitched seam: a low ridge along a line of points on the cloth; `out` is the way the cloth
+    faces at each of them. Wound by construction (the ridge has no underside)."""
+    P = [Vector(p) for p in pts]
+    rows = []
+    for i, p in enumerate(P):
+        d = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
+        o = Vector(out[i]).normalized()
+        t = o.cross(d).normalized()
+        rows.append((bm.verts.new(p + t * w - o * 0.004), bm.verts.new(p + o * h), bm.verts.new(p - t * w - o * 0.004)))
+    for ra, rb in zip(rows, rows[1:]):
+        bm.faces.new((ra[0], ra[1], rb[1], rb[0]))
+        bm.faces.new((ra[1], ra[2], rb[2], rb[1]))
+
+
+def lobe_seams(bm, rows, crown, girth=2, arc=None):
+    """The seams of a lobe made by bag_lobe: the girth seam round its side and the panel seams that
+    climb from it to the crown. `arc` = (first, last) column limits them to the side that is seen."""
+    seg = len(rows[0])
+    cz = crown.co.z
+    centre = Vector((crown.co.x, crown.co.y, 0.0))
+
+    def facing(v):
+        o = v.co - centre
+        o.z = max(0.0, v.co.z - 0.45 * cz) * 1.6
+        return o
+
+    first, last = arc if arc is not None else (0, seg)
+    cols = [i % seg for i in range(first, last + 1)]
+    ring = [rows[girth][i] for i in cols]
+    welt(bm, [v.co for v in ring], [facing(v) for v in ring])
+    for i in cols:
+        if (i * 6) % seg == 0 and (i * 2) % seg != 0:                         # the panel seams (not where the cord lies)
+            line = [rows[j][i] for j in range(girth, min(len(rows), girth + 4))]
+            welt(bm, [v.co for v in line], [facing(v) for v in line])
 
 
 def wheel(rim, hub, M, r, w, seg=20, th=0.006, cleats=12, cleat_h=0.006, cleat_t=0.006, chevron=0.0, crown=0.04,
@@ -811,7 +851,7 @@ def build_pathfinder():
     root = part('pathfinder')
     k = Kit(root)
     alu, cell, white, gold = k('aluminium'), k('solar_cell'), k('painted_white', 30), k('gold_foil', 28)
-    dark, bag, lens, grid = k('painted_dark'), k('vectran', 15), k('lens'), k('cell_grid')
+    dark, lens, grid = k('painted_dark'), k('lens'), k('cell_grid')
     a = 1.30                                    # edge of the base petal
     Rc, ri, zb = a / sqrt(3), a / (2 * sqrt(3)), 0.31
     hgt = a * sqrt(3) / 2
@@ -947,7 +987,7 @@ def build_pathfinder():
             z = max(0.016, pa.z * (1 - t) - 0.035 * sin(pi * t)) + 0.004
             rod(steel, (pa.x, pa.y, z), (pb.x, pb.y, z), 0.005, 4)
 
-    # --- the airbags: deflated and hauled in by their cords, a slumped, creased sheet of tan cloth round and under the petals ---
+    # --- the airbags: deflated and hauled in by their cords, the lobes lying slack round and under the petals ---
     petal_dirs = (-90.0, 30.0, 150.0)
     inv = {th: PM[th].inverted() for th in PM}
 
@@ -956,21 +996,15 @@ def build_pathfinder():
         lobes = 0.075 * cos(9 * th + 1.3) + 0.05 * cos(15 * th + 0.4) + 0.035 * cos(24 * th + 2.0)
         return 1.56 + 0.23 * c3 + lobes + 0.16 * (noise3(2.2 * cos(th) + 3, 2.2 * sin(th) + 3, 0.5, 17) - 0.5)
 
-    def bulk(x, y, rho):
-        th = math.atan2(y, x)
-        c3 = cos(3 * (th - rad(-90)))
-        # most cloth bunched against the lander in the three notches, thinning to a few centimetres at the edge
-        return (0.30 - 0.06 * c3) * (1 - rho) ** 1.3 + 0.14 * (1 - rho) ** 0.4 + 0.03
-
     def under_hardware(x, y, z):
         if point_in_poly(base, x, y) > -0.05:                         # the base petal sits on it
             z = min(z, zb - 0.095)
         for th in petal_dirs:                                         # the side petals rest on it
             q = inv[th] @ Vector((x, y, 0.0))
             m = point_in_poly(petal, q.x, q.y)
-            if m > -0.07:
+            if m > -0.13:
                 top = (PM[th] @ Vector((q.x, q.y, -0.06))).z - 0.012
-                z = min(z, top if m > 0.0 else top + (z - top) * (-m / 0.07))
+                z = min(z, top if m > -0.02 else top + (z - top) * ((-m - 0.02) / 0.11))
         for line in ramp_lines:                                       # and the ramps were unrolled over it
             for a, b in zip(line, line[1:]):
                 ax, ay, az = a
@@ -984,13 +1018,94 @@ def build_pathfinder():
                     z = min(z, top if d < 0.07 else top + (z - top) * ((d - 0.07) / 0.10))
         return z
 
-    rows = slumped_cloth(bag, outline_r, bulk, r_in=0.47, nu=132, nr=13, seed=23, limit=under_hardware)
-    # retraction cords still lying across the cloth, from under the petals out to the hem
+    bag, seam = bm_new(), bm_new()
+    # the lobes: (bearing off the petal, radius of its centre or None to lie just inside the hem, half-length out,
+    #             half-width round, height, slump, cinch, sag, columns, seams and cord?)
+    LOBES = ((0.0, None, 0.29, 0.42, 0.20, 0.70, 0.40, 0.30, 24, True),          # beyond the tip of the petal
+             (-25.0, None, 0.33, 0.35, 0.27, 0.35, 0.34, 0.15, 18, True),        # beside it
+             (26.0, None, 0.32, 0.34, 0.25, 0.80, 0.30, 0.35, 18, True),
+             (-43.0, None, 0.30, 0.30, 0.21, 0.90, 0.30, 0.40, 12, False),
+             (44.0, None, 0.31, 0.31, 0.24, 0.30, 0.36, 0.20, 12, False),
+             (61.0, None, 0.33, 0.43, 0.29, 0.50, 0.38, 0.25, 24, True),         # heaped in the notch between two petals
+             (57.0, 0.78, 0.26, 0.36, 0.28, 0.25, 0.22, 0.10, 12, False))
+    rng = random.Random(29)
     cord = k('painted_dark')
-    for i in (7, 19, 37, 52, 63, 81, 96, 107, 125):
-        pts = [rows[j][i].co + Vector((0, 0, 0.007)) for j in (4, 6, 8, 10, 12)]
-        pts.append(rows[13][i].co + Vector((0, 0, 0.02)))
-        sweep(cord, pts, circ(0.0045, 3), caps=False)
+    n = 0
+    plans = []                                                        # the lobes in plan, for the apron
+    for thp in petal_dirs:
+        for (dth, r, la, lb, lh, slump, cinch, sag, seg, dressed) in LOBES:
+            n += 1
+            th = thp + dth + rng.uniform(-3.0, 3.0)
+            la, lb, lh = la * rng.uniform(0.94, 1.06), lb * rng.uniform(0.94, 1.06), lh * rng.uniform(0.92, 1.08)
+            if r is None:
+                r = outline_r(rad(th)) - 1.0 * la
+            yaw = th + rng.uniform(-14.0, 14.0)
+            lrows, crown = bag_lobe(bag, polar(r, th)[:2], yaw, la, lb, lh, seed=40 + n, seg=seg, slump=slump, cinch=cinch, sag=sag,
+                                    limit=under_hardware, rings=7 if dressed else 6)
+            plans += [[(v.co.x, v.co.y) for v in lrows[j]] for j in (1, 2)]
+            if not dressed:
+                continue
+            lobe_seams(seam, lrows, crown, arc=(-seg * 2 // 9, seg * 2 // 9))
+            # its tether cord: out from under the lander, over the crown in the fold it has drawn, down the outer end to the ground
+            path = [lrows[j][seg // 2] for j in (3, 5)] + [crown] + [lrows[j][0] for j in (6, 4, 2, 1)]
+            pts = [v.co + Vector((0, 0, 0.005)) + (v.co - crown.co).normalized() * (0.004 if v is not crown else 0.0) for v in path]
+            end = lrows[1][0].co
+            out = Vector((end.x - crown.co.x, end.y - crown.co.y, 0.0)).normalized()
+            pts.append(Vector((end.x, end.y, 0.004)) + out * 0.035)
+            sweep(cord, pts, circ(0.008, 3), caps=False)
+
+    # the slack skirts of the bags: a low apron of cloth under the lobes, a hand's breadth beyond them (never past
+    # the old hem) and on down for ground that falls away
+    def reach(th):
+        dx, dy = cos(th), sin(th)
+        far = 0.9
+        for plan in plans:
+            for (ax, ay), (bx, by) in zip(plan, plan[1:] + plan[:1]):
+                ex, ey = bx - ax, by - ay
+                den = dx * ey - dy * ex
+                if abs(den) > 1e-9 and 0.0 <= (ax * dy - ay * dx) / den <= 1.0:
+                    far = max(far, (ax * ey - ay * ex) / den)
+        return min(far + 0.04, outline_r(th))
+
+    NA, FR = 72, (0.0, 0.62, 1.0)
+    rows = []
+    for j, f in enumerate(FR):
+        row = []
+        for i in range(NA):
+            th = TAU * (i + 0.5 * (j % 2)) / NA
+            r = 0.47 + (reach(th) - 0.47) * f
+            x, y = r * cos(th), r * sin(th)
+            z = (0.13 - 0.07 * f) * (0.7 + 0.6 * noise3(x * 2.3 + 4, y * 2.3 + 4, 0.2, 23))
+            row.append(bag.verts.new((x, y, under_hardware(x, y, z) if f < 1.0 else 0.006)))
+        rows.append(row)
+    rows.append([bag.verts.new((v.co.x * 1.01, v.co.y * 1.01, -0.30)) for v in rows[-1]])
+    for j in range(len(rows) - 1):
+        a, b = rows[j], rows[j + 1]
+        for i in range(NA):
+            i2 = (i + 1) % NA
+            if j == len(rows) - 2:
+                bag.faces.new((a[i], b[i], b[i2], a[i2]))
+            elif j % 2 == 0:                                          # ring j+1 is shifted half a step on
+                bag.faces.new((a[i], b[i], a[i2]))
+                bag.faces.new((a[i2], b[i], b[i2]))
+            else:
+                bag.faces.new((a[i], b[i], b[i2]))
+                bag.faces.new((a[i], b[i2], a[i2]))
+
+    def hidden(v):
+        """Is this point of the cloth right under the base or a side petal, where nothing can see it?"""
+        if point_in_poly(base, v.co.x, v.co.y) > 0.06:
+            return True
+        for th in petal_dirs:
+            q = inv[th] @ Vector((v.co.x, v.co.y, 0.0))
+            if point_in_poly(petal, q.x, q.y) > 0.06:
+                return True
+        return False
+
+    under = {v for v in bag.verts if hidden(v)}
+    bmesh.ops.delete(bag, geom=[f for f in bag.faces if all(v in under for v in f.verts)], context='FACES')
+    mesh_obj('pathfinder_vectran_bags', bag, 'vectran', parent=root, smooth_angle=78.0)         # (named to sort with the Kit's meshes)
+    mesh_obj('pathfinder_vectran_seams', seam, 'vectran', parent=root, smooth_angle=40.0)
 
     sj, ks = _sojourner(root, (1.92, -1.78, 0.0), -62.0)
     anchor('col_body', root, loc=(0, 0, 0), radius=1.9)
@@ -2461,6 +2576,152 @@ def shard(bm, M, r, t=0.012, seed=1, n=7, crumple=0.22, curl=0.0, back=None, sim
             back.faces.new([remap.setdefault(v, back.verts.new(v.co)) for v in f])
 
 
+def burst_tank(shell, fit, M, r=0.19, seed=1, seg=16, split=(15.0, 150.0), gape=20.0, crack=82.0, dents=(), th=0.007,
+               lugs=(200.0, 290.0), bolts=False):
+    """A propellant tank that burst: a sphere of two halves welded at the girth, split open along part of that weld
+    (`split`: from and to, degrees round the equator) and sprung open by `gape` degrees about what is left of it, like
+    a shell, with the lips flared and ragged, a crack torn on from the split toward one pole (at `crack` degrees, which
+    must lie inside the split), dents ((direction, half-angle in degrees, depth), ...), a boss on each
+    pole with the stub of a feed line, and mounting lugs on the weld. The wall has thickness and an inside, so the
+    opening shows a dark hollow. Local Z is the tank's axis. `shell` takes hand-wound faces (do not recalculate them)."""
+    rng = random.Random(seed)
+    LAT = (-68.0, -46.0, -26.0, -10.0, -3.2, 3.2, 10.0, 26.0, 46.0, 68.0)
+    step = 360.0 / seg
+    ic = int(crack // step) % seg                                      # the crack takes the cells of this column
+
+    span = split[1] - split[0]
+    uh = rad((split[0] + split[1]) / 2 + 180.0)                           # the hinge: the middle of the weld that held
+    Hh = T(r * cos(uh), r * sin(uh), 0.0)
+    axis = Vector((-sin(uh), cos(uh), 0.0))
+    halves = [M @ Hh @ Matrix.Rotation(sg * rad(gape) / 2, 4, axis) @ Hh.inverted() for sg in (-1.0, 1.0)]     # south, north
+
+    def opened(u):
+        t = ((u - split[0]) % 360.0) / span
+        return sin(pi * t) ** 0.5 if 0.0 < t < 1.0 else 0.0
+
+    def point(j, i, inner):
+        lat, u = LAT[j], i * step
+        s = opened(u)
+        lip = smooth01(46.0, 3.2, abs(lat))                               # 1 at the weld, 0 well up the dome
+        sign = 1.0 if lat > 0 else -1.0
+        rad_ = 1.0 + (0.022 if abs(lat) < 4 and not inner else 0.0)       # the weld bead
+        if s > 0.0:
+            jag = (_hash(i, j, 3, seed) - 0.5) * 2.0 if abs(lat) < 4 else 0.0
+            lat += sign * (2.0 * s * lip + 5.0 * jag * s)
+            rad_ += 0.13 * s * lip * lip + 0.07 * jag * s
+        if LAT[j] > 0 and LAT[j] < 40 and i in (ic, (ic + 1) % seg):      # the crack: a narrowing tear, its corners curled back
+            close = {3.2: 0.0, 10.0: 4.5, 26.0: 9.5}[LAT[j]] * (step / 22.5)
+            u += close if i == ic else -close
+            if LAT[j] < 4:
+                lat += 7.0
+                rad_ += 0.13
+        la, uu = rad(lat), rad(u)
+        n = Vector((cos(la) * cos(uu), cos(la) * sin(uu), sin(la)))
+        for d, half, depth in dents:
+            ang = math.degrees(n.angle(Vector(d).normalized()))
+            if ang < half:
+                rad_ -= (depth / r) * (0.5 + 0.5 * cos(pi * ang / half))
+        return halves[LAT[j] > 0] @ (n * (r * rad_ - (th if inner else 0.0)))
+
+    def pole(z, inner):
+        n = Vector((0.0, 0.0, z))
+        rad_ = 1.0
+        for d, half, depth in dents:
+            ang = math.degrees(n.angle(Vector(d).normalized()))
+            if ang < half:
+                rad_ -= (depth / r) * (0.5 + 0.5 * cos(pi * ang / half))
+        return halves[z > 0] @ (n * (r * rad_ - (th if inner else 0.0)))
+
+    nr = len(LAT)
+    O = [[shell.verts.new(point(j, i, False)) for i in range(seg)] for j in range(nr)]
+    I = [[shell.verts.new(point(j, i, True)) for i in range(seg)] for j in range(nr)]
+    hole = {(4, i) for i in range(seg) if opened((i + 0.5) * step) > 0.02} | {(5, ic), (6, ic)}
+    for j in range(nr - 1):
+        for i in range(seg):
+            i2 = (i + 1) % seg
+            if (j, i) not in hole:
+                shell.faces.new((O[j][i], O[j][i2], O[j + 1][i2], O[j + 1][i]))
+                shell.faces.new((I[j][i], I[j + 1][i], I[j + 1][i2], I[j][i2]))
+                continue
+            if (j - 1, i) not in hole:                                    # the torn edge, all round the opening
+                shell.faces.new((O[j][i], O[j][i2], I[j][i2], I[j][i]))
+            if (j + 1, i) not in hole:
+                shell.faces.new((O[j + 1][i2], O[j + 1][i], I[j + 1][i], I[j + 1][i2]))
+            if (j, (i - 1) % seg) not in hole:
+                shell.faces.new((O[j + 1][i], O[j][i], I[j][i], I[j + 1][i]))
+            if (j, i2) not in hole:
+                shell.faces.new((O[j][i2], O[j + 1][i2], I[j + 1][i2], I[j][i2]))
+    for z, ring_o, ring_i in ((-1.0, O[0], I[0]), (1.0, O[-1], I[-1])):
+        po, pi_ = shell.verts.new(pole(z, False)), shell.verts.new(pole(z, True))
+        for i in range(seg):
+            i2 = (i + 1) % seg
+            shell.faces.new((po, ring_o[i2], ring_o[i]) if z < 0 else (ring_o[i], ring_o[i2], po))
+            shell.faces.new((pi_, ring_i[i], ring_i[i2]) if z < 0 else (ring_i[i2], ring_i[i], pi_))
+    # fittings: the feed boss with its flange and the stub of the line, a blind boss opposite, lugs on the weld
+    Mb = halves[1] @ T(0, 0, r - 0.012)
+    lathe(fit, [(0.0, 0.0), (0.054, 0.0), (0.054, 0.016), (0.036, 0.021), (0.036, 0.046), (0.024, 0.052), (0.0, 0.052)], 10, Mb)
+    if bolts:
+        bolt_circle(fit, 0.045, 6, 0.006, 0.005, Mb @ T(0, 0, 0.0165), seg=5)
+    tube(fit, [(0.0, 0.0, 0.045), (0.0, 0.0, 0.085), (0.018 + 0.02 * rng.random(), 0.01, 0.125), (0.06, 0.035 * rng.uniform(-1, 1), 0.15)], 0.0095, 5,
+         round_r=0.02, steps=2, M=Mb)
+    lathe(fit, [(0.0, 0.0), (0.032, 0.0), (0.032, 0.018), (0.02, 0.026), (0.0, 0.026)], 8, halves[0] @ R('X', 180) @ T(0, 0, r - 0.01))
+    for u in lugs:
+        cbox(fit, (0.045, 0.012, 0.05), (r + 0.012, 0.0, -0.035), halves[0] @ R('Z', u), c=0.004)
+        lathe(fit, [(0.0, -0.009), (0.009, -0.009), (0.009, 0.009), (0.0, 0.009)], 6, halves[0] @ R('Z', u) @ T(r + 0.022, 0, -0.035) @ AX['Y'])
+
+
+def shield_chunk(char, comb, skin, M, size=0.27, seed=1, core=0.046, ablator=0.020):
+    """A fragment of the heat shield: a sandwich broken out of the aeroshell, lying with its outer face along local +Z.
+    The charred ablator has spalled back from the broken edge, which shows the honeycomb core as a fluted band (a
+    cell every 24 mm) on the inner skin. A piece this size is as good as flat. Hand-wound faces: `char`, `comb` and `skin`
+    must not be recalculated."""
+    rng = random.Random(seed)
+    n = 11
+    corners = []
+    for i in range(n):
+        a = TAU * (i + rng.uniform(-0.3, 0.3)) / n
+        rr = size * rng.uniform(0.66, 1.12)
+        if rng.random() < 0.28:
+            rr *= rng.uniform(0.50, 0.72)                                 # a bite out of the edge
+        corners.append(Vector((rr * cos(a), rr * sin(a))))
+    edge = []                                                              # the broken edge, cell by cell
+    for i in range(n):
+        p, q = corners[i], corners[(i + 1) % n]
+        m = max(2, int(round((q - p).length / 0.024 / 2)) * 2)
+        out = Vector(((q - p).y, -(q - p).x)).normalized()
+        for kk in range(m):
+            edge.append(p.lerp(q, kk / m) - out * (0.0065 if kk % 2 else 0.0) + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.0015)
+    ne = len(edge)
+
+    def lift(pt, z):
+        return M @ Vector((pt.x, pt.y, z))
+
+    def ring(bm, pts, z):
+        return [bm.verts.new(lift(pt, z + dz)) for pt, dz in pts]
+
+    flat = [(pt, 0.0) for pt in edge]
+    # how far the ablator has spalled back from each point of the edge
+    back = [0.016 + 0.022 * noise3(pt.x * 6 + 3, pt.y * 6 + 3, 0.4, seed) + 0.12 * smooth01(0.60, 0.74, noise3(pt.x * 2.1 + 9, pt.y * 2.1 + 9, 0.7, seed + 1))
+            for pt in edge]
+    inner = [(pt * (1.0 - min(0.6, b / max(pt.length, 1e-6))), 0.0) for pt, b in zip(edge, back)]
+    blister = [(pt * 0.5, 0.006 * (noise3(pt.x * 9, pt.y * 9, 1.0, seed + 2) - 0.5)) for pt, _ in inner]       # the char has blistered a little
+    # inner skin (underneath), the core's broken edge and the ledge the ablator left
+    c0 = skin.verts.new(lift(Vector((0, 0)), 0.0))
+    s0 = ring(skin, flat, 0.0)
+    w0, w1, w2 = ring(comb, flat, 0.0), ring(comb, flat, core), ring(comb, inner, core)
+    a0, a1 = ring(char, inner, core), ring(char, [(pt * 0.985, dz) for pt, dz in inner], core + ablator)
+    a2 = ring(char, blister, core + ablator)
+    c1 = char.verts.new(lift(Vector((0, 0)), core + ablator))
+    for i in range(ne):
+        i2 = (i + 1) % ne
+        skin.faces.new((c0, s0[i2], s0[i]))
+        comb.faces.new((w0[i], w0[i2], w1[i2], w1[i]))
+        comb.faces.new((w1[i], w1[i2], w2[i2], w2[i]))
+        char.faces.new((a0[i], a0[i2], a1[i2], a1[i]))
+        char.faces.new((a1[i], a1[i2], a2[i2], a2[i]))
+        char.faces.new((a2[i], a2[i2], c1))
+
+
 def kinked(bm, p0, direction, length, r=0.02, seed=1, seg=5, kinks=2, bend=0.35):
     """A bent strut or pipe: a tube with a couple of random kinks."""
     rng = random.Random(seed)
@@ -2569,6 +2830,8 @@ def build_schiaparelli_wreck():
     ti, char = k('titanium', 45), k('scorched', 32)
     comb = k('canvas', 30)
     cloth = k(('canvas', 'suit_orange'), 50)
+    # pieces whose faces are wound as they are made (shells with an inside, layered slabs): not for the Kit, which re-orients
+    tank, slab_char, slab_comb, slab_skin = bm_new(), bm_new(), bm_new(), bm_new()
     rng = random.Random(16)
 
     # --- the core: crushed central bay, three tanks, broken deck plates, ribs, thruster clusters ---
@@ -2580,14 +2843,10 @@ def build_schiaparelli_wreck():
     for v in vs[6:]:
         v.co += Vector((rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), rng.uniform(-0.06, 0.02)))
     for i, (a, rr, zz, sc) in enumerate(((20, 0.56, 0.17, (1, 1, 0.9)), (145, 0.60, 0.15, (1.0, 0.8, 0.7)), (262, 0.78, 0.16, (1, 1, 1)))):
-        Mt = T(*polar(rr, a, zz)) @ R('Z', a) @ S(*sc)
-        vs = ball(ti, (0, 0, 0), 0.19, 12, 6, M=Mt)                     # burst tanks: split and dented
-        for v in vs:
-            q = Mt.inverted() @ v.co
-            dent = max(0.0, 1.0 - (q - Vector((0.13, 0.05 * (i - 1), 0.12))).length / 0.16)
-            v.co -= (v.co - Mt.translation).normalized() * 0.09 * dent
-        lathe(steel, [(0.192, -0.012), (0.197, -0.012), (0.197, 0.012), (0.192, 0.012)], 12, Mt @ R('X', 70 + 30 * i), close=True)
-        lathe(steel, [(0.0, 0.18), (0.04, 0.18), (0.03, 0.22), (0.0, 0.22)], 6, Mt @ R('X', 70 + 30 * i))
+        Mt = T(*polar(rr, a, zz)) @ R('Z', a) @ S(*sc) @ R('X', 70 + 30 * i)
+        burst_tank(tank, steel, Mt, 0.19, seed=11 + i, seg=12, split=((10.0, 220.0), (220.0, 400.0), (60.0, 300.0))[i],      # the tanks: burst at the weld, dented
+                   gape=(16.0, 10.0, 24.0)[i], crack=(95.0, 330.0, 200.0)[i],
+                   dents=(((0.6, 0.2 * (i - 1), 0.75), 46.0, 0.06), ((-0.3, -0.8, -0.4), 38.0, 0.035)), lugs=((250.0, 320.0), (60.0, 150.0), (20.0, 340.0))[i])
     plates = ((75, 0.62, 0.52, 18, -24, white), (118, 0.70, 0.46, -30, 20, char), (200, 0.66, 0.56, 22, 16, white), (318, 0.74, 0.50, -16, -30, char),
               (240, 0.42, 0.40, 55, 10, steel), (0, 0.50, 0.38, -48, 8, char), (160, 0.35, 0.34, 65, -20, char))
     for i, (a, rr, sz, tx, ty, bm_p) in enumerate(plates):
@@ -2644,8 +2903,14 @@ def build_schiaparelli_wreck():
         size = (0.36 - 0.07 * rr / 3) * (0.6 + 0.8 * rng.random())
         bm_f = (white, char, char, white, foil, steel)[i % 6]
         Mf = T(*polar(rr, a + rng.uniform(-6, 6), 0.02)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-26, 26)) @ R('Y', rng.uniform(-18, 18))
-        if bm_f is foil:
-            blob(foil, Mf @ R('X', 0), size * 0.8, size * 0.6, size * 0.35, seed=100 + i, nu=9, pleats=4, rough=0.7)
+        if i == 4:                                                         # a tank thrown clear, split open along its weld
+            thrown = Vector((Mf.translation.x, Mf.translation.y, 0.0))
+            burst_tank(tank, steel, T(Mf.translation.x, Mf.translation.y, 0.176) @ R('Z', 205) @ R('X', 66), 0.19, seed=7, seg=20, split=(-52.0, 232.0),
+                       gape=36.0, crack=84.0, dents=(((0.75, -0.55, 0.35), 50.0, 0.055), ((-0.5, 0.3, -0.8), 44.0, 0.04), ((0.0, -1.0, 0.0), 30.0, 0.022)),
+                       lugs=(250.0, 290.0), bolts=True)
+        elif i == 10:                                                      # a chunk of the heat shield, charred face up, propped on its edge
+            shield_chunk(slab_char, slab_comb, slab_skin, T(Mf.translation.x, Mf.translation.y, 0.062) @ R('Z', 118) @ R('X', 15) @ R('Y', -7), 0.27,
+                         seed=3)
         else:
             shard(bm_f, Mf @ T(0, 0, size * 0.20), size, t=0.024, seed=100 + i, n=8 + i % 3, crumple=0.28, curl=0.5 * (1 if i % 2 else -1),
                   back=char)
@@ -2659,7 +2924,7 @@ def build_schiaparelli_wreck():
             continue                                                                               # (not on the canopy)
         bm_f = (char, char, steel, white)[i % 4]
         shard(bm_f, T(*polar(rr, a, 0.012)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-30, 30)), 0.05 + 0.09 * rng.random(), t=0.016,
-              seed=200 + i, n=5, crumple=0.3, back=char, simple=True)
+              seed=200 + i, n=5, crumple=0.12, back=char, simple=True)
 
     # --- the parachute: canopy collapsed in a heap, torn, lines trailing back to the shell ---
     Mcan = T(1.05, 2.05, 0.0) @ R('Z', 25)
@@ -2679,10 +2944,13 @@ def build_schiaparelli_wreck():
         shard(k('canvas', 50) if i else k('suit_orange', 50), T(x, y, 0.04) @ R('Z', 40 * i), 0.36, t=0.006, seed=160 + i, n=7, crumple=0.3)
 
     # everything lies ON the blast patch: lift each vertex by the height of the dish under it
-    for bm in k.b.values():
+    wound = ((tank, 'titanium', 40.0), (slab_char, 'scorched', 50.0), (slab_comb, 'canvas', 30.0), (slab_skin, 'painted_white', 32.0))
+    for bm in list(k.b.values()) + [w[0] for w in wound]:
         for v in bm.verts:
             v.co.z += _blast_ground(v.co.x, v.co.y)
     _scorch_dish(k('ground_dust', 60))
+    for bm, material, smooth in wound:
+        mesh_obj('wound_' + material, bm, material, parent=root, smooth_angle=smooth)
 
     for kk in (k,):
         kk.flush()
@@ -2718,6 +2986,8 @@ def build_schiaparelli_wreck():
                 burn = max(0.0, min(1.0, (3.4 - d) / 2.4)) * (0.55 + 0.9 * n)
                 smear = noise3(p.x * 3.1 + 8, p.y * 3.1 + 2, p.z * 4.0, 22)             # soot lies in smears, no plate is evenly dirty
                 f = min(0.24 * (0.40 + 0.60 * smear), 1.0 - 0.85 * max(0.0, min(1.0, burn)))
+                if (Vector((p.x, p.y, 0.0)) - thrown).length < 0.36:        # the tank thrown clear was scorched, not buried in soot: its metal still shows
+                    f = 0.34 + 0.30 * smear
                 attr.data[i].color = (c[0] * f, c[1] * f * 0.96, c[2] * f * 0.90, 1.0)
     anchor('col_body', root, loc=(0, 0, 0), radius=1.25)
     anchor('col_backshell', root, loc=(2.2, 0.3, 0), radius=0.75)

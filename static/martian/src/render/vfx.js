@@ -216,7 +216,7 @@ export class Vfx {
           gl_Position = projectionMatrix * mv;
           vUv = position.xy * 0.5 + 0.5;
           float d = length(centre);
-          vA = uStorm * uStorm * 0.42 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
+          vA = smoothstep(0.32, 0.75, uStorm) * 0.42 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
              * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
         }`,
       fragmentShader: /* glsl */`
@@ -403,7 +403,7 @@ export class Vfx {
     st.uFall.value = this.fall; st.uCam.value.copy(camera.position); st.uUp.value.copy(up); st.uWind.value.copy(_s); st.uStorm.value = p.storm;
     st.uLight.value.copy(a.uLight.value); st.uLight.value.r *= 0.74; st.uLight.value.g *= 0.60; st.uLight.value.b *= 0.46;      // dust-coloured, never white
     const sh = this.sheetU;
-    this.sheets.visible = this.air.visible && p.storm > 0.08;
+    this.sheets.visible = this.air.visible && p.storm > 0.32;
     sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm;
     sh.uCamH.value = Math.min(40, Math.max(0.5, p.camHeight === undefined ? 2 : p.camHeight));
     sh.uLight.value.copy(a.uLight.value);

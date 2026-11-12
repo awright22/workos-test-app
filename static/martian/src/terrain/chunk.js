@@ -26,7 +26,7 @@ export function chunkSize(level) { return (2 / (1 << level)) * R * PI_4; }
 
 export function buildChunk(planet, face, level, ix, iy, G, rocks) {
   const spacing = chunkSpacing(level, G);
-  const minW = Math.max(FINEST, spacing * 1.25);
+  const minW = Math.max(planet.finest, spacing * 1.25);
   const W = G + 3;                                   // one extra ring for normals
   const px = new Float64Array(W * W), py = new Float64Array(W * W), pz = new Float64Array(W * W);
   let minR = Infinity, maxR = -Infinity;
@@ -173,14 +173,14 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
       if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos(keepOut / R)) { clear = false; break; }
     }
     if (!clear) continue;
-    const size = kind === 'big' ? Math.min(4.2, 0.42 * Math.pow(1 - u * 0.985, -0.58)) : 0.09 + 0.36 * u * u;
-    let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], FINEST);
+    const size = kind === 'big' ? Math.min(4.2, 0.48 * Math.pow(1 - u * 0.985, -0.6)) : 0.09 + 0.36 * u * u;
+    let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], planet.finest);
     // sit it in the ground: a little always, and on a slope by enough that its downhill side is not left in the air
     let sink = size * (0.10 + 0.16 * v);
     if (size > 0.5) {
       const e = size * 0.6 / FACE_M;
-      faceToDir(face, s + e, t, d2); const ra = planet.radiusFace(face, s + e, t, d2[0], d2[1], d2[2], FINEST);
-      faceToDir(face, s, t + e, d2); const rb = planet.radiusFace(face, s, t + e, d2[0], d2[1], d2[2], FINEST);
+      faceToDir(face, s + e, t, d2); const ra = planet.radiusFace(face, s + e, t, d2[0], d2[1], d2[2], planet.finest);
+      faceToDir(face, s, t + e, d2); const rb = planet.radiusFace(face, s, t + e, d2[0], d2[1], d2[2], planet.finest);
       sink += Math.min(size * 0.45, Math.hypot(ra - r, rb - r) * 0.8);
     }
     r -= sink;

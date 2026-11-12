@@ -53,6 +53,25 @@ const FINAL_FRAGMENT = /* glsl */`
     gl_FragColor = vec4(col, 1.0);
   }`;
 
+class CeilingPass extends Pass {
+  constructor(cap) {
+    super();
+    this.material = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uCap: { value: cap } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: 'uniform sampler2D tDiffuse; uniform float uCap; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); float m = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c.rgb * (m > uCap ? uCap / m : 1.0), c.a); }',
+      depthTest: false, depthWrite: false,
+    });
+    this.quad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    this.material.uniforms.tDiffuse.value = readBuffer.texture;
+    if (this.renderToScreen) renderer.setRenderTarget(null); else renderer.setRenderTarget(writeBuffer);
+    this.quad.render(renderer);
+  }
+  dispose() { this.material.dispose(); this.quad.dispose(); }
+}
+
 class FinalPass extends Pass {
   constructor() {
     super();
@@ -125,6 +144,9 @@ export class Engine {
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
     if (this.q.bloom) {
+      // a ceiling on what reaches the bloom: one blown surface (a lamp on white a metre away, a glint, an
+      // emitter) would otherwise spread into a white blob many times its size
+      this.composer.addPass(new CeilingPass(7.0));
       this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.17, 0.32, 1.35);
       this.composer.addPass(this.bloom);
     }
@@ -201,7 +223,7 @@ export class Engine {
     // one soft fill light: the room's bounce indoors; outdoors, starlight and the after-glow, so
     // the ground keeps its shape at night instead of going black
     const dusk = 1 - sky.day, glow = smoothstep(-0.34, -0.02, sky.sunE) * dusk;
-    const nr = 0.115 + 0.10 * glow, ng = 0.14 + 0.13 * glow, nb = 0.215 + 0.22 * glow;
+    const nr = 0.08 + 0.10 * glow, ng = 0.10 + 0.13 * glow, nb = 0.16 + 0.22 * glow;
     const io = this.indoor;
     this.hemi.color.setRGB(lerp(nr, 0.50 * pw, io), lerp(ng, 0.46 * pw, io), lerp(nb, 0.40 * pw, io));
     this.hemi.groundColor.setRGB(lerp(0.02, 0.26 * pw, io), lerp(0.02, 0.24 * pw, io), lerp(0.03, 0.21 * pw, io));
@@ -227,7 +249,7 @@ export class Engine {
     const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
     // (a high sun flattens everything: close down further toward noon, or the ground washes out to peach)
     const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun));
-    const target = (p.inside ? 0.95 : lerp(2.3 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
+    const target = (p.inside ? 0.95 : lerp(1.95 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
     this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
     if (this.snapLight > 0) this.snapLight--;
     const fu = this.final.uniforms;

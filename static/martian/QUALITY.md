@@ -36,12 +36,12 @@ the local time and the weather, step the simulation without drawing, and place a
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
-| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 2: NEARLY. Missing natural ground detail (R6) and a noon that is not washed out (R11) |
-| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 2: NEARLY. The low sun and its blue glow are right; the ground goes grey and glossy toward the sun (R12) |
-| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 2: NEARLY. Stars, lamp pool, headlights and portholes are there; corner haze, ambient lift and a blown-out greenhouse are not right (R3, R4) |
-| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 2: NEARLY. Visibility collapses and the sun is a disc; the dust has no body (R14) |
-| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 2: NOT MET. White sand, not ice (R5) |
-| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 2: MET |
+| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 3: NEARLY. Washes to peach at high sun and toward the sun; the sky drifts to khaki (T5, T6) |
+| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 3: NEARLY. Low sun, long shadows and the blue glow are right; pale slivers on dark hills remain |
+| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 3: NEARLY. Corner haze gone, lamp pool and headlights work; built things look floodlit and the greenhouse whites out (T4) |
+| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 3: NEARLY. Visibility collapses and the sun is a disc; little streams past (T8) |
+| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 3: NOT MET. No artefact at the pole itself; the ice still reads as white plaster (T2) |
+| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 3: MET |
 | Models | Every object is a purpose-built model; nothing reads as a primitive | 37 models. Lander and prop pass after the review: Perseverance has its own model, solar cells are consistent, the wreck, airbags, parachute, soil heap, ice and uplink dish are rebuilt, the greenhouse has a door. Second review owed |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Twelve clips blended. Idle rebuilt as a relaxed stand (8 s); he takes his helmet off where there is air. Not yet reviewed in motion; feet dip up to 4 cm in cross-fades |
 | First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Independent review of a phone walk-through: NEARLY. A "what" is always on screen; the why, the where and the six bars are not explained |
@@ -81,9 +81,37 @@ Round-2 findings, most damaging first, and their state:
 | R12 | At a low sun the ground goes grey and glossy; pale slivers on dark hills (`dawn`, `dusk`) | shader, part bug | acted on: regolith has almost no sheen at grazing angles (ice keeps its glint). Slivers to re-check |
 | R13 | Sky featureless; no sun disc on a clear day; sun-side brightening is a vertical curtain | sky | open |
 | R14 | Storm dust is thin white hairlines with no body; a straight horizon line crosses the murk (`storm`) | effect, part bug | acted on: the storm sky is now exactly the fog's colour (no horizon line); soft dust-coloured smears instead of hairlines; denser sheets. To re-review |
-| R15 | Props: the pod's parachute is faceted and hovers; Pathfinder's airbags read as dirt; a polyhedron lump at the wreck | models | open |
+| R15 | Props: the pod's parachute is faceted and hovers; Pathfinder's airbags read as dirt; a polyhedron lump at the wreck | models | rebuilt: the drogue is one smooth sheet lying on the ground (and pods level their landing spot); Pathfinder's airbags are 21 pale lobes with seams and cords; the wreck's lump is a burst propellant tank; the ice outcrop is fractured blocks. To re-review |
 | R16 | Rover tracks are intermittent stamps; no disturbed soil under the Hab, landers, pod or greenhouse | effect | open |
 | R17 | Daylight glare blobs at the frame edge (`walk-plain`, `debris-b`) | bug | acted on: metal's roughness floor raised so a facet no longer mirrors the sun into the bloom. To re-check |
+
+**Round 3** (55 pictures, after the work on R1–R17): orbit MET; day, dawn and dusk, night,
+storm, models, figure and interiors NEARLY; poles NOT MET; overall NOT MET. "The base in morning
+or low light, the title globe and most hardware are within reach of the bar. The world around
+them is not." Against round 2 it judged R9 (the astronaut's shadow) fixed at the Hab, most
+others improved but not done, and four **unchanged**: R2 (landmarks), R10 (dust: landers one
+beige, the player's gear clean), R17 (glare blobs) and the soil half of R16, so the first
+attempts at those were too weak to be seen. The night greenhouse was still a white-out.
+
+What round 3 added or sharpened (T-numbers), most damaging first:
+
+| # | Finding (pictures) | State |
+| --- | --- | --- |
+| T1 | Landmarks do not read: Valles Marineris from above is a striped bank with no rim or drop in frame; Olympus is a rippled dune (`canyon`, `olympus`) | part done: the matrix now has a rim view and a wall view of the north wall of Valles Marineris at 296 E (a hundred metres of layered cliff); strata are uneven and wobble. Olympus still needs lava forms |
+| T2 | Polar ice is matte white cracked plaster with tan shadows; the outcrop is two smooth bars (`north-pole`, `pole-90`, `ice`) | acted on: bluer ice that is blue in its shadows; the outcrop rebuilt as six fractured, tilted blocks with rubble. To re-review |
+| T3 | Zigzag chevrons in rows on a far hillside (`lander-curiosity`); specks and a scalloped ledge on the canyon wall | acted on: band edges wobble at a scale finer than a far mesh's triangles and merge sooner with distance. To re-review |
+| T4 | At night the Hab, rover and astronaut look floodlit by ambient; porch and parked-rover lamps make no pool; the greenhouse is a white starburst | acted on: a ceiling on what reaches the bloom, less night fill, porch lamps that pool on the ground, gentler dome lamps, lower night exposure. To re-review |
+| T5 | Exposure and colour spread: pale peach at noon and toward the sun, deep rust elsewhere; `day-sun` is beige | open |
+| T6 | The nearest metres are a soft blur at high sun | open |
+| T7 | Rocks are one family of flat faceted slabs, near-black in places; few mid-size boulders; one floats (`debris-c`) | acted on: blockier rocks, less dark, more mid-size boulders; rocks and physics now rest on the ground the current quality draws (they used finer detail than low and medium meshes show, which floated some). To re-review |
+| T8 | The storm has no motion or threat; a straight band survives | open |
+| T9 | A row of pale soft discs across the mid-ground (`pod`, `pod-open`) | fixed: the storm's sheets are drawn only in a storm |
+| T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | acted on: the patches of packed soil are twice as strong and wider. To re-review |
+| T11 | The astronaut is pitched forward with bent knees in side views; tilted in one picture | measured: the torso is within 3.5 degrees of upright; the look comes from bent knees and raised forearms in the idle clip. Open for an animation pass |
+| T12 | Blown emitters: the nav beacon in daylight, a workbench lamp, glare blobs at the frame edge | acted on: the same ceiling before the bloom. To re-review |
+
+Capture mistakes it named: two interior pictures swapped against the manifest, no rim in
+`canyon`, a shovel at the edge of `hab-noon`.
 
 Capture gaps the reviewer named: no clear-day picture with the sun in frame, no front view of
 the astronaut, nothing at 90° north or at the south cap, and `canyon` no longer stands on a

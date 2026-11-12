@@ -157,14 +157,14 @@
 
 /* ---------------------------------------------------------------- sleep */
 #mg-overlay.k-sleep { background: #030303; animation: mg-fade-in .35s both; }
-.sleep { display: grid; justify-items: center; width: 30rem; max-width: 100%; text-align: center; }
+.sleep { display: grid; justify-items: center; width: 38rem; max-width: 100%; text-align: center; }
 .sleep .zz { font: 500 .8125rem/1 var(--f-cond); letter-spacing: .5em; text-indent: .5em; text-transform: uppercase; color: var(--ink-3); animation: mg-pulse 1.6s ease-in-out infinite; }
 .sleep.done .zz { display: none; }
 .sleep .sum { display: none; width: 100%; }
 .sleep.done .sum { display: block; animation: mg-fade-in .5s both; }
 .sleep .solbig { display: flex; align-items: baseline; justify-content: center; gap: .75rem; font: 600 5rem/1 var(--f-cond); letter-spacing: .04em; }
 .sleep .solbig span { font-size: 1.125rem; letter-spacing: .4em; color: var(--accent); }
-.sleep .deltas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 1.75rem; background: var(--line-2); border: 1px solid var(--line-2); }
+.sleep .deltas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin-top: 1.75rem; background: var(--line-2); border: 1px solid var(--line-2); }
 .sleep .delta { display: flex; flex-direction: column; align-items: center; gap: .375rem; padding: .75rem .5rem .6875rem; background: #0b0a09; }
 .sleep .delta b { font: 600 1.375rem/1 var(--f-cond); letter-spacing: .02em; }
 .sleep .delta b.up { color: var(--ok); }
@@ -306,3 +306,13 @@
 .mg-compact #mg-overlay.k-pause .menu-item { min-height: 2.25rem; padding-top: .125rem; padding-bottom: .125rem; }
 .mg-compact #mg-overlay.k-pause .menu-col h1.pz { font-size: 1.875rem; margin-top: .25rem; }
 .mg-compact #mg-overlay.k-pause .menu-col .tag { margin-top: .3125rem; }
+
+/* the night's account: readable notes and a way to start the day */
+.sleep .notes { margin-top: 1.25rem; display: grid; gap: .375rem; font-size: 1rem; line-height: 1.4; color: var(--ink); }
+.sleep .wake { margin-top: 1.5rem; }
+.mg-compact .sleep .solbig { font-size: 3rem; }
+.mg-compact .sleep .deltas { margin-top: .75rem; }
+.mg-compact .sleep .delta { padding: .4375rem .25rem; }
+.mg-compact .sleep .delta b { font-size: 1.0625rem; }
+.mg-compact .sleep .notes { margin-top: .625rem; font-size: .8125rem; gap: .1875rem; }
+.mg-compact .sleep .wake { margin-top: .75rem; }

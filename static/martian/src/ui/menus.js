@@ -342,17 +342,20 @@ export function showSleep() {
 /**
  * d: { sol, deltas: [{ icon, label, from, to, unit }], notes: [text] }
  */
-export function showSleepSummary(d) {
+export function showSleepSummary(d, onDone) {
   const box = UI.panel.querySelector('.sleep');
   if (!box) return;
   const deltas = d.deltas.map((x) => {
-    const v = x.to - x.from;
-    return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span></div>`;
+    const v = x.whole ? Math.round(x.to) - Math.round(x.from) : x.to - x.from;
+    return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${x.whole ? Math.abs(v) : Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span></div>`;
   }).join('');
   box.querySelector('.sum').innerHTML =
     `<div class="solbig"><span>SOL</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
-    `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>`;
+    `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>` +
+    (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
   box.classList.add('done');
+  const b = box.querySelector('.wake');
+  if (b) { b.addEventListener('click', (ev) => { ev.stopPropagation(); onDone(); }); try { b.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ } }
 }
 
 // ------------------------------------------------------------------------------------------

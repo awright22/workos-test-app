@@ -90,8 +90,10 @@ for (const [key, id, what] of [['m', 'map', 'The map, opened for the first time.
 await ev((G) => { if (G.S.uiOpen) { const b = document.querySelector('#mg-panel [data-act="resume"]'); if (b) b.click(); } G.setLocalTime(20.5); G.tpLocal(-5.0, -6.2); G.tick(0.05, 30); });
 await shot('bunk-at-night', 'Evening, at the bunk.', 2500);
 await hold(1.4);
-await shot('sleeping', 'Sleeping until dawn: the summary of the night.', 1500);
-await shot('woken', 'Awake again.', 5000);
+await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
+await shot('night-summary', 'Sleeping until dawn: the account of the night, which waits to be read.', 600);
+await tapSel('#mg-panel .sleep .wake');
+await shot('woken', 'Awake again.', 4000);
 await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 20000);
 
 await writeFile(path.join(dir, 'steps.txt'), steps.join('\n') + '\n');

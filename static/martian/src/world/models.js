@@ -27,7 +27,7 @@ const DUST = {
   // (the second review: decades-old landers were a uniform beige wash, and his own gear showroom-clean.
   //  Dust now lies mostly on what faces up and near the ground, so less of it goes further.)
   hab: 0.46, rover: 0.5, astronaut: 0.16, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
-  pathfinder: 0.5, viking: 0.6, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
+  pathfinder: 0.4, viking: 0.6, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.42, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
   crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
@@ -65,7 +65,8 @@ function plainMaterial() {
         uniform mat3 normalMatrix;
         #endif
         ${GLSL_GROUND_GRADE}
-        float dustAmount;`)
+        float dustAmount;
+        float surfGrain;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
           // more on what faces up, more near the ground, in patches; none where the model has none
@@ -80,9 +81,15 @@ function plainMaterial() {
             dustAmount = 0.0;
             diffuseColor.rgb *= dust * (0.86 + 0.28 * fine);
           } else {
-            dustAmount = clamp(vPbr.z * (0.07 + 1.15 * facing * facing + 0.6 * low) * (0.45 + 1.3 * patchy) + vPbr.z * (fine - 0.5) * 0.3, 0.0, 0.92);
+            // (laid unevenly: drifts and clean patches, heavy on what faces up, a skirt of it thrown up near the ground)
+            float low2 = 1.0 - smoothstep(0.1, 1.5, vObjPos.y);
+            dustAmount = clamp(vPbr.z * (0.05 + 1.25 * facing * facing + 0.55 * low + 0.45 * low2) * (0.15 + 1.9 * patchy * patchy) * 1.25 + vPbr.z * (fine - 0.5) * 0.3, 0.0, 0.94);
+            dust *= 0.86;
+            // no real surface is one flat colour: a broad mottle and a fine grain, fixed in the model's own space
+            diffuseColor.rgb *= 0.925 + 0.11 * patchy + (fine - 0.5) * 0.09;
             diffuseColor.rgb = mix(diffuseColor.rgb, dust, dustAmount);
           }
+          surfGrain = fine;
         }`)
       // soil that is part of the ground is not a smooth casting: give it the ground's own grain
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -91,10 +98,10 @@ function plainMaterial() {
           vec3 gB = texture(uDustGrain, vObjPos * 0.37 + 0.2).rgb * 2.0 - 1.0;
           normal = normalize(normal + normalMatrix * (gA * 0.30 + gB * 0.42));
         }`)
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x, 0.05, 1.0), 0.96, dustAmount);')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x * (0.86 + 0.28 * surfGrain), 0.05, 1.0), 0.96, dustAmount);')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust3';
+  plain.customProgramCacheKey = () => 'plain-pbr-dust5';
   return plain;
 }
 

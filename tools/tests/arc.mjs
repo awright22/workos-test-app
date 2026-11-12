@@ -6,6 +6,7 @@ const g = await openGame({ quality: 'low' });
 const results = [];
 const check = (name, ok, detail) => { results.push({ name, ok: !!ok, detail }); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); };
 const ev = (fn, arg) => g.eval(fn, arg);
+const page = g.page;
 const click = async (text) => { await g.page.locator('#mg-panel button', { hasText: text }).first().click({ timeout: 20000 }); };
 
 await ev(async (G) => { await G.start(2.0, 303.7); G.paused = true; });
@@ -70,9 +71,15 @@ check('eating at the shelf restores vitals', s.health === 92 && s.potatoes === 3
 
 const sol0 = (await ev((G) => G.S.sol));
 await ev((G) => { G.setLocalTime(21); G.tpLocal(-5.0, -6.2); G.hold(1.4); });
-await sleep(3400);
+await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
+const held = await ev((G) => ({ sleeping: G.S.sleeping, cells: document.querySelectorAll('#mg-panel .sleep .delta').length, notes: [...document.querySelectorAll('#mg-panel .sleep .notes div')].map((n) => n.textContent) }));
+await sleep(3200);                                     // it used to vanish after 2.4 s, unread
+const still = await ev(() => !!document.querySelector('#mg-panel .sleep .wake'));
+await ev(() => document.querySelector('#mg-panel .sleep .wake').click());
+await sleep(300);
 s = await ev((G) => ({ sol: G.S.sol, sleeping: G.S.sleeping, ui: G.S.uiOpen, over: G.S.over }));
-check('sleeping until dawn advances the sol', s.sol === sol0 + 1 && !s.sleeping && !s.ui && !s.over, { ...s, sol0 });
+check('sleeping until dawn advances the sol; the night\'s account waits to be read, then Start the day wakes him',
+  s.sol === sol0 + 1 && !s.sleeping && !s.ui && !s.over && held.sleeping && held.cells === 5 && held.notes.some((n) => /^Breakfast/.test(n)) && held.notes.some((n) => /^Morale/.test(n)) && still, { ...s, sol0, held, still });
 
 s = await ev((G) => {
   G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8);

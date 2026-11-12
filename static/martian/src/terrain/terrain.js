@@ -77,6 +77,7 @@ export class Terrain {
       w.onmessage = (e) => this._onMessage(w, e.data);
       w.onerror = () => { this._workerFailed(w); };
       w.postMessage({ type: 'init', data: o.heightData });
+      w.postMessage({ type: 'finest', finest: o.planet.finest });
       this.workers.push(w);
     }
     this.sync = this.workers.length === 0;  // no workers: build on the main thread

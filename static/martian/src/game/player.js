@@ -147,6 +147,8 @@ export function collideUnit(q, radius) {
 export let astro = null;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
+/** Tuning for the standing pose (exposed on the debug hook so it can be measured). */
+export const poseTune = { upright: -0.12 };      // radians, about the spine's own side-to-side axis
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
 
 export function buildAstronaut() {
@@ -160,7 +162,7 @@ export function buildAstronaut() {
     anim.actions[clip.name] = a;
   }
   for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
-  anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
+  anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone(), spine: anim.bones.spine.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
   // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
   const lamp = new THREE.SpotLight(0xfff4e0, 0, 50, 0.66, 1.0, 1.25);
@@ -243,7 +245,12 @@ export function updateAstronaut(dt) {
   // the look-at below is added on top of the clip each frame, so start from the rest pose
   anim.bones.chest.quaternion.copy(anim.rest.chest);
   anim.bones.head.quaternion.copy(anim.rest.head);
+  anim.bones.spine.quaternion.copy(anim.rest.spine);
   anim.mixer.update(dt);
+  // standing still he leans forward from the hips, as under a heavy pack: stand the torso up most of the way
+  anim.upright = lerp(anim.upright || 0, anim.name === 'Idle' ? 1 : 0, damp(0.25, dt));
+  if (anim.upright > 0.01) { anim.bones.spine.rotateX(poseTune.upright * anim.upright); anim.bones.chest.rotateX(poseTune.upright * 0.5 * anim.upright); }
+  player.bones = anim.bones;
   if (!driving) {
     astro.position.copy(player.pos);
     astro.quaternion.copy(player.q).multiply(_q2.setFromAxisAngle(Y_AXIS, player.face));

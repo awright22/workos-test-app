@@ -34,7 +34,7 @@ function rockGeometry(detail, seed, squash, cuts, crease = 0.8) {
   const planes = [];
   for (let i = 0; i < cuts; i++) {
     const z = rnd() * 1.5 - 0.5, a = rnd() * Math.PI * 2, r = Math.sqrt(Math.max(0, 1 - z * z));       // more cuts on the upper half
-    planes.push([r * Math.cos(a), z, r * Math.sin(a), 0.48 + rnd() * 0.36]);      // some deep: broken faces, not a tumbled pebble
+    planes.push([r * Math.cos(a), z, r * Math.sin(a), 0.56 + rnd() * 0.34]);      // some deep: broken faces, not a tumbled pebble
   }
   // no rock is as wide as it is long
   const sx = 0.8 + rnd() * 0.5, sz = 0.72 + rnd() * 0.4;
@@ -113,7 +113,7 @@ function rockMaterial(albedoCube) {
         float gl = dot(ground, vec3(0.3, 0.55, 0.15));
         // diffuseColor carries the rock's own tone (instance colour): how dark, how grey
         // basalt: darker and greyer than the dust that settles on it, which lies on what faces up
-        vec3 stone = mix(mix(vec3(gl), ground, 0.36) * 0.74, vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
+        vec3 stone = mix(mix(vec3(gl), ground, 0.42) * 0.84, vec3(0.20, 0.19, 0.20), icy * 0.8) * diffuseColor.rgb;
         float dust = clamp(vRockMix.x * 1.1 - 0.1 + (rg1.a - 0.5) * 0.9, 0.0, 1.0);
         diffuseColor.rgb = mix(stone, ground * 0.92, dust) * vRockMix.y * (1.0 + (rg1.a - 0.5) * 0.7 + (rg2.a - 0.5) * 0.45);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
@@ -124,7 +124,7 @@ function rockMaterial(albedoCube) {
           normal = normalize(normal - vRockRot * g);
         }`);
   };
-  mat.customProgramCacheKey = () => 'rock4';
+  mat.customProgramCacheKey = () => 'rock5';
   return mat;
 }
 
@@ -155,10 +155,11 @@ export class RockField {
       return m;
     };
     // boulders close by get the detailed shapes and a shadow; the rest are cheap
-    this.near = [rockGeometry(3, 1.7, 0.78, 10, 0.5), rockGeometry(3, 5.3, 0.64, 12, 0.5)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
-    this.far = [rockGeometry(1, 9.2, 0.62, 6, 0.6), rockGeometry(1, 4.4, 0.84, 7, 0.6)].map((g) => mk(g, Math.round(700 * this.density), false));
+    // (blocky, not slabs: a third review found every rock a flat-topped plate)
+    this.near = [rockGeometry(3, 1.7, 0.94, 7, 0.5), rockGeometry(3, 5.3, 0.8, 8, 0.5)].map((g) => mk(g, Math.round(60 * this.density), this.shadowRange > 0));
+    this.far = [rockGeometry(1, 9.2, 0.78, 5, 0.6), rockGeometry(1, 4.4, 0.92, 5, 0.6)].map((g) => mk(g, Math.round(700 * this.density), false));
     // stones: a rounder shape underfoot, the simplest one beyond
-    this.smallNear = mk(rockGeometry(2, 2.6, 0.66, 7, 0.55), Math.round(260 * this.density), this.shadowRange > 0);
+    this.smallNear = mk(rockGeometry(2, 2.6, 0.8, 5, 0.55), Math.round(260 * this.density), this.shadowRange > 0);
     this.small = mk(rockGeometry(0, 6.1, 0.62, 2, 0.5), Math.round(3600 * this.density), false);
     this.gravel = new GravelField(parent, terrain.planet, mat, { reach: this.density < 0.7 ? 9 : 14, cap: Math.round(2600 * Math.min(1, this.density)) });
     this.smallCap = this.small.instanceMatrix.count;

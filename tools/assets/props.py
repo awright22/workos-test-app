@@ -1490,6 +1490,180 @@ def build_o2_cache():
 # ==============================================================================================
 # supply_pod.glb
 # ==============================================================================================
+def _ground_cord(bm, pts, w=0.007, h=0.009):
+    """A cord lying on the ground: a low ridge-section strip with no underside (nothing sees it)."""
+    P = [Vector(p) for p in pts]
+    rows = []
+    for i, p in enumerate(P):
+        d = P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]
+        d.z = 0.0
+        d.normalize()
+        left = Vector((-d.y, d.x, 0.0))
+        rows.append((bm.verts.new(p + left * w), bm.verts.new(p + Vector((0, 0, h))), bm.verts.new(p - left * w)))
+    for a, b in zip(rows, rows[1:]):
+        bm.faces.new((a[0], a[1], b[1], b[0]))
+        bm.faces.new((a[1], a[2], b[2], b[1]))
+    return [v for r_ in rows for v in r_]
+
+
+def _pod_drogue(K, root, conf):
+    """The supply pod's drogue where it came down, 2.5 m from the capsule: the canopy pancaked on
+    the ground, twelve gores (white and orange) round a vent, gathered into long soft folds that
+    run out from the vent to the hem, heaped a little on the far side. One sheet with no
+    overhangs, so every part of it rests on the ground or on cloth: the hem lies on z = 0 all the
+    way round and carries on down as a buried skirt for ground that falls away. The suspension
+    lines lie slack from the near hem to the confluence `conf`; those of the far gores come out
+    from under the near hem. Returns the Paint that holds the cloth's grime for the tint pass."""
+    cb = Vector((2.10, 1.28, 0.0))
+    away = cb.normalized()                                              # from the capsule out to the canopy
+    side = Vector((-away.y, away.x, 0.0))
+    NG, PER = 12, 8                                                     # gores; columns of the mesh across each
+    NU = NG * PER
+    RHO = (0.08, 0.19, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.89, 0.955, 1.0)   # rings, from the vent band out to the hem
+    JH = 3                                                              # rings 0..JH carry every second column
+    P = Paint()
+    rng = random.Random(41)
+    # The folds, in the cloth's own coordinates (column round the canopy, rho along a gore), so that
+    # each one runs along the mesh and is drawn round however it wanders over the ground:
+    # (centre column, half-width in columns, height, where it starts and ends along the gore, drift)
+    folds = []
+    c = rng.uniform(0.0, 2.0)
+    while c < NU - 1.2:                                                 # the many thin wrinkles of gathered cloth
+        pick = rng.random()
+        if pick < 0.40:
+            r0, r1 = -0.2, rng.uniform(0.55, 1.25)                      # from the vent out, dying away
+        elif pick < 0.85:
+            r0, r1 = rng.uniform(0.18, 0.55), 1.35                      # from part-way down the gore to the hem
+        else:
+            r0, r1 = rng.uniform(0.12, 0.30), rng.uniform(0.65, 0.95)   # a short one in the middle
+        folds.append((c, rng.uniform(0.85, 1.4), rng.uniform(0.010, 0.030), r0, r1, rng.uniform(-3.0, 3.0)))
+        c += rng.uniform(1.9, 4.2)
+    for c in (7.0, 19.5, 33.0, 44.5, 57.0, 71.5, 86.0):                 # and a few broad soft rolls where a gore lies doubled
+        folds.append((c + rng.uniform(-3.0, 3.0), rng.uniform(2.0, 3.0), rng.uniform(0.035, 0.060), rng.uniform(-0.2, 0.35),
+                      rng.choice((0.85, 1.0, 1.4, 1.4)), rng.uniform(-4.0, 4.0)))
+
+    def smooth(a, b, x):
+        t = max(0.0, min(1.0, (x - a) / (b - a)))
+        return t * t * (3.0 - 2.0 * t)
+
+    HEAP = 0.80                                                         # the bearing (round the canopy) of the heaped far side
+
+    def ground(rho, i):
+        """Where the cloth's point (rho along a gore from the vent, column i round it) came to rest."""
+        phi = TAU * i / NU
+        phi += 0.38 * sin(phi - HEAP)                                   # the heaped gores are squeezed together, the near ones spread
+        phi += 0.07 * noise3((2.0 * cos(phi), 2.0 * sin(phi), 2.2 * rho), 1.0, 9.0) * rho       # the seams wander
+        n1 = noise3((cos(phi), sin(phi), 0.0), 1.9, 3.0)                # the outline: ragged, not an ellipse
+        ru = 0.65 * (1.0 + 0.22 * n1) * (1.0 + 0.16 * cos(phi - 2.7))
+        rv = 0.49 * (1.0 + 0.20 * noise3((cos(phi), sin(phi), 0.5), 2.7, 5.0))
+        k = rho ** 0.9 * (1.0 + 0.045 * abs(sin(NG * phi / 2)) * rho ** 3)                      # the hem bellies out between its lines
+        k *= 1.0 - 0.27 * smooth(0.15, 0.95, cos(phi - HEAP)) * rho     # ... and the heaped side lies short
+        q = cb + away * (0.21 * (1 - rho)) + (away * (ru * cos(phi)) + side * (rv * sin(phi))) * k
+        if cos(phi) < -0.2:                                             # the lines dragged the near skirt out toward the capsule
+            q -= away * (0.10 * (-cos(phi) - 0.2) * rho ** 2)
+        return q
+
+    heap_at = cb + away * 0.21 + (away * cos(HEAP) * 0.66 + side * sin(HEAP) * 0.50) * 0.26
+    roll_a, roll_b = cb + away * 0.02 - side * 0.34, cb - away * 0.40 - side * 0.02      # one long soft roll lying across the near gores
+
+    def relief(rho, i, q, wide):
+        """Height of the cloth above the ground, and how much of that is fold (for the grime).
+        `wide` is the width of a mesh column on the ground here: a fold cannot stand taller than it is broad."""
+        f = 0.0
+        for (c0, w, h, r0, r1, drift) in folds:
+            d = (i - (c0 + drift * (rho - 0.5)) + NU / 2) % NU - NU / 2
+            if abs(d) > 3.0 * w:
+                continue
+            f += min(h, 1.3 * w * wide) * math.exp(-(d / w) ** 2) * smooth(r0, r0 + 0.22, rho) * (1.0 - smooth(r1 - 0.30, r1, rho))
+        heap = math.exp(-((q - heap_at).length / 0.30) ** 2)             # where the far gores came down on each other
+        # pushed together along the gores as well, the heap buckled across them (in step with the rings of the mesh)
+        f += heap * 0.010 * (1.0 + sin(TAU * rho / 0.232 + 2.2 + 2.4 * noise3((0.13 * i, 0.0, 0.0), 1.0, 4.0)))
+        f += heap * 0.030 * (0.5 + 0.5 * noise3((q.x, q.y, 0.4), 9.0, 6.0))
+        t = max(0.0, min(1.0, (q - roll_a).dot(roll_b - roll_a) / (roll_b - roll_a).length_squared))
+        d = (q - roll_a.lerp(roll_b, t)).length
+        f += 0.030 * math.exp(-(d / 0.055) ** 2) * sin(pi * t) ** 0.5
+        lay = 0.008 + 0.006 * (0.5 + 0.5 * noise3((q.x, q.y, 0.0), 6.0, 2.0))
+        crown = 0.022 * math.exp(-(rho / 0.24) ** 2)                    # cloth bunched round the vent band
+        edge = min(1.0, (1.0 - rho) / 0.10)                             # everything thins to a single flat hem
+        hem = 0.004 + min(0.014, 0.25 * f)                              # the hem itself lies on the ground, lifted a little by each fold
+        return hem * (1.0 - edge) + (lay + 0.035 * heap + f) * edge + crown, f
+
+    bm = bm_new()
+    rows = []
+    for j, rho in enumerate(RHO):
+        row = {}
+        gq = [ground(rho, i) for i in range(NU)]
+        for i in range(0, NU, 2 if j <= JH else 1):
+            q = gq[i]
+            z, f = relief(rho, i, q, (gq[(i + 1) % NU] - gq[i - 1]).length / 2)
+            row[i] = bm.verts.new((q.x, q.y, z))
+            P.add((q.x, q.y, z), (0.74 + 0.26 * smooth(0.0, 0.03, f),) * 3)                    # dust lies in the flats between folds
+        rows.append(row)
+    skirt = {}
+    for i in range(0, NU, 2):
+        q = ground(1.0, i)
+        o = cb + (q - cb) * 1.012
+        skirt[i] = bm.verts.new((o.x, o.y, -0.22))
+
+    def face(vs, i):
+        f = bm.faces.new(vs)
+        f.material_index = (i // PER) % 2
+        return f
+
+    for j in range(len(RHO) - 1):
+        a, b = rows[j], rows[j + 1]
+        if j < JH:
+            for i in range(0, NU, 2):
+                face((a[i], b[i], b[(i + 2) % NU], a[(i + 2) % NU]), i)
+        elif j == JH:                                                   # the mesh doubles here
+            for i in range(0, NU, 2):
+                i1, i2 = i + 1, (i + 2) % NU
+                face((a[i], b[i], b[i1]), i)
+                face((a[i], b[i1], a[i2]), i)
+                face((a[i2], b[i1], b[i2]), i)
+        else:
+            for i in range(NU):
+                face((a[i], b[i], b[(i + 1) % NU], a[(i + 1) % NU]), i)
+    hem = rows[-1]
+    for i in range(0, NU, 2):                                           # the buried skirt
+        i1, i2 = i + 1, (i + 2) % NU
+        face((hem[i], skirt[i], hem[i1]), i)
+        face((hem[i1], skirt[i], skirt[i2]), i)
+        face((hem[i1], skirt[i2], hem[i2]), i)
+    ring = [hem[i].co.copy() for i in range(NU)]
+    vent = ground(0.0, 0)
+    K.lathe('canvas_dark', [(0.0, 0.0), (0.060, 0.0), (0.072, 0.012), (0.046, 0.032), (0.0, 0.032)], 10,
+            T(vent.x, vent.y, min(v.co.z for v in rows[0].values()) - 0.012))                   # vent band
+    mesh_obj('drogue', bm, ['canvas', 'painted_orange'], parent=root, smooth_angle=75.0)
+
+    # suspension lines, slack on the ground from the confluence to the near hem: one to each seam of the
+    # near skirt; those of the far seams go in under the hem between them
+    lines = K.bm('canvas', smooth=60.0)
+    near = [g for g in range(NG) if (ring[g * PER] - cb).dot(away) < 0.06]
+    for g in range(NG):
+        cI = g * PER
+        if g in near:
+            end = ring[cI] + (ring[cI] - cb).normalized() * 0.004
+        else:                                                           # under the hem, part-way between two near seams
+            t = (hash01(g, 7.0) * 0.6 + 0.2)
+            n0 = near[(g * 5) % (len(near) - 1)]
+            n1 = near[(g * 5) % (len(near) - 1) + 1]
+            ia, ib = sorted((n0 * PER, n1 * PER))
+            if ib - ia > NU / 2:
+                ia, ib = ib, ia + NU
+            e = ring[int(round(ia + (ib - ia) * t)) % NU]
+            end = Vector((e.x, e.y, 0.0)) + (cb - e).normalized() * 0.03
+        bow = side * ((hash01(cI, 3.0) - 0.5) * 0.34)
+        pts = [conf, conf.lerp(end, 0.33) + bow, conf.lerp(end, 0.70) + bow * 0.55, end]
+        for q in pts[1:3]:
+            q.z = 0.001
+        if g not in near:
+            pts[3].z = -0.006
+        for v in _ground_cord(lines, spline(pts, 2), 0.0065, 0.009):
+            P.add(v.co, (0.86,) * 3)
+    return P
+
+
 def build_supply_pod():
     """An air-dropped resupply capsule, landed: a hexagonal base pan 1.4 m across, six petals
     folded open on their hinges over the deflated airbags, the cargo canister in the middle with a
@@ -1615,89 +1789,13 @@ def build_supply_pod():
             r_ = 0.66 + (1.50 - 0.66) * t
             pts.append((r_ * cos(th), r_ * sin(th), 0.19 * (1 - t) ** 1.5 + 0.21 * sin(pi * t) ** 0.8 * (0.9 if t < 1 else 0) + 0.012))
         K.tube('canvas_dark', pts, 0.007, 3)
-    # --- the drogue, lying where it came down: a collapsed canopy of orange and white gores heaped in folds,
-    #     its suspension lines trailing back across the ground to the riser and the capsule's bridle ---
-    cb = Vector((2.10, 1.28, 0))
-    away = Vector((cb.x, cb.y, 0)).normalized()                         # from the capsule out to the canopy
-    side = Vector((-away.y, away.x, 0))
-    NG, PER, NRC = 12, 3, 7
-    NU = NG * PER
-
-    FOLD = 0.58                                                         # beyond this the far gores are folded back over the heap
-
-    def folded(i):
-        return cos(TAU * i / NU - 0.5) > 0.45
-
-    def cloth(rho, i):
-        """Where the canopy's point (rho along a gore from the vent, column i round it) came to rest."""
-        phi = TAU * i / NU
-        over = folded(i) and rho > FOLD
-        if over:
-            rho = FOLD - (rho - FOLD) * 0.8                             # doubled back toward the vent, lying on the cloth below
-        n1 = noise3((cos(phi), sin(phi), 0.0), 1.9, 3.0)                # the outline: ragged, not an ellipse
-        ru = 0.66 * (1.0 + 0.22 * n1) * (1.0 + 0.16 * cos(phi - 2.7))
-        rv = 0.50 * (1.0 + 0.20 * noise3((cos(phi), sin(phi), 0.5), 2.7, 5.0))
-        q = cb + away * (0.10 * (1 - rho)) + (away * (ru * cos(phi)) + side * (rv * sin(phi))) * rho ** 0.9
-        if cos(phi) < -0.2:                                             # the lines dragged the near skirt out toward the capsule
-            q -= away * (0.10 * (-cos(phi) - 0.2) * rho ** 2)
-        seam = abs(sin(NG * phi / 2))                                   # 0 on a seam, 1 along the middle of a gore
-        puff = 0.5 + 0.5 * noise3((q.x, q.y, 0.3), 4.2, 7.0)            # a few gores still hold a pocket of air, most lie flat
-        puff = puff ** 1.6
-        crease = abs(noise3((q.x, q.y, 1.7), 9.0, 2.0))                 # cross-creases
-        body = sin(pi * min(1.0, rho * 1.04) ** 0.8)
-        z = body * (0.022 + 0.19 * puff * (0.15 + 0.85 * seam ** 0.8) + 0.05 * crease)
-        z *= 0.70 + 0.60 * hash01(i, round(rho * NRC * 3), 5.0)         # crumple
-        if rho < 0.05:
-            z = 0.05
-        if over:
-            z += 0.035 + 0.05 * (FOLD - rho) / FOLD
-        return Vector((q.x, q.y, z + 0.014))
-
-    rows = [[cloth(j / NRC, i) for i in range(NU)] for j in range(1, NRC + 1)]
-    hem = [Vector((cb.x + (pp.x - cb.x) * 1.035, cb.y + (pp.y - cb.y) * 1.035, -0.012)) if not folded(i) else pp + Vector((0, 0, -0.02))
-           for i, pp in enumerate(rows[-1])]
-    vent = cloth(0.0, 0)
-    gore_bm = [K.bm('canvas', smooth=24.0), K.bm('painted_orange', smooth=24.0)]
-    jf = int(FOLD * NRC)                                                # ring index (in rows) of the last ring before the fold
-    for g in range(NG):
-        bmg = gore_bm[g % 2]
-        cols = [(g * PER + e) % NU for e in range(PER + 1)]
-        vv = [[bmg.verts.new(r_[c]) for c in cols] for r_ in rows] + [[bmg.verts.new(hem[c]) for c in cols]]
-        v0 = bmg.verts.new(vent)
-        for e in range(PER):
-            bmg.faces.new((v0, vv[0][e], vv[0][e + 1]))
-            fo = folded(cols[e]) and folded(cols[e + 1])
-            for j in range(NRC):
-                quad_ = (vv[j][e], vv[j + 1][e], vv[j + 1][e + 1], vv[j][e + 1])
-                if fo and j + 1 >= jf:                                  # turned over: the other side of the cloth faces up
-                    bmg.faces.new(tuple(reversed(quad_)))
-                    if j + 1 == jf:                                     # the crease itself is seen from both sides
-                        bmg.faces.new([bmg.verts.new(v.co) for v in quad_])
-                else:
-                    bmg.faces.new(quad_)
-    K.lathe('canvas_dark', [(0.0, 0.0), (0.05, 0.0), (0.06, 0.012), (0.035, 0.03), (0.0, 0.03)], 8, T(vent.x, vent.y, vent.z - 0.008))   # vent band
-    # suspension lines: slack on the ground from the near skirt to the confluence; the far ones lie over the cloth
+    # --- the drogue, lying where it came down: a collapsed canopy of orange and white gores, its suspension
+    #     lines trailing back across the ground to the riser and the capsule's bridle ---
     conf = Vector((1.34, 0.80, 0.02))
-    for g in range(NG):
-        c = g * PER
-        end = rows[-1][c]
-        if (end - cb).dot(away) < 0.05 and not folded(c):
-            bow = side * ((hash01(c, 3.0) - 0.5) * 0.40)
-            pts = [conf, conf.lerp(end, 0.35) + bow, conf.lerp(end, 0.7) + bow * 0.6, end + Vector((0, 0, 0.004))]
-            for q in pts[1:3]:
-                q.z = 0.009
-            pts = spline(pts, 3)                                        # slack cord, not bent wire
-        elif g % 2 == 0:
-            co = (c + NU // 2) % NU                                     # along its own seam to the vent, on down the opposite seam
-            up = Vector((0, 0, 0.011))
-            pts = [conf, conf.lerp(rows[-1][co], 0.6), rows[-1][co] + up, rows[NRC - 3][co] + up, rows[1][co] + up, rows[1][c] + up,
-                   rows[NRC - 4][c] + up]
-            pts[1].z = 0.009
-        else:
-            continue
-        K.tube('canvas', pts, 0.007, 3, caps=False)
+    cloth_tint = _pod_drogue(K, root, conf)
     K.lathe('aluminium', [(0.0, -0.02), (0.022, -0.012), (0.022, 0.012), (0.0, 0.02)], 6, T(*conf) @ R('Y', 90) @ R('X', 30))            # confluence link
     swivel = Vector((1.08, 0.60, 0.02))
+    side = Vector((-1.28, 2.10, 0.0)).normalized()                      # across the line from the capsule to the canopy
     K.tube('canvas_dark', [conf, conf.lerp(swivel, 0.5) + side * 0.07 + Vector((0, 0, -0.006)), swivel], 0.011, 5, round_r=0.05)         # riser
     K.lathe('aluminium', [(0.0, -0.03), (0.026, -0.018), (0.026, 0.018), (0.0, 0.03)], 6, T(*swivel) @ R('Y', 90) @ R('X', 31))           # swivel
     for k, (ex, ey) in enumerate(((0.36, 0.20), (0.30, 0.26), (0.40, 0.14))):                                                            # three-legged bridle
@@ -1725,10 +1823,12 @@ def build_supply_pod():
     anchor('col_body', root, loc=(0, 0, 0), radius=0.9)
 
     def tint(co, name, a):
+        if name in ('canvas', 'painted_orange'):
+            k = cloth_tint.at(co)               # the canopy and its lines carry their own grime, painted as they were made
+            if k is not None:
+                return a * k[0]
         if name == 'canvas':                    # dust settles in the folds of the fabric
             return a * (0.30 + 0.70 * max(0.0, min(1.0, co.z / 0.15)) ** 1.2)
-        if name == 'painted_orange' and co.x > 1.2:      # ... and in the folds of the canopy's orange gores
-            return a * (0.45 + 0.55 * max(0.0, min(1.0, co.z / 0.12)) ** 1.2)
         return None
     return finish(root, 'supply_pod', samples=32, distance=0.5, tint=tint)
 
@@ -2340,14 +2440,36 @@ def _smooth01(a, b, x):
     return t * t * (3 - 2 * t)
 
 
+def _ice_cut(bm, co, no, close=True):
+    """Break a convex solid along a plane: what lies beyond it (the side `no` points to) goes, and
+    the break is one flat face."""
+    res = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-5, plane_co=co, plane_no=no, clear_outer=True)
+    edges = [e for e in res['geom_cut'] if isinstance(e, bmesh.types.BMEdge)]
+    if close and edges:
+        bmesh.ops.holes_fill(bm, edges=edges, sides=0)
+
+
+def _ice_between(bm, co, no, thick):
+    """The skin of a solid between two parallel planes (a copy; the solid is left alone)."""
+    c = bm.copy()
+    no = Vector(no).normalized()
+    bmesh.ops.bisect_plane(c, geom=c.verts[:] + c.edges[:] + c.faces[:], dist=1e-5, plane_co=co, plane_no=no, clear_inner=True)
+    bmesh.ops.bisect_plane(c, geom=c.verts[:] + c.edges[:] + c.faces[:], dist=1e-5, plane_co=Vector(co) + no * thick, plane_no=no, clear_outer=True)
+    return c
+
+
 def build_ice_outcrop():
     """Dirty water ice exposed in a low cut bank, the way the Phoenix trench and the scarps seen
-    from orbit show it: one pale blue-white slab under a skin of soil, layered with thin bands of
-    dust, cracked into six squat blocks. Each block is a part (`block_0` .. `block_5`, origin on
-    the ground under it) that the game takes away one by one; its foot is 35 cm below the origin
-    plane, so it never shows its underside on uneven ground. What stays is the scraped floor of
-    the ice table inside a low berm of spoil, whose apron fades into the ground and whose hem
-    hangs 35 cm below the origin plane as well. The face of the bank looks toward -Y."""
+    from orbit show it: a pale blue-white slab under a skin of soil, layered with thin bands of
+    dust, that has broken up into six blocks. They are angular: every face is a flat fracture, the
+    blocks have settled apart and lean their own ways (two have all but toppled), and the dust
+    bands, which were one set of level layers, are now tilted with each block and stepped across
+    every break. Each block is a part (`block_0` .. `block_5`, origin on the ground under it) that
+    the game takes away one by one, the last first, so a block only ever leans toward one that
+    outlasts it; its foot is 35 cm below the origin plane, so it never shows its underside on
+    uneven ground. What stays is the scraped floor of the ice table with the shards and frost
+    rubble that fell at the blocks' feet, inside a low berm of spoil whose apron fades into the
+    ground and whose hem hangs 35 cm below the origin plane as well. The face looks toward -Y."""
     ground_dust()
     mat('ice', roughness=0.46)                              # weathered, sublimated ice: no polish
     root = part('ice_outcrop')
@@ -2356,14 +2478,9 @@ def build_ice_outcrop():
     seeds = ((-1.95, 0.45), (-0.45, -1.30), (0.40, 0.90), (1.75, -0.65), (2.45, 1.20), (-0.95, 2.10))      # the six part origins
     outline = [(-2.55, 0.10), (-2.10, -1.20), (-0.90, -1.95), (0.60, -2.00), (2.10, -1.55), (2.85, -0.35), (3.00, 1.10), (2.55, 2.00),
                (1.20, 2.50), (-0.60, 2.70), (-1.90, 2.30), (-2.50, 1.30)]
-    CLEAN, BAND, MANTLE, GRIME = (0.84, 0.93, 1.0), (0.68, 0.56, 0.45), (0.70, 0.52, 0.39), (0.58, 0.47, 0.38)
+    CLEAN, BAND, MANTLE, GRIME = (0.84, 0.93, 1.0), (0.52, 0.39, 0.29), (0.70, 0.52, 0.39), (0.58, 0.47, 0.38)
     SPOIL, DAMP, GROUND = (0.80, 0.74, 0.70), (0.62, 0.56, 0.52), (1.0, 1.0, 1.0)
     FOOT = -0.35
-
-    def top(x, y):
-        """Height of the slab's upper surface: a scarp about 0.75 m high along the front, dipping to the back."""
-        h = 0.27 + 0.50 * (1.0 - _smooth01(-1.7, 2.3, y))
-        return h * (1.0 - 0.16 * (x / 3.0) ** 2) + 0.04 * noise3((x, y, 0.0), 1.3, 0.4)
 
     def mix(a, b, t):
         t = max(0.0, min(1.0, t))
@@ -2373,7 +2490,20 @@ def build_ice_outcrop():
         """How much dust lies on the ice here: patches, thicker toward the back of the bank."""
         return _smooth01(0.30, 0.62, 0.28 + 0.42 * _smooth01(-1.6, 2.4, y) + 0.45 * noise3((x, y, 0.2), 1.9, 1.0))
 
-    # ---- the six blocks: the cells of the cracked slab ----
+    # ---- the six blocks: the cells of the broken slab ----
+    # (height, size against its cell, the bearing its top leans toward and by how many degrees, how far it has sunk,
+    #  turn in plan, dust-skinned top?, breaks through it: (bearing of the break's normal, offset from the middle, gap))
+    BLOCKS = ((0.98, 0.95, (172.0, 7.0), 0.00, 4.0, True, ((28.0, 0.30, 0.06), (112.0, -0.22, 0.05))),
+              (0.66, 0.93, (248.0, 13.0), 0.03, -6.0, False, ((98.0, -0.18, 0.07),)),
+              (1.16, 0.90, (40.0, 5.0), 0.00, 7.0, True, ((142.0, 0.16, 0.05), (48.0, -0.25, 0.05))),
+              (0.76, 0.88, (300.0, 24.0), 0.10, -5.0, False, ((20.0, 0.10, 0.06),)),
+              (0.86, 0.87, (158.0, 16.0), 0.05, 9.0, True, ((70.0, 0.05, 0.06),)),
+              (0.56, 0.86, (292.0, 33.0), 0.14, -8.0, False, ((335.0, -0.20, 0.05),)))
+    # the dust layers of the slab before it broke: (height, thickness), dipping a little to the east and the back
+    STRATA = ((0.13, 0.034), (0.29, 0.026), (0.49, 0.042), (0.72, 0.028), (0.95, 0.030))
+    DIP = Vector((-0.035, -0.022, 1.0)).normalized()
+    DEEP = (0.66, 0.82, 0.98)
+    cells = []
     for k, (sx, sy) in enumerate(seeds):
         cell = list(outline)
         for m, (ox, oy) in enumerate(seeds):
@@ -2382,78 +2512,106 @@ def build_ice_outcrop():
             d = Vector((ox - sx, oy - sy))
             L = d.length
             d /= L
-            gap = 0.035 + 0.03 * hash01(min(k, m), max(k, m))        # the crack between two blocks
+            gap = 0.055 + 0.05 * hash01(min(k, m), max(k, m))        # the crack between two blocks
             cell = _clip_half(cell, (sx + d.x * (L / 2 - gap), sy + d.y * (L / 2 - gap)), (d.x, d.y))
-        # blunt the corners and break the long edges, so no block is a clean prism
-        per = []
-        n = len(cell)
-        for i in range(n):
-            a, b = Vector(cell[i]), Vector(cell[(i + 1) % n])
-            e = b - a
-            L = e.length
-            if L < 0.05:
-                continue
-            c = min(0.11, L * 0.3)
-            nrm = Vector((e.y, -e.x)).normalized()
-            steps = max(1, int(L / 0.55))
-            for q in range(steps + 1):
-                t = c / L + (1 - 2 * c / L) * q / steps
-                wob = 0.0 if q in (0, steps) else (hash01(k, i, q) - 0.5) * 0.07
-                per.append(a + e * t + nrm * wob)
-        cx = sum(v.x for v in per) / len(per)
-        cy = sum(v.y for v in per) / len(per)
-        off = (hash01(k, 11) - 0.5) * 0.10
-        tx, ty = (hash01(k, 12) - 0.5) * 0.10, (hash01(k, 13) - 0.5) * 0.10
-
-        def ht(x, y):
-            return max(0.24, top(x, y) + off + (x - sx) * tx + (y - sy) * ty)
-
-        B = Kit(f'block_{k}', part(f'block_{k}', parent=root, loc=(sx, sy, 0)))
-        bm = B.bm('ice', smooth=22.0)
-        # (height as a fraction of the top, inset toward the middle, what the ice is like there)
-        levels = ((None, -0.03, GRIME), (0.03, 0.0, GRIME), (0.20, 0.012, CLEAN), (0.345, 0.034, BAND), (0.395, 0.036, BAND), (0.58, 0.03, CLEAN),
-                  (0.715, 0.050, BAND), (0.75, 0.052, BAND), (0.93, 0.05, CLEAN), (1.0, 0.12, None))     # the dust layers weather back into grooves
-        rings = []
-        for li, (f, inset, col) in enumerate(levels):
-            ring = []
-            for i, v in enumerate(per):
-                th = math.atan2(v.y - cy, v.x - cx)
-                q = Vector((cx, cy)) + (v - Vector((cx, cy))) * (1.0 - inset / max(0.3, (v - Vector((cx, cy))).length))
-                h = ht(q.x, q.y)
-                if f is None:
-                    z = FOOT
-                else:
-                    z = h * min(1.0, f + (0.035 * sin(3 * th + k) + 0.02 * sin(7 * th + 2 * k) if 0.1 < f < 0.9 else 0.0))
-                jit = 0.0 if (li in (0, len(levels) - 1) or col is BAND) else 0.011
-                q += Vector(((hash01(k, li, i) - 0.5) * jit * 2, (hash01(k, i, li, 2) - 0.5) * jit * 2))
-                c_ = mix(CLEAN, MANTLE, mantle(q.x, q.y)) if col is None else col
-                P.add((q.x, q.y, z), c_)
-                ring.append(bm.verts.new((q.x - sx, q.y - sy, z)))
-            rings.append(ring)
-        n = len(per)
-        for a, b in zip(rings, rings[1:]):
-            for i in range(n):
-                i2 = (i + 1) % n
-                bm.faces.new((a[i], a[i2], b[i2], b[i]))
-        # the top: two inner rings and the middle, pitted where the ice has sublimed, dust lying in patches
-        tops = []
-        for fr in (0.74, 0.42):
-            ring = []
-            for i, v in enumerate(per):
-                q = Vector((cx, cy)) + (v - Vector((cx, cy))) * fr
-                z = ht(q.x, q.y) + 0.012 + 0.05 * hash01(k, i, fr * 9) + 0.03 * noise3((q.x, q.y, 0.0), 6.0, 0.5)
-                P.add((q.x, q.y, z), mix(CLEAN, MANTLE, mantle(q.x, q.y)))
-                ring.append(bm.verts.new((q.x - sx, q.y - sy, z)))
-            tops.append(ring)
-        zc = ht(cx, cy) + 0.035
-        P.add((cx, cy, zc), mix(CLEAN, MANTLE, mantle(cx, cy)))
-        vc_ = bm.verts.new((cx - sx, cy - sy, zc))
-        for i in range(n):
-            i2 = (i + 1) % n
-            bm.faces.new((rings[-1][i], rings[-1][i2], tops[0][i2], tops[0][i]))
-            bm.faces.new((tops[0][i], tops[0][i2], tops[1][i2], tops[1][i]))
-            bm.faces.new((tops[1][i], tops[1][i2], vc_))
-        B.finish()
+        cells.append(cell)
+    for k, (sx, sy) in enumerate(seeds):
+        high, size, (lean_to, lean), sink, turn, skinned, breaks = BLOCKS[k]
+        rk = random.Random(100 + k)
+        cell = [Vector(v) for v in cells[k]]
+        mid = sum(cell, Vector((0.0, 0.0))) / len(cell)
+        cell = [mid + (v - mid) * size for v in cell]
+        deep = (0.45 + 1.25 * sin(rad(lean))) / cos(rad(lean))          # enough below ground that no tilt lifts the foot clear
+        solid = bm_new()
+        lo = [solid.verts.new((v.x, v.y, -deep)) for v in cell]
+        hi = [solid.verts.new((v.x, v.y, high)) for v in cell]
+        solid.faces.new(list(reversed(lo)))
+        cap = solid.faces.new(hi)
+        for i in range(len(cell)):
+            solid.faces.new((lo[i], lo[(i + 1) % len(cell)], hi[(i + 1) % len(cell)], hi[i]))
+        # the pieces the block has broken into
+        pieces, slid = [solid], [Vector((0.0, 0.0, 0.0))]
+        for (bear, off, gap) in breaks:
+            n = Vector((cos(rad(bear)), sin(rad(bear)), rk.uniform(-0.18, 0.18))).normalized()
+            at = Vector((mid.x, mid.y, 0.0)) + n * off
+            other = solid.copy()
+            _ice_cut(solid, at - n * (gap / 2), n)
+            _ice_cut(other, at + n * (gap / 2), -n)
+            pieces.append(other)
+            slid.append(Vector((n.x, n.y, 0.0)) * rk.uniform(0.02, 0.07))
+        lean_axis = Vector((-sin(rad(lean_to)), cos(rad(lean_to)), 0.0))
+        M_block = (T(mid.x, mid.y, -sink) @ Matrix.Rotation(rad(lean), 4, lean_axis) @ R('Z', turn) @ T(-mid.x, -mid.y, 0.0))
+        body, bands = bm_new(), bm_new()
+        dusty = []                                                  # points of the old surface that kept their skin of dust
+        for pi_, piece in enumerate(pieces):
+            c = sum((v.co for v in piece.verts), Vector()) / len(piece.verts)
+            reach = max((Vector((v.co.x - c.x, v.co.y - c.y))).length for v in piece.verts)
+            top_z = high
+            if not skinned or pi_ > 0:                              # the top went with the break: one or two fresh faces across it
+                for _ in range(1 if skinned else 2):
+                    a = rk.uniform(0, TAU)
+                    t = rad(rk.uniform(9.0, 24.0))
+                    _ice_cut(piece, Vector((c.x, c.y, high - rk.uniform(0.03, 0.14))) + Vector((cos(a), sin(a), 0.0)) * reach * rk.uniform(-0.2, 0.3),
+                             Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t))))
+            for _ in range(5 if pi_ == 0 else 4):                   # corners and edges knocked off
+                a = rk.uniform(0, TAU)
+                n = Vector((cos(a + rk.uniform(-0.5, 0.5)), sin(a + rk.uniform(-0.5, 0.5)), rk.uniform(0.35, 1.25))).normalized()
+                rim_pt = max((v.co for v in piece.verts if v.co.z > 0.2), key=lambda q: (q.x - c.x) * cos(a) + (q.y - c.y) * sin(a))
+                _ice_cut(piece, rim_pt - n * rk.uniform(0.05, 0.20), n)
+            for _ in range(3):                                      # and a slab spalled off a side
+                a = rk.uniform(0, TAU)
+                far = max((v.co.x - c.x) * cos(a) + (v.co.y - c.y) * sin(a) for v in piece.verts)
+                _ice_cut(piece, Vector((c.x, c.y, 0.3)) + Vector((cos(a), sin(a), 0.0)) * far * rk.uniform(0.80, 0.94),
+                         Vector((cos(a), sin(a), rk.uniform(-0.22, 0.30))).normalized())
+            bmesh.ops.recalc_face_normals(piece, faces=piece.faces[:])
+            # each piece has shifted a little on its own
+            M = M_block
+            if pi_ > 0:
+                a = rk.uniform(0, TAU)
+                M = (M_block @ T(c.x + slid[pi_].x, c.y + slid[pi_].y, -rk.uniform(0.04, 0.16)) @ Matrix.Rotation(rad(rk.uniform(4.0, 10.0)), 4, Vector((cos(a), sin(a), 0.0)))
+                     @ T(-c.x, -c.y, 0.0))
+            for (z, thick) in STRATA:                               # its share of the dust layers, as it lay before it moved
+                if z + thick > top_z - 0.05:
+                    continue
+                strip = _ice_between(piece, Vector((0.25, 0.45, z)), DIP, thick)
+                strip.normal_update()
+                for v in strip.verts:
+                    v.co = M @ (v.co + v.normal * 0.004)
+                bmesh.ops.bisect_plane(strip, geom=strip.verts[:] + strip.edges[:] + strip.faces[:], dist=1e-5, plane_co=(0, 0, 0.035), plane_no=(0, 0, 1),
+                                       clear_inner=True)
+                me = bpy.data.meshes.new('strip')
+                strip.to_mesh(me)
+                strip.free()
+                bands.from_mesh(me)
+                bpy.data.meshes.remove(me)
+            skin = [f for f in piece.faces if f.normal.z > 0.999 and abs(f.calc_center_median().z - high) < 1e-4] if skinned else []
+            if skin:
+                bmesh.ops.inset_individual(piece, faces=skin, thickness=0.075, use_even_offset=True)
+                dusty += [M @ v.co for f in skin for v in f.verts]
+            bmesh.ops.transform(piece, matrix=M, verts=piece.verts[:])
+            _ice_cut(piece, (0.0, 0.0, FOOT), (0.0, 0.0, -1.0), close=False)             # the foot: buried, open
+            bmesh.ops.bisect_plane(piece, geom=piece.verts[:] + piece.edges[:] + piece.faces[:], dist=1e-5, plane_co=(0, 0, 0.075), plane_no=(0, 0, 1))
+            me = bpy.data.meshes.new('piece')                       # ... a ring of points where it meets the floor, for the grime and the shade there
+            piece.to_mesh(me)
+            piece.free()
+            body.from_mesh(me)
+            bpy.data.meshes.remove(me)
+        inv = M_block.inverted()
+        for v in body.verts:
+            was = (inv @ v.co).z / high                             # how high in the slab this ice lay
+            if any((v.co - q).length < 1e-4 for q in dusty):
+                col = mix(CLEAN, MANTLE, 0.55 + 0.45 * mantle(v.co.x, v.co.y))
+            elif v.co.z < 0.08:
+                col = mix(CLEAN, GRIME, 0.75 if v.co.z > 0.0 else 1.0)
+            else:
+                col = mix(DEEP, CLEAN, 0.25 + 0.75 * was + 0.25 * (hash01(k, round(v.co.x * 40), round(v.co.y * 40)) - 0.5))
+            P.add(v.co, col)
+        for v in bands.verts:
+            P.add(v.co, BAND)
+        node = part(f'block_{k}', parent=root, loc=(sx, sy, 0))
+        for nm, bm in (('ice', body), ('bands', bands)):
+            bmesh.ops.translate(bm, verts=bm.verts[:], vec=(-sx, -sy, 0.0))
+            mesh_obj(f'block_{k}.{nm}', bm, 'ice', parent=node, smooth_angle=12.0)
 
     # ---- what stays: the scraped floor of the ice table, the berm of spoil round it, fallen pieces ----
     K = Kit('bank', root)
@@ -2525,16 +2683,48 @@ def build_ice_outcrop():
         a, b = rows[i], rows[(i + 1) % NU]
         for j in range(len(a) - 1):
             bermb.faces.new((a[j], a[j + 1], b[j + 1], b[j]))
-    # pieces fallen from the face, and clods and stones on the berm
-    for i in range(7):
-        a = rad(-150 + 20 * i + rng.uniform(-6, 6))
-        r_ = rim(a) + rng.uniform(0.02, 0.30)
-        s_ = rng.uniform(0.07, 0.15)
-        pts = [(rng.uniform(-1, 1) * s_, rng.uniform(-1, 1) * s_ * 0.8, rng.uniform(-0.3, 1.0) * s_) for _ in range(7)]
-        M = T(ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.07) @ R('Z', rng.uniform(0, 360))
+    # shards and frost rubble where they fell at the blocks' feet (they stay when the blocks have gone), and clods and stones on the berm
+    def shard(x, y, z, L, W, Ht):
+        """A splinter of ice: a long sharp wedge lying on its broadest face, with a few crumbs of frost beside it."""
+        pts = [(-L * 0.5, -W * rng.uniform(0.2, 0.5), 0.0), (-L * rng.uniform(0.2, 0.45), W * 0.5, 0.0), (L * 0.5, W * rng.uniform(-0.2, 0.2), 0.0),
+               (L * rng.uniform(-0.1, 0.25), W * rng.uniform(-0.15, 0.15), Ht), (-L * rng.uniform(0.15, 0.35), W * rng.uniform(-0.1, 0.2), Ht * rng.uniform(0.45, 0.8))]
+        M = T(x, y, z) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-14, 14))
+        col = mix(DEEP, CLEAN, rng.random())
         for q in pts:
-            P.add(M @ Vector(q), mix(CLEAN, BAND, rng.random() * 0.7))
-        K.hull('ice', pts, M, smooth=22.0)
+            P.add(M @ Vector(q), col)
+        K.hull('ice', pts, M, smooth=12.0)
+        for _ in range(rng.choice((2, 2, 3))):
+            g = rng.uniform(0.022, 0.05)
+            Mc = T(x + rng.uniform(-1, 1) * (L * 0.5 + 0.08), y + rng.uniform(-1, 1) * (L * 0.5 + 0.08), z) @ R('Z', rng.uniform(0, 360))
+            crumb = [(-g, -g * 0.7, 0.0), (g, -g * 0.5, 0.0), (0.0, g, 0.0), (g * 0.2, 0.0, g * rng.uniform(0.7, 1.3))]
+            for q in crumb:
+                P.add(Mc @ Vector(q), (1.0, 1.0, 1.0))
+            K.hull('ice', crumb, Mc, smooth=12.0)
+
+    for k, (sx, sy) in enumerate(seeds):                             # round each block, most of it in the cracks between them
+        for i in range(4):
+            a = rng.uniform(0, TAU)
+            x, y = sx + rng.uniform(0.85, 1.25) * cos(a), sy + rng.uniform(0.85, 1.25) * sin(a)
+            th = math.atan2(y - oy_, x - ox_)
+            r_ = min(math.hypot(x - ox_, y - oy_), rim(th) - 0.12)
+            shard(ox_ + r_ * cos(th), oy_ + r_ * sin(th), 0.06, rng.uniform(0.12, 0.34), rng.uniform(0.06, 0.15), rng.uniform(0.04, 0.12))
+    for i in range(8):                                                # and tumbled out over the low berm in front of the face
+        a = rad(-152 + 18 * i + rng.uniform(-6, 6))
+        r_ = rim(a) + rng.uniform(0.02, 0.34)
+        shard(ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.07, rng.uniform(0.16, 0.44), rng.uniform(0.09, 0.20), rng.uniform(0.06, 0.17))
+    for i in range(10):                                               # broken lumps too big to call shards, in the cracks and along the face
+        sx, sy = seeds[i % 6]
+        a = rng.uniform(0, TAU)
+        x, y = sx + rng.uniform(0.9, 1.2) * cos(a), sy + rng.uniform(0.9, 1.2) * sin(a)
+        th = math.atan2(y - oy_, x - ox_)
+        r_ = min(math.hypot(x - ox_, y - oy_), rim(th) + (0.18 if sin(th) < -0.3 else -0.15))
+        s_ = rng.uniform(0.09, 0.19)
+        pts = [(rng.uniform(-1, 1) * s_, rng.uniform(-1, 1) * s_ * 0.8, rng.uniform(-0.25, 1.0) * s_ * 0.9) for _ in range(8)]
+        M = T(ox_ + r_ * cos(th), oy_ + r_ * sin(th), 0.07) @ R('Z', rng.uniform(0, 360))
+        col = mix(DEEP, CLEAN, rng.random())
+        for q in pts:
+            P.add(M @ Vector(q), col)
+        K.hull('ice', pts, M, smooth=12.0)
     for i in range(12):
         a = rng.uniform(0, TAU)
         r_ = rim(a) + rng.uniform(0.05, 0.75) * (0.5 + 0.5 * (0.5 + 0.5 * sin(a)))

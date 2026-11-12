@@ -117,8 +117,8 @@ export function buildHabColony(spawn) {
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
-  groundStain(World.hab, 15, 0x2a160c, 0.26, HAB_FLOOR + 0.03).position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
-  groundStain(World.hab, 12.5, 0x24130a, 0.3, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
+  groundStain(World.hab, 15, 0x24120a, 0.46, HAB_FLOOR + 0.03).position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
+  groundStain(World.hab, 13.5, 0x1e0f08, 0.55, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
@@ -143,7 +143,7 @@ export function buildHabColony(spawn) {
   }
   // outside: the porch lamps and the work light by the tanks come on as it gets dark
   const outside = () => dark() * (S.power > 0.5 ? 1 : 0);
-  for (const [n, power, range] of [['lamp_door_L', 5.5, 20], ['lamp_door_R', 5.5, 20], ['lamp_tanks', 5, 16]]) {
+  for (const [n, power, range] of [['lamp_door_L', 13, 24], ['lamp_door_R', 13, 24], ['lamp_tanks', 10, 18]]) {
     const a = hab.part(n);
     if (a) addLamp(a, { color: 0xffe2bd, power, range, level: outside });
   }
@@ -387,7 +387,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) groundStain(g, o.stain, 0x24130a, o.stainOpacity || 0.26, 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) groundStain(g, o.stain, 0x1e0f08, o.stainOpacity || 0.5, 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -449,7 +449,13 @@ export function buildStorySites() {
 
 /** A supply capsule (or route cache) standing in a placed group. */
 export function addSupplyPod(g, loot, label) {
-  const m = addSiteModel(g, 'supply_pod', { stain: 2.6, stainOpacity: 0.3 });
+  {
+    const u = _aw.copy(g.position).normalize();
+    const pad = ctx.planet.addPad(u.x, u.y, u.z, 3.4, 3.2);
+    ctx.terrain.syncPads([pad]);
+    g.position.copy(u).multiplyScalar(surfaceAt(u));
+  }
+  const m = addSiteModel(g, 'supply_pod', { stain: 2.8, stainOpacity: 0.5 });
   const pod = { group: g, kind: 'pod', taken: false, loot, label, cols: m.cols, lid: m.part('lid'),
     strobe: ownMaterials(m.part('strobe'), /^light_/) };
   World.pods.push(pod);
@@ -471,14 +477,16 @@ export function buildDeployable(kind, atVec, yaw = 0) {
   const g = placeAt(atVec, undefined, yaw);
   const b = { kind, group: g, v: g.position.clone().normalize(), yaw, charges: kind === 'cache' ? 3 : 0 };
   if (kind === 'solar') {
-    addSiteModel(g, 'solar_kit', { stain: 1.7, stainOpacity: 0.2 });
+    addSiteModel(g, 'solar_kit', { stain: 1.8, stainOpacity: 0.4 });
   } else if (kind === 'greenhouse') {
     g.position.addScaledVector(g.userData.up, -GREENHOUSE.floor);       // the deck is the ground you walk on
-    const gm = addSiteModel(g, 'greenhouse', { stain: 6.4, stainOpacity: 0.28 });
+    const gm = addSiteModel(g, 'greenhouse', { stain: 6.8, stainOpacity: 0.5 });
     // its lights: white from the apex, pink from the grow strips; they carry the dome at night
     const lit = () => 0.3 + 0.7 * (World.dark || 0);
-    addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 20, range: 18, level: lit });
-    addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 12, range: 11, level: lit });
+    // (kept modest: the dome's own floor and trays are white and a metre or two from these, and blow out long
+    //  before the ground outside is lit)
+    addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 20, decay: 1.25, level: lit });
+    addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 6, range: 12, decay: 1.3, level: lit });
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
     // the door swings outward on its left jamb as someone walks up to it, from either side
     b.door = { node: gm.part('door_leaf'), k: 0, cols: [siteCollider(g, 0, GREENHOUSE.portalEnd, 0.7)] };

@@ -39,12 +39,12 @@ const model = (where, dist, bearing, hours, o = {}) => g.page.evaluate(`(async (
 // each scene: set the state through the debug hook, let the terrain settle, take the picture
 const scenes = {
   'hab-morning': async () => ev(async (G) => { G.S.firstPerson = false; G.tpLocal(7, 24, 0); G.setLocalTime(8.2); G.look(-0.06); G.tick(0.05, 40); await G.settle(); }),
-  'hab-noon': async () => ev(async (G) => { G.tpLocal(-14, 20, 0.6); G.setLocalTime(12.3); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
+  'hab-noon': async () => ev(async (G) => { G.tpLocal(-9, 26, 0.35); G.setLocalTime(12.3); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
   'hab-dusk': async () => ev(async (G) => { G.tpLocal(10, 26, -0.4); G.setLocalTime(17.6); G.look(-0.02); G.tick(0.05, 40); await G.settle(); }),
   'hab-night': async () => ev(async (G) => { G.tpLocal(6, 22, 0); G.setLocalTime(22); G.look(-0.05); G.tick(0.05, 30); await G.settle(); }),
   'inside-game-cam': async () => ev(async (G) => { G.setLocalTime(10); G.tpLocal(0, 4.5, 0); G.look(-0.2); G.tick(0.05, 30); await G.settle(); }),
-  'inside-farm': async () => ev(async (G) => { G.tpLocal(-1.5, 0.5, 1.9); G.look(-0.25); G.tick(0.05, 30); await G.settle(); }),
-  'inside-machines': async () => ev(async (G) => { G.tpLocal(1.5, -0.5, -1.3); G.look(-0.15); G.tick(0.05, 30); await G.settle(); }),
+  'inside-machines': async () => ev(async (G) => { G.tpLocal(-1.5, 0.5, 1.9); G.look(-0.25); G.tick(0.05, 30); await G.settle(); }),
+  'inside-farm': async () => ev(async (G) => { G.tpLocal(1.5, -0.5, -1.3); G.look(-0.15); G.tick(0.05, 30); await G.settle(); }),
   'walk-plain': async () => ev(async (G) => { G.setLocalTime(9.5); G.tpLocal(40, 120, 0.4); G.look(-0.08); G.input.keys['w'] = true; G.tick(0.05, 26); G.input.keys['w'] = false; await G.settle(); }),
   'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 7); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); G.input.keys['w'] = false; await G.settle(); }),
@@ -54,6 +54,9 @@ const scenes = {
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
   'mav': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
   'canyon': async () => ev(async (G) => { await G.tp(-11.3, 293, 3.14); G.setLocalTime(11); G.look(0.15); G.tick(0.05, 40); await G.settle(); }),
+  // the north wall of Valles Marineris at 296 E: about 13 m of drop in every 4 m of ground, a hundred metres in all
+  'canyon-rim': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
+  'canyon-wall': async () => ev(async (G) => { await G.tp(-8.72, 296, 0); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 1.9); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),

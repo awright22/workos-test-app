@@ -1,5 +1,7 @@
 // Stranded II — entry point: load the planet, build the engine, run the game loop.
 import * as farmApi from './game/farm.js';
+import { FINEST } from './planet/height.js';
+import { chunkSpacing } from './terrain/chunk.js';
 import { photo, photoCamera, updatePhoto, enterPhoto, exitPhoto, takePhoto } from './game/photo.js';
 import { initPhotoUi, togglePhoto } from './ui/photo.js';
 import { inputHooks } from './game/input.js';
@@ -33,7 +35,7 @@ import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
-import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
+import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt, poseTune } from './game/player.js';
 import { roverF, updateRover, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
@@ -66,6 +68,8 @@ async function boot() {
   ctx.terrainMaterial = material;
   ctx.outdoor = new THREE.Group();                 // terrain and rocks: skipped while sealed inside the Hab
   engine.scene.add(ctx.outdoor);
+  ctx.terrainUniforms = material.userData.uniforms;        // (the storm's dusting of the ground was never switched on: nothing set it)
+  data.planet.finest = Math.max(FINEST, chunkSpacing(engine.q.maxLevel, engine.q.grid) * 1.25);
   ctx.terrain = new Terrain({
     planet: data.planet, heightData: data.heightData, parent: ctx.outdoor, material,
     workerUrl: asset('terrain-worker.js'), grid: engine.q.grid, maxLevel: engine.q.maxLevel, split: engine.q.split, workers: engine.q.workers,
@@ -136,6 +140,7 @@ function draw(dt, focus) {
   ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
+  if (ctx.terrainUniforms) { ctx.terrainUniforms.uDust.value = S.started ? S.storm.i : 0; ctx.terrainUniforms.uDay.value = e.sky.day; }
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
@@ -229,7 +234,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, poseTune, photoMode: { photo, enterPhoto, exitPhoto, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },

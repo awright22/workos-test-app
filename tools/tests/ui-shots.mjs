@@ -263,7 +263,8 @@ async function run(size) {
   if (await ev((G) => G.S.breach.active)) await shot('hud-breach');
   await ev((G) => { G.S.breach.active = false; G.S.breach.done = true; G.syncAllVisuals(); G.tick(0.05, 2); G.hold(1.4); });
   await shot('sleep', 1300);
-  await sleep(2600);
+  await ev(() => { const b = document.querySelector('#mg-panel .sleep .wake'); if (b) b.click(); });
+  await sleep(500);
 
   // ---------------------------------------------------------------- death
   await ev((G) => { G.checkpoint(); G.tpLocal(0, 60); G.S.suit = 0; G.S.health = 0.5; G.tick(0.05, 10); });
