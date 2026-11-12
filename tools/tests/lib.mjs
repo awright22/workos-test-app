@@ -29,6 +29,8 @@ export async function openGame(o = {}) {
     hasTouch: !!o.touch, isMobile: !!o.touch,
   });
   const page = await context.newPage();
+  // (software rendering on a busy machine: a click or a screenshot can wait far longer than Playwright's 30 s for a frame)
+  page.setDefaultTimeout(180000);
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));

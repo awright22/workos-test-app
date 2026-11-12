@@ -16,7 +16,17 @@ for (const quality of (process.env.Q || 'low,high').split(',')) {
   ]) {
     await g.eval(setup);
     await g.eval(async (G) => { G.tick(0.05, 3); await G.settle(); });
-    await sleep(2500);
+    // The counts are those of the last frame drawn. Wait for frames drawn after the scene settled, not for a
+    // fixed time: with software rendering on a busy machine a frame can take seconds, and a count read too soon
+    // is the previous scene's, or this one's before its stones arrived.
+    await g.eval(async (G) => {
+      const e = G.ctx.engine;
+      for (let n = 0, last = e.frameStats; n < 3;) {
+        await new Promise((r) => setTimeout(r, 60));
+        if (e.frameStats !== last) { last = e.frameStats; n++; }
+      }
+    });
+    await sleep(300);
     const i = await g.eval((G) => G.info());
     rows.push({ scene: name, calls: i.calls, main: i.triangles - i.shadowTriangles, shadow: i.shadowTriangles, shadowCalls: i.shadowCalls, terrainTiles: i.visible, rocks: i.rocks });
   }
