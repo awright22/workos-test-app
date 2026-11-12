@@ -1,15 +1,18 @@
 {
-  "name": "Stranded on Mars",
-  "short_name": "Stranded",
-  "description": "A full-planet Martian survival game. Farm. Salvage. Phone home. Fly out.",
+  "name": "Stranded II",
+  "short_name": "Stranded II",
+  "description": "A survival game on a whole, real Mars. Farm. Salvage. Phone home. Fly out.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
-  "background_color": "#160a04",
-  "theme_color": "#160a04",
+  "background_color": "#050403",
+  "theme_color": "#050403",
+  "categories": ["games"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

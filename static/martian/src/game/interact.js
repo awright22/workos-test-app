@@ -1,6 +1,6 @@
 import { S } from './state.js';
 import { screenOpen } from '../ui/screens.js';
-import { UI } from '../ui/dom.js';
+import { setPrompt } from '../ui/dom.js';
 import { World } from '../world/build.js';
 import { player } from './player.js';
 import { groundDist } from '../planet/geo.js';
@@ -14,7 +14,7 @@ export const interaction = { active: null };
 export let lastActiveI = null;
 export function updateInteract(dt) {
   interaction.active = null;
-  if (S.uiOpen || screenOpen() || S.over || S.mode === 'cutscene') { UI.prompt.style.display = 'none'; return; }
+  if (S.uiOpen || screenOpen() || S.over || S.mode === 'cutscene') { setPrompt(null); return; }
   let best = null, bestD = 1e9, bestP = 1e9;
   const pp = S.mode === 'rover' ? World.rover.group.position : player.pos;
   for (const it of interactables) {
@@ -26,30 +26,26 @@ export function updateInteract(dt) {
     if (d > it.r) continue;
     if (it.priority < bestP || (it.priority === bestP && d < bestD)) { bestP = it.priority; bestD = d; best = it; }
   }
-  if (!best) { UI.prompt.style.display = 'none'; UI.promptSub.textContent = ''; S.holdT = 0; lastActiveI = null; return; }
+  if (!best) { setPrompt(null); S.holdT = 0; lastActiveI = null; return; }
   interaction.active = best;
   if (best !== lastActiveI) { S.holdT = 0; lastActiveI = best; }
   const en = best.enabled ? best.enabled() : true;
-  UI.prompt.style.display = 'block';
-  UI.promptSub.textContent = best.sub ? best.sub() : '';
+  const sub = best.sub ? best.sub() : '';
   if (en !== true) {
-    UI.promptText.innerHTML = `<span style="opacity:.75">${typeof en === 'string' ? en : best.label()}</span>`;
-    UI.hold.style.display = 'none';
     S.holdT = 0;
+    setPrompt({ label: best.label(), sub, disabled: typeof en === 'string' ? en : true, hold: best.hold, progress: 0, minor: best.priority >= 9 });
     return;
   }
-  UI.promptText.innerHTML = `<span class="key">E</span>${best.hold > 0.7 ? 'HOLD — ' : ''}${best.label()}`;
   if (input.eHeld) {
     S.holdT += dt;
-    UI.hold.style.display = 'block';
-    UI.holdFill.style.width = clamp(S.holdT / best.hold * 100, 0, 100) + '%';
     if (S.holdT >= best.hold) {
       S.holdT = 0; input.eHeld = false;
-      UI.hold.style.display = 'none';
+      setPrompt({ label: best.label(), sub, hold: best.hold, progress: 0, minor: best.priority >= 9 });
       best.use();
+      return;
     }
   } else {
     S.holdT = 0;
-    UI.hold.style.display = 'none';
   }
+  setPrompt({ label: best.label(), sub, hold: best.hold, progress: clamp(S.holdT / best.hold, 0, 1), minor: best.priority >= 9 });
 }

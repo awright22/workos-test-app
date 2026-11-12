@@ -1,2 +1,12 @@
-@import "./hud.css";
-html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+/* Stranded II interface. Built by tools/build.mjs into static/martian/game.css. */
+@import "@fontsource/barlow-condensed/latin-500.css";
+@import "@fontsource/barlow-condensed/latin-600.css";
+@import "@fontsource/barlow/latin-400.css";
+@import "@fontsource/barlow/latin-500.css";
+@import "@fontsource/barlow/latin-600.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
+@import "./css/base.css";
+@import "./css/hud.css";
+@import "./css/touch.css";
+@import "./css/menus.css";
+@import "./css/screens.css";

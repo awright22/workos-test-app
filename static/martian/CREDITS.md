@@ -1,5 +1,8 @@
 # Credits
 
+Third-party work the game ships or is built from. A shorter list is shown in the game under
+Title → Credits.
+
 ## Data
 
 - **Mars elevation** — Mars Orbiter Laser Altimeter (MOLA) Mission Experiment Gridded Data
@@ -9,6 +12,21 @@
 - **Mars colour** — Viking Mars Digital Image Mosaic 2.1 colourised global mosaic. NASA / JPL /
   USGS Astrogeology Science Center; tiles from NASA Mars Trek. Public domain. Reprojected into
   `assets/mars/color.jpg` and, with MOLA shaded relief, `assets/mars/map.jpg`.
+
+## Typefaces (interface)
+
+Shipped as `.woff2` files in `assets/fonts/`, Latin subset only, copied at build time from the
+`@fontsource/*` packages named in `tools/package.json`.
+
+| Typeface | Weights shipped | Author | Licence |
+| --- | --- | --- | --- |
+| Barlow Condensed | 500, 600 | Jeremy Tribby | SIL Open Font License 1.1 |
+| Barlow | 400, 500, 600 | Jeremy Tribby | SIL Open Font License 1.1 |
+| JetBrains Mono | 500 | JetBrains s.r.o. | SIL Open Font License 1.1 |
+
+Barlow: <https://github.com/jpt/barlow> · JetBrains Mono: <https://github.com/JetBrains/JetBrainsMono>
+
+The interface's icons were drawn for this game (`src/ui/icons.js`).
 
 ## Software
 

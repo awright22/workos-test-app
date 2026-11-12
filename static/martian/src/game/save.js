@@ -5,7 +5,7 @@ import { _v1 } from '../core/scratch.js';
 import { player, syncPlayerPos } from './player.js';
 import { roverF, syncRoverVisual } from './rover.js';
 import { Snd } from '../audio/sound.js';
-import { UI, hideOverlay, log } from '../ui/dom.js';
+import { hideOverlay, log } from '../ui/dom.js';
 import { initScience } from './science.js';
 import { initMachines } from './machines.js';
 import { syncAllVisuals } from './visuals.js';
@@ -81,7 +81,6 @@ export function applyState(d) {
   roverF.speed = 0;
   S.over = false; S.dead = null; S.sleeping = false; S.mode = 'walk'; S.uiOpen = false;
   Snd.alarm(false); Snd.disco(false); S.disco = false;
-  UI.vign.style.opacity = 0;
   syncPlayerPos();
   syncRoverVisual(0);
   syncAllVisuals();

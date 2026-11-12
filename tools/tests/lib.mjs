@@ -18,6 +18,7 @@ const GL_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-s
  * @param {number} [o.width] @param {number} [o.height] @param {boolean} [o.touch]
  * @param {string} [o.quality]  low | medium | high | ultra (default low: software rendering is slow)
  * @param {number} [o.dsf] device scale factor
+ * @param {string} [o.query] extra URL parameters, e.g. 'safe=0,47,21,47' to simulate a phone's safe-area insets
  */
 export async function openGame(o = {}) {
   await mkdir(outDir, { recursive: true });
@@ -32,7 +33,7 @@ export async function openGame(o = {}) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   const t0 = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}`, { waitUntil: 'load' });
+  await page.goto(`http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
   const loadMs = Date.now() - t0;
   const game = {

@@ -6,14 +6,24 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#160a04">
-    <title>Stranded on Mars</title>
+    <meta name="apple-mobile-web-app-title" content="Stranded II">
+    <meta name="theme-color" content="#050403">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Stranded II: a survival game on a whole, real Mars. Farm. Salvage. Phone home. Fly out.">
+    <title>Stranded II</title>
     <link rel="icon" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.webmanifest">
+    <link rel="preload" href="assets/fonts/barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="game.css">
 </head>
 <body>
+    <div id="mg-boot" role="status" aria-live="polite">
+        <div class="mg-wordmark">STRANDED<em>II</em></div>
+        <div class="mg-boot-sub">Loading</div>
+    </div>
+    <noscript><p style="color:#f5f0e8;font-family:sans-serif;text-align:center;margin-top:40vh">Stranded II needs JavaScript and WebGL to run.</p></noscript>
     <script type="module" src="game.js"></script>
 </body>
 </html>

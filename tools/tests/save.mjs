@@ -21,7 +21,7 @@ const title = await g.page.locator('#mg-panel').innerText();
 const fails = [];
 const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (d !== undefined ? '  ' + JSON.stringify(d) : '')); if (!ok) fails.push(name); };
 // Sol 12 of 45 under the old, shorter sols is Sol 7 of 25 now
-check('title offers to continue the old save, its sol converted', /CONTINUE — SOL 7/.test(title), title.split('\n').filter((l) => /CONTINUE|NEW GAME/.test(l)));
+check('title offers to continue the old save, its sol converted', /continue\s*sol 7\b/i.test(title), title.split('\n').filter((l) => /continue|new game|sol/i.test(l)));
 await g.page.locator('#mg-panel button', { hasText: 'CONTINUE' }).click();
 await sleep(600);
 const s = await g.eval(async (G) => { await G.settle(); return { sol: G.S.sol, potatoes: G.S.potatoes, scrap: G.S.inv.scrap, tank1: !!G.S.upgrades.tank1, pf: G.S.pf.connected, plots: G.World.plots.length, plot6: G.World.plots[6] && G.World.plots[6].state,
@@ -43,7 +43,7 @@ await g.page.evaluate(() => localStorage.setItem('stranded2-save', JSON.stringif
 await g.page.reload({ waitUntil: 'load' });
 await g.page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
 const title2 = await g.page.locator('#mg-panel').innerText();
-check('unreadable save is reported plainly', /cannot be continued/.test(title2) && !/CONTINUE —/.test(title2));
+check('unreadable save is reported plainly', /cannot be continued/.test(title2) && !/continue\s*sol/i.test(title2));
 console.log(`${fails.length ? 'FAILED' : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));
 await g.close();
 process.exit(fails.length || g.errors.length ? 1 : 0);

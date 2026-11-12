@@ -63,9 +63,30 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 | `F` | Leave the rover |
 | `V` | Helmet view / suit view |
 | `M` / `C` / `J` | Map · Colony and crafting · Journal |
-| `Esc` | Pause (saves) |
+| `Esc` | Pause (saves): settings, controls, save and quit, restart |
+| `F3` | Diagnostics (frame rate, GPU, errors) |
 
-On a phone: a stick to move, drag to look, and on-screen buttons for everything else.
+On a phone (landscape): the left thumb moves, dragging anywhere else looks, and the big button
+on the right is the one verb: it shows what it will do and fills as you hold it. Run, jump,
+camera and the oxygen candle sit around it; pause, map, colony and journal are top right.
+Four quick taps in the top-left corner open the diagnostics.
+
+## Interface
+
+The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `tools/build.mjs`.
+
+- `dom.js` builds the HUD, touch controls, screen frames and dialog layer, and exports the
+  widgets the game calls (`log`, `toast`, `setPrompt`, `showOverlay`, `flashScreen`).
+- `hud.js` updates the HUD each frame; `menus.js` holds the title, pause, settings, controls,
+  credits, sleep and uplink dialogs; `screens.js` and `map.js` hold the map, colony and journal.
+- `layout.js` sets one scale for everything (all sizes are in rem), switches phones to the
+  compact arrangement, and reads the safe-area insets. `settings.js` keeps the player's
+  settings in `localStorage` (`stranded2-settings`, and `stranded2-quality` for graphics).
+- `?safe=top,right,bottom,left` in the URL simulates a phone's notch and home indicator.
+- `node tools/tests/ui.mjs` checks the interface (keyboard, settings, touch, and that nothing
+  overlaps or leaves the safe area at seven window sizes). `node tools/tests/ui-shots.mjs`
+  saves a screenshot of every state at every size to `tools/tests/.cache/ui/`.
+- Third-party fonts and data are credited in `CREDITS.md`. App icons: `tools/build_icons.py`.
 
 ## How it is built
 
