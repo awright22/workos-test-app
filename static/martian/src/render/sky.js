@@ -57,9 +57,15 @@ const GLSL_SKY = /* glsl */`
     space = 1.0 - exp(-max(uAlt, 0.0) / ${ATMO_H.toFixed(1)});
     float camR = ${R.toFixed(1)} + uAlt;
     float b = camR * sqrt(max(1.0 - mu * mu, 0.0));           // closest approach of the ray to the centre
-    float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.55).toFixed(1)});
-    limb = max(limb, exp(-max(uAlt, 0.0) / ${(ATMO_H * 2.0).toFixed(1)}) * h);
-    col = mix(col, col * limb * 1.4, space);
+    // the air seen edge-on from above: a thin band of haze along the limb, lit only where the
+    // sun reaches that part of the planet
+    vec3 nearest = normalize(uUp * camR - v * (camR * mu));
+    float limbLit = smoothstep(-0.12, 0.30, dot(nearest, uSun));
+    float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.30).toFixed(1)});
+    vec3 fromSpace = vec3(0.78, 0.52, 0.34) * limb * limbLit * 0.95;
+    // lower down, the day sky thins toward the zenith before it gives way to black
+    fromSpace = max(fromSpace, col * exp(-max(uAlt, 0.0) / ${(ATMO_H * 2.0).toFixed(1)}) * h);
+    col = mix(col, fromSpace, space);
     return col;
   }
 

@@ -204,7 +204,7 @@ export function updateAstronaut(dt) {
     if (driving && seat) { seat.add(astro); astro.position.set(0, -0.52, 0); astro.quaternion.identity(); anim.inner.rotation.y = 0; }
     else { ctx.world.add(astro); anim.inner.rotation.y = Math.PI; }
   }
-  astro.visible = driving ? !!(World.rover && World.rover.seat) : (!S.firstPerson && !S.sleeping) || S.over;
+  astro.visible = driving ? !!(World.rover && World.rover.seat) : (!S.firstPerson && !S.sleeping && !(cam.init && cam.dist < 1.0)) || S.over;
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
   if (S.over && S.dead) play('Collapse', 0.25);
@@ -382,6 +382,41 @@ function habCeiling(x, z) {
   return Math.hypot(x, z) > 6.2 ? 2.6 : 3.3;
 }
 
+// The room the astronaut is in, as the camera needs to know it: its frame, how far out the
+// camera may go, and how high at each spot. null when he is out in the open.
+const _habRoom = { group: null, inside: (x, z) => Math.hypot(x, z) < HAB_R - 0.45, ceiling: habCeiling };
+const _lockRoom = { group: null, inside: (x) => Math.abs(x) < 0.95, ceiling: () => 2.2 };
+const _domeRoom = {
+  group: null,
+  inside: (x, z) => Math.hypot(x, z) < GREENHOUSE.wall - 0.4 || (Math.abs(x) < GREENHOUSE.doorHalf - 0.2 && z > 0 && z < GREENHOUSE.portalEnd + 3),
+  ceiling: (x, z) => 0.3 + Math.sqrt(Math.max(0.2, 16 - x * x - z * z)),       // under the glazing: a 4 m dome on a low wall
+};
+function cameraRoom() {
+  if (World.hab && (S.inside || S.inAirlock)) {
+    siteWorldToLocal(World.hab, player.pos, _v3);
+    if (Math.hypot(_v3.x, _v3.z) < AIRLOCK_END + 1) { const r = S.inAirlock ? _lockRoom : _habRoom; r.group = World.hab; return r; }
+  }
+  if (S.inside) for (const b of World.builtMeshes) {
+    if (b.kind === 'greenhouse' && groundDist(player.pos, b.group.position) < 4.2) { _domeRoom.group = b.group; return _domeRoom; }
+  }
+  return null;
+}
+/** May the camera be at `p`? Inside a room it must stay in the room; outside, out of every building. */
+function cameraClear(p, room) {
+  if (room) { siteWorldToLocal(room.group, p, _v3); return room.inside(_v3.x, _v3.z); }
+  if (World.hab) {
+    siteWorldToLocal(World.hab, p, _v3);
+    const r = Math.hypot(_v3.x, _v3.z);
+    if (_v3.y < 6.2 && (r < HAB_R + 0.7 || (Math.abs(_v3.x) < AIRLOCK_OUTER_HALF + 0.5 && _v3.z > 0 && _v3.z < AIRLOCK_END + 0.5 && _v3.y < 3.6))) return false;
+  }
+  for (const b of World.builtMeshes) {
+    if (b.kind !== 'greenhouse') continue;
+    siteWorldToLocal(b.group, p, _v3);
+    if (_v3.y < 5 && Math.hypot(_v3.x, _v3.z) < 4.45) return false;
+  }
+  return true;
+}
+
 function updateWalkCamera(dt, running) {
   const c = ctx.engine.camera;
   const landDip = cam.land * 0.22;
@@ -400,24 +435,20 @@ function updateWalkCamera(dt, running) {
     _cq.copy(player.q).multiply(_q2.setFromAxisAngle(X_AXIS, player.pitch));
     const wantDist = indoors ? 3.1 : 5.4 + Math.min(1.2, player.speed * 0.08);
     const rise = indoors ? 0.2 : 0.42;
-    // shorten the boom until the camera is above the ground and inside the walls
+    // shorten the boom until the camera is above the ground and on the astronaut's side of every wall
+    const room = cameraRoom();
     let dist = wantDist;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_cq));
-      let ok = c.position.length() >= surfaceAt(c.position) + 0.35;
-      if (ok && World.hab && indoors) {
-        siteWorldToLocal(World.hab, c.position, _v3);
-        ok = S.inside ? Math.hypot(_v3.x, _v3.z) < HAB_R - 0.45 : Math.abs(_v3.x) < 0.95;
-      }
-      if (ok) break;
+      if (c.position.length() >= surfaceAt(c.position) + 0.35 && cameraClear(c.position, room)) break;
       dist *= 0.72;
     }
     cam.dist = dist < cam.dist ? dist : lerp(cam.dist, dist, damp(0.25, dt));
     c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, cam.dist / 3), rise, cam.dist).applyQuaternion(_cq));
     // indoors, duck under whatever hangs from the roof rather than zooming in
-    if (World.hab && indoors) {
-      siteWorldToLocal(World.hab, c.position, _v3);
-      const top = S.inside ? habCeiling(_v3.x, _v3.z) : 2.2;
+    if (room) {
+      siteWorldToLocal(room.group, c.position, _v3);
+      const top = room.ceiling(_v3.x, _v3.z);
       if (_v3.y > top) { cam.duck = lerp(cam.duck || 0, _v3.y - top, damp(0.08, dt)); } else cam.duck = lerp(cam.duck || 0, 0, damp(0.15, dt));
       if (cam.duck > 0.005) c.position.addScaledVector(player.up, -cam.duck);
     } else cam.duck = 0;

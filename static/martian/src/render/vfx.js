@@ -63,7 +63,10 @@ export class Vfx {
     this.scene = scene;
     this.time = 0;
     this.sprite = softSprite();
+    this.drift = new THREE.Vector3();          // how far the wind has carried the dust (wrapped), and how far it has settled
+    this.fall = 0;
     this._initAir(o.air === undefined ? 1400 : o.air);
+    this._initSheets(o.sheets === undefined ? 36 : o.sheets);
     this._initPuffs(o.puffs || 500);
     this._initMarks(o.marks || 500);
   }
@@ -76,21 +79,22 @@ export class Vfx {
     g.setAttribute('position', new THREE.BufferAttribute(seeds, 3));
     g.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
     this.airU = {
-      uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector3(1, 0, 0) }, uUp: { value: new THREE.Vector3(0, 1, 0) },
+      uDrift: { value: this.drift }, uFall: { value: 0 }, uCam: { value: new THREE.Vector3() }, uUp: { value: new THREE.Vector3(0, 1, 0) },
       uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uPx: { value: 600 }, uMap: { value: this.sprite }, uAmount: { value: 1 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.airU, transparent: true, depthWrite: false, fog: false, blending: THREE.NormalBlending,
       vertexShader: /* glsl */`
         attribute float aRnd;
-        uniform float uTime, uStorm, uPx, uAmount;
-        uniform vec3 uCam, uWind, uUp;
+        uniform float uFall, uStorm, uPx, uAmount;
+        uniform vec3 uCam, uDrift, uUp;
         varying float vA;
         void main() {
           const float BOX = 70.0;
-          // a box of motes that wraps around the camera: each stays put in the world as you move
-          float speed = mix(1.5, 26.0, uStorm) * (0.6 + 0.8 * aRnd);
-          vec3 world = position * BOX + uWind * (uTime * speed) - uUp * (uTime * (0.15 + uStorm * 1.2) * (0.5 + aRnd));
+          // a box of motes that wraps around the camera: each stays put in the world as you move.
+          // Each mote rides the wind at its own pace, in tenths, so the wrapped totals stay exact.
+          float pace = (6.0 + floor(aRnd * 9.0)) * 0.1;
+          vec3 world = position * BOX + uDrift * pace - uUp * (uFall * (pace - 0.1));
           vec3 rel = mod(world - uCam, BOX) - BOX * 0.5;
           vec4 mv = viewMatrix * vec4(rel, 0.0);
           mv.w = 1.0;
@@ -114,6 +118,62 @@ export class Vfx {
     this.air.frustumCulled = false;
     this.air.renderOrder = 20;
     this.scene.add(this.air);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Storm sheets: wide soft veils of dust that stream past low over the ground.
+  _initSheets(n) {
+    const g = new THREE.InstancedBufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    const seeds = new Float32Array(n * 3), rnd = new Float32Array(n);
+    for (let i = 0; i < n; i++) { seeds[i * 3] = Math.random(); seeds[i * 3 + 1] = Math.random(); seeds[i * 3 + 2] = Math.random(); rnd[i] = Math.random(); }
+    g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 3));
+    g.setAttribute('aRnd', new THREE.InstancedBufferAttribute(rnd, 1));
+    g.instanceCount = n;
+    this.sheetU = {
+      uDrift: { value: this.drift }, uCam: { value: new THREE.Vector3() }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uCamH: { value: 2 },
+      uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uMap: { value: this.sprite },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.sheetU, transparent: true, depthWrite: false, fog: false, blending: THREE.NormalBlending,
+      vertexShader: /* glsl */`
+        attribute vec3 aSeed; attribute float aRnd;
+        uniform float uStorm, uCamH;
+        uniform vec3 uCam, uDrift, uUp;
+        varying float vA; varying vec2 vUv;
+        void main() {
+          const float BOX = 70.0;
+          float pace = (8.0 + floor(aRnd * 7.0)) * 0.1;
+          vec3 rel = mod(aSeed * BOX + uDrift * pace - uCam, BOX) - BOX * 0.5;
+          // keep the spread sideways, but press the height into the few metres above the ground
+          float v = dot(rel, uUp);
+          float h = v / BOX + 0.5;
+          vec3 centre = rel - uUp * v + uUp * (0.4 + h * h * 9.0 - uCamH);
+          float len = mix(4.5, 10.0, aRnd), tall = mix(1.0, 2.8, h);
+          vec4 mv = viewMatrix * vec4(centre, 0.0);
+          mv.xy += position.xy * vec2(len, tall);
+          mv.w = 1.0;
+          gl_Position = projectionMatrix * mv;
+          vUv = position.xy * 0.5 + 0.5;
+          float d = length(centre);
+          vA = uStorm * uStorm * 0.20 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
+             * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
+        }`,
+      fragmentShader: /* glsl */`
+        uniform sampler2D uMap; uniform vec3 uLight;
+        varying float vA; varying vec2 vUv;
+        void main() {
+          float a = texture2D(uMap, vUv).a * vA;
+          if (a < 0.003) discard;
+          gl_FragColor = vec4(uLight, a);
+        }`,
+    });
+    this.sheets = new THREE.Mesh(g, mat);
+    this.sheets.frustumCulled = false;
+    this.sheets.renderOrder = 19;
+    this.sheets.visible = false;
+    this.scene.add(this.sheets);
   }
 
   // ---------------------------------------------------------------------------------------
@@ -267,12 +327,23 @@ export class Vfx {
     const px = (p.pixelHeight || 720) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const lit = Math.min(1.6, 0.25 + p.sunIntensity * 0.32);
     const a = this.airU;
-    a.uTime.value = this.time; a.uCam.value.copy(camera.position); a.uUp.value.copy(up);
-    a.uWind.value.copy(_e).multiplyScalar(Math.cos(veer)).addScaledVector(_v, Math.sin(veer));
+    // carry the dust along: the wind's speed rises with the storm. The totals wrap at a length
+    // every mote's pace divides, so they stay small and exact however long the game runs.
+    const WRAP = 700;
+    _s.copy(_e).multiplyScalar(Math.cos(veer)).addScaledVector(_v, Math.sin(veer));
+    this.drift.addScaledVector(_s, (1.5 + 24.5 * p.storm) * dt);
+    this.drift.set(((this.drift.x % WRAP) + WRAP) % WRAP, ((this.drift.y % WRAP) + WRAP) % WRAP, ((this.drift.z % WRAP) + WRAP) % WRAP);
+    this.fall = (this.fall + (0.15 + p.storm * 1.2) * dt) % WRAP;
+    a.uFall.value = this.fall; a.uCam.value.copy(camera.position); a.uUp.value.copy(up);
     a.uStorm.value = p.storm; a.uPx.value = px;
     a.uAmount.value = p.inside ? 0 : Math.max(0, 1 - (camera.position.length() - R) / 900);
     a.uLight.value.setRGB(0.86 * lit + p.ambient.r * 0.4, 0.62 * lit + p.ambient.g * 0.4, 0.44 * lit + p.ambient.b * 0.4);
     this.air.visible = a.uAmount.value > 0.01;
+    const sh = this.sheetU;
+    this.sheets.visible = this.air.visible && p.storm > 0.08;
+    sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm;
+    sh.uCamH.value = Math.min(40, Math.max(0.5, p.camHeight === undefined ? 2 : p.camHeight));
+    sh.uLight.value.copy(a.uLight.value);
     const u = this.puffU;
     u.uTime.value = this.time; u.uUp.value.copy(up); u.uPx.value = px;
     u.uLight.value.setRGB(lit * 0.75 + p.ambient.r * 0.8, lit * 0.72 + p.ambient.g * 0.8, lit * 0.7 + p.ambient.b * 0.8);

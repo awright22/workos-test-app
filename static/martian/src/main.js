@@ -63,7 +63,7 @@ async function boot() {
     shadowLevel: engine.q.maxLevel - engine.q.terrainShadowLevels + 1,
   });
   ctx.rocks = new RockField(ctx.outdoor, ctx.terrain, { density: engine.q.rocks, shadowRange: engine.q.scale >= 0.7 ? engine.q.shadowRange : 0, albedoCube: data.albedoCube });
-  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600 });
+  ctx.vfx = new Vfx(engine.scene, { air: engine.q.scale < 0.7 ? 700 : 1600, puffs: engine.q.scale < 0.7 ? 300 : 600, sheets: engine.q.scale < 0.7 ? 18 : 36 });
   initEffects();
   const mapImg = new Image();
   mapImg.onload = () => { ctx.mapImage = mapImg; };
@@ -98,14 +98,18 @@ function titleCamera(dt) {
   const cam = ctx.engine.camera, sun = ctx.engine.sunDir;
   startOrbitA += dt * 0.012;
   updateSunDir();
-  _v1.copy(sun).multiplyScalar(R * 2.6);
-  _v2.set(-sun.z, 0, sun.x);                      // sideways drift around the subsolar point
-  cam.position.copy(_v1).addScaledVector(_v2, Math.sin(startOrbitA) * R * 1.1).setY(R * (0.5 + 0.35 * Math.sin(startOrbitA * 0.6)));
+  // well round from the sun, so the terminator crosses the disc and the craters cast shadows
+  const phase = 1.02 + 0.16 * Math.sin(startOrbitA);
+  _v2.set(-sun.z, 0, sun.x).normalize();
+  _v1.copy(sun).multiplyScalar(Math.cos(phase)).addScaledVector(_v2, Math.sin(phase)).multiplyScalar(R * 2.6);
+  cam.position.copy(_v1).setY(R * (0.45 + 0.25 * Math.sin(startOrbitA * 0.6)));
   camLookAt(_v3.set(0, 0, 0), _v2.set(0, 1, 0));
 }
 
+let photoCam = null;                 // a free camera for pictures, set through the debug hook
 function draw(dt, focus) {
   const e = ctx.engine;
+  if (photoCam) { e.camera.position.copy(photoCam.pos); camLookAt(photoCam.look, photoCam.up); }
   e.camera.updateMatrixWorld();
   ctx.terrain.update(e.camera.position);
   ctx.rocks.update(e.camera.position);
@@ -113,7 +117,8 @@ function draw(dt, focus) {
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;
   e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
-  ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height });
+  ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
+    camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();
@@ -257,6 +262,18 @@ function installDebug() {
       const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
       initPlayerAt(up.addScaledVector(n, Math.cos(b) * dist / R).addScaledVector(e, Math.sin(b) * dist / R).normalize(), b);
       lastFocus = tick(0.001);
+    },
+    /** A free camera for pictures: look at a world position from `dist` metres away on a bearing
+     *  (degrees east of north), `height` metres above the ground there. photo(null) gives the
+     *  game its camera back. */
+    photo(target, dist = 6, bearing = 0, height = 1.7, aimHeight = 0.9) {
+      if (!target) { photoCam = null; return; }
+      const b = bearing * Math.PI / 180;
+      const up = target.clone().normalize();
+      const e = new THREE.Vector3(-up.z, 0, up.x).normalize(), n = new THREE.Vector3().crossVectors(up, e);
+      const at = up.clone().addScaledVector(n, Math.cos(b) * dist / R).addScaledVector(e, Math.sin(b) * dist / R).normalize();
+      photoCam = { pos: at.clone().multiplyScalar(surfaceAt(at) + height), look: up.clone().multiplyScalar(surfaceAt(up) + aimHeight), up };
+      ctx.engine.snapLight = 3;
     },
     /** Turn the astronaut (and the camera behind him) to face the sun's bearing. */
     faceSun() {
