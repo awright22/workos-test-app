@@ -31,7 +31,15 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 
 - **Survival**: suit oxygen, Hab oxygen, water, food, power and health; potato farming;
   burning hydrazine for water; solar panels that gather dust; roaming dust storms; a Hab
-  breach; the cold of the night.
+  breach; the cold of the night. A sol lasts eight minutes.
+- **Upkeep**: the oxygenator, the water reclaimer, the rover and the suit's scrubber wear and
+  need servicing. Done in time it costs nothing; left to fail it costs parts.
+- **Field science**: chip samples off boulders and bag soil wherever you dig. What a sample
+  turns out to be depends on where on the real Mars it came from (hematite spherules at
+  Meridiani, sulfates in Valles Marineris, clays at Jezero: seventeen materials). The analyser
+  in the Hab catalogues them; science credit earns NASA grants.
+- **Weather**: dust storms that close visibility to tens of metres, and dust devils that wander
+  the plains on warm afternoons and sometimes sweep the solar array clean.
 - **Exploration**: a six-wheeled rover with its own power and air; a journal of landmarks and
   landers; achievements; an orbital map drawn from the same data as the ground.
 - **Making things**: scrap and circuits from salvage become oxygen candles, a folding solar
@@ -39,7 +47,8 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   permanent upgrades. Some need blueprints that NASA sends for survey work.
 - **Quests**: once Pathfinder is connected, NASA radios survey tasks that take you across the
   planet and pays in supply drops and blueprints.
-- **Structure**: a checkpoint every dawn, automatic saving, three difficulties.
+- **Structure**: a checkpoint every dawn, automatic saving, three difficulties (rescue on
+  Sol 15, 25 or 35).
 
 ## Controls
 

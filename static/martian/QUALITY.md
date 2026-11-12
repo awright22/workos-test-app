@@ -10,7 +10,8 @@ headless Chromium with software rendering (SwiftShader) is not a real frame rate
 cd tools && npm ci
 node build.mjs              # bundle src/ -> game.js, terrain-worker.js, game.css, sw.js
 node lint.mjs               # undefined names, bad imports
-node tests/run.mjs          # smoke, full story arc (20 checks), save migration
+node tests/run.mjs          # smoke, story arc, save migration, science, machines, audio wiring
+node tests/audio.mjs        # 129 offline audio renders measured for loudness and clicks (5 min)
 node tests/perf.mjs         # draw calls and triangles per frame against the budgets below
 node tests/shots.mjs        # screenshot matrix -> tools/tests/.cache/shots/
 node serve.mjs              # play at http://127.0.0.1:8765/  (?q=low|medium|high|ultra)
@@ -29,8 +30,9 @@ the local time and the weather, step the simulation without drawing, and place a
 | Scene cost | Per frame (`tests/perf.mjs`). "low": 180 draw calls, 340k triangles in the picture, 230k in the shadow passes. "medium": 240 / 480k / 300k. "high": 290 / 600k / 400k. These budgets are estimates, not derived from hardware: they exist to catch regressions until a real frame rate is known | Measured (counts, valid on any machine). low: 143–154 calls, 146–257k picture, 46–215k shadow. medium: 169–171, 161–329k, 67–222k. high: 228–264, 345–383k, 191–353k. Sealed inside the Hab: 27–40 calls, 122k. The worst case is standing at the base, where the Hab, rover and astronaut are drawn into both shadow cascades |
 | Load | Title screen interactive in under 5 s on a 20 Mbit connection; total download under 14 MB; works offline after first load | 11.8 MB precached (41 files). Headless load to title: 1.2–5.5 s from localhost. Not measured on a phone network |
 | Console | Zero errors or warnings in a full playthrough | Zero errors in smoke, arc, save, perf and screenshot runs |
-| Story arc | Every step from the crash to the rescue works | 20/20 scripted checks (`tests/arc.mjs`) |
-| Saves | Old saves load or the player is told plainly why not | Version-2 saves migrate (tested); unreadable saves are reported on the title screen (tested) |
+| Story arc | Every step from the crash to the rescue works | 21/21 scripted checks (`tests/arc.mjs`) |
+| Systems | Every system does what it says: science (16 checks), equipment wear (8), audio wiring (26) | All pass |
+| Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested); unreadable saves are reported on the title screen (tested) |
 | Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Second pass done (new ground, rocks, shadows). Independent review owed |
 | Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Tuned: exposure meters against the sun, the glow shrinks at the horizon. Independent review owed |
 | Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Tuned: dark cool ground, lamp pools, porch lights. Independent review owed |
@@ -41,7 +43,7 @@ the local time and the weather, step the simulation without drawing, and place a
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Twelve clips blended; not yet reviewed in motion |
 | First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Objectives tracker exists; onboarding not yet designed |
 | Interface | Every screen is legible and unclipped at 1280x720 through 2560x1440 and at phone sizes under the notch and status bar; touch has a pause button | Being rebuilt (branch `ui-redesign`) |
-| Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Being rebuilt (branch `audio-rebuild`) |
+| Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Merged: synthesised in the browser, no audio files. Measured offline: peaks under -1.4 dBFS with everything at once, calm day about -34 LUFS, storm -18. **Nobody has listened to it**: timbre and musicality are judged only from spectrograms. Calm beds are mostly below 300 Hz and will be faint on a phone speaker |
 | Feel | Walking, jumping and driving have weight; the camera never clips through walls or ground | New controllers in. The camera now treats the Hab, its airlock and greenhouse domes as rooms from inside and as obstacles from outside. Not yet reviewed in motion |
 
 ## Open items
@@ -49,7 +51,10 @@ the local time and the weather, step the simulation without drawing, and place a
 | # | Item | State |
 | --- | --- | --- |
 | 1 | Merge the interface redesign (branch `ui-redesign`) | in progress |
-| 2 | Merge the audio rebuild (branch `audio-rebuild`) | in progress |
+| 2 | Merge the audio rebuild (branch `audio-rebuild`) | done |
+| 15 | Listen to the audio on real speakers and a phone; retune by ear | blocked on a listener |
+| 16 | Journal page for the sample catalogue; colony page for machine condition; sounds for dust devils | with the interface merge |
+| 17 | More depth: crops beyond potatoes and a kitchen, morale and Hab comforts, daily messages from NASA and the crew, photo mode | open |
 | 3 | Reviewer pass on the screenshot matrix against this bar; act on findings | open |
 | 4 | Storm: sheets of dust streaming past; sound | open |
 | 5 | Sky from orbit: thinner limb haze; Phobos and Deimos | open |
@@ -83,6 +88,12 @@ the local time and the weather, step the simulation without drawing, and place a
   around the camera so the astronaut's shadow is a figure, a wide one for the base.
 - **Exposure is metered.** It opens up as the sun sinks, closes when the camera looks into a low
   sun, and eases over about a second like an eye.
+- **A sol is eight minutes.** It was 220 seconds, which flipped day and night every two
+  minutes and gave a suit tank under three minutes on foot. Rescue moved from Sol 20/45/60 to
+  15/25/35, so a mission is about as long in real time; a tank is about six minutes walking.
+- **Samples are identified by place, not by chance.** What a bag holds is fixed by its
+  coordinates on the real planet, so the catalogue is a reason to travel and a lead in the
+  journal means something.
 - **The sol turns at dawn at the colony.** Local clocks elsewhere on the planet differ, as they
   should.
 - **Mars gravity is real** (3.72 m/s2). Walk and run are loping gaits made for 5.1 and 9.2 m/s.
