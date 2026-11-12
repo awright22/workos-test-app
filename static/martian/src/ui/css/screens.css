@@ -203,7 +203,8 @@
 .mg-compact .pane.on { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; align-content: start; }
 .mg-compact .pane.on > .pane-hd, .mg-compact .pane.on > .empty { grid-column: 1 / -1; }
 .mg-compact .pane-hd:not(:first-child) { margin-top: .75rem; }
-.mg-compact .inv-row { min-height: 2rem; }
+.mg-compact .inv-row { min-height: 2.375rem; padding: .25rem 0; }
+.mg-compact .inv-row .nm small { font-size: .6875rem; }
 .mg-compact .inv-row .nm { font-size: .8125rem; }
 .mg-compact .rcp { padding: .5rem .625rem .5625rem; margin-bottom: .5rem; }
 .mg-compact .rcp-hd h4 { font-size: .9375rem; }

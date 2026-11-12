@@ -59,6 +59,12 @@
 .is-cold .res { display: none; }
 .is-cold #mg-vitals { padding-right: .75rem; }
 
+/* corner marks: the two instrument panels are framed like a suit display */
+#mg-vitals::before, #mg-vitals::after, #mg-tr::before, #mg-tr::after { content: ""; position: absolute; width: .5rem; height: .5rem; pointer-events: none; }
+#mg-vitals::before, #mg-tr::before { left: -1px; top: -1px; border-left: 1px solid var(--ink-3); border-top: 1px solid var(--ink-3); border-top-left-radius: .25rem; }
+#mg-vitals::after, #mg-tr::after { right: -1px; bottom: -1px; border-right: 1px solid var(--ink-3); border-bottom: 1px solid var(--ink-3); border-bottom-right-radius: .25rem; }
+.mg-compact #mg-tr::before, .mg-compact #mg-tr::after { display: none; }
+
 /* ---------------------------------------------------------------- compass (top centre) */
 #mg-compass { --cw: min(30rem, calc(100vw - 50rem)); position: absolute; left: 50%; top: calc(var(--m) - .375rem + var(--sat)); width: var(--cw); margin-left: calc(var(--cw) / -2); height: 3.875rem; }
 #mg-compass .strip { position: relative; height: 2.75rem; overflow: hidden; background: rgba(14, 12, 11, .62); border-radius: .25rem;
