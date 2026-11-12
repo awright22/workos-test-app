@@ -159,10 +159,10 @@ export class Ambience {
     this.power += ((p.habPower > 0.5 ? 1 : 0) - this.power) * k(1.4);
     if (inHab > 0.01) {
       const c = this.hab.use(), pw = this.power;
-      c.hum.to(0.014 * inHab * pw, 0.4);
-      c.fan.to(0.16 * inHab * pw, 0.4); c.fanF.to(200 + 230 * pw, 0.5);
+      c.hum.to(0.012 * inHab * pw, 0.4);
+      c.fan.to(0.125 * inHab * pw, 0.4); c.fanF.to(200 + 230 * pw, 0.5);
       c.blade.to(0.006 * inHab * pw, 0.4); c.bladeF.to(60 + 87 * pw, 0.5);
-      c.vent.to(0.045 * inHab * pw, 0.4);
+      c.vent.to(0.036 * inHab * pw, 0.4);
       if (playing && !p.sleeping && pw > 0.6) {
         if (this.nextRelay < 0) { this.nextRelay = now + E.rr(3, 12); this.nextPump = now + E.rr(4, 14); this.nextBeep = now + E.rr(8, 30); }
         if (now >= this.nextRelay) { sys.play('habRelay', { pan: E.rr(-0.7, 0.7), gain: inHab }); this.nextRelay = now + E.rr(5, 26); }

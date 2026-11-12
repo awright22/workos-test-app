@@ -3,6 +3,7 @@
 //   node tools/tests/audio.mjs                 everything (about two minutes)
 //   node tools/tests/audio.mjs sfx_ ui         only scenarios whose name or group contains a word
 //   node tools/tests/audio.mjs --no-wav        skip writing WAV files
+//   node tools/tests/audio.mjs --verbose       also print where each scenario's largest step is
 //
 // The audio modules are bundled on their own (they do not import the game), loaded into
 // headless Chromium and rendered with OfflineAudioContext while Snd.update() is fed the way
@@ -22,6 +23,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, '.cache', 'audio');
 const args = process.argv.slice(2), words = args.filter((a) => !a.startsWith('--'));
 const noWav = args.includes('--no-wav');
+const verbose = args.includes('--verbose');
 
 const bundle = await build({ entryPoints: [path.join(here, 'audio', 'page.js')], bundle: true, write: false, format: 'iife', target: 'es2020', logLevel: 'warning' });
 const browser = await chromium.launch();
@@ -81,6 +83,7 @@ for (const group of groups) {
   console.log(`-- ${group}`);
   for (const s of todo.filter((x) => x.group === group)) {
     const r = R[s.name], m = r.m;
+    if (verbose) console.log(`   (largest step at ${m.jumpAt.toFixed(3)} s; left-right correlation ${m.corr.toFixed(2)}; starts ${m.start.toFixed(2)} s, sounds for ${m.active.toFixed(2)} s)`);
     console.log(`${s.name.padEnd(26)} ${r.dur.toFixed(1).padStart(5)} ${f1(m.peakDb)} ${f1(m.rmsDb)} ${f1(m.lufs)} ${f1(m.momentary)}  ${String(Math.round(m.centroid)).padStart(7)}  ${(m.below400 * 100).toFixed(0).padStart(4)}%  ${m.jump.toFixed(3).padStart(7)}   ${String(r.stats.maxLive).padStart(5)}/${String(r.stats.endLive).padEnd(5)}   ${String(r.stats.maxVoices).padStart(3)}`);
   }
 }
@@ -93,6 +96,8 @@ for (const s of todo) {
   expect(m.peak < 0.99, `${n}: peak stays below full scale`, m.peakDb.toFixed(2) + ' dBFS');
   expect(m.dc < 0.004, `${n}: no DC offset`, m.dc.toFixed(5));
   expect(m.rms > 1e-5, `${n}: is not silent`, m.rmsDb.toFixed(1) + ' dB');
+  expect(m.jump < 0.7, `${n}: no full-scale click (largest step between two samples)`, `${m.jump.toFixed(3)} at ${m.jumpAt.toFixed(2)} s`);
+  expect(m.corr > -0.2, `${n}: left and right are not out of phase (it survives a mono speaker)`, m.corr.toFixed(2));
   if (!r.from) expect(m.head < 0.02, `${n}: starts from silence (no click)`, m.head.toFixed(4));
   if (s.group === 'sfx' || s.group === 'ui') expect(m.tail < 0.004, `${n}: has died away by the end (no cut-off tail)`, m.tail.toFixed(4));
   if (s.group === 'ui') {
@@ -152,6 +157,9 @@ if (!words.length) {
     expect(R[n].stats.maxLive < 170, `${n}: the live graph stays small`, R[n].stats.maxLive + ' nodes');
   }
   expect(R.mix_worst_case.stats.maxVoices <= 40, 'voices are limited under load', R.mix_worst_case.stats.maxVoices);
+  const long = R.mix_long.stats;
+  console.log(`ten-minute rotation: ${long.made} nodes created, ${long.maxLive} alive at most, ${long.early} alive at 1:55 and ${long.late} at 9:55 (same point of the rotation)`);
+  expect(long.maxLive < 420 && Math.abs(long.late - long.early) < 40, 'ten minutes of play does not grow the graph', `${long.early} -> ${long.late}, max ${long.maxLive}`);
   expect(Math.abs(unity - 3) < 0.5, 'quiet signals pass the limiter untouched (at the engine\'s +3 dB output trim)', unity.toFixed(2) + ' dB');
 }
 expect(pageErrors.length === 0, 'no console errors or warnings', pageErrors.slice(0, 3).join(' | '));

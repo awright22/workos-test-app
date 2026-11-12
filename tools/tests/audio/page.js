@@ -86,6 +86,20 @@ add('mix_worst_case', { group: 'mix', dur: 14, from: 0, base: { ...PLAY, place: 
   events: [{ t: 0, fn: (s) => { s.disco(true); s.alarm(true); } }, { t: 1, fn: (s) => { for (const n of ['breach', 'ignition', 'discovery', 'achievement', 'rescued', 'pfAlive', 'craft']) s.play(n); } },
     { t: 3, fn: (s) => { for (const n of ['boom', 'hydrazine', 'death', 'jingle', 'salvage', 'deploy']) s.play(n); } }, { t: 3.6, fn: (s) => { for (const n of ['hydrazineBoom', 'drill', 'questDone']) s.play(n); } }] });
 
+// ten minutes of everything in rotation: the graph must not grow
+const ROTA = [
+  (t) => ({ ...walk(7, false)(t) }),
+  (t) => ({ ...walk(11, true)(t), storm: 0.8 }),
+  (t) => ({ ...walk(7, false)(t), place: 'hab', move: t % 4 < 2 ? 1 : 0, hold: (t % 4) / 4, holdKind: 'dig' }),
+  (t) => ({ place: 'rover', roverSpeed: 14, throttle: 1, rough: 0.5 }),
+  (t) => ({ ...walk(7, false)(t), place: 'hab', breach: true }),
+  (t) => ({ day: 0, o2: 0.07, health: 0.2 }),
+];
+const LONG_SFX = ['dig', 'plant', 'water', 'harvest', 'wipe', 'salvage', 'craft', 'deploy', 'eat', 'candle', 'jingle', 'discovery', 'ok', 'pickup', 'uiClick', 'uiOpen', 'boom', 'podOpen'];
+add('mix_long', { group: 'mix', dur: 600, from: 0, base: { ...PLAY },
+  params: (t) => ({ storm: 0, day: 1, o2: 1, health: 1, breach: false, place: 'outside', move: 0, hold: 0, roverSpeed: 0, throttle: 0, ...ROTA[Math.floor(t / 20) % ROTA.length](t) }),
+  events: Array.from({ length: 85 }, (_, i) => ({ t: 3 + i * 7, fn: (s) => { s.play(LONG_SFX[i % LONG_SFX.length]); if (i % 12 === 5) s.disco(true); if (i % 12 === 8) s.disco(false); } })) });
+
 // one scenario per one-shot recipe, alone, in the place it is normally heard
 const AT_HAB = ['fillBed', 'plant', 'water', 'harvest', 'clearBed', 'hydrazine', 'hydrazineBoom', 'eat', 'breach', 'sealBreach', 'craft', 'terminal', 'nasaSend',
   'habRelay', 'habPump', 'habBeep', 'habBuffet', 'powerDown', 'powerUp', 'klaxon', 'pfAlive'];
@@ -120,6 +134,7 @@ async function render(name) {
   const events = (sc.events || []).slice().sort((a, b) => a.t - b.t);
   let ei = 0, maxLive = 0, maxVoices = 0;
   const live = [];
+  if (window.gc) window.gc();
   const step = (t) => {
     while (ei < events.length && events[ei].t <= t + 1e-6) events[ei++].fn(snd, t);
     snd.update(sc.params ? { ...sc.base, ...sc.params(t) } : sc.base);
@@ -137,7 +152,9 @@ async function render(name) {
   const buf = await ctx.startRendering();
   const chs = [buf.getChannelData(0), buf.getChannelData(1)];
   const st = snd.stats();
-  return (cache[name] = { name, sc, chs, dur, ms: performance.now() - t0, stats: { ...st, maxLive, maxVoices, endLive: live[live.length - 1], core: st.core } });
+  // the graph's size at the same point of the rotation early and late (for the long run)
+  const at = (sec) => live[Math.min(live.length - 1, Math.round(sec * SR / STEP))];
+  return (cache[name] = { name, sc, chs, dur, ms: performance.now() - t0, stats: { ...st, maxLive, maxVoices, endLive: live[live.length - 1], core: st.core, early: at(115), late: at(dur - 5) } });
 }
 
 window.AT = {

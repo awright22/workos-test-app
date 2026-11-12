@@ -103,7 +103,7 @@ export const BANDS = [[20, 60], [60, 150], [150, 400], [400, 1000], [1000, 2500]
 export function analyse(chs, sr, from = 0, to = Infinity) {
   const a = Math.floor(from * sr), b = Math.min(chs[0].length, Math.floor(to * sr));
   const cut = chs.map((c) => c.subarray(a, b)), n = cut[0].length;
-  let peak = 0, sq = 0, dc = 0, jump = 0, nan = 0, first = -1, last = -1;
+  let peak = 0, sq = 0, dc = 0, jump = 0, jumpAt = 0, nan = 0, first = -1, last = -1;
   const mono = new Float32Array(n);
   for (const c of cut) {
     let prev = c[0] || 0, m = 0;
@@ -113,7 +113,8 @@ export function analyse(chs, sr, from = 0, to = Infinity) {
       const av = v < 0 ? -v : v;
       if (av > peak) peak = av;
       if (av > 0.001) { if (first < 0 || i < first) first = i; if (i > last) last = i; }
-      const d = v - prev; if (d > jump) jump = d; else if (-d > jump) jump = -d;
+      const d = v < prev ? prev - v : v - prev;
+      if (d > jump) { jump = d; jumpAt = i; }
       prev = v; sq += v * v; m += v; mono[i] += v / cut.length;
     }
     dc = Math.max(dc, Math.abs(m / n));
@@ -145,7 +146,7 @@ export function analyse(chs, sr, from = 0, to = Infinity) {
     centroid: tot ? cen / tot : 0, below400: tot ? below400 / tot : 0,
     bands: bands.map((p) => (tot ? p / tot : 0)),
     bandDb: bands.map((p) => 10 * Math.log10(p / (spec.length * spec.length) + 1e-20)),
-    jump, head, tail,
+    jump, jumpAt: from + jumpAt / sr, head, tail,
     active: first < 0 ? 0 : (last - first) / sr, start: first < 0 ? -1 : first / sr,
     corr: ll && rr ? lr / Math.sqrt(ll * rr) : 1,
   };

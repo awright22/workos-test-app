@@ -228,7 +228,7 @@ def('wipe', { bus: 'world', gap: 0.2, gain: 2.6 }, (E, v, t, o, K) => {
     const ts = t + s * 0.42, up = s === 0;
     E.burst(v, ts, { bp: up ? 1500 : 3000, bp1: up ? 3000 : 1500, bglide: 0.3, q: 2.2, a: 0.05, h: 0.12, d: 0.2, g: 0.14 });
     E.tone(v, ts, { type: 'triangle', f: up ? 950 : 1400, f1: up ? 1500 : 1000, glide: 0.3, a: 0.04, h: 0.12, d: 0.12, g: 0.03 });
-    E.burst(v, ts + 0.08, { table: 'grit', hp: 1500, a: 0.1, d: 0.3, g: 0.7 });
+    E.burst(v, ts + 0.08, { table: 'grit', hp: 1500, lp: 5000, a: 0.1, d: 0.3, g: 0.14 });   // dust falling off the glass
   }
   E.bell(v, t + 0.86, { f: n(K, 36), g: 0.03, d: 0.6, index: 0.6 });
 });
