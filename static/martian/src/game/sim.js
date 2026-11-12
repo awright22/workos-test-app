@@ -435,7 +435,8 @@ export function sleepToDawn(inRover) {
       { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', whole: true },
     ],
   };
-  // the night's account stays up until he starts the day (or for a quarter of a minute), so it can be read
+  // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,
+  // read or not; the clock is stopped while he sleeps, so there is nothing to hurry for.)
   let woke = false;
   const wake = () => {
     if (woke) return;
@@ -448,6 +449,5 @@ export function sleepToDawn(inRover) {
     checkpoint();
     saveGame();
   };
-  setTimeout(() => { if (!S.over) showSleepSummary(summary, wake); }, 500);
-  setTimeout(wake, 15000);
+  setTimeout(() => { if (!S.over && !showSleepSummary(summary, wake)) wake(); }, 500);      // (no account on screen to dismiss: wake at once)
 }

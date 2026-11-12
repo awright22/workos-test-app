@@ -398,10 +398,11 @@ export function showSleep() {
 }
 /**
  * d: { sol, deltas: [{ icon, label, from, to, unit }], notes: [text] }
+ * Returns whether the account is up with its button (if not, the caller must not wait for a tap).
  */
 export function showSleepSummary(d, onDone) {
   const box = UI.panel.querySelector('.sleep');
-  if (!box) return;
+  if (!box) return false;
   const deltas = d.deltas.map((x) => {
     const v = x.whole ? Math.round(x.to) - Math.round(x.from) : x.to - x.from;
     // (the change overnight, and under it what that leaves)
@@ -417,6 +418,7 @@ export function showSleepSummary(d, onDone) {
   box.classList.add('done');
   const b = box.querySelector('.wake');
   if (b) { b.addEventListener('click', (ev) => { ev.stopPropagation(); onDone(); }); try { b.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ } }
+  return !!b;
 }
 
 // ------------------------------------------------------------------------------------------
