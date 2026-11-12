@@ -39,7 +39,7 @@ export function syncRoverVisual(dt) {
 export function enterRover() {
   S.mode = 'rover';
   roverF.camInit = false;
-  Snd.click();
+  Snd.play('roverEnter');
 }
 export function exitRover() {
   S.mode = 'walk';
@@ -48,7 +48,7 @@ export function exitRover() {
   collideUnit(player.q, 0.42);
   player.alt = 0; player.vy = 0;
   syncPlayerPos();
-  Snd.click();
+  Snd.play('roverExit');
 }
 export function updateRover(dt) {
   const RV = roverF;
@@ -100,5 +100,4 @@ export function updateRover(dt) {
   ctx.engine.camera.fov = lerp(ctx.engine.camera.fov, 74 + Math.abs(RV.speed) * 0.25, 1 - Math.pow(0.001, dt));
   ctx.engine.camera.updateProjectionMatrix();
   S.inside = false;
-  if (Math.random() < dt * 8 && Math.abs(RV.speed) > 2) Snd.beep(55 + Math.random() * 20, 0.08, 'sawtooth', 0.03);
 }

@@ -20,7 +20,7 @@ import { tryReload } from './flow.js';
 export function connectPathfinder() {
   S.pf.connected = true;
   syncAllVisuals();
-  Snd.jingle();
+  Snd.play('pfAlive');
   checkpoint();
   const mavDist = fmtDist(groundDist(World.hab.position, World.mav.position));
   const convo = [
@@ -115,7 +115,7 @@ export function onQuestEvent(type, name) {
     }
     if (!hit) continue;
     S.quests[q.id] = 'done';
-    Snd.discovery();
+    Snd.play('questDone');
     const pod = dropSupplyPod(q.loot, `Open "${q.name}" reward pod`);
     if (q.bp) pod.blueprint = q.bp;
     if (q.reveal) {
@@ -177,7 +177,7 @@ export function checkAchievements() {
     try { ok = a.check(); } catch (e) {}
     if (ok) {
       S.achieved[a.id] = true;
-      Snd.discovery();
+      Snd.play('achievement');
       toast('ACHIEVEMENT', a.name, a.desc);
     }
   }
@@ -198,7 +198,7 @@ export function startLaunch() {
     S.disco = true; Snd.disco(true);
     setTimeout(() => log('The playlist synced to the MAV. I\'m launching to disco. This is my life now.', 'nasa'), 3500);
   }
-  [3, 2, 1].forEach((n, i) => setTimeout(() => { Snd.beep(700 + n * 60, 0.18, 'square', 0.15); log(`${n}...`, 'nasa'); }, 2000 + i * 1000));
+  [3, 2, 1].forEach((n, i) => setTimeout(() => { Snd.play('countdown'); log(`${n}...`, 'nasa'); }, 2000 + i * 1000));
   if (!hermes) {
     hermes = buildModel('hermes', 1.4);
     ctx.world.add(hermes);
@@ -242,7 +242,7 @@ export function startLaunch() {
 export function winGame() {
   S.won = true;
   Snd.rumble(0);
-  Snd.jingle();
+  Snd.play('rescued');
   checkAchievements();
   setTimeout(() => Snd.disco(false), 6000);
   wipeSave();

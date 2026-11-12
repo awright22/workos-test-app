@@ -32,9 +32,10 @@ function buildWind(E, L) {
   const h1 = E.filter(L, 'bandpass', 420, 9), h2 = E.filter(L, 'bandpass', 560, 11), gh1 = E.gain(L, 0), gh2 = E.gain(L, 0);
   p1.connect(h1); h1.connect(gh1); gh1.connect(pn1);
   p2.connect(h2); h2.connect(gh2); gh2.connect(pn2);
-  // grit on the visor
-  const grit = E.loop(L, 'grit', 1.3), ghp = E.filter(L, 'highpass', 2600, 0.7), glp = E.filter(L, 'lowpass', 9000, 0.7), gg = E.gain(L, 0);
-  grit.connect(ghp); ghp.connect(glp); glp.connect(gg); gg.connect(out);
+  // grit on the visor: a fine hiss of dust with single grains ticking through it
+  const grit = E.loop(L, 'grit', 1.6), ghp = E.filter(L, 'highpass', 2600, 0.7), glp = E.filter(L, 'lowpass', 9000, 0.7), gg = E.gain(L, 0);
+  const gt = E.gain(L, 0.3), gs = E.gain(L, 0.5);
+  grit.connect(gt); gt.connect(ghp); p2.connect(gs); gs.connect(ghp); ghp.connect(glp); glp.connect(gg); gg.connect(out);
   return {
     low: E.ctl(gLow.gain, 0), lowCut: E.ctl(lp.frequency, 220),
     mid1: E.ctl(g1.gain, 0), mid2: E.ctl(g2.gain, 0), midF1: E.ctl(b1.frequency, 480), midF2: E.ctl(b2.frequency, 610),
@@ -94,7 +95,7 @@ export class Ambience {
     this.nextRelay = -1; this.nextPump = -1; this.nextBeep = -1;
     this.alarmNext = -1; this.alarmSince = -1;
     this.stormArmed = true;
-    this.lastPlace = null;
+    this.lastPlace = null; this.powered = null;
   }
 
   update(p, now, dt) {
@@ -134,14 +135,14 @@ export class Ambience {
     if (scene * w > 0.002) {
       const c = this.wind.use(), h = this.hear;
       const st = smooth(0.3, 0.9, p.storm), g = this.gust;
-      c.low.to(0.62 * w * h.low * scene, 0.25);
+      c.low.to(0.42 * w * h.low * scene, 0.25);
       c.lowCut.to(Math.min(h.cut, 170 + 820 * Math.pow(w, 1.4)), 0.3);
-      const mid = 0.62 * Math.pow(w, 1.3) * g * h.mid * scene;
+      const mid = 0.52 * Math.pow(w, 1.3) * g * h.mid * scene;
       c.mid1.to(mid, 0.3); c.mid2.to(mid * 0.9, 0.34);
       c.midF1.to(420 + 520 * w, 0.5); c.midF2.to(540 + 600 * w, 0.6);
-      c.howl1.to(2.6 * st * this.howlGust * h.howl * scene, 0.7); c.howl2.to(2.2 * st * (1.4 - this.howlGust) * h.howl * scene, 0.8);
+      c.howl1.to(1.2 * st * this.howlGust * h.howl * scene, 0.7); c.howl2.to(1.0 * st * (1.4 - this.howlGust) * h.howl * scene, 0.8);
       c.howlF1.to(this.hf1, 1.1); c.howlF2.to(this.hf2, 1.3);
-      c.grit.to(0.4 * smooth(0.22, 0.85, p.storm) * (0.45 + 0.6 * g) * h.grit * scene, 0.2);
+      c.grit.to(0.3 * smooth(0.22, 0.85, p.storm) * (0.45 + 0.6 * g) * h.grit * scene, 0.2);
       c.gritCut.to(h.gritCut, 0.3);
     } else if (this.wind.on) {
       const c = this.wind.c;
@@ -158,15 +159,19 @@ export class Ambience {
     this.power += ((p.habPower > 0.5 ? 1 : 0) - this.power) * k(1.4);
     if (inHab > 0.01) {
       const c = this.hab.use(), pw = this.power;
-      c.hum.to(0.017 * inHab * pw, 0.4);
-      c.fan.to(0.2 * inHab * pw, 0.4); c.fanF.to(200 + 230 * pw, 0.5);
+      c.hum.to(0.014 * inHab * pw, 0.4);
+      c.fan.to(0.16 * inHab * pw, 0.4); c.fanF.to(200 + 230 * pw, 0.5);
       c.blade.to(0.006 * inHab * pw, 0.4); c.bladeF.to(60 + 87 * pw, 0.5);
-      c.vent.to(0.055 * inHab * pw, 0.4);
+      c.vent.to(0.045 * inHab * pw, 0.4);
       if (playing && !p.sleeping && pw > 0.6) {
         if (this.nextRelay < 0) { this.nextRelay = now + E.rr(3, 12); this.nextPump = now + E.rr(4, 14); this.nextBeep = now + E.rr(8, 30); }
         if (now >= this.nextRelay) { sys.play('habRelay', { pan: E.rr(-0.7, 0.7), gain: inHab }); this.nextRelay = now + E.rr(5, 26); }
         if (now >= this.nextPump) { sys.play('habPump', { pan: E.rr(-0.5, 0.5), gain: inHab }); this.nextPump = now + E.rr(11, 26); }
         if (now >= this.nextBeep) { sys.play('habBeep', { pan: E.rr(-0.6, 0.6), gain: inHab }); this.nextBeep = now + E.rr(14, 55); }
+      }
+      // a storm leans on the canvas: thumps and creaks in the gusts
+      if (playing && !p.sleeping && p.storm > 0.3 && E.rand() < 0.45 * p.storm * this.gust * this.gust * dt) {
+        sys.play('habBuffet', { pan: E.rr(-0.8, 0.8), gain: inHab * clamp(p.storm * this.gust, 0.3, 1.3) });
       }
     } else if (this.hab.on) {
       const c = this.hab.c;
@@ -177,8 +182,11 @@ export class Ambience {
 
     // ---- breach: the rush of air, and the klaxon ----
     const near = sys.habNear(p);
+    const powered = p.habPower > 0.5;
+    if (this.powered !== null && powered !== this.powered && playing && near > 0.25) sys.play(powered ? 'powerUp' : 'powerDown', { gain: near });
+    this.powered = playing ? powered : null;
     const breach = alive && p.breach ? near : 0;
-    if (breach > 0.003) this.hiss.use().level.to(0.55 * breach, 0.25);
+    if (breach > 0.003) this.hiss.use().level.to(0.4 * breach, 0.25);
     else if (this.hiss.on) { this.hiss.c.level.to(0, 0.3); this.hiss.rest(now); }
     const alarm = playing && (p.breach || p.alarm) && !p.sleeping;
     if (alarm) {

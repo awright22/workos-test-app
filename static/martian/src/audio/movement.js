@@ -11,8 +11,8 @@ const WORK_EVERY = { dig: 0.5, wipe: 0.42, tool: 0.46, soft: 0.55 };
 
 function buildHold(E, L) {
   // a faint tone that climbs while an action charges, so the hand knows how long is left
-  const o = E.osc(L, 'tone', 220), lp = E.filter(L, 'lowpass', 1200, 0.7), g = E.gain(L, 0);
-  o.connect(lp); lp.connect(g); g.connect(E.bus.ui);
+  const o = E.osc(L, 'sine', 220), g = E.gain(L, 0);
+  o.connect(g); g.connect(E.bus.ui);
   return { f: E.ctl(o.frequency, 220), g: E.ctl(g.gain, 0) };
 }
 
@@ -53,7 +53,7 @@ export class Movement {
     if (holding) {
       const c = this.hold.use(), h = clamp(p.hold, 0, 1);
       c.f.to(220 * Math.pow(2, h), 0.05);
-      c.g.to(0.016 * smooth(0, 0.12, h) * (1 - smooth(0.9, 1, h)), 0.05);
+      c.g.to(0.007 * smooth(0, 0.12, h) * (1 - smooth(0.9, 1, h)), 0.05);
       const every = WORK_EVERY[p.holdKind];
       if (every) {
         if (this.workNext < 0) this.workNext = now + 0.06;

@@ -64,6 +64,8 @@ add('event_airlock', { group: 'event', dur: 9, base: { ...PLAY }, events: [{ t: 
 add('event_launch', { group: 'event', dur: 52, base: { ...PLAY, scene: 'cutscene', place: 'outside' },
   events: [{ t: 2, fn: (s) => s.play('countdown') }, { t: 3, fn: (s) => s.play('countdown') }, { t: 4, fn: (s) => s.play('countdown') }, { t: 40.5, fn: (s) => s.play('rescued') }],
   params: (t) => { const lt = t - 5.2; return { scene: t >= 40.5 ? 'won' : 'cutscene', launch: { burning: lt > 0, alt: lt > 0 ? Math.min(15600, lt * lt * 14) : 0 } }; } });
+add('event_pause', { group: 'event', dur: 12, base: { ...PLAY, storm: 0.5 }, events: [{ t: 0, fn: (s) => { calm(s); noScore(s); } }], params: (t) => ({ ...walk(7, false)(t), move: t < 4 || t > 8 ? 1 : 0, paused: t >= 4 && t < 8 }) });
+add('event_power', { group: 'event', dur: 14, base: { ...PLAY, place: 'hab' }, events: [{ t: 0, fn: noScore }], params: (t) => ({ habPower: t > 3 && t < 9 ? 0 : 1 }) });
 add('event_death', { group: 'event', dur: 14, base: { ...PLAY, o2: 0, health: 0.05 }, events: [{ t: 0, fn: noScore }, { t: 4, fn: (s) => s.play('death') }], params: (t) => ({ scene: t >= 4 ? 'dead' : 'play' }) });
 
 // the score, one forced state at a time, plus the playlist
@@ -86,13 +88,14 @@ add('mix_worst_case', { group: 'mix', dur: 14, from: 0, base: { ...PLAY, place: 
 
 // one scenario per one-shot recipe, alone, in the place it is normally heard
 const AT_HAB = ['fillBed', 'plant', 'water', 'harvest', 'clearBed', 'hydrazine', 'hydrazineBoom', 'eat', 'breach', 'sealBreach', 'craft', 'terminal', 'nasaSend',
-  'habRelay', 'habPump', 'habBeep', 'klaxon', 'pfAlive'];
+  'habRelay', 'habPump', 'habBeep', 'habBuffet', 'powerDown', 'powerUp', 'klaxon', 'pfAlive'];
 const IN_ROVER = ['roverThud', 'roverRattle', 'roverCreak', 'roverEnter', 'roverExit'];
 const VARIANTS = { step: [['step', {}], ['step_hard', { hard: true }]], land: [['land', {}], ['land_hard', { hard: true }]], o2Warn: [['o2Warn_caution', { level: 1 }], ['o2Warn_critical', { level: 2 }]] };
 for (const name of Object.keys(SFX)) {
   for (const [label, opts] of VARIANTS[name] || [[name, {}]]) {
     const place = opts.hard || AT_HAB.includes(name) ? 'hab' : IN_ROVER.includes(name) ? 'rover' : 'outside';
-    add('sfx_' + label, { group: SFX[name].bus === 'ui' ? 'ui' : 'sfx', sfx: name, solo: true, dur: 0, base: { ...PLAY, place }, events: [{ t: 0.1, fn: (s) => s.play(name, opts) }] });
+    add('sfx_' + label, { group: SFX[name].bus === 'ui' ? 'ui' : 'sfx', sfx: name, solo: true, dur: 0, base: { ...PLAY, place, habAmt: 0 },
+      events: [{ t: 0, fn: (s) => { s.sys.veh.update = () => {}; } }, { t: 0.1, fn: (s) => s.play(name, opts) }] });
   }
 }
 

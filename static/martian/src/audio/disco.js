@@ -16,10 +16,10 @@ const GUITAR = [[2, 6, 7, 10, 14], [2, 3, 6, 10, 13, 14], [1, 2, 6, 9, 10, 14], 
 const HAT = [0.9, 0.35, 0.6, 0.4];
 const LEAD = [69, 72, 74, 76, 79, 81, 84];
 const TONE = {
-  hab:   { level: 0.5, hp: 180, lp: 5200, wet: 0.25 },
+  hab:   { level: 0.4, hp: 180, lp: 5200, wet: 0.25 },
   out:   { level: 0.13, hp: 300, lp: 1100, wet: 0 },
   rover: { level: 0.3, hp: 200, lp: 2600, wet: 0.1 },
-  full:  { level: 0.55, hp: 40, lp: 15000, wet: 0.06 },
+  full:  { level: 0.5, hp: 40, lp: 15000, wet: 0.06 },
 };
 
 function buildDisco(E, L) {
@@ -91,10 +91,12 @@ export class Disco {
       for (let i = 1; i < 4; i++) E.tone(v, t + i * 0.004, { type: 'saw', f: mtof(chord[i] + 12), a: 0.002, d: 0.08, g: 0.045, dest: wah });
     }
     // strings: one soft chord a bar
-    if (s === 0) {
-      const lp = E.filter(v, 'lowpass', 3000, 0.7); lp.connect(inst);
-      for (const m of chord) E.tone(v, t, { type: 'saw', f: mtof(m + 12), cents: E.rr(-8, 8), a: 0.09, h: STEP * 16 - 0.36, d: 0.3, g: 0.014, dest: lp });
-      E.tone(v, t, { type: 'saw', f: mtof(chord[3] + 24), cents: 6, a: 0.12, h: STEP * 16 - 0.4, d: 0.3, g: 0.007, dest: lp });
+    if (s === 0) {                                                 // (their own voice: they last the whole bar)
+      const sv = E.voice('discoStrings', { bus: 'music', dest: inst, prio: 1 }), lp = E.filter(sv, 'lowpass', 3000, 0.7);
+      lp.connect(sv.out);
+      for (const m of chord) E.tone(sv, t, { type: 'saw', f: mtof(m + 12), cents: E.rr(-8, 8), a: 0.09, h: STEP * 16 - 0.36, d: 0.3, g: 0.014, dest: lp });
+      E.tone(sv, t, { type: 'saw', f: mtof(chord[3] + 24), cents: 6, a: 0.12, h: STEP * 16 - 0.4, d: 0.3, g: 0.007, dest: lp });
+      E.seal(sv);
     }
     // a lead lick in the second half of every sixteen bars
     if (bar % 16 >= 8 && bar % 16 < 12 && [0, 3, 6, 8, 11, 14].includes(s) && E.rand() < 0.7) {

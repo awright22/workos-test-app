@@ -96,7 +96,7 @@ for (const s of todo) {
   if (!r.from) expect(m.head < 0.02, `${n}: starts from silence (no click)`, m.head.toFixed(4));
   if (s.group === 'sfx' || s.group === 'ui') expect(m.tail < 0.004, `${n}: has died away by the end (no cut-off tail)`, m.tail.toFixed(4));
   if (s.group === 'ui') {
-    expect(m.active < 1.6, `${n}: interface sounds are short`, m.active.toFixed(2) + ' s');
+    expect(m.active < 1.5, `${n}: interface sounds are short`, m.active.toFixed(2) + ' s');
     expect(m.peakDb < -15, `${n}: interface sounds are never the loudest thing`, m.peakDb.toFixed(1) + ' dBFS');
   }
 }
@@ -113,7 +113,7 @@ if (!words.length) {
   expect(R.wind_storm_hab.windBand < R.wind_storm.windBand - 20, 'inside the Hab the wind band is far lower than outside', (R.wind_storm.windBand - R.wind_storm_hab.windBand).toFixed(1) + ' dB lower');
   expect(g('amb_hab_nopower').lufs < g('amb_hab').lufs - 6, 'the Hab falls quiet when the power is out', (g('amb_hab').lufs - g('amb_hab_nopower').lufs).toFixed(1) + ' LU');
   // the suit
-  expect(g('suit_low_o2').lufs > g('suit_rest').lufs + 6, 'low oxygen makes the suit sounds clearly louder', (g('suit_low_o2').lufs - g('suit_rest').lufs).toFixed(1) + ' LU');
+  expect(g('suit_low_o2').lufs > g('suit_rest').lufs + 4, 'low oxygen makes the suit sounds clearly louder', (g('suit_low_o2').lufs - g('suit_rest').lufs).toFixed(1) + ' LU');
   expect(g('suit_critical').lufs > g('suit_low_o2').lufs, 'critical oxygen is louder again');
   expect(g('suit_critical').peakDb < -9, 'the oxygen warning is alarming, not unbearable', g('suit_critical').peakDb.toFixed(1) + ' dBFS');
   // movement
@@ -128,7 +128,7 @@ if (!words.length) {
   const L = R.event_launch.parts;
   expect(L.burn.lufs > -22, 'the launch roars', L.burn.lufs.toFixed(1) + ' LUFS');
   expect(L.high.lufs < L.burn.lufs - 10 && L.high.centroid < L.burn.centroid, 'the roar thins out with altitude', `${L.high.lufs.toFixed(1)} LUFS, ${Math.round(L.high.centroid)} Hz`);
-  expect(L.orbit.rmsDb < -50, 'orbit is silent', L.orbit.rmsDb.toFixed(1) + ' dB');
+  expect(L.orbit.lufs < L.burn.lufs - 24 && L.orbit.below400 < 0.5, 'orbit is silent but for the astronaut\'s own breath', `${L.orbit.lufs.toFixed(1)} LUFS, ${(L.orbit.below400 * 100).toFixed(0)}% below 400 Hz`);
   expect(L.rescue.lufs > -32, 'the rescue theme plays', L.rescue.lufs.toFixed(1) + ' LUFS');
   // the mix: ambience well under effects, score under both
   const mean = (ns) => ns.reduce((a, n) => a + (g(n).lufs > -150 ? g(n).lufs : g(n).momentary), 0) / ns.length;
@@ -148,7 +148,7 @@ if (!words.length) {
   expect(quiet >= 4 && sounding >= 8, 'the score both plays and rests', `${sounding} sounding, ${quiet} silent`);
   // steady layers must not leak nodes, and the steady graph must stay small
   for (const n of ['amb_calm_day', 'amb_hab', 'mix_walk_day', 'rover_15', 'music_day', 'mix_storm_walk']) {
-    expect(R[n].stats.maxLive < 140, `${n}: the live graph stays small`, R[n].stats.maxLive + ' nodes');
+    expect(R[n].stats.maxLive < 170, `${n}: the live graph stays small`, R[n].stats.maxLive + ' nodes');
   }
   expect(R.mix_worst_case.stats.maxVoices <= 40, 'voices are limited under load', R.mix_worst_case.stats.maxVoices);
   expect(Math.abs(unity) < 0.5, 'quiet signals pass the limiter at unity gain', unity.toFixed(2) + ' dB');

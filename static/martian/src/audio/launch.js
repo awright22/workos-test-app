@@ -38,7 +38,7 @@ export class Launch {
     if (L && L.burning) {
       if (!this.burning) { this.burning = true; this.lit = now; this.sys.play('ignition'); }
       thin = smooth(1200, 13500, L.alt || 0);
-      level = 0.8 * Math.pow(1 - thin, 1.6) * lerp(0.55, 1, smooth(0, 1.6, now - this.lit));
+      level = 0.6 * Math.pow(1 - thin, 1.6) * lerp(0.55, 1, smooth(0, 1.6, now - this.lit));
     } else {
       this.burning = false;
       level = clamp(p.rumble || 0, 0, 1) * 0.75;                 // the old Snd.rumble() call still works

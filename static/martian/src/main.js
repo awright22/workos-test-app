@@ -13,6 +13,7 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
+import { updateAudio } from './audio/driver.js';
 import { World, siteLocalToWorld } from './world/build.js';
 import { input, initInput } from './game/input.js';
 import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
@@ -103,6 +104,7 @@ function draw(dt, focus) {
 
 /** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
 function tick(dt) {
+  updateAudio(dt);
   if (!S.started) { titleCamera(dt); return null; }
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
   if (S.over && S.mode !== 'cutscene') return focus;
@@ -122,7 +124,6 @@ function tick(dt) {
     updateDiscoveries(dt);
     updatePing();
   }
-  Snd.wind((S.inside ? 0.05 : 0.16) + S.storm.i * 0.65 + (S.breach.active && S.inside ? 0.4 : 0));
   blinkT += dt;
   if (World.beacon) World.beacon.material.emissive.setHex(Math.sin(blinkT * 5) > 0 ? 0x33ff66 : 0x0a3315);
   if (World.mavStrobe) World.mavStrobe.material.emissive.setHex(Math.sin(blinkT * 7) > 0 ? 0xff4020 : 0x330a05);
@@ -157,7 +158,7 @@ function updatePing() {
   const d = groundDist(player.pos, World.pathfinder.position);
   if (d > 90) return;
   const interval = clamp(d / 60, 0.12, 1.4);
-  if (perf() - lastPing > interval) { lastPing = perf(); Snd.beep(1200, 0.04, 'square', 0.05); }
+  if (perf() - lastPing > interval) { lastPing = perf(); Snd.play('pfPing'); }
   if (d < 10 && !S.pf.found) { S.pf.found = true; log('Signal source dead ahead. There you are.'); }
 }
 

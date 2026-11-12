@@ -98,7 +98,7 @@ export class Music {
     if (p.scene === 'title') return 'title';
     if (p.scene === 'dead') return 'silence';
     if (p.scene === 'won') return 'triumph';
-    if (p.scene === 'cutscene') return (p.space || 0) > 0.6 ? 'space' : 'silence';
+    if (p.scene === 'cutscene') return 'silence';     // the launch has no score: roar, then nothing, then the rescue
     if (this.E.now < this.triumphUntil) return 'triumph';
     this.driveTime = p.place === 'rover' && Math.abs(p.roverSpeed) > 3 ? this.driveTime + dt : Math.max(0, this.driveTime - dt * 0.5);
     const d = Math.max(p.breach ? 1 : 0, smooth(0.26, 0.08, p.o2), smooth(0.34, 0.1, p.health),
@@ -221,7 +221,7 @@ export class Music {
       off += fast ? E.rr(0.7, 1.5) : E.rr(2.2, 4.2);
     }
     const bm = 33 + ((((K + this.chord.root - 33) % 12) + 12) % 12);
-    this.retune(c.bass, bm, 12, now + (fast ? 0.5 : 2), E.rand() < st.bass ? 0.5 : 0, fast);
+    this.retune(c.bass, bm, 12, now + (fast ? 0.5 : 2), E.rand() < st.bass ? 0.13 : 0, fast);
   }
   /** Move one voice: fade it out, change its note in the silence, fade it in. A held note just carries on. */
   retune(vc, midi, octave, t, level, fast) {
@@ -261,7 +261,7 @@ export class Music {
     if (st.low && E.rand() < 0.6) midi -= 12;
     const vel = E.rr(0.6, 1) * (this.phraseLeft === 1 ? 0.8 : 1);
     const v = E.voice('mBell', { bus: 'music', hall: 0.6, pan: E.rr(-0.45, 0.45), prio: 1 });
-    E.bell(v, t, { f: mtof(midi), ratio: midi < 72 ? 2 : 3, index: 0.5 + 0.6 * vel, d: lerp(7, 4.5, smooth(60, 96, midi)), g: 0.06 * vel * st.bells * level });
+    E.bell(v, t, { f: mtof(midi), ratio: midi < 72 ? 2 : 3, index: 0.3 + 0.45 * vel, d: lerp(7, 4.5, smooth(60, 96, midi)), g: 0.06 * vel * st.bells * level });
     E.seal(v);
     this.phraseLeft--;
     this.noteNext = t + (this.phraseLeft > 0 ? dur * this.beat * E.rr(0.94, 1.06) : E.rr(st.rest[0], st.rest[1]));

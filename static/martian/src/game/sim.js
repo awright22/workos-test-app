@@ -223,7 +223,7 @@ export function advanceTime(dt) {
     S.breach.timer = 0;
     S.shake = 1.4;
     flashScreen('rgba(255,255,255,0.5)', 200);
-    Snd.boom(); Snd.alarm(true);
+    Snd.play('breach'); Snd.alarm(true);
     syncAllVisuals();
     log('BREACH. The Hab canvas just blew. Air\'s screaming out. MOVE, WATNEY.', 'sys');
   }

@@ -2,6 +2,7 @@
 // is made from.
 //
 //   voices and layers ─► buses (ambience · sfx · ui · music) ─► sum ─► master volume
+//                              (ambience and world pass a "hush" gain that dips while a menu is open)
 //        │                   ▲                                           │
 //        └─► world ─► helmet ┘ (what the astronaut hears through the suit)  ▼
 //        └─► sends ─► room / hall convolution reverb ─► sum      limiter ─► soft clip ─► fade ─► out
@@ -17,7 +18,7 @@ const LIMITER = { threshold: -4, knee: 4, ratio: 20, attack: 0.001, release: 0.0
 const BUSES = ['ambience', 'sfx', 'ui', 'music'];
 /** How the world reaches the ears: thin air and a helmet outside, a pressurised room inside. */
 const PLACES = {
-  outside: { cut: 1900, room: 0.0, gain: 0.85 },
+  outside: { cut: 2600, room: 0.0, gain: 0.85 },
   hab:     { cut: 12000, room: 0.32, gain: 1.0 },
   rover:   { cut: 4200, room: 0.10, gain: 0.9 },
 };
@@ -75,7 +76,7 @@ export class Engine {
     this.maxVoices = o.maxVoices || 28;
     this.lastPlay = Object.create(null);
     this.place = 'outside';
-    this.volume = { master: 1, music: 1, sfx: 1, ambience: 1 };
+    this.volume = { master: 1, music: 0.8, sfx: 1, ambience: 1 };
     this.core = { nodes: [], srcs: [] };
     this._buildTables();
     this._buildGraph();
@@ -113,6 +114,10 @@ export class Engine {
     const c = this.ctx, K = this.core;
     this.sum = this.gain(K, 1);
     this.master = this.gain(K, 1);
+    this.hush = this.gain(K, 1);                    // the world steps back while the game is paused
+    this.hush.connect(this.sum);
+    this.hushCtl = new Ctl(c, this.hush.gain, 1);
+    this.duck = 1;
     const comp = this.comp = this._reg(K, c.createDynamicsCompressor());
     comp.threshold.value = LIMITER.threshold; comp.knee.value = LIMITER.knee; comp.ratio.value = LIMITER.ratio;
     comp.attack.value = LIMITER.attack; comp.release.value = LIMITER.release;
@@ -143,7 +148,7 @@ export class Engine {
       const g = this.gain(K, 1), r = this.gain(K, 1), h = this.gain(K, 1);
       r.channelCount = 1; r.channelCountMode = 'explicit';
       h.channelCount = 1; h.channelCountMode = 'explicit';
-      g.connect(this.sum); r.connect(this.room); h.connect(this.hall);
+      g.connect(n === 'ambience' ? this.hush : this.sum); r.connect(this.room); h.connect(this.hall);
       this.bus[n] = g; this.send[n] = { room: r, hall: h };
       this.busCtl[n] = [new Ctl(c, g.gain, 1), new Ctl(c, r.gain, 1), new Ctl(c, h.gain, 1)];
     }
@@ -179,7 +184,13 @@ export class Engine {
     if (place === this.place || !PLACES[place]) return;
     this.place = place;
     const P = PLACES[place];
-    this.helmetCut.to(P.cut, 0.18); this.worldRoom.to(P.room, 0.2); this.worldGain.to(P.gain, 0.2);
+    this.helmetCut.to(P.cut, 0.18); this.worldRoom.to(P.room, 0.2); this.worldGain.to(P.gain * this.duck, 0.2);
+  }
+  /** Pull the ambience and the world down (a menu is open) or let them back up. Interface and score are untouched. */
+  setDuck(v) {
+    if (v === this.duck) return;
+    this.duck = v;
+    this.hushCtl.to(v, 0.25); this.worldGain.to(PLACES[this.place].gain * v, 0.25);
   }
 
   // ---- node factories (every node is registered with an owner: the core, a layer or a voice) ----
@@ -357,11 +368,11 @@ export class Engine {
    * Options: f, g, d (ring time), ratio (modulator/carrier), index (brightness), bite (how fast the brightness dies), dest.
    */
   bell(v, t, o) {
-    const f = o.f, ratio = o.ratio || 3, index = o.index === undefined ? 1.1 : o.index;
+    const f = o.f, ratio = o.ratio || 3, index = o.index === undefined ? 0.8 : o.index;
     const car = this.osc(v, 'sine', f, t), mod = this.osc(v, 'sine', f * ratio, t);
     const depth = this.gain(v, 0);
     depth.gain.setValueAtTime(index * f * ratio, t);
-    depth.gain.setTargetAtTime(index * f * ratio * 0.04, t, o.bite || 0.16);
+    depth.gain.setTargetAtTime(index * f * ratio * 0.04, t, o.bite || 0.12);
     mod.connect(depth); depth.connect(car.frequency);
     const e = this.env(v, t, { a: o.a === undefined ? 0.004 : o.a, d: o.d || 4, g: o.g === undefined ? 0.2 : o.g });
     car.connect(e); e.connect(o.dest || v.out);

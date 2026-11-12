@@ -32,6 +32,7 @@ export const DEFAULT_PARAMS = {
   scene: 'none',        // none | title | play | cutscene | dead | won
   place: 'outside',     // outside | hab | rover
   sleeping: false,
+  paused: false,        // a menu or screen is open over the game
   storm: 0,             // 0..1 dust storm where the astronaut is
   day: 1,               // 0 night .. 1 full daylight
   move: 0,              // 0..1 walking input
@@ -82,6 +83,7 @@ class AudioSystem {
     const E = this.E, p = this.p, now = E.now;
     E.reap(now);
     E.setPlace(p.scene === 'play' || p.scene === 'dead' ? p.place : 'outside');
+    E.setDuck(p.paused && p.scene === 'play' ? 0.35 : 1);
     this.move.update(p, now);                       // edges (footsteps, jumps) are checked every call
     // the continuous layers are steered about 30 times a second of audio time, however often we are called
     if (now - this.lastSlow < 0.03) return;
@@ -107,6 +109,7 @@ class AudioSystem {
     const v = E.voice(name, { bus: def.bus, gain, pan: o.pan, hall: def.hall, room: def.room, prio: def.prio });
     def.fn(E, v, E.now + 0.005 + (o.delay || 0), o, this.music.key());
     E.seal(v);
+    if (def.cue) this.music.cue(def.cue);
     return v;
   }
 
@@ -124,7 +127,7 @@ class AudioSystem {
 function makeSnd() {
   return {
     sys: null, ctx: null,
-    vol: { master: 1, music: 1, sfx: 1, ambience: 1 },
+    vol: { master: 1, music: 0.8, sfx: 1, ambience: 1 },     // the score ships a little under full, so the slider has room to go up
     errors: 0, _watching: false, _hidden: false, _driven: false, _disco: false, _alarm: false,
 
     /**

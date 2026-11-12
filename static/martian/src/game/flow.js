@@ -22,7 +22,7 @@ export function die(cause) {
   if (S.over) return;
   S.over = true;
   S.dead = cause;
-  Snd.alarm(false); Snd.disco(false); Snd.bad(); Snd.rumble(0);
+  Snd.alarm(false); Snd.disco(false); Snd.play('death'); Snd.rumble(0);
   const iron = S.diff === 'iron';
   if (iron) wipeSave();
   const buttons = [];

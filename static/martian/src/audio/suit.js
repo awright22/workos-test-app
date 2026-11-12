@@ -17,12 +17,12 @@ function buildSuit(E, L) {
 }
 function buildHeart(E, L) {
   const o = E.osc(L, 'hollow', 56), g = E.gain(L, 0), lp = E.filter(L, 'lowpass', 300, 0.7), out = E.gain(L, 1);
-  o.connect(g); g.connect(lp); lp.connect(out); out.connect(E.bus.sfx);
+  o.connect(g); g.connect(lp); lp.connect(out); out.connect(E.bus.ambience);
   return { f: o.frequency, g: g.gain };
 }
 function buildLeak(E, L) {
   const white = E.loop(L, 'white'), bp = E.filter(L, 'bandpass', 6200, 2.5), tr = E.gain(L, 1), out = E.gain(L, 0);
-  white.connect(bp); bp.connect(tr); tr.connect(out); out.connect(E.bus.sfx);
+  white.connect(bp); bp.connect(tr); tr.connect(out); out.connect(E.bus.ambience);
   E.wobble(L, tr.gain, 0.2, 0.5);
   return { level: E.ctl(out.gain, 0) };
 }
@@ -51,7 +51,7 @@ export class Suit {
       if (!p.onGround) want = Math.max(want, 0.5);
       if (p.hold > 0) want = Math.max(want, 0.3);
     }
-    if (p.scene === 'cutscene') want = 0.55;                       // strapped to a rocket
+    if (p.scene === 'cutscene') want = 0.3;                        // strapped to a rocket
     want = want + 0.5 * air + 0.25 * hurt + (p.leak ? 0.25 : 0);
     this.ex += (want - this.ex) * k(want > this.ex ? 4.5 : 11);
 
@@ -60,11 +60,11 @@ export class Suit {
       const c = this.suit.use(), ex = this.ex;
       const inside = p.place === 'outside' ? 1 : 0.75;
       c.level.to(1, 0.3);
-      c.fan.to(0.085 * inside, 0.5); c.fanTone.to(0.0016 * inside, 0.5);
+      c.fan.to(0.06 * inside, 0.5); c.fanTone.to(0.0012 * inside, 0.5);
       if (this.nextBreath < now - 1) this.nextBreath = now + 0.3;
       if (now + 0.15 >= this.nextBreath) {
         const P = 60 / (12.5 + 25 * Math.min(ex, 1.35)), T0 = Math.max(this.nextBreath, now + 0.02);
-        const A = (0.05 + 0.36 * Math.pow(ex, 1.25)) * inside * E.rr(0.86, 1.1);
+        const A = (0.05 + 0.45 * Math.pow(ex, 1.25)) * inside * E.rr(0.86, 1.1);
         const tin = P * 0.36, tout = P * 0.46, Te = T0 + tin + P * 0.06;
         const gasp = 1 + air * 0.5;                                 // short of air: sharper, brighter in-breaths
         c.breathF.setTargetAtTime(880, T0 - 0.015, 0.012);

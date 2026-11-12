@@ -64,7 +64,7 @@ window.addEventListener('keydown', (ev) => {
   if ((S.inv.candle || 0) > 0 && S.suit < suitCap() - 5) {
     S.inv.candle--;
     S.suit = clamp(S.suit + 40, 0, suitCap());
-    Snd.ok();
+    Snd.play('candle');
     log('Cracked an O2 candle. Chemistry: still my favorite roommate.');
   }
 });
