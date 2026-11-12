@@ -5,9 +5,11 @@
 import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
-import { OBJECTIVES } from './hud.js';
+import { missionList, suitTimeLeft } from './hud.js';
 import { layout } from './layout.js';
 import { DIFFICULTIES } from '../game/state.js';
+import { regionName } from '../planet/features.js';
+import { llToVec } from '../planet/geo.js';
 import { ctx } from '../game/ctx.js';
 import { Snd } from '../audio/sound.js';
 import { setAudioVolume, getAudioVolumes } from '../audio/settings.js';
@@ -96,14 +98,20 @@ export function showNewGame(o, back) {
   const cards = DIFF_ORDER.map((k, i) => {
     const d = DIFFICULTIES[k];
     const pips = [0, 1, 2].map((n) => `<i${n <= i ? ' class="on"' : ''}></i>`).join('');
-    return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''}>` +
+    // (how fast air, water and power are used, against the rated pace: "go 13% sooner" read as a mistake)
+    const drain = d.drain < 0.995 ? `${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `${Math.round((d.drain - 1) * 100)}% faster` : 'As rated';
+    // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
+    return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies</dt><dd>${d.drain < 0.995 ? `Last ${Math.round((1 / d.drain - 1) * 100)}% longer` : d.drain > 1.005 ? `Go ${Math.round((1 - 1 / d.drain) * 100)}% sooner` : 'As rated'}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
+      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies drain</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
-    '<div class="sheet wide"><header class="sheet-hd"><div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div></header>' +
-    '<div class="sheet-bd mg-scroll"><p class="brief-1">Stranded somewhere on the real Mars. Farm, make water, find Pathfinder, call home, drive to the rocket.</p><div class="brief">' +
+    // (on a phone the way back and the warning are in the header: a footer took the height the Begin buttons needed)
+    `<div class="sheet wide newgame"><header class="sheet-hd"><button type="button" class="mg-btn hd-back" data-act="back">${icon('back')}Back</button>` +
+    '<div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div>' +
+    (o.saved ? `<span class="hd-note warn">Replaces your saved run (Sol ${o.saved.sol})</span>` : '') + '</header>' +
+    '<div class="sheet-bd mg-scroll"><p class="brief-1">Stranded on the real Mars. Farm, make water, call home, drive to the rocket.</p><div class="brief">' +
     '<p>The storm hit. The crew evac\'d. Your bio-monitor said you were dead. It exaggerated. You are stranded <b>somewhere on Mars</b> — a real Mars: Olympus Mons, Valles Marineris, both ice caps, and every probe humanity ever threw at this planet, rusting exactly where history left it.</p>' +
     '<p>Grow food. Make water. Salvage the dead landers. Find Pathfinder in Ares Vallis. Call home. Then drive to Schiaparelli crater and fly out.</p></div>' +
     `<div class="diffs">${cards}</div></div>` +
@@ -126,7 +134,7 @@ export function showNewGame(o, back) {
 export function showBarsGuide(onDone) {
   const o2 = 'O<sub>2</sub>';
   const rows = [
-    ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains whenever you are outside, and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long it lasts at the rate it is going. Empty, you start to die.`],
+    ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains whenever you are outside, and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long the tank lasts at a walk: a run burns it faster, standing still slower. Empty, you start to die.`],
     ['hab', `Hab ${o2}`, 'The air in the Hab. The oxygenator keeps it up while there is power; a breach lets it out.'],
     ['water', 'Water', 'Litres in the tank. You drink some every sol and the farm drinks more. Burning hydrazine makes it.'],
     ['food', 'Food', 'Meals left: rations, potatoes and everything in the pantry. Breakfast takes one each dawn.'],
@@ -134,14 +142,16 @@ export function showBarsGuide(onDone) {
     ['vitals', 'Vitals', 'Your body. It falls when you go without air, water, food or sleep, and mends when you have them. At nothing, the run is over.'],
     ['mood', 'Morale', 'Your spirits, out of 100. Variety on the plate, a cooked dinner, music, sights and comforts lift them; every sol alone lowers them. High, work goes a fifth faster; low, a fifth slower.'],
   ];
-  showOverlay({
-    kicker: 'Field notes', title: 'What keeps you alive',
-    extra: `<ul class="guide">${rows.map(([ic, name, text]) => `<li>${icon(ic)}<b>${name}</b><span>${text}</span></li>`).join('')}</ul>` +
-      '<p class="guide-n">A small arrow beside a number means it is rising or falling now.</p>',
-    onEscape: () => { hideOverlay(); if (onDone) onDone(); },
-    buttons: [{ label: 'Got it', fn: onDone }],
-  });
-  UI.panel.querySelector('.dlg').classList.add('wide', 'mg-scroll');
+  // A sheet: the seven entries scroll between a fixed heading and a fixed foot, so "Got it" is on the screen at
+  // every size. (As a plain dialog it was taller than a phone, and its one button was below the fold.)
+  const done = () => { hideOverlay(); if (onDone) onDone(); };
+  const p = openOverlay('sheet',
+    '<div class="sheet"><header class="sheet-hd"><div><span class="t-kicker">Field notes</span><h1 id="mg-dlg-title">What keeps you alive</h1></div></header>' +
+    `<div class="sheet-bd mg-scroll"><ul class="guide">${rows.map(([ic, name, text]) => `<li>${icon(ic)}<b>${name}</b><span>${text}</span></li>`).join('')}</ul>` +
+    '<p class="guide-n">A small arrow beside a number means it is rising or falling now.</p></div>' +
+    `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Got it</button></footer></div>`,
+    { label: 'What keeps you alive', onEscape: done, guard: true });
+  on(p, '[data-act="back"]', done);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -206,28 +216,33 @@ function sw(id, label, onNow) {
 }
 const pct = (v) => Math.round(v * 100) + '%';
 
+const SET_TABS = [['graphics', 'Graphics'], ['controls', 'Controls'], ['sound', 'Sound'], ['interface', 'Interface']];
+let setTab = 'graphics';
 export function showSettings(back, overTitle) {
   const running = ctx.engine ? ctx.engine.qualityName : null;
   const quality = savedQuality() || 'auto';
+  // On a phone the four groups are four tabs, each of which fits the screen. (As one scrolling sheet, Sound
+  // and the colour-blind switch were below the fold with nothing to say they were there.)
+  const tabbed = layout.compact;
   const p = openOverlay('sheet',
-    '<div class="sheet"><header class="sheet-hd"><h1>Settings</h1></header>' +
+    `<div class="sheet settings${tabbed ? ' tabbed' : ''}"><header class="sheet-hd"><h1>Settings</h1>${tabbed ? seg('settab', 'Settings group', SET_TABS, setTab) : ''}</header>` +
     '<div class="sheet-bd mg-scroll"><div class="set-grid">' +
     // graphics
-    `<section class="set-sec" style="grid-column:1/-1"><h3>${icon('monitor')}Graphics</h3>` +
+    `<section class="set-sec" data-sec="graphics" style="grid-column:1/-1"><h3>${icon('monitor')}Graphics</h3>` +
     `<div class="set-row"><span class="lbl">Quality</span><div class="ctl">${seg('quality', 'Graphics quality', QUALITIES, quality)}</div>` +
     '<p class="hint" id="set-q-hint"></p></div></section>' +
     // controls
-    `<section class="set-sec"><h3>${icon(layout.touch ? 'hand' : 'mouse')}Controls</h3>` +
+    `<section class="set-sec" data-sec="controls"><h3>${icon(layout.touch ? 'hand' : 'mouse')}Controls</h3>` +
     `<div class="set-row"><label for="set-sensitivity">Look sensitivity</label><div class="ctl">${range('sensitivity', 'Look sensitivity', 0.3, 2.5, 0.05, settings.sensitivity, pct)}</div></div>` +
     `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div></section>` +
     // audio
-    `<section class="set-sec"><h3>${icon('volume')}Sound</h3>` +
+    `<section class="set-sec" data-sec="sound"><h3>${icon('volume')}Sound</h3>` +
     `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div>` +
     // the three kinds of sound, each against the master (kept by the sound module itself)
     [['music', 'Music'], ['sfx', 'Effects'], ['ambience', 'Ambience']].map(([bus, label]) =>
       `<div class="set-row"><label for="set-bus-${bus}">${label}</label><div class="ctl">${range('bus-' + bus, label + ' volume', 0, 1, 0.05, busVolume(bus), pct)}</div></div>`).join('') + '</section>' +
     // interface
-    `<section class="set-sec" style="grid-column:1/-1"><h3>${icon('eye')}Interface</h3>` +
+    `<section class="set-sec" data-sec="interface" style="grid-column:1/-1"><h3>${icon('eye')}Interface</h3>` +
     `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct)}</div>` +
     '<p class="hint" id="set-scale-hint"></p></div>' +
     `<div class="set-row"><span class="lbl">Reduce motion</span><div class="ctl">${sw('reducedMotion', 'Reduce motion', reducedMotion())}</div>` +
@@ -259,6 +274,12 @@ export function showSettings(back, overTitle) {
     scaleHint.classList.toggle('warn', capped);
   };
   scaleNote();
+  const showTab = () => {
+    if (!tabbed) return;
+    p.querySelectorAll('.set-sec').forEach((s) => { s.hidden = s.dataset.sec !== setTab; });
+    p.querySelector('.sheet-bd').scrollTop = 0;
+  };
+  showTab();
   // option groups: click, or left/right when focused
   p.querySelectorAll('[data-seg]').forEach((g) => {
     const pick = (btn) => {
@@ -266,6 +287,7 @@ export function showSettings(back, overTitle) {
       btn.focus();
       Snd.click();
       if (g.dataset.seg === 'quality') { saveQuality(btn.dataset.v === 'auto' ? null : btn.dataset.v); qNote(); }
+      if (g.dataset.seg === 'settab') { setTab = btn.dataset.v; showTab(); }
     };
     g.addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b) pick(b); });
     g.addEventListener('keydown', (ev) => {
@@ -295,12 +317,16 @@ export function showSettings(back, overTitle) {
     r.addEventListener('change', () => { show(); setSetting(key, +r.value); if (key === 'volume') Snd.click(); if (key === 'hudScale') scaleNote(); });
   });
   p.querySelectorAll('[data-switch]').forEach((b) => {
-    b.addEventListener('click', () => {
+    const flip = () => {
       const v = b.getAttribute('aria-checked') !== 'true';
       b.setAttribute('aria-checked', v);
       setSetting(b.dataset.switch, v);
       Snd.click();
-    });
+    };
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); flip(); });
+    // the whole row is the target (a switch is small to look at, and smaller than a thumb)
+    const row = b.closest('.set-row');
+    if (row) { row.classList.add('tap'); row.addEventListener('click', flip); }
   });
   on(p, '[data-act="back"]', back);
   on(p, '[data-act="reset"]', () => { resetSettings(); showSettings(back, overTitle); });
@@ -320,12 +346,12 @@ export function showSettings(back, overTitle) {
 const kbd = (...keys) => keys.map((k) => `<kbd class="mg-kbd">${k}</kbd>`).join('');
 const KEYBOARD = [
   ['Move, drive', kbd('W', 'A', 'S', 'D')], ['Look', `${icon('mouse')}Mouse`], ['Run', kbd('Shift')], ['Jump', kbd('Space')],
-  ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Leave the rover', kbd('F')], ['Switch camera', kbd('V')],
+  ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Leave the rover', kbd('F')], ['Switch view', kbd('V')],
   ['Map', kbd('M')], ['Colony and fabrication', kbd('C')], ['Journal', kbd('J')], ['Photo mode', kbd('P')], ['Pause, back', kbd('Esc')],
 ];
 const TOUCH = [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
-  ['Jump', `${icon('jump')}Jump`], ['Leave the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', '<span class="chem">O<sub>2</sub></span> button, when carrying one'], ['Switch camera', `${icon('camera')}Camera`],
+  ['Jump', `${icon('jump')}Jump`], ['Leave the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle, when carrying one'], ['Switch view', `${icon('camera')}View`],
   ['Map', `${icon('map')}Top right`], ['Colony and fabrication', `${icon('colony')}Top right`], ['Journal', `${icon('journal')}Top right`], ['Pause, settings', `${icon('pause')}Top right`], ['Photo mode', 'In the pause menu'],
 ];
 export function showControls(back, which) {
@@ -382,10 +408,10 @@ export function showSleepSummary(d, onDone) {
     return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${x.whole ? Math.abs(v) : Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${x.unit}</i></div>`;
   }).join('');
   // the first thing still to do, as the mission list has it
-  const todo = OBJECTIVES.filter((o) => o.shown() && !o.done()).sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0))[0];
-  const today = todo ? todo.text() : '';
+  const todo = missionList().find((e) => !e.done);
+  const today = todo ? todo.o.text() : '';
   box.querySelector('.sum').innerHTML =
-    `<div class="solbig"><span>SOL</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
+    `<div class="solbig"><span>${d.turned === false ? 'Still sol' : 'Dawn · Sol'}</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
     `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${esc(today)}</div>` : ''}</div>` +
     (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
   box.classList.add('done');
@@ -459,4 +485,7 @@ export function showChoice(o) {
 
 // test and debug handle (tools/tests/ui-shots.mjs drives every view through this)
 window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings, showControls, showCredits, showSleep, showSleepSummary, showComms, showChoice,
-  showOverlay, hideOverlay, toast, log, settings, setSetting, resetSettings, layout };
+  showOverlay, hideOverlay, toast, log, settings, setSetting, resetSettings, layout,
+  /** the name of the region at a latitude and longitude (so a test's made-up title screen can name the real place) */
+  regionAt: (lat, lon) => regionName(llToVec(lat, lon)),
+  suitTimeLeft, missionList };

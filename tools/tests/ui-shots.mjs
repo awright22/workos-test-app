@@ -35,14 +35,17 @@ async function run(size) {
   await mkdir(dir, { recursive: true });
   const page = g.page;
   let n = 0;
-  const shot = async (name, wait = 500) => {
-    n++;
+  /** `sub` (a letter) files the picture beside the previous one, as 05b-..., without taking a number: the numbers stay the same at every size. */
+  const shot = async (name, wait = 500, sub = '') => {
+    if (!sub) n++;
     await sleep(wait);                                              // waited even when the state is filtered out: later steps rely on the timing
     if (only && !only.some((o) => name.includes(o))) return;
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    await page.screenshot({ path: path.join(dir, `${String(n).padStart(2, '0')}-${name}.png`), timeout: 120000 });
+    await page.screenshot({ path: path.join(dir, `${String(n).padStart(2, '0')}${sub}-${name}.png`), timeout: 120000 });
     total++;
   };
+  /** Wait until no toast is showing or queued, so the next one fired is the one photographed. */
+  const toastsDone = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});
   const ev = g.eval;
   const ui = (fn, a) => page.evaluate(`(${fn.toString()})(window.__UI, window.__MG, ${JSON.stringify(a === undefined ? null : a)})`);
   const click = (sel, opts) => page.locator(sel).first().click({ timeout: 20000, ...opts });
@@ -63,17 +66,23 @@ async function run(size) {
 
   // ---------------------------------------------------------------- menus before the game
   await shot('title', 2200);
-  const fakeTitle = (U, G, o) => U.showTitle({ saved: o.saved, unreadable: o.unreadable, onContinue() {}, onNewGame() {} });
-  await ui(fakeTitle, { saved: { sol: 12, diffName: 'ENGINEER', region: 'Elysium Planitia' }, unreadable: false });
+  // (the saved run on this made-up title is the run the rest of the pictures play: the same site, so the same region's name)
+  const fakeTitle = (U, G, o) => U.showTitle({ saved: o.saved && { ...o.saved, region: U.regionAt(2.0, 303.7) }, unreadable: o.unreadable, onContinue() {}, onNewGame() {} });
+  await ui(fakeTitle, { saved: { sol: 12, diffName: 'ENGINEER' }, unreadable: false });
   await shot('title-continue');
   await ui(fakeTitle, { saved: null, unreadable: true });
   await shot('title-unreadable-save');
-  await ui(fakeTitle, { saved: { sol: 12, diffName: 'ENGINEER', region: 'Elysium Planitia' }, unreadable: false });
+  await ui(fakeTitle, { saved: { sol: 12, diffName: 'ENGINEER' }, unreadable: false });
   await click('[data-act="new"]');
   await shot('newgame');
   await key('Escape');
   await click('[data-act="settings"]');
   await shot('settings');
+  // on a phone the four groups are tabs: one picture of each
+  if (await visible('[data-seg="settab"]')) {
+    for (const [t, s] of [['controls', 'b'], ['sound', 'c'], ['interface', 'd']]) { await click(`[data-seg="settab"] [data-v="${t}"]`); await shot('settings-' + t, 250, s); }
+    await click('[data-seg="settab"] [data-v="graphics"]');
+  }
   await key('Escape');
   await click('[data-act="credits"]');
   await shot('credits');
@@ -92,7 +101,7 @@ async function run(size) {
     U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys');
     U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
   });
-  await sleep(3600);
+  await sleep(5200);                                              // (past the moment the skipped intro's last objective stays ticked on the list)
   await ev((G) => { G.tick(0.05, 8); });
   await shot('hud-day', 300);
 
@@ -108,7 +117,7 @@ async function run(size) {
   await ev((G) => { G.input.eHeld = true; G.tick(0.05, 18); });
   await shot('hud-prompt-holding', 200);
   await ev((G) => { G.input.eHeld = false; G.World.panels[0].dust = 0; G.tick(0.05, 3); });
-  await shot('hud-prompt-refused', 200);
+  await shot('hud-prompt-refused', 900);                           // (long enough for the button to finish fading back from lit)
 
   await ev((G) => { G.tpLocal(0, 0, 0); G.tick(0.05, 4); });
   await live(1500);
@@ -124,20 +133,23 @@ async function run(size) {
   await ev((G) => { G.setStorm(0); G.S.storm.i = 0; G.S.suit = 21; G.tick(0.05, 30); });
   await live(1200);
   await shot('hud-oxygen-low');
-  await ev((G) => { G.S.suit = 8; G.S.health = 34; G.tick(0.05, 40); });
+  // (only the air is forced low here: forcing the vitals down too showed them "rising" beside a critical tank)
+  await ev((G) => { G.S.suit = 8; G.tick(0.05, 40); });
   await shot('hud-oxygen-critical');
   await ui((U, G) => { U.setSetting('colorBlind', true); G.S.water = 9; G.S.power = 18; G.tick(0.05, 3); });
   await shot('hud-colour-blind-safe', 300);
   await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; });
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.tick(0.05, 40); });
 
-  // toasts
-  await ui((U) => U.toast('ACHIEVEMENT', 'Not Dead Yet', 'Reach the dawn of Sol 2'));
+  // toasts (each fired once nothing else is showing or queued: fired blind, it was photographed one picture late,
+  // and the made-up achievement was one that cannot be earned on Sol 1)
+  await toastsDone();
+  await ui((U) => U.toast('ACHIEVEMENT', 'Storm Rider', 'Spend 60 seconds outside in a dust storm'));
   await shot('hud-toast-achievement', 700);
-  await sleep(6200);
+  await toastsDone();
   await ui((U) => U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'));
   await shot('hud-toast-discovery', 700);
-  await sleep(6200);
+  await toastsDone();
 
   // ---------------------------------------------------------------- driving
   await ev((G) => {
@@ -147,12 +159,15 @@ async function run(size) {
   await ev((G) => { G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 70); });
   await live(600);
   await shot('hud-driving', 200);
-  await ev((G) => { G.input.keys['w'] = false; G.tick(0.05, 90); });
+  // (parked means stopped: left to coast, it was photographed "parked" at 56 km/h)
+  await ev((G) => { G.input.keys['w'] = false; G.tick(0.05, 30); G.roverF.speed = 0; G.tick(0.05, 6); });
   await shot('hud-rover-parked', 200);
   await ev((G) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); });
 
   // ---------------------------------------------------------------- Pathfinder: the NASA conversation
+  // (the run is on Sol 12 from here on, as the later pictures say: set afterwards, the conversation spoke of "24 more sols")
   await ev((G) => {
+    G.S.sol = 12; G.S.achieved.notdead = true;
     G.S.flags.pfRevealed = true;
     G.roverTo(G.World.pathfinder.position, 8); G.tpNear(G.World.pathfinder.position, 2.5); G.hold(2.8);
     G.roverTo(G.World.uplinkRing.position, 0.5); G.tpNear(G.World.uplink.position, 2.5); G.hold(2.8);
@@ -203,7 +218,8 @@ async function run(size) {
   await ev((G) => {
     // a mid-game larder, catalogue and home, so the newer pages have something to show
     const S = G.S; G.farm.farm();
-    S.pantry = { radish: 3, lettuce: 0, soy: 4, tomato: 2 }; S.seeds = { radish: 1, lettuce: 2, soy: 0, tomato: 1 }; S.stats.produce = 9; S.morale = 71;
+    // (the seed packets are set here, once: changed between the inventory picture and the seed chooser, the two disagreed)
+    S.pantry = { radish: 3, lettuce: 0, soy: 4, tomato: 2 }; S.seeds = { radish: 1, lettuce: 2, soy: 2, tomato: 1 }; S.stats.produce = 9; S.morale = 71;
     if (!S.science) G.science.scienceSummary();
     Object.assign(S.science, { found: { basalt: 2, dust: 1, hematite: 1, sulfate: 1 }, points: 52, serial: 5 });
     S.machines = { oxygenator: 88, reclaimer: 54, rover: 31, suit: 12 };
@@ -236,7 +252,7 @@ async function run(size) {
   await key('Escape');
 
   // ---------------------------------------------------------------- the farm's seed chooser, and photo mode
-  await ev((G) => { G.S.seeds.soy = 2; G.S.seeds.tomato = 1; G.World.plots[0].state = 'soil'; G.syncAllVisuals(); G.tpLocal(-6.7, -3.2); G.tick(0.05, 6); G.hold(1.6); });
+  await ev((G) => { G.World.plots[0].state = 'soil'; G.syncAllVisuals(); G.tpLocal(-6.7, -3.2); G.tick(0.05, 6); G.hold(1.6); });
   await shot('farm-chooser', 400);
   await ev(() => { const b = document.querySelector('#mg-panel [data-act="cancel"]'); if (b) b.click(); });
   await ev((G) => { G.tpLocal(8, 30, 0); G.tick(0.05, 6); G.photoMode.enterPhoto(); });
@@ -247,6 +263,9 @@ async function run(size) {
   await ev((G) => { G.tick(0.05, 2); });
   if (size.touch) await page.locator('#mg-tPause').tap(); else await key('Escape');
   await shot('pause');
+  await click('[data-act="bars"]');
+  await shot('pause-bars-guide', 300, 'b');
+  await key('Escape');
   await click('[data-act="controls"]');
   await shot('pause-controls');
   await key('Escape');

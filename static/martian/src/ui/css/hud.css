@@ -309,7 +309,13 @@
 .mg-compact .obj.primary { font-size: .8125rem; }
 .mg-compact .obj .ds { font-size: .6875rem; }
 .mg-compact .obj .mk { margin-top: .25rem; width: .375rem; height: .375rem; }
-.mg-compact .obj:nth-of-type(n+4) { display: none; }
+/* (how many lines a phone shows is decided by the room there is: ui/hud.js marks the ones that do not fit, drops the
+   reason if the first line and its reason are too tall together, and as a last resort holds the first line to two) */
+.obj.cut { display: none !important; }
+#mg-objectives.no-why .why { display: none !important; }
+#mg-objectives.clamp .obj .tx { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* ... and whatever it holds, the block ends above the round buttons under it (VIEW is the highest of them) */
+.mg-compact.mg-touch #mg-tr { max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 3rem - 7.375rem - max(2.75rem, 44px) - 8px); overflow: hidden; }
 
 .mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + 7.125rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
 .mg-compact .mg-line { grid-template-columns: 2.25rem 1fr; column-gap: .375rem; padding: .25rem .5rem .3125rem .4375rem; font-size: .6875rem; line-height: 1.32; }
@@ -341,6 +347,9 @@
 .mg-compact #mg-prompt .sub { font-size: .6875rem; }
 .mg-compact #mg-prompt.minor { bottom: calc(var(--sab) + 1rem); }
 
+/* driving, the rover's panel has the middle of the bottom edge: the log ends short of it at every interface size
+   (at its full width it reached 16 px into the panel at 135% on a 1080p screen) */
+.is-rover:not(.mg-compact) #mg-log { width: min(27rem, calc(50vw - 15rem - var(--sal))); }
 /* tablets: the stick lives where the log would be */
 .mg-touch:not(.mg-compact) #mg-log { bottom: calc(var(--sab) + 12.5rem); }
 
@@ -387,26 +396,31 @@
 .obj.urgent.first { font-size: .9375rem; }
 .mg-compact .obj.urgent.first { font-size: .8125rem; }
 
-/* the narrowest phones have no room for the bars' names beside the compass */
+/* the narrowest phones have no room for a bar beside each name and number */
 @media (max-width: 760px) {
-  /* ... so each name stands on its own bar: the bar is a rule under the word, and takes no column */
-  .mg-compact .res .row { grid-template-columns: .875rem 2.625rem 2.5rem .375rem; height: .9375rem; }
-  /* (and the compass gives up the width four 44 px buttons need; the banner keeps to its headline, the mission line says the rest) */
-  .mg-compact #mg-compass { --cw: min(15rem, calc(100vw - var(--sal) - var(--sar) - 27.25rem)); }
-  .mg-compact .alert small { display: none; }
-  .mg-compact .res .row > * { grid-row: 1; }
-  .mg-compact .res .row .lb { grid-column: 2; align-self: start; line-height: .75rem; }
-  .mg-compact .res .row .tk { grid-column: 2; align-self: end; height: .125rem; }
-  .mg-compact .res .row .val { grid-column: 3; }
+  /* ... so the gauge is the band the name and the number stand on: it fills from the left, behind them.
+     (It was a rule under the word, which read as an underline.) */
+  .mg-compact .res { gap: .09375rem; }
+  .mg-compact .res .row { grid-template-columns: .875rem 2.75rem 2.25rem .375rem; column-gap: .25rem; height: .9375rem; }
+  .mg-compact .res .row > * { grid-row: 1; position: relative; }
+  .mg-compact .res .row .lb { grid-column: 2; padding-left: .25rem; z-index: 1; }
+  .mg-compact .res .row:not(.warn):not(.crit) .lb { color: var(--ink); }
+  .mg-compact .res .row .val { grid-column: 3; padding-right: .25rem; z-index: 1; }
+  .mg-compact .res .row .tk { grid-column: 2 / 4; align-self: stretch; height: auto; background: rgba(245, 240, 232, .1); border-radius: .125rem; }
+  .mg-compact .res .row .fl { background: rgba(245, 240, 232, .3); }
+  .mg-compact .res .row.warn .fl { background: rgba(255, 180, 84, .34); }
+  .mg-compact .res .row.crit .fl { background: rgba(255, 106, 92, .4); }
   .mg-compact .res .row .tr { grid-column: 4; }
+  /* (and the compass gives up the width four thumb-sized buttons need) */
+  .mg-compact #mg-compass { --cw: min(15rem, calc(100vw - var(--sal) - var(--sar) - 28.75rem)); }
 }
-/* the reason for the current objective, under it */
-.obj .why { grid-column: 2 / -1; font-size: .75rem; line-height: 1.3; color: var(--ink-3); font-weight: 400; }
-/* (no room for it in the phone's panel beside the touch buttons: there the reason arrives as a toast) */
-.mg-compact .obj .why { display: none !important; }
+/* the reason for the current objective, under it (on a phone too: it used to arrive there as a card that repeated the line above it) */
+.obj .why { grid-column: 2 / -1; font-size: .75rem; line-height: 1.3; color: var(--ink-2); font-weight: 400; }
+.mg-compact .obj .why { font-size: var(--t11); line-height: 1.28; margin-top: .0625rem; }
 
-/* ================================================================ waypoint: where the current objective is */
-#mg-way { position: absolute; left: 0; top: 0; z-index: 0; display: flex; flex-direction: column; align-items: center; gap: .1875rem; margin: -1.125rem 0 0 -1.5rem; width: 3rem;
+/* ================================================================ waypoint: where the current objective is
+   (it comes before the panels in the HUD, so a diamond over a place in the world is drawn under them) */
+#mg-way { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: .1875rem; margin: -1.125rem 0 0 -1.5rem; width: 3rem;
   pointer-events: none; will-change: transform; }
 #mg-way .wp { width: .75rem; height: .75rem; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 0 2px rgba(19, 17, 15, .7), 0 0 .625rem rgba(255, 180, 84, .6);
   animation: mg-way-bob 1.6s ease-in-out infinite; }
@@ -420,7 +434,90 @@
 .is-modal #mg-way, .is-photo #mg-way, .is-cutscene #mg-way { display: none !important; }
 
 /* on a phone the log sits between the bars and the joystick: room for the newest message only
-   (the journal keeps them all) */
+   (the journal keeps them all), and six lines of it at the most (ui/dom.js gives it whole sentences that fit) */
 .mg-compact #mg-log .mg-line:nth-last-child(n+2) { display: none; }
+.mg-compact #mg-log .mg-line { line-height: 1.3; }
+.mg-compact #mg-log .mg-line .tx { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 /* driving, the rover's panel has the low middle of a phone: the prompt stands on it */
-.mg-compact.is-rover #mg-prompt, .mg-compact.is-rover #mg-prompt.minor { bottom: calc(var(--sab) + 4.25rem); }
+.mg-compact.is-rover #mg-prompt, .mg-compact.is-rover #mg-prompt.minor { bottom: calc(var(--sab) + 4.5rem); }
+
+/* ================================================================ the prompt's three states
+   Something to do: HOLD and the thing. Something in the way: a padlock and the reason. Nothing to do here now
+   (a bed still growing, a clean panel): the reading alone, quietly, with no ring and no padlock. */
+#mg-prompt.info { padding: .375rem 1.125rem; background: rgba(14, 12, 11, .56); border-color: transparent; }
+#mg-prompt.info .pk { display: none !important; }
+#mg-prompt.info .lb { color: var(--ink-2); font-weight: 400; }
+.mg-compact #mg-prompt.info, .mg-compact.mg-touch #mg-prompt.info { padding: .3125rem .875rem; }
+/* the first minute's two hints give way to the prompt at the airlock (they stood on it) */
+.mg-touch.is-cold #mg-prompt.on ~ #mg-keys { display: none; }
+
+/* ================================================================ the six bars arrive as he first steps into the Hab (ui/hud.js) */
+.no-bars .res { display: none; }
+.no-bars #mg-vitals { padding-right: .75rem; }
+
+/* ================================================================ phones: nothing under 11 px
+   (the interface's rem falls below 16 px on a small phone, so these are held in real pixels) */
+.mg-compact { --t11: max(.6875rem, 11px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); }
+.mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
+.mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
+.mg-compact .suit .st { font-size: var(--t13); }
+.mg-compact .res .row .lb { font-size: var(--t12); letter-spacing: .02em; }
+.mg-compact .res .row .val { font-size: var(--t13); }
+.mg-compact .row .val small { font-size: var(--t11); }
+.mg-compact #mg-compass .dists span { font-size: var(--t11); }
+.mg-compact #mg-region { font-size: var(--t11); letter-spacing: .2em; text-indent: .2em; }
+.mg-compact #mg-clock .sol .k { font-size: var(--t11); }
+.mg-compact .obj { font-size: var(--t12); }
+.mg-compact .obj.primary, .mg-compact .obj.urgent.first { font-size: var(--t13); }
+.mg-compact .obj .ds { font-size: var(--t11); }
+.mg-compact .mg-line { grid-template-columns: 2.5rem 1fr; font-size: var(--t12); }
+.mg-compact .mg-line .who { font-size: var(--t11); letter-spacing: .06em; }
+.mg-compact .toast .t1 { font-size: var(--t11); }
+.mg-compact .toast .t3 { font-size: var(--t12); line-height: 1.3; }
+.mg-compact #mg-rover .spd span, .mg-compact #mg-rover .row .lb, .mg-compact #mg-rover .row .val { font-size: var(--t11); }
+.mg-compact #mg-rover .row { grid-template-columns: .8125rem 3.5rem 2.5rem 2.5rem; column-gap: .375rem; height: 1rem; }
+/* (the rover's two rows are laid out as the Hab's six are: a bar beside the name on a phone with the room... */
+.mg-compact #mg-rover .row .lb { grid-column: 2; align-self: center; line-height: 1; }
+.mg-compact #mg-rover .row .tk { grid-column: 3; align-self: center; height: .1875rem; }
+.mg-compact #mg-rover .row .val { grid-column: 4; }
+/* ... and, on the narrowest, the band the name and the number stand on) */
+@media (max-width: 760px) {
+  .mg-compact #mg-rover .row { grid-template-columns: .8125rem 3.75rem 2.5rem; column-gap: .25rem; }
+  .mg-compact #mg-rover .row > * { position: relative; }
+  .mg-compact #mg-rover .row .lb { padding-left: .25rem; z-index: 1; color: var(--ink); }
+  .mg-compact #mg-rover .row .val { grid-column: 3; padding-right: .25rem; z-index: 1; }
+  .mg-compact #mg-rover .row .tk { grid-column: 2 / 4; align-self: stretch; height: auto; background: rgba(245, 240, 232, .1); border-radius: .125rem; }
+  .mg-compact #mg-rover .row .fl { background: rgba(245, 240, 232, .3); }
+  .mg-compact #mg-rover .row.warn .fl { background: rgba(255, 180, 84, .34); }
+  .mg-compact #mg-rover .row.crit .fl { background: rgba(255, 106, 92, .4); }
+}
+.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--t11); }
+.mg-compact #mg-prompt .pl, .mg-compact #mg-prompt.minor .pl { font-size: var(--t13); }
+.mg-compact #mg-prompt .sub { font-size: var(--t11); }
+.mg-compact #mg-way b { font-size: var(--t11); }
+.mg-compact .ph-hint, .mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t11); }
+
+/* ================================================================ desktops: a banner keeps between the bars and the mission panel
+   (the longest of them, at the largest interface size, reached a few pixels into the bars: past the room there is,
+   the instruction goes onto a line of its own, as it does on a phone) */
+#mg-root:not(.mg-compact) .alert { flex-wrap: wrap; justify-content: center; row-gap: .25rem; max-width: calc(100vw - 48.5rem); }
+#mg-root:not(.mg-compact) #mg-toast { top: calc(var(--m) + var(--sat) + 9.875rem + var(--al2, 0) * 3.25rem); }
+/* ... and the log keeps under the bars: the newest entry shows whole, the two before it two lines each (three long
+   ones together stood as tall as the screen at the largest interface size) */
+#mg-root:not(.mg-compact) #mg-log { justify-content: flex-end; overflow: hidden; max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 13rem); }
+#mg-root:not(.mg-compact) #mg-log .mg-line:not(:last-child) .tx { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* (on a tablet the log stands above the stick, so it has that much less room under the bars) */
+#mg-root.mg-touch:not(.mg-compact) #mg-log { max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 23.5rem); }
+
+/* ================================================================ phones: a banner is two lines, what is wrong over what to do
+   (on one line the longer ones reached to within 2 px of the bars, and the narrowest phones dropped the second half) */
+.mg-compact .alert { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; column-gap: .375rem; row-gap: .1875rem;
+  padding: .3125rem .75rem .375rem; max-width: 13.5rem; white-space: normal; font-size: var(--t12); letter-spacing: .1em; }
+.mg-compact .alert small { grid-column: 1 / -1; margin-left: 0; text-align: center; font-size: var(--t11); line-height: 1.15; letter-spacing: .02em; }
+@media (max-width: 760px) {
+  .mg-compact .alert { max-width: 8.25rem; padding-left: .375rem; padding-right: .375rem; letter-spacing: .04em; column-gap: .25rem; }
+  /* the log and the toast have the width between the screen's edge and the banners, and the log the smaller of the two sizes:
+     six lines of it stand between the bars and the stick */
+  .mg-compact #mg-log, .mg-compact .toast { width: min(15rem, calc(50vw - var(--sal) - 5.25rem)); }
+  .mg-compact .mg-line { font-size: var(--t11); line-height: 1.3; }
+}

@@ -8,7 +8,7 @@ import { ctx } from './ctx.js';
 import { _du, _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { clamp, hash3, lerp, smoothstep } from '../core/math.js';
 import { D2R, R, SOL_HOURS } from '../planet/constants.js';
-import { flashScreen, hideOverlay, log } from '../ui/dom.js';
+import { flashScreen, hideOverlay, log, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { World, addSupplyPod, placeAt } from '../world/build.js';
 import { angDist, fmtDist, groundDist, llToVec, tangentBasis, vecToLl } from '../planet/geo.js';
@@ -75,6 +75,20 @@ export function localTempC(upVec, sunEl) {
   return Math.round(-63 + 85 * Math.max(0, sunEl) - 35 * Math.pow(lat / 90, 2) - (sunEl < 0 ? 22 : 0));
 }
 
+/**
+ * Suit oxygen used per second away from air, at a pace: 'rest', 'walk' or 'run'. The simulation drains
+ * the tank by this, and the HUD's time left divides the tank by it (at a walk), so the two cannot drift apart.
+ */
+export function suitDrain(pace) {
+  let rate = pace === 'run' ? BAL.suitRun : pace === 'walk' ? BAL.suitWalk : BAL.suitRest;
+  if (S.inside) rate = BAL.suitIndoors;                          // a dead Hab: no wind, no walking to speak of
+  if (S.upgrades.recycler) rate *= 0.75;
+  rate *= 1 + (1 - machineEff('suit')) * 0.9;                    // a spent scrubber wastes air
+  if (S.flags.coldOpen) rate *= 1.9;                             // the hole the antenna made
+  if (localTempC(playerUnit(), localSunEl()) < -85) rate *= 1.25;   // the suit heater sips the reserve
+  return rate * S.drainMult;
+}
+
 export const warnedLow = {};
 export function warnLow(key, val, thresh, msg) {
   if (val <= thresh && !warnedLow[key]) { warnedLow[key] = true; log(msg, 'sys'); Snd.bad(); }
@@ -129,14 +143,7 @@ export function applyRates(dt, sleeping) {
       S.suit = clamp(S.suit + 26 * dt, 0, suitCap());
     } else {
       const moving = moveInputMag().mag > 0.12;
-      let rate = moving ? (sprinting() ? BAL.suitRun : BAL.suitWalk) : BAL.suitRest;
-      if (S.inside) rate = BAL.suitIndoors;
-      if (S.upgrades.recycler) rate *= 0.75;
-      rate *= 1 + (1 - machineEff('suit')) * 0.9;                   // a spent scrubber wastes air
-      if (S.flags.coldOpen) rate *= 1.9;
-      const t = localTempC(playerUnit(), playerSunEl);
-      if (t < -85) rate *= 1.25;                                     // suit heater sips O2 reserve
-      S.suit = clamp(S.suit - rate * D * dt, 0, suitCap());
+      S.suit = clamp(S.suit - suitDrain(moving ? (sprinting() ? 'run' : 'walk') : 'rest') * dt, 0, suitCap());
     }
     // rover recharges near hab or a deployed solar panel
     if (groundDist(World.rover.group.position, World.hab.position) < 60 && S.power > 10)
@@ -279,15 +286,25 @@ export function advanceTime(dt) {
 }
 
 bindWorld(World);
+/** What the last dawn did: { sol, ate, alone, meal, sky, home } (morale changes; `ate` is breakfast's words). */
+let dawnAccount = null;
 export function newSol() {
   S.sol++;
   const band = moraleBand();
-  if (breakfast() === 'skipped') log('No breakfast. The stomach files a formal complaint.', 'sys');
-  if (S.storm.i > 0.5) cheer(-2);                         // another morning with no sky
+  // what dawn does to morale, piece by piece, so the night's account can say why the number moved
+  const m0 = S.morale, alone = -5 * (S.drainMult || 1);
+  const ate = breakfast();
+  const meal = S.morale - m0 - alone;
+  if (ate === 'skipped') log('No breakfast. The stomach files a formal complaint.', 'sys');
+  const sky = S.storm.i > 0.5 ? -2 : 0;
+  if (sky) cheer(sky);                                   // another morning with no sky
   cheer(comfortCheer());                                 // what he has made of the place
+  dawnAccount = { sol: S.sol, ate, alone, meal, sky, home: comfortCheer() };
+  // awake at dawn (up all night, or camped far from home), nobody shows him the night's account: say it
+  if (!S.sleeping && ate !== 'skipped') toast(`SOL ${S.sol}`, 'Dawn', `Breakfast: ${ate} (${foodTotal()} meals left). Another sol alone: morale ${Math.round(S.morale)}.`, { yields: true });
   if (!S.flags.moraleTold) {
     S.flags.moraleTold = true;
-    setTimeout(() => log('MORALE is how I am holding up. Monotony and bad days wear it down. Different things on the plate, a cooked dinner, music, word from home and making this tent a home bring it back. In good spirits I work faster.', 'sys'), 16000);
+    setTimeout(() => log('MORALE is how I am holding up. Bad days wear it down. Variety on the plate, a hot dinner, music and word from home lift it, and then I work faster.', 'sys'), 16000);
   }
   if (moraleBand() !== band) {
     const now = moraleBand();
@@ -307,8 +324,7 @@ export function newSol() {
     }
   }
   if (S.sol >= S.rescueSol && !S.flags.mavRevealed) revealMav();
-  dawnFaults();
-  deliverMail();
+  { const m1 = S.morale; dawnFaults(); dawnAccount.faults = S.morale - m1; const m2 = S.morale; deliverMail(); dawnAccount.mail = S.morale - m2; }
   // storm forecast (uplink gives you weather service; easy mode always has it)
   if (S.pf.connected || S.diff === 'story') {
     for (const c of S.storm.cells) {
@@ -343,7 +359,7 @@ export function revealMav() {
   S.flags.mavRevealed = true;
   const d = fmtDist(groundDist(player.pos, World.mav.position));
   if (S.pf.connected)
-    log(`Launch window is OPEN. The Ares 4 MAV is fueled and waiting in Schiaparelli crater — ${d} out. Time to fly a convertible.`, 'nasa');
+    log(`Launch window is OPEN. The Ares 4 MAV is fuelled and waiting in Schiaparelli crater — ${d} out. Time to fly a convertible.`, 'nasa');
   else
     log(`Sol ${S.rescueSol}. NASA's original plan had the Ares 4 MAV launching from Schiaparelli about now — ${d} away. That rocket is my ride, phone call or no phone call.`);
   Snd.jingle();
@@ -359,9 +375,14 @@ export function sleepToDawn(inRover) {
   showSleep();
   // advance until the LOCAL sun crosses the horizon rising (max 1.3 sols for polar nights)
   const u = _v1.copy(inRover ? World.rover.group.position : player.pos).normalize().clone();
-  let advanced = 0, rolled = false;
+  let advanced = 0, rolled = false, sunUp = false;
   const step = BAL.solLen / 40;
   let prevEl = u.dot(ctx.engine.sunDir);
+  // The sol turns at the colony's dawn (06:00 at the Hab), and where the days are long the sun is up before
+  // that. Within a couple of hours of the Hab's clock the night therefore runs on to the turn of the sol:
+  // breakfast and the morning's morale belong in the night's account, not ten minutes after he has woken.
+  // (Camped far to the east or west, he wakes with his own sunrise and the sol turns when it turns.)
+  const lon = Math.atan2(-u.z, u.x) / D2R, home = !World.spawn || Math.abs(((lon - World.spawn.lon + 540) % 360) - 180) < 30;
   for (let i = 0; i < 60; i++) {
     const dawn = advanceClock(step / BAL.solLen);
     advanceStorms(step / BAL.solLen);
@@ -371,26 +392,41 @@ export function sleepToDawn(inRover) {
     advanced += step;
     updateSunDir();
     const el = u.dot(ctx.engine.sunDir);
-    if (advanced > BAL.solLen * 0.1 && prevEl < 0.03 && el >= 0.03) break;
+    if (advanced > BAL.solLen * 0.1 && prevEl < 0.03 && el >= 0.03) sunUp = true;
+    if (sunUp && (rolled || !home)) break;
     prevEl = el;
     if (advanced > BAL.solLen * 1.3) break;
   }
-  // a night slept is a sol lived, even when the global sun phase didn't wrap
-  void rolled;   // the sol turns at the colony's dawn; camping far from home does not force it
   if (S.over) { S.sleeping = false; return; }
   const growing = World.plots.filter(p => p.state === 'growing').length;
   const ready = World.plots.filter(p => p.state === 'ready').length;
-  cheer(inRover ? -1 : 3);                                // a bunk is a bed; a driver's seat is not
-  const notes = S.sol > before.sol ? [`Breakfast: ${S.diet.breakfast}`] : [];
-  notes.push(`Morale ${Math.round(S.morale)} (${S.morale >= before.morale ? '+' : '−'}${Math.abs(Math.round(S.morale - before.morale))}): ${MORALE_WORD[moraleBand()].toLowerCase()}`);
+  const bed = inRover ? -1 : 3;
+  cheer(bed);                                             // a bunk is a bed; a driver's seat is not
+  // the account: what was eaten, and why morale stands where it does, part by part
+  const signed = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v))}`;
+  const notes = [], why = [];
+  const dawn = rolled && dawnAccount && dawnAccount.sol === S.sol ? dawnAccount : null;
+  if (dawn) {
+    notes.push(dawn.ate === 'skipped' ? 'No breakfast: there is nothing left to eat' : `Breakfast: ${dawn.ate} (${foodTotal()} meal${foodTotal() === 1 ? '' : 's'} left)`);
+    why.push(`another sol alone ${signed(dawn.alone)}`);
+    if (Math.round(dawn.meal)) why.push(`${dawn.ate === 'skipped' ? 'no breakfast' : 'breakfast'} ${signed(dawn.meal)}`);
+    if (dawn.sky) why.push(`no sky this morning ${signed(dawn.sky)}`);
+    if (dawn.home) why.push(`home comforts ${signed(dawn.home)}`);
+    if (Math.round(dawn.mail)) why.push(`word from home ${signed(dawn.mail)}`);
+    if (Math.round(dawn.faults)) why.push(`a machine failing ${signed(dawn.faults)}`);
+  } else notes.push(`Still Sol ${S.sol}: the sol turns, and breakfast is eaten, at the Hab's dawn`);
+  why.push(`${inRover ? 'a night in the driving seat' : 'a night in the bunk'} ${signed(bed)}`);
+  // (whatever else the night did, so the parts always add up to the change shown above them)
+  { const named = (dawn ? dawn.alone + dawn.meal + dawn.sky + dawn.home + dawn.mail + dawn.faults : 0) + bed, rest = S.morale - before.morale - named;
+    if (Math.abs(rest) >= 0.75) why.push(`the night's other events ${signed(rest)}`); }
+  notes.push(`Morale ${Math.round(S.morale)}, ${MORALE_WORD[moraleBand()].toLowerCase()} (${why.join(', ')})`);
   if (growing + ready > 0) notes.push(`Farm: ${growing} growing, ${ready} ready`);
   // what the numbers mean for the days ahead: he eats one thing a sol, and the rescue is a fixed date
   { const meals = foodTotal(), wait = Math.max(0, S.rescueSol - S.sol);
-    notes.push(meals >= wait ? `Food for ${meals} sols; the rescue is in ${wait}` : `Food for ${meals} sols; the rescue is in ${wait}. ${wait - meals} short`); }
-  if (comfortCheer() > 0) notes.push(`Home comforts: +${comfortCheer()} morale each dawn`);
+    notes.push(meals >= wait ? `Food for ${meals} sols; the rescue is in ${wait}` : `Food for ${meals} sols; the rescue is in ${wait}: ${wait - meals} short, and the farm has to make up the rest`); }
   if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
   const summary = {
-    sol: S.sol, notes,
+    sol: S.sol, notes, turned: rolled,
     deltas: [
       { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
       { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },

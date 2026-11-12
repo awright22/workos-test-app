@@ -267,6 +267,55 @@
 .mg-compact .leads { grid-template-columns: 1fr 1fr; gap: .25rem 1rem; }
 .mg-compact .leads li { font-size: .75rem; grid-template-columns: 2.25rem 1fr; gap: .375rem; }
 
+/* journal: each thing to do has its reason on a line of its own, under it */
+.obj-list .obj .why { font-size: .875rem; line-height: 1.35; color: var(--ink-3); margin-top: .0625rem; }
+.obj-list .obj.urgent .why { color: var(--ink-2); font-weight: 400; }
+/* a cost: how many it takes, the thing, then how many you have */
+.chip i { font-style: normal; color: var(--ink-3); margin-left: .25rem; letter-spacing: .04em; }
+.chip.miss i { color: var(--danger); }
+/* statistics: each tile draws its own edge, so a row that is not full ends where its tiles end (it ended in a grey block) */
+.stat-grid { background: none; border: 0; padding: 1px; }
+.stat-grid .stat { box-shadow: 0 0 0 1px var(--line-2); }
+
+/* ================================================================ the narrowest phones: all six journal tabs on the screen
+   (the fifth was cut and the sixth was off the edge, with nothing to say so) */
+@media (max-width: 760px) {
+  .mg-compact .journal .tabs { padding: 0 .25rem; overflow-x: hidden; }
+  .mg-compact .journal .tabs button { flex: 1 1 auto; justify-content: center; padding: 0 .3125rem; gap: .1875rem; letter-spacing: .04em; }
+  .mg-compact .journal .tabs button .ic { display: none; }
+  .mg-compact .colony .tabs button { flex: 1 1 auto; justify-content: center; padding: 0 .375rem; letter-spacing: .08em; }
+  .mg-compact .scr-nav button { padding: 0 .5rem; letter-spacing: .1em; }
+  .mg-compact .scr-title h1 { letter-spacing: .06em; }
+}
+
+/* ================================================================ phones: nothing under 11 px, the text people read at 12 */
+.mg-compact .scr-nav button, .mg-compact .colony .tabs button, .mg-compact .journal .tabs button { font-size: var(--t12); }
+.mg-compact .pane-hd, .mg-compact .pane-note, .mg-compact .pane.on > .pane-note, .mg-compact .col-bar, .mg-compact .jr-note { font-size: var(--t12); }
+.mg-compact .inv-row .nm { font-size: var(--t13); }
+.mg-compact .inv-row .nm small, .mg-compact .inv-row .ct small { font-size: var(--t12); }
+.mg-compact .rcp .ds, .mg-compact .card p, .mg-compact .card .todo, .mg-compact .rcp-ft .why { font-size: var(--t12); }
+.mg-compact .chip { font-size: var(--t12); }
+.mg-compact .badge { font-size: var(--t11); letter-spacing: .1em; }
+.mg-compact .card .prog { font-size: var(--t12); }
+.mg-compact .card h4 small { font-size: var(--t12); }
+.mg-compact .leads li { font-size: var(--t12); }
+.mg-compact .leads b { font-size: var(--t11); }
+.mg-compact .obj-list .obj .why { font-size: var(--t12); }
+.mg-compact .obj-list .obj { font-size: var(--t13); }
+.mg-compact .obj-list .obj .ds { font-size: var(--t12); }
+.mg-compact .stat-grid .stat b small { font-size: var(--t12); }
+.mg-compact .jlog .mg-line { font-size: var(--t12); }
+.mg-compact .jlog .mg-line .who, .mg-compact .jlog .mg-line .who small { font-size: var(--t11); }
+.mg-compact .empty { font-size: var(--t12); }
+.mg-compact .map-status, .mg-compact .map-status .hint, .mg-compact .map-status .t-mono { font-size: var(--t11); }
+.mg-compact .map-tools .cap { font-size: var(--t11); letter-spacing: .04em; }
+.mg-compact .map-legend li { font-size: var(--t12); }
+.mg-compact .map-legend h3, .mg-compact .map-info .ty, .mg-compact .map-info dt, .mg-compact .map-info .grp b { font-size: var(--t11); }
+.mg-compact .map-info p { font-size: var(--t12); }
+.mg-compact .map-info dd.t-mono { font-size: var(--t11); }
+
 .tabs button em i { font-style: normal; }
-.mg-compact .tabs button em i { display: none; }
+/* (a count on a colony tab is how many things there can be made now, and says so, on a phone as well: bare, it read as a
+   total and disagreed with the tab's own heading. The narrowest phones give up the tabs' icons to make the room.) */
+@media (max-width: 760px) { .mg-compact .colony .tabs button .ic { display: none; } }
 .mg-compact .tabs button em::before { content: ""; display: inline-block; width: .375rem; height: .375rem; margin-right: .1875rem; border-radius: 50%; background: var(--accent); vertical-align: .0625rem; }

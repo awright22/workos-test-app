@@ -36,8 +36,16 @@ for (let i = 0; i < 60 && !(/real orbital elevation/.test(logText) && /Mission c
   logText += '\n' + await g.page.locator('#mg-log').innerText();
 }
 check('player is told what changed', /real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText), logText.slice(-300));
-const resaved = await g.eval((G) => { G.saveGame(); return JSON.parse(localStorage.getItem('stranded2-save')).v; });
-check('re-saved in the current format', resaved === 4, resaved);
+const resaved = await g.eval((G) => { G.saveGame(); const d = JSON.parse(localStorage.getItem('stranded2-save')); return { v: d.v, log: Array.isArray(d.log) ? d.log.length : -1, line: d.log && d.log[0] }; });
+check('re-saved in the current format', resaved.v === 4, resaved.v);
+// the last lines of the log go with the save (an optional field), and come back with it
+check('the log is kept with the save', resaved.log >= 1 && typeof resaved.line.text === 'string' && resaved.line.sol >= 1, resaved);
+const kept = await g.eval((G) => { const d = JSON.parse(localStorage.getItem('stranded2-save')); d.log = [{ text: 'A line from yesterday.', voice: 'log', sol: 6 }]; G.applyState(d); return true; });
+await g.page.keyboard.press('j');
+await g.page.locator('#mg-journal [data-tab="log"]').click();
+const jl = await g.page.locator('#mg-journal .jr-body').innerText();
+check('a continued run has its log in the journal', kept && /A line from yesterday\./.test(jl) && /SOL 6/i.test(jl), jl.slice(0, 120));
+await g.page.keyboard.press('Escape');
 // an unreadable save is reported on the title screen
 await g.page.evaluate(() => localStorage.setItem('stranded2-save', JSON.stringify({ v: 99, nonsense: true })));
 await g.page.reload({ waitUntil: 'load' });

@@ -3,7 +3,7 @@ import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
 import { BAL, S, roverPowerCap, suitCap } from './state.js';
-import { flashScreen, log, showOverlay, toast } from '../ui/dom.js';
+import { flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
 import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
@@ -18,6 +18,7 @@ import { bagSoilHere } from './fieldwork.js';
 import { CROPS, MORALE_WORD, cookDinner, dinnerPlan, foodTotal, harvest, moraleBand, plantable, seedStock, snack, takeSeed } from './farm.js';
 import { showChoice } from '../ui/menus.js';
 import { R } from '../planet/constants.js';
+import { layout } from '../ui/layout.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
 export function syncPlot(pl) {
   pl.soilMesh.visible = pl.state !== 'empty';
@@ -62,11 +63,12 @@ addI({
   enabled: () => {
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
-      case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith — dig some outside';
-      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)') : 'Nothing left to plant';
+      case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith: dig it at the heap outside the airlock';
+      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5 L): burn hydrazine at the rig') : 'Nothing left to plant';
       case 'growing':
-        if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5L)';
-        return `${cropOf(pl).name} — ${Math.round(pl.growth * 100)}%`;
+        if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5 L): burn hydrazine at the rig';
+        // (a reading, not a lock: there is nothing to do to it yet)
+        return statusText(`${cropOf(pl).name}: ${Math.round(pl.growth * 100)}% grown${pl.watered < cropOf(pl).waterings ? ', water again at half' : ''}`);
       case 'ready': case 'dead': return true;
     }
     return false;
@@ -97,12 +99,18 @@ addI({
         const can = plantable();
         if (can.length > 1) {
           // more than one thing to plant: ask
+          // (which one? Until the staple is in the ground, the card says so. And "6 to plant" says what the six are
+          // when they are packets and last harvest's together.)
+          const first = !World.plots.some((p) => (p.state === 'growing' || p.state === 'ready') && (p.crop || 'potato') === 'potato') && can.includes('potato');
           showChoice({
-            kicker: 'Farm', title: 'What goes in this bed?', note: 'Each bed takes 5 L of water to plant.',
+            kicker: 'Farm', title: 'What goes in this bed?',
+            note: `${first ? 'Potatoes first: they are what keeps you fed. ' : ''}Each bed takes 5 L of water to plant.`,
             items: can.map((id) => {
               const c = CROPS[id], n = seedStock(id);
-              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield}${id === 'potato' ? ' · uses 1 of your food' : ''}`,
-                note: c.note, count: `${n} to plant`, fn: () => plant(pl, id) };
+              const packets = id === 'potato' ? 0 : (S.seeds[id] || 0), kept = id === 'potato' ? 0 : (S.pantry[id] || 0);
+              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield}`,
+                note: id === 'potato' ? `The staple. Planting one uses a ${S.potatoes > 0 ? 'potato' : 'ration'}.` : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.` : c.note,
+                count: `${n} to plant`, fn: () => plant(pl, id) };
             }),
           });
         } else plant(pl, can[0] || 'potato');
@@ -165,7 +173,7 @@ export function addInspect(id, lx, lz, name, doneLine) {
   });
 }
 addInspect('oxy', 5.6, -3.6, 'oxygenator',
-  'Oxygenator: alive. It eats CO2 and power, makes air. My favorite roommate.');
+  'Oxygenator: alive. It eats CO2 and power, makes air. My favourite roommate.');
 addInspect('rec', 5.9, -0.4, 'water reclaimer',
   'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.');
 // NOTE: world arrays (panels, piles, landers, ice) fill AFTER world build —
@@ -190,7 +198,7 @@ addI({
   },
   r: 3.0, hold: 1.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
-  enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : 'Panel is clean',
+  enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : statusText('This panel is clean'),
   label: () => `Wipe solar panel (${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output)`,
   use: () => {
     const p = World._activePanel;
@@ -230,7 +238,7 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 5.5, 0, 2.6, _v2),
   r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
-  enabled: () => S.hydrazine > 0 ? true : 'Hydrazine tank is empty',
+  enabled: () => S.hydrazine > 0 ? true : statusText('The hydrazine tank is empty'),
   label: () => `Burn hydrazine for water (+${BAL.hydrazineWater}L) — ${S.hydrazine} left`,
   use: () => {
     S.hydrazine--;
@@ -264,7 +272,9 @@ addI({
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => {
     if (S.breach.active) return 'Seal the breach first: the far wall, behind the comms desk';
-    return sleepTime();
+    // (not yet time is a reading, not a lock: the first prompt on waking was a padlock)
+    const ok = sleepTime();
+    return ok === true ? true : statusText(`The bunk. ${ok}`);
   },
   label: () => 'Sleep until dawn',
   use: () => sleepToDawn(false),
@@ -276,7 +286,7 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
   r: 2.2, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && !dinnerPlan().ok,
-  enabled: () => S.health > 92 ? 'Not hungry right now' : foodTotal() > 0 ? true : 'The shelf is bare',
+  enabled: () => S.health > 92 ? statusText('The food shelf. Not hungry right now') : foodTotal() > 0 ? true : statusText('The food shelf is bare'),
   label: () => `Eat a ${SNACK[nextSnack()] || 'ration'} (+12 vitals)`,
   // once there is produce, say what a cooked dinner still wants
   sub: () => (S.stats.produce > 0 ? `Dinner: ${dinnerPlan().why.toLowerCase()}` : ''),
@@ -317,8 +327,8 @@ addI({
       stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
-        'The Hab has six farm beds: fill them with soil from the heaps outside, plant, water, and eat what grows. A potato bed costs one ration to plant.\n\n' +
-        'Top left, the six bars that keep you alive (tap or pause to see what each one is). Top right, what to do next and why.',
+        'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. A potato bed costs one ration to plant.\n\n' +
+        `Top left, the six bars that keep you alive: ${layout.touch ? 'tap them' : 'the pause menu has a guide'} to see what each one is. Top right, what to do next, why, and how far.`,
       buttons: [{ label: 'Get to work' }],
     });
   },
@@ -365,7 +375,7 @@ addI({
   r: 3.8, hold: 0.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   label: () => 'Drive the rover',
-  sub: () => `Power ${Math.round(S.roverPower)}/${roverPowerCap()} · O2 tank ${Math.round(S.roverO2)}`,
+  sub: () => `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}% · O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%`,
   use: () => enterRover(),
 });
 addI({
@@ -521,7 +531,7 @@ addI({
   },
   r: 3.5, hold: 1.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
-  enabled: () => S.suit < suitCap() - 5 ? true : 'Suit is full',
+  enabled: () => S.suit < suitCap() - 5 ? true : statusText('An O2 cache. The suit is full'),
   label: () => `Refill suit O2 (${World._activeCache ? World._activeCache.charges : 0} charges left)`,
   use: () => {
     const c = World._activeCache;

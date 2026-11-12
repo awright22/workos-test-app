@@ -179,7 +179,10 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 @keyframes mg-fade-in { from { opacity: 0; } }
 @keyframes mg-rise-in { from { opacity: 0; transform: translateY(.5rem); } }
 
-/* reduced motion: the player's setting, or the system's when they have not chosen */
+/* reduced motion: the player's setting, or the system's when they have not chosen.
+   No transitions at all, not very short ones. (A one-millisecond transition on every property meant that, after a
+   change of interface size, sizes set in rem kept their old values until the next frame was drawn: on a slow machine
+   the HUD measured itself at two sizes at once, and the layout checks saw the log reach into the rover's panel.) */
 .mg-reduced *, .mg-reduced *::before, .mg-reduced *::after {
   animation-duration: .001s !important; animation-iteration-count: 1 !important;
-  transition-duration: .001s !important; scroll-behavior: auto !important; }
+  transition: none !important; scroll-behavior: auto !important; }

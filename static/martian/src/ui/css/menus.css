@@ -352,6 +352,7 @@
 .guide li sub, .dlg h1 sub { font-size: .7em; }
 .guide-n { margin-top: .875rem; font-size: .875rem; color: var(--ink-3); }
 .pause-side .side-btn { margin-top: .875rem; width: 100%; }
+.sheet-bd .guide { margin-top: 0; }
 .mg-compact .dlg.wide { width: 44rem; }
 .mg-compact .guide { gap: .3125rem; margin-top: .5rem; }
 .mg-compact .guide li { grid-template-columns: 1rem 4.5rem 1fr; gap: .5rem; font-size: .75rem; line-height: 1.3; }
@@ -360,7 +361,98 @@
 .mg-compact .pause-side .side-btn { margin-top: .5rem; }
 
 /* the night's account: what each number stands at now, and what today is for */
-.sleep .delta i { font: 500 .75rem/1 var(--f-cond); font-style: normal; letter-spacing: .08em; color: var(--ink-3); }
+.sleep .delta i { font: 500 .75rem/1 var(--f-cond); font-style: normal; letter-spacing: .08em; color: var(--ink-2); }
 .sleep .notes .today { margin-top: .5rem; color: var(--ink); }
 .sleep .notes .today b { font: 600 .75rem/1 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-right: .5rem; }
-.mg-compact .sleep .delta i { font-size: .6875rem; }
+.sleep .solbig span { text-transform: uppercase; }
+
+/* ================================================================ new game: the way back and the warning in the header on a phone */
+.hd-back, .hd-note { display: none; }
+.diff dt { white-space: nowrap; }
+.mg-compact .newgame .sheet-ft { display: none; }
+.mg-compact .newgame .hd-back { display: inline-flex; flex: none; padding: 0 .875rem 0 .625rem; }
+.mg-compact .newgame .sheet-hd > div { flex: 1; min-width: 0; }
+.mg-compact .newgame .hd-note { display: block; flex: none; max-width: 40%; text-align: right; font: 500 var(--t12)/1.25 var(--f-cond); letter-spacing: .04em; color: var(--accent); }
+.mg-compact .newgame .sheet-bd { display: flex; flex-direction: column; overflow: hidden; }
+.mg-compact .newgame .brief-1 { flex: none; }
+.mg-compact .newgame .diffs { flex: 1 1 auto; min-height: 0; }
+/* Begin is the foot of its card: a bar a thumb high, always inside the card and the card always inside the sheet */
+.mg-compact .diff .go { margin-top: auto; flex: none; min-height: 44px; font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact .diff dl { margin-bottom: .4375rem; }
+.mg-compact .diff p { margin-top: 0; margin-bottom: .4375rem; flex: 0 1 auto; overflow: hidden; }
+/* (a short or a narrow phone has no room for the line of description: the three rows above it say what differs) */
+@media (max-height: 380px), (max-width: 760px) { .mg-compact .diff p { display: none; } }
+/* (and its cards are narrow: the three rows keep to a line each) */
+@media (max-width: 760px) {
+  .mg-compact .newgame .diff { padding-left: .5rem; padding-right: .5rem; }
+  .mg-compact .newgame .diff dl { column-gap: .375rem; }
+  .mg-compact .newgame .diff dt { letter-spacing: .03em; }
+  .mg-compact .newgame .diff dd { white-space: nowrap; letter-spacing: .02em; }
+}
+
+/* ================================================================ settings on a desktop: one sheet, all of it showing at 1280x720
+   (a little tighter than other sheets: the last row, the colour-blind switch, was under the fold) */
+.sheet.settings:not(.tabbed) .sheet-hd { padding-top: 1rem; padding-bottom: .875rem; }
+.sheet.settings:not(.tabbed) .sheet-bd { padding-top: 1rem; padding-bottom: 1rem; }
+.sheet.settings:not(.tabbed) .sheet-ft { padding-top: .75rem; padding-bottom: .75rem; }
+.sheet.settings:not(.tabbed) .set-grid { row-gap: 1rem; }
+.sheet.settings:not(.tabbed) .set-row { min-height: 2.75rem; padding: .25rem 0; }
+
+/* ================================================================ settings: four tabs on a phone, each of which fits the screen */
+.sheet.tabbed .sheet-hd { gap: .75rem; }
+.sheet.tabbed .sheet-hd h1 { flex: 0 1 auto; }
+.sheet.tabbed .sheet-hd .mg-seg { margin-left: auto; }
+.sheet.tabbed .set-grid { grid-template-columns: minmax(0, 1fr); }
+.sheet.tabbed .set-sec h3 { display: none; }
+.sheet.tabbed .set-row:first-of-type { border-top: 0; }
+.sheet.tabbed .sheet-bd { padding-top: .25rem; padding-bottom: .25rem; }
+.sheet.tabbed .set-row { padding-top: 0; padding-bottom: 0; }
+@media (max-width: 760px) { .sheet.tabbed .sheet-hd h1 { display: none; } .sheet.tabbed .sheet-hd .mg-seg { margin-left: 0; flex: 1; } .sheet.tabbed .sheet-hd .mg-seg button { flex: 1; } }
+
+/* ================================================================ phones: nothing under 11 px, the labels people read at 12 */
+.mg-compact .stat span { font-size: var(--t11); letter-spacing: .08em; }
+.mg-compact .title-foot { font-size: var(--t11); letter-spacing: .12em; bottom: .125rem; }
+.mg-compact .menu-item .mi-s { font-size: var(--t12); letter-spacing: .1em; }
+.mg-compact .pause-side .kv { font-size: var(--t12); }
+.mg-compact .pause-side p { font-size: var(--t12); }
+.mg-compact .diff .dx { font-size: var(--t11); letter-spacing: .14em; }
+.mg-compact .diff dt { font-size: var(--t11); letter-spacing: .1em; }
+.mg-compact .diff dd { font-size: var(--t13); }
+.mg-compact .diff p { font-size: var(--t12); }
+.mg-compact .brief-1 { font-size: var(--t13); }
+.mg-compact .set-row .hint { font-size: var(--t12); }
+.mg-compact .set-row label, .mg-compact .set-row .lbl { font-size: max(.875rem, 13px); }
+.mg-compact .mg-seg button { font-size: var(--t12); }
+.mg-compact .ctl-row { font-size: var(--t13); min-height: 2.125rem; }
+.mg-compact .ctl-row .keys { font-size: var(--t12); }
+.mg-compact .credits section p { font-size: var(--t12); }
+.mg-compact .credits section h3, .mg-compact .set-sec h3, .mg-compact .pause-side h3 { font-size: var(--t11); }
+.mg-compact .dlg .steps li { font-size: var(--t12); }
+.mg-compact .dlg .steps b { font-size: var(--t11); }
+.mg-compact #mg-overlay.k-win .dlg blockquote { font-size: var(--t12); }
+.mg-compact .dlg blockquote cite { font-size: var(--t11); }
+.mg-compact .dlg h2, .mg-compact .t-kicker { font-size: var(--t12); }
+.mg-compact .sleep .delta > span { font-size: var(--t12); letter-spacing: .1em; color: var(--ink-2); }
+.mg-compact .sleep .delta i { font-size: var(--t12); }
+.mg-compact .sleep .solbig span { font-size: var(--t13); letter-spacing: .3em; }
+.mg-compact .sleep .notes { font-size: var(--t13); }
+.mg-compact .sleep .notes .today b { font-size: var(--t11); }
+.mg-compact .choice .ch-s { font-size: var(--t12); letter-spacing: .06em; }
+.mg-compact .choice .ch-t { font-size: var(--t12); }
+.mg-compact .choice .ch-n { font-size: var(--t12); }
+.mg-compact .pick-note { font-size: var(--t12); }
+/* (five crops, a line of advice and Cancel, all on a phone's screen at once: the kicker gives up its line) */
+.mg-compact .dlg.pick .t-kicker { display: none; }
+.mg-compact .dlg.pick { padding-top: .625rem; padding-bottom: .625rem; }
+.mg-compact .dlg.pick .choices { margin-top: .5rem; }
+.mg-compact .dlg.pick .btns { margin-top: .5rem; flex-wrap: nowrap; }
+.mg-compact .choice { padding: .3125rem .625rem; }
+.mg-compact .choice .ch-t { line-height: 1.2; }
+.mg-compact .guide li { font-size: var(--t12); }
+.mg-compact .guide li b { font-size: var(--t11); letter-spacing: .08em; }
+.mg-compact .guide-n { font-size: var(--t12); }
+.mg-compact .comms-hd .live, .mg-compact .comms-ft .prog, .mg-compact .msg .who { font-size: var(--t11); }
+.mg-compact .msg .tx { font-size: var(--t12); }
+.mg-compact .ld-row { font-size: var(--t11); }
+.mg-compact .menu-note { font-size: var(--t12); }
+.mg-compact .sheet-ft .note { font-size: var(--t12); }

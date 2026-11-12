@@ -127,14 +127,16 @@ UI.touch = el('div', 'mg-touch', null, root);
 UI.joyZone = el('div', 'mg-joyzone', null, UI.touch);
 UI.joy = el('div', 'mg-joy', null, UI.touch, '<i class="n"></i><i class="e"></i><i class="s"></i><i class="w"></i>');
 UI.joyKnob = el('div', 'mg-joyknob', null, UI.joy);
-UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vb">USE</span><span class="vh">HOLD</span>`);
+// (idle, it shows a hand and no words: "USE / HOLD" with nothing to use, and "— / HOLD" at a thing that cannot be used, both read as broken)
+UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('hand')}${icon('lock')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
 UI.tEArc = UI.tE.querySelector('.arc');
 UI.tEVerb = UI.tE.querySelector('.vb');
 UI.tJump = tbtn('mg-tJump', 'sec', 'Jump', `${icon('jump')}<span>JUMP</span>`);
 UI.tExit = tbtn('mg-tExit', 'sec', 'Exit the rover', `${icon('exit')}<span>EXIT</span>`);
 UI.tSprint = tbtn('mg-tSprint', 'sec', 'Run', `${icon('run')}<span>RUN</span>`);
-UI.tCam = tbtn('mg-tCam', 'mini', 'Switch camera', `${icon('camera')}<span>VIEW</span>`);
-UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle', '<span class="chem">O<sub>2</sub></span><b>0</b>');
+UI.tCam = tbtn('mg-tCam', 'mini', 'Switch view', `${icon('camera')}<span>VIEW</span>`);
+// (it said only "O2": what it does is under it now)
+UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle: 40 more suit oxygen', '<i>+<span class="chem">O<sub>2</sub></span></i><span>CANDLE</span><b>0</b>');
 UI.tCandle.style.display = 'none';
 UI.tRow = el('div', 'mg-trow', null, UI.touch);
 UI.tPause = tbtn('mg-tPause', 'top', 'Pause and menu', `${icon('pause')}<span>MENU</span>`, UI.tRow);
@@ -310,7 +312,15 @@ document.addEventListener('keyup', (ev) => {
 // Toasts: discoveries, achievements, system notices. One at a time, queued.
 // ------------------------------------------------------------------------------------------
 const toastQueue = [];
-let toastBusy = false;
+let toastBusy = false, toastNow = null;                 // toastNow: the one on screen, { node, yields, timer }
+function closeToast(cur, atOnce) {
+  if (toastNow !== cur) return;
+  clearTimeout(cur.timer);
+  toastNow = null;
+  const done = () => { cur.node.remove(); root.classList.remove('has-toast'); nextToast(); };
+  if (atOnce) done();
+  else { cur.node.classList.add('out'); setTimeout(done, 380); }
+}
 function nextToast() {
   if (!toastQueue.length) { toastBusy = false; return; }
   toastBusy = true;
@@ -327,47 +337,72 @@ function nextToast() {
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${esc(t.title)}</div>${t.note ? `<div class="t3">${esc(t.note)}</div>` : ''}</div>`);
   root.classList.add('has-toast');
   const life = toastQueue.length ? 3400 : 6000;
-  setTimeout(() => {
-    node.classList.add('out');
-    setTimeout(() => { node.remove(); root.classList.remove('has-toast'); nextToast(); }, 380);
-  }, life);
+  const cur = toastNow = { node, yields: !!t.yields, timer: 0 };
+  cur.timer = setTimeout(() => closeToast(cur, false), life);
 }
-export function toast(kicker, title, note) {
+/**
+ * Queue a notice. `o.yields` marks a reminder (night has fallen, a new sol): it is shown like any other, but gives
+ * up the screen at once if news arrives while it is up.
+ */
+export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
   if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
   // a phone's card holds two short lines of note: give it whole sentences that fit, not a line cut mid-word
-  if (layout.compact && note && note.length > 92) {
-    const cut = note.slice(0, 93), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  // (how much two lines hold depends on the card's width: fewer letters on the narrowest phones)
+  const room = window.innerWidth <= 760 ? 62 : 76;
+  if (layout.compact && note && note.length > room) {
+    const cut = note.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
     note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
   }
-  toastQueue.push({ kicker, title, note });
+  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields) });
   if (!toastBusy) nextToast();
+  else if (toastNow && toastNow.yields) closeToast(toastNow, true);
 }
 
 // ------------------------------------------------------------------------------------------
 // The log feed: three voices (the astronaut, the Hab's systems, NASA) and survey notes
 // ------------------------------------------------------------------------------------------
 const VOICES = { nasa: 'NASA', sys: 'HAB', disc: 'SURVEY', log: 'LOG' };
-/** Everything said this session, newest last: { text, voice, sol }. The journal shows it. */
+/** What has been said, newest last: { text, voice, sol }. The journal shows it, and the last of it is kept with the saved game. */
 export const logHistory = [];
-export function log(text, cls) {
+/** The last lines of the log, for the saved game (it was this session's only: a run continued the next day had an empty log). */
+export function logSnapshot() { return logHistory.slice(-60).map((l) => ({ text: l.text, voice: l.voice, sol: l.sol })); }
+/** Put back the log a saved game or a checkpoint carried (nothing, for a save from before logs were kept). */
+export function restoreLog(lines) {
+  logHistory.length = 0;
+  if (Array.isArray(lines)) for (const l of lines) if (l && typeof l.text === 'string') logHistory.push({ text: l.text, voice: VOICES[l.voice] ? l.voice : 'log', sol: +l.sol || 1 });
+}
+/** As much of a text as fits in `room` letters, ending at the end of a sentence where it can (never mid-word). */
+function wholeSentences(text, room) {
+  if (text.length <= room) return text;
+  const cut = text.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  return end > 40 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
+}
+export function log(full, cls) {
   const voice = VOICES[cls] ? cls : 'log';
-  logHistory.push({ text, voice, sol: S.sol });
+  logHistory.push({ text: full, voice, sol: S.sol });
   if (logHistory.length > 120) logHistory.shift();
+  // A phone's log has the room between the bars and the stick: six short lines. A longer entry shows as many whole
+  // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
+  const text = layout.compact ? wholeSentences(full, window.innerWidth <= 760 ? 150 : 170) : full;
   const line = el('div', null, 'mg-line ' + voice, UI.log, `<span class="who">${VOICES[voice]}</span><span class="tx" aria-hidden="true"></span><span class="sr"></span>`);
   const tx = line.querySelector('.tx');
-  line.querySelector('.sr').textContent = text;
+  line.querySelector('.sr').textContent = full;
   const done = () => {
     setTimeout(() => { line.classList.add('fade'); setTimeout(() => line.remove(), 1300); }, 9500);
   };
-  if (reducedMotion()) { tx.textContent = text; done(); }
+  // (once it is all there, O2 gets its subscript, as it has everywhere else)
+  if (reducedMotion()) { tx.innerHTML = chem(esc(text)); done(); }
   else {
+    // typed out a word at a time, never part of one: caught mid-number, "Suit O2 at 4" was a false reading
     let i = 0;
     const t = setInterval(() => {
       i += 3;
-      tx.textContent = text.slice(0, i);
-      if (i >= text.length) { clearInterval(t); done(); }
-    }, 16);
+      const sp = text.indexOf(' ', i);
+      i = sp < 0 ? text.length : sp;
+      if (i >= text.length) { clearInterval(t); tx.innerHTML = chem(esc(text)); done(); }
+      else tx.textContent = text.slice(0, i);
+    }, 24);
   }
   while (UI.log.children.length > 4) UI.log.firstChild.remove();
 }
@@ -376,6 +411,12 @@ export function log(text, cls) {
 // The interaction prompt (and the touch action button, which shows the same verb)
 // ------------------------------------------------------------------------------------------
 const pr = { on: false, label: null, sub: null, state: null, pct: -1, minor: false, verb: null };
+const STATUS_MARK = '\u200b';                       // (a zero-width space, written as its escape so that it can be seen)
+/**
+ * Marks a reason an interaction gives for not being available as a plain reading ("Potatoes — 41% grown",
+ * "Panel is clean") rather than something in the way ("Needs regolith"). A reading is shown without the padlock.
+ */
+export function statusText(s) { return STATUS_MARK + s; }
 function verbOf(label) {
   const w = label.replace(/\[[^\]]*\]/g, ' ').replace(/[^A-Za-z' ]/g, ' ').trim().split(/\s+/);
   let v = w[0] || 'USE';
@@ -393,20 +434,23 @@ export function setPrompt(p) {
     if (pr.on) {
       pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null;
       UI.prompt.classList.remove('on');
-      UI.tE.classList.remove('ready', 'no', 'holding');
-      UI.tEVerb.textContent = 'USE';
+      UI.tE.classList.remove('ready', 'no', 'holding', 'verb');
+      UI.tEVerb.textContent = '';
       UI.tEArc.style.strokeDashoffset = 100;
     }
     return;
   }
-  const label = p.disabled && typeof p.disabled === 'string' ? p.disabled : p.label;
-  const state = p.disabled ? 'no' : (p.hold > 0.7 ? 'hold' : 'tap');
+  // not available: either something is in the way (a padlock), or there is simply nothing to do here now (a reading)
+  const reading = typeof p.disabled === 'string' && p.disabled.charAt(0) === STATUS_MARK;
+  const label = p.disabled && typeof p.disabled === 'string' ? (reading ? p.disabled.slice(1) : p.disabled) : p.label;
+  // (every interaction is held, the quick ones for half a second: the tag is on all of them, where it was on some)
+  const state = p.disabled ? (reading ? 'info' : 'no') : 'hold';
   if (!pr.on) { pr.on = true; UI.prompt.classList.add('on'); }
   if (label !== pr.label) {
     pr.label = label;
     UI.promptLabel.innerHTML = chem(esc(label));
   }
-  const verb = p.disabled ? '—' : verbOf(p.label);
+  const verb = p.disabled ? '' : verbOf(p.label);
   if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
   if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
   const sub = p.sub || '';
@@ -414,9 +458,11 @@ export function setPrompt(p) {
   if (state !== pr.state) {
     pr.state = state;
     UI.prompt.classList.toggle('no', state === 'no');
+    UI.prompt.classList.toggle('info', state === 'info');
     UI.prompt.classList.toggle('hold', state === 'hold');
     UI.tE.classList.toggle('no', state === 'no');
-    UI.tE.classList.toggle('ready', state !== 'no' && !pr.minor);          // lit only for something actually in reach
+    UI.tE.classList.toggle('verb', state === 'hold');                       // a word on it only when there is something to do
+    UI.tE.classList.toggle('ready', state === 'hold' && !pr.minor);          // lit only for something actually in reach
   }
   const pct = p.disabled ? 0 : Math.round(Math.min(1, Math.max(0, p.progress || 0)) * 100);
   if (pct !== pr.pct) {
@@ -457,17 +503,25 @@ function scrollCue(n) {
 }
 root.addEventListener('scroll', (ev) => { const t = ev.target; if (t && t.classList && t.classList.contains('mg-scroll')) scrollCue(t); }, true);
 let cueTick = 0;
-function syncChrome() {
-  requestAnimationFrame(syncChrome);
+/**
+ * Bring the root's state classes up to date now. They are kept every frame below; the HUD also calls this before
+ * it measures itself, so that what it measures is what is showing (a menu just closed, the rover just entered).
+ */
+export function syncFlags() {
   const modal = S.uiOpen || anyScreenOpen();
-  // (their contents change under them, so the regions on screen are looked at again a few times a second)
-  if ((modal || !S.started) && ++cueTick % 2 === 0) for (const n of root.querySelectorAll('.mg-scroll')) if (n.offsetParent) scrollCue(n);
   flag('is-playing', S.started);
   flag('is-modal', modal);
   flag('is-rover', S.mode === 'rover');
   flag('is-cutscene', S.mode === 'cutscene');
   flag('is-cold', !!S.flags.coldOpen);
   flag('is-fp', S.firstPerson && S.mode === 'walk');
+  return modal;
+}
+function syncChrome() {
+  requestAnimationFrame(syncChrome);
+  const modal = syncFlags();
+  // (their contents change under them, so the regions on screen are looked at again a few times a second)
+  if ((modal || !S.started) && ++cueTick % 2 === 0) for (const n of root.querySelectorAll('.mg-scroll')) if (n.offsetParent) scrollCue(n);
   // a phone turned upright mid-game: pause, so nothing happens behind the "rotate" notice
   if (layout.portrait && S.started && !modal && !S.over && S.mode !== 'cutscene' && uiHooks.pause) uiHooks.pause();
 }

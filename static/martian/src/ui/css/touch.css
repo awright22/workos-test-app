@@ -32,21 +32,31 @@
 #mg-tE .ring { inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); }
 #mg-tE .ring .trk { stroke: transparent; }
 #mg-tE .ring .arc { stroke: var(--accent); stroke-width: 5; stroke-dashoffset: 100; transition: none; }
-#mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-3); }
-#mg-tE .vh { font-size: .5625rem; letter-spacing: .2em; color: var(--ink-3); }
+#mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-2); }
+#mg-tE .vh { font-size: max(.6875rem, 11px); letter-spacing: .18em; color: var(--ink-3); }
+/* nothing in reach: a hand, dim, and no words. Something in the way: a padlock. Something to do: the verb, and HOLD. */
+#mg-tE .vi { display: grid; place-items: center; color: var(--ink-3); }
+#mg-tE .vi .ic { width: 1.625rem; height: 1.625rem; }
+#mg-tE .vi .ic:last-child, #mg-tE .vb, #mg-tE .vh { display: none; }
+#mg-tE.verb .vi { display: none; }
+#mg-tE.verb .vb, #mg-tE.verb .vh { display: block; }
+#mg-tE.no .vi .ic:first-child { display: none; }
+#mg-tE.no .vi .ic:last-child { display: block; }
 #mg-tE.ready { border-color: var(--accent); background: rgba(40, 26, 10, .62); }
 #mg-tE.ready .vb { color: var(--ink); }
 #mg-tE.ready .vh { color: var(--accent); }
 #mg-tE.no { border-style: dashed; }
-#mg-tE:not(.ready):not(.no) .vb { color: var(--ink-2); }
 #mg-tE.holding { background: rgba(255, 180, 84, .22); }
 #mg-tJump, #mg-tExit { right: calc(var(--sar) + 7rem); bottom: calc(var(--sab) + 1.5rem); width: 3.625rem; height: 3.625rem; }
 #mg-tSprint { right: calc(var(--sar) + 5.5rem); bottom: calc(var(--sab) + 5.75rem); width: 3.625rem; height: 3.625rem; }
 #mg-tCam { right: calc(var(--sar) + 1.75rem); bottom: calc(var(--sab) + 7.375rem); width: 2.75rem; height: 2.75rem; }
-#mg-tCandle { right: calc(var(--sar) + 5.25rem); bottom: calc(var(--sab) + 10rem); width: 2.75rem; height: 2.75rem; font-size: .8125rem; letter-spacing: .02em;
+/* the candle stands left of RUN (above it, it took the room the mission list needs for its reason) */
+#mg-tCandle { right: calc(var(--sar) + 9.5rem); bottom: calc(var(--sab) + 6.125rem); width: 3rem; height: 3rem; gap: .0625rem; letter-spacing: .02em;
   border-color: var(--cold); color: var(--cold); }
-#mg-tCandle b { position: absolute; right: -.25rem; top: -.25rem; min-width: 1.125rem; height: 1.125rem; padding: 0 .25rem; border-radius: .5625rem; background: var(--cold); color: #06131c;
-  font: 600 .6875rem/1.125rem var(--f-cond); letter-spacing: 0; text-align: center; }
+#mg-tCandle i { font: 600 .875rem/1 var(--f-cond); font-style: normal; }
+#mg-tCandle > span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: 0; }
+#mg-tCandle b { position: absolute; right: -.25rem; top: -.25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .25rem; border-radius: .625rem; background: var(--cold); color: #06131c;
+  font: 600 max(.75rem, 12px)/1.25rem var(--f-cond); letter-spacing: 0; text-align: center; }
 #mg-tExit { display: none; border-color: var(--accent); color: var(--accent); }
 .is-rover #mg-tExit { display: flex; }
 .is-rover #mg-tJump, .is-rover #mg-tSprint { display: none; }
@@ -93,7 +103,24 @@
 .mg-touch.is-playing:not(.is-modal) #mg-vitals { pointer-events: auto; }
 
 /* the words under the top-right buttons and the camera button */
-#mg-trow .mg-tbtn, #mg-tCam { gap: .0625rem; }
-#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 .625rem/1 var(--f-cond); letter-spacing: .04em; color: var(--ink-2); }
+#mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
+#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .02em; color: var(--ink); }
 #mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
-.mg-touch #mg-trow .mg-tbtn { min-width: 46px; }
+.mg-touch #mg-trow .mg-tbtn { min-width: 48px; min-height: 46px; }
+.mg-touch #mg-trow { gap: .25rem; }
+/* the words on the round buttons (JUMP, RUN, EXIT) */
+.mg-tbtn { font-size: max(.6875rem, 11px); letter-spacing: .1em; }
+
+/* ---------------------------------------------------------------- forty-four pixels, whatever a narrower rule says
+   (the compact rules for sheets, dialogs, tabs and option groups are more specific than the ones above and set
+   40 px and 36 px: on a touch screen a thumb's height is not negotiable) */
+.mg-touch .mg-btn, .mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .menu-item, .mg-touch .choice, .mg-touch .scr-nav button { min-height: 44px !important; }
+.mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .scr-nav button { min-width: 44px; }
+.mg-touch .mg-range { height: max(2.75rem, 44px); }
+.mg-touch .mg-iconbtn { width: max(2.75rem, 44px); height: max(2.75rem, 44px); }
+/* a switch's row is what is pressed (ui/menus.js) */
+.mg-touch .set-row { min-height: 44px !important; }
+.mg-touch .set-row.tap { cursor: pointer; }
+/* no hover on a touch screen: a card stays lit after the tap that opened the sheet under it */
+.mg-touch .diff:hover { background: rgba(245, 240, 232, .035); border-color: var(--line-2); border-top-color: var(--ink-4); transform: none; }
+.mg-touch .diff:active { border-color: var(--accent); }

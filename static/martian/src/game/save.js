@@ -5,7 +5,7 @@ import { _v1 } from '../core/scratch.js';
 import { player, syncPlayerPos } from './player.js';
 import { roverF, syncRoverVisual } from './rover.js';
 import { Snd } from '../audio/sound.js';
-import { hideOverlay, log } from '../ui/dom.js';
+import { hideOverlay, log, logSnapshot, restoreLog } from '../ui/dom.js';
 import { initScience } from './science.js';
 import { initMachines } from './machines.js';
 import { farm } from './farm.js';
@@ -40,9 +40,11 @@ export function serializeState() {
     built: World.builtMeshes.map(b => ({ kind: b.kind, charges: b.charges, yaw: b.yaw || 0,
       ll: vecToLl(_v1.copy(b.group.position).normalize()) })),
     playerQ: player.q.toArray(), roverQ: roverF.q.toArray(),
+    log: logSnapshot(),                  // (optional: the last lines of the log, for the journal; older saves have none)
   };
 }
 export function applyState(d) {
+  restoreLog(d.log);
   Object.assign(S, {
     sol: d.sol, tod: d.tod, o2: d.o2, water: d.water, food: d.food, potatoes: d.potatoes,
     power: d.power, health: d.health, suit: d.suit, roverPower: d.roverPower, roverO2: d.roverO2,
