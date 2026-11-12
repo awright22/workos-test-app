@@ -2420,200 +2420,407 @@ def build_regolith_pile():
 # ==============================================================================================
 # ice_outcrop.glb
 # ==============================================================================================
-def _clip_half(poly_, p, n):
-    """Keep the part of a 2D polygon on the inner side of the line through p with outward normal n."""
-    out = []
-    for i in range(len(poly_)):
-        a, b = poly_[i], poly_[(i + 1) % len(poly_)]
-        sa = (a[0] - p[0]) * n[0] + (a[1] - p[1]) * n[1]
-        sb = (b[0] - p[0]) * n[0] + (b[1] - p[1]) * n[1]
-        if sa <= 0:
-            out.append(a)
-        if (sa <= 0) != (sb <= 0):
-            t = sa / (sa - sb)
-            out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
-    return out
-
-
 def _smooth01(a, b, x):
     t = max(0.0, min(1.0, (x - a) / (b - a)))
     return t * t * (3 - 2 * t)
 
 
-def _ice_cut(bm, co, no, close=True):
+def _seg_dist(p, a, b):
+    """Distance from the point p to the segment a-b."""
+    ab = b - a
+    t = max(0.0, min(1.0, (p - a).dot(ab) / max(ab.length_squared, 1e-12)))
+    return (p - a - ab * t).length
+
+
+def _ice_cut(bm, co, no, close=True, keep=0.0):
     """Break a convex solid along a plane: what lies beyond it (the side `no` points to) goes, and
-    the break is one flat face."""
+    the break is one flat face. With `keep`, a break that would leave less than that share of the
+    solid is not made (returns False)."""
+    if keep > 0.0:
+        trial = bm.copy()
+        before = abs(trial.calc_volume())
+        _ice_cut(trial, co, no)
+        left = abs(trial.calc_volume()) if trial.faces else 0.0
+        trial.free()
+        if left < keep * before:
+            return False
     res = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-5, plane_co=co, plane_no=no, clear_outer=True)
     edges = [e for e in res['geom_cut'] if isinstance(e, bmesh.types.BMEdge)]
     if close and edges:
         bmesh.ops.holes_fill(bm, edges=edges, sides=0)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.normal_update()
+    return True
 
 
-def _ice_between(bm, co, no, thick):
-    """The skin of a solid between two parallel planes (a copy; the solid is left alone)."""
+def _ice_between(bm, co, no, thick=0.0, co2=None, no2=None):
+    """The skin of a solid between two planes (a copy; the solid is left alone): above the plane
+    through `co` with normal `no`, and below a second one, which is either parallel and `thick`
+    higher or the plane through `co2` with normal `no2` (a layer that thickens one way and pinches
+    out the other)."""
     c = bm.copy()
     no = Vector(no).normalized()
     bmesh.ops.bisect_plane(c, geom=c.verts[:] + c.edges[:] + c.faces[:], dist=1e-5, plane_co=co, plane_no=no, clear_inner=True)
-    bmesh.ops.bisect_plane(c, geom=c.verts[:] + c.edges[:] + c.faces[:], dist=1e-5, plane_co=Vector(co) + no * thick, plane_no=no, clear_outer=True)
+    if c.faces:
+        bmesh.ops.bisect_plane(c, geom=c.verts[:] + c.edges[:] + c.faces[:], dist=1e-5, plane_co=Vector(co) + no * thick if co2 is None else co2,
+                               plane_no=no if no2 is None else Vector(no2).normalized(), clear_outer=True)
     return c
 
 
+def _ice_lift(bm, tree, clear=0.004):
+    """Raise a band so that no part of it dips under the surface it lies on (`tree`: that surface
+    as it will be drawn, in triangles)."""
+    for _ in range(2):
+        bm.normal_update()
+        push = {}
+        for f in bm.faces:
+            pts = [v.co for v in f.verts]
+            pts = pts + [(pts[i] + pts[(i + 1) % len(pts)]) / 2 for i in range(len(pts))] + [f.calc_center_median()]
+            need = 0.0
+            for p in pts:
+                loc, nrm, _, _ = tree.find_nearest(p)
+                if loc is not None:
+                    need = max(need, clear - (p - loc).dot(nrm))
+            if need > 0.0:
+                for v in f.verts:
+                    push[v] = max(push.get(v, 0.0), need)
+        for v, d in push.items():
+            v.co += v.normal * min(d, 0.03)
+
+
+def _ice_flake(bm, rk, zmin=0.2, deep=(0.015, 0.06), tilt=(3.0, 13.0), keep=0.80):
+    """Strike a flake off one edge of a convex solid. The break starts part of the way along the
+    edge and widens toward one end of it, so it leaves a long tapering facet and takes that corner
+    with it: no edge of the block stays a ruled line between two square corners."""
+    edges = [e for e in bm.edges if len(e.link_faces) == 2 and max(e.verts[0].co.z, e.verts[1].co.z) > zmin and e.calc_length() > 0.14]
+    if not edges:
+        return
+    e = rk.choices(edges, weights=[e.calc_length() * (0.4 + max(0.0, e.verts[0].co.z + e.verts[1].co.z)) for e in edges])[0]
+    a, b = e.verts[0].co.copy(), e.verts[1].co.copy()
+    if rk.random() < 0.5:
+        a, b = b, a
+    n = e.link_faces[0].normal + e.link_faces[1].normal
+    if n.length < 1e-4:
+        return
+    n.normalize()
+    t = rad(rk.uniform(*tilt))
+    _ice_cut(bm, a.lerp(b, rk.uniform(0.05, 0.55)) - n * rk.uniform(*deep), (n * cos(t) + (b - a).normalized() * sin(t)).normalized(), keep=keep)
+
+
+def _ice_facets(bm, rk, step=0.42, zlo=0.12):
+    """Ice breaks like glass: each fracture leaves a shallow hollow between sharp edges, not a
+    plane. Every flat face of the solid is remembered, the solid is sliced by a loose lattice of
+    planes so that the faces have points inside them, and those points are sunk toward the middle
+    of their face (a few faces are left proud instead). The edges between faces do not move, so
+    they stay crisp. Returns the face layer that tells which break each face belongs to, and per
+    vertex (how far inside its face it lies, 0 on an edge to 1 in the middle; a tone for its face)."""
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.normal_update()
+    fid = bm.faces.layers.int.new('fid')
+    c = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+    thin = min((abs((f.calc_center_median() - c).dot(f.normal)) for f in bm.faces), default=0.1)
+    info = {}
+    for i, f in enumerate(bm.faces[:]):
+        f[fid] = i + 1
+        pts = [v.co.copy() for v in f.verts]
+        m = f.calc_center_median()
+        inr = max(1e-3, min(_seg_dist(m, pts[j], pts[(j + 1) % len(pts)]) for j in range(len(pts))))
+        depth = min(0.10, 0.45 * thin, inr * rk.uniform(0.10, 0.24)) * (1.0 if rk.random() < 0.84 else -0.4)
+        info[i + 1] = (f.normal.copy(), pts, inr, depth, rk.random())
+    a0 = rk.uniform(0, pi)
+    for no, lo in ((Vector((cos(a0), sin(a0), 0.0)), None), (Vector((-sin(a0 + 0.3), cos(a0 + 0.3), 0.0)), None), (Vector((0.05, -0.04, 1.0)).normalized(), zlo)):
+        ds = [v.co.dot(no) for v in bm.verts]
+        t = (min(ds) if lo is None else lo) + step * rk.uniform(0.45, 0.8)
+        while t < max(ds) - step * 0.3:
+            bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-4, plane_co=no * t, plane_no=no)
+            t += step * rk.uniform(0.8, 1.2)
+    inside = {}
+    for v in bm.verts:
+        ids = {f[fid] for f in v.link_faces}
+        if len(ids) != 1:
+            inside[v] = (0.0, sum(info[i][4] for i in ids) / len(ids))
+            continue
+        n, pts, inr, depth, tone = info[ids.pop()]
+        d = min(_seg_dist(v.co, pts[j], pts[(j + 1) % len(pts)]) for j in range(len(pts)))
+        inside[v] = (min(1.0, d / inr), tone)
+        v.co -= n * (depth * (1.0 - (1.0 - min(1.0, d / inr)) ** 2) + 0.005 * noise3(v.co, 9.0, 1.3))
+    bm.normal_update()
+    return fid, inside
+
+
+def _ice_triangulate(bm):
+    """Triangles, with every warped quad folded along its valley: the folded surface then lies on
+    or under the quad it came from, and a band cut from that quad stays on top of it."""
+    bm.normal_update()
+    for f in bm.faces[:]:
+        if len(f.verts) != 4:
+            continue
+        a, b, c, d = f.verts
+        if ((a.co + c.co) / 2 - (b.co + d.co) / 2).dot(f.normal) <= 0.0:
+            bmesh.utils.face_split(f, a, c)
+        else:
+            bmesh.utils.face_split(f, b, d)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+
+
+def _ice_edges(bm, fid):
+    """Per vertex, how sharp the sharpest outward edge between two breaks is there (0..1)."""
+    out = {}
+    for v in bm.verts:
+        k = 0.0
+        for e in v.link_edges:
+            if len(e.link_faces) == 2 and e.link_faces[0][fid] != e.link_faces[1][fid] and e.is_convex:
+                k = max(k, _smooth01(rad(16.0), rad(60.0), e.calc_face_angle(0.0)))
+        out[v] = k
+    return out
+
+
+def _bm_into(dst, src):
+    """Copy the geometry of one bmesh into another; returns the new verts. Frees `src`."""
+    me = bpy.data.meshes.new('tmp')
+    src.to_mesh(me)
+    src.free()
+    n0 = len(dst.verts)
+    dst.from_mesh(me)
+    bpy.data.meshes.remove(me)
+    dst.verts.ensure_lookup_table()
+    return dst.verts[n0:]
+
+
 def build_ice_outcrop():
-    """Dirty water ice exposed in a low cut bank, the way the Phoenix trench and the scarps seen
-    from orbit show it: a pale blue-white slab under a skin of soil, layered with thin bands of
-    dust, that has broken up into six blocks. They are angular: every face is a flat fracture, the
-    blocks have settled apart and lean their own ways (two have all but toppled), and the dust
-    bands, which were one set of level layers, are now tilted with each block and stepped across
-    every break. Each block is a part (`block_0` .. `block_5`, origin on the ground under it) that
-    the game takes away one by one, the last first, so a block only ever leans toward one that
-    outlasts it; its foot is 35 cm below the origin plane, so it never shows its underside on
-    uneven ground. What stays is the scraped floor of the ice table with the shards and frost
-    rubble that fell at the blocks' feet, inside a low berm of spoil whose apron fades into the
-    ground and whose hem hangs 35 cm below the origin plane as well. The face looks toward -Y."""
+    """Old water ice standing out of the ground in a low scarp, as the scarps of the middle
+    latitudes and the polar layered deposits show it: blue ice laid down in layers, with thin
+    bands of dust running through it, that has broken along clean fractures into six blocks.
+    Four still stand about where they formed (the scarp faces -Y; their bands still line up
+    across the cracks, stepped where a piece has dropped); two have slumped forward off its foot
+    and lie tilted, their bands with them. Every block is itself in three or four pieces, a
+    hand's breadth apart. Every break is a shallow conchoidal hollow between crisp edges, with
+    long flakes struck off the edges and corners; the layers thicken one way and pinch out the
+    other; old healed fractures show as pale seams. Each block is a part (`block_0` ..
+    `block_5`, origin on the ground under it) that the game takes away one by one, the last
+    first, so no block rests on one that goes before it; its foot is 30 cm below the origin
+    plane. What stays is the floor of the ice table (the stump of each block), with talus and
+    frost where the blocks stood, inside a skirt of dusty soil that climbs highest behind the
+    scarp and whose hem fades into the ground.
+    Materials: `ice` (the game makes it glossy, blue and faintly glowing; its vertex colour is
+    dark blue in the body, darker with depth and in the cracks, pale along the edges),
+    `dust_lag` (matte: the bands, stones), `frost`, `ground_dust` (the skirt)."""
     ground_dust()
-    mat('ice', roughness=0.46)                              # weathered, sublimated ice: no polish
+    mat('ice', roughness=0.2)
+    mat('dust_lag', color=(0.30, 0.21, 0.15), metallic=0.0, roughness=1.0)         # dust frozen into the ice in layers; stones
+    mat('frost', color=(0.50, 0.68, 0.98), metallic=0.0, roughness=0.9)            # (blue in itself: under a butterscotch sky white turns to cream)
     root = part('ice_outcrop')
     rng = random.Random(21)
-    P = Paint()
+    PI, PD, PG = Paint(), Paint(), Paint()                      # colours painted on the ice, the dust, the ground
     seeds = ((-1.95, 0.45), (-0.45, -1.30), (0.40, 0.90), (1.75, -0.65), (2.45, 1.20), (-0.95, 2.10))      # the six part origins
     outline = [(-2.55, 0.10), (-2.10, -1.20), (-0.90, -1.95), (0.60, -2.00), (2.10, -1.55), (2.85, -0.35), (3.00, 1.10), (2.55, 2.00),
                (1.20, 2.50), (-0.60, 2.70), (-1.90, 2.30), (-2.50, 1.30)]
-    CLEAN, BAND, MANTLE, GRIME = (0.84, 0.93, 1.0), (0.52, 0.39, 0.29), (0.70, 0.52, 0.39), (0.58, 0.47, 0.38)
-    SPOIL, DAMP, GROUND = (0.80, 0.74, 0.70), (0.62, 0.56, 0.52), (1.0, 1.0, 1.0)
-    FOOT = -0.35
+    # Vertex colours of the ice. The game multiplies them into a pale blue, lights it hard and adds a blue glow of its own,
+    # so the body has to be far darker than it reads: measured in the game, in full sun anything much lighter than BODY
+    # washes out to white. CLEAN is for edges and seams; GRIME for the foot; DUSTY for what is left of the old surface.
+    CLEAN, BODY, DEEP, DIRTY, GRIME = (0.80, 0.93, 1.0), (0.07, 0.18, 0.40), (0.022, 0.078, 0.25), (0.17, 0.25, 0.36), (0.26, 0.15, 0.08)
+    DUSTY = (0.45, 0.22, 0.10)
+    BAND_PALE, BAND_DARK, LAG = (1.0, 0.96, 0.90), (0.58, 0.54, 0.52), (0.70, 0.70, 0.70)       # tones of `dust_lag`: the layers, the stones
+    SPOIL, DAMP, GROUND = (0.74, 0.62, 0.53), (0.56, 0.47, 0.41), (1.0, 1.0, 1.0)               # tints of the skirt, to the ground's own at its hem
+    FOOT = -0.30
+    # the old surface: the top of the slab, falling gently away behind the scarp. The layers lie parallel to it.
+    DIP = Vector((0.012, 0.085, 1.0)).normalized()
+    TOP = Vector((0.25, 0.90, 1.32))
 
     def mix(a, b, t):
         t = max(0.0, min(1.0, t))
         return tuple(a[c] + (b[c] - a[c]) * t for c in range(3))
 
-    def mantle(x, y):
-        """How much dust lies on the ice here: patches, thicker toward the back of the bank."""
-        return _smooth01(0.30, 0.62, 0.28 + 0.42 * _smooth01(-1.6, 2.4, y) + 0.45 * noise3((x, y, 0.2), 1.9, 1.0))
+    def depth_of(p):
+        """How far under the old surface a point of the unbroken slab lay."""
+        return (TOP - Vector(p)).dot(DIP)
 
     # ---- the six blocks: the cells of the broken slab ----
-    # (height, size against its cell, the bearing its top leans toward and by how many degrees, how far it has sunk,
-    #  turn in plan, dust-skinned top?, breaks through it: (bearing of the break's normal, offset from the middle, gap))
-    BLOCKS = ((0.98, 0.95, (172.0, 7.0), 0.00, 4.0, True, ((28.0, 0.30, 0.06), (112.0, -0.22, 0.05))),
-              (0.66, 0.93, (248.0, 13.0), 0.03, -6.0, False, ((98.0, -0.18, 0.07),)),
-              (1.16, 0.90, (40.0, 5.0), 0.00, 7.0, True, ((142.0, 0.16, 0.05), (48.0, -0.25, 0.05))),
-              (0.76, 0.88, (300.0, 24.0), 0.10, -5.0, False, ((20.0, 0.10, 0.06),)),
-              (0.86, 0.87, (158.0, 16.0), 0.05, 9.0, True, ((70.0, 0.05, 0.06),)),
-              (0.56, 0.86, (292.0, 33.0), 0.14, -8.0, False, ((335.0, -0.20, 0.05),)))
-    # the dust layers of the slab before it broke: (height, thickness), dipping a little to the east and the back
-    STRATA = ((0.13, 0.034), (0.29, 0.026), (0.49, 0.042), (0.72, 0.028), (0.95, 0.030))
-    DIP = Vector((-0.035, -0.022, 1.0)).normalized()
-    DEEP = (0.66, 0.82, 0.98)
-    cells = []
+    # (the bearing its top leans toward and by how many degrees, how far it has sunk, turn in plan, how much of its top broke away when it fell,
+    #  breaks through it: (bearing of the break's normal, offset from the middle, gap, how far that piece has dropped, how far it tips out))
+    BLOCKS = (((184.0, 3.0), 0.03, 3.0, 0.0, ((262.0, 0.36, 0.035, 0.12, 7.0), (20.0, 0.42, 0.03, 0.22, 5.0), (150.0, 0.50, 0.03, 0.34, 9.0))),
+              ((250.0, 27.0), 0.12, -9.0, 0.44, ((120.0, 0.08, 0.05, 0.06, 6.0), (30.0, 0.45, 0.04, 0.12, 8.0))),
+              ((95.0, 1.5), 0.00, 4.0, 0.0, ((276.0, 0.30, 0.04, 0.13, 6.5), (170.0, 0.46, 0.035, 0.30, 8.0), (60.0, 0.44, 0.03, 0.18, 5.0))),
+              ((305.0, 31.0), 0.17, 8.0, 0.36, ((35.0, 0.12, 0.05, 0.05, 7.0), (250.0, 0.42, 0.04, 0.10, 9.0))),
+              ((15.0, 5.0), 0.09, -5.0, 0.0, ((250.0, 0.34, 0.04, 0.16, 9.0), (140.0, 0.40, 0.035, 0.26, 7.0))),
+              ((115.0, 8.0), 0.06, 7.0, 0.0, ((330.0, 0.30, 0.04, 0.20, 10.0), (200.0, 0.42, 0.03, 0.14, 6.0))))
+    # the dust layers of the slab: (depth under the old surface, thickness in the middle of the exposure, how dark, the bearing along which
+    #  it thickens and by how much in a metre: no layer is the same thickness all the way, and some pinch out)
+    STRATA = ((0.17, 0.018, 0.6, 40.0, 0.007), (0.42, 0.028, 0.9, 200.0, 0.008), (0.56, 0.012, 0.45, 110.0, 0.006), (0.78, 0.034, 1.0, 320.0, 0.008),
+              (1.02, 0.020, 0.7, 150.0, 0.007))
+    stumps = []
     for k, (sx, sy) in enumerate(seeds):
-        cell = list(outline)
-        for m, (ox, oy) in enumerate(seeds):
+        (lean_to, lean), sink, turn, lop, breaks = BLOCKS[k]
+        rk = random.Random(300 + k)
+        deep = (0.42 + 1.3 * sin(rad(lean))) / cos(rad(lean))          # enough below ground that no tilt lifts the foot clear
+        solid = bm_new()
+        lo = [solid.verts.new((x, y, -deep)) for x, y in outline]
+        hi = [solid.verts.new((x, y, 1.8)) for x, y in outline]
+        solid.faces.new(list(reversed(lo)))
+        solid.faces.new(hi)
+        for i in range(len(outline)):
+            solid.faces.new((lo[i], lo[(i + 1) % len(outline)], hi[(i + 1) % len(outline)], hi[i]))
+        _ice_cut(solid, TOP, DIP)
+        for m in range(len(seeds)):                                 # the cracks between this block and the others: planes, none of them plumb
             if m == k:
                 continue
-            d = Vector((ox - sx, oy - sy))
-            L = d.length
-            d /= L
-            gap = 0.055 + 0.05 * hash01(min(k, m), max(k, m))        # the crack between two blocks
-            cell = _clip_half(cell, (sx + d.x * (L / 2 - gap), sy + d.y * (L / 2 - gap)), (d.x, d.y))
-        cells.append(cell)
-    for k, (sx, sy) in enumerate(seeds):
-        high, size, (lean_to, lean), sink, turn, skinned, breaks = BLOCKS[k]
-        rk = random.Random(100 + k)
-        cell = [Vector(v) for v in cells[k]]
-        mid = sum(cell, Vector((0.0, 0.0))) / len(cell)
-        cell = [mid + (v - mid) * size for v in cell]
-        deep = (0.45 + 1.25 * sin(rad(lean))) / cos(rad(lean))          # enough below ground that no tilt lifts the foot clear
-        solid = bm_new()
-        lo = [solid.verts.new((v.x, v.y, -deep)) for v in cell]
-        hi = [solid.verts.new((v.x, v.y, high)) for v in cell]
-        solid.faces.new(list(reversed(lo)))
-        cap = solid.faces.new(hi)
-        for i in range(len(cell)):
-            solid.faces.new((lo[i], lo[(i + 1) % len(cell)], hi[(i + 1) % len(cell)], hi[i]))
+            a, b = min(k, m), max(k, m)                             # (both blocks must agree on the plane between them)
+            d = Vector((seeds[b][0] - seeds[a][0], seeds[b][1] - seeds[a][1], 0.0)).normalized()
+            turn_ = rad(22.0 * (hash01(a, b, 1) - 0.5))
+            n = Vector((d.x * cos(turn_) - d.y * sin(turn_), d.x * sin(turn_) + d.y * cos(turn_), 0.5 * (hash01(a, b, 2) - 0.5))).normalized()
+            at = Vector(((seeds[a][0] + seeds[b][0]) / 2, (seeds[a][1] + seeds[b][1]) / 2, 0.45)) + d * (0.24 * (hash01(a, b, 3) - 0.5))
+            gap = 0.02 + 0.025 * hash01(a, b, 4)
+            if k == a:
+                _ice_cut(solid, at - n * gap, n)
+            else:
+                _ice_cut(solid, at + n * gap, -n)
+        upper = [v.co for v in solid.verts if v.co.z > -1e-3]
+        mid = sum((Vector((p.x, p.y)) for p in upper), Vector((0.0, 0.0))) / len(upper)
+        stump = solid.copy()                                        # what stays when the game takes the block away: a low stump
+        a = TAU * hash01(k, 8)
+        _ice_cut(stump, Vector((mid.x, mid.y, 0.06 + 0.06 * hash01(k, 9))), Vector((0.06 * cos(a), 0.06 * sin(a), 1.0)).normalized())
+        _ice_cut(stump, (0.0, 0.0, -0.06), (0.0, 0.0, -1.0), close=False)
+        stumps.append(stump)
+        if lop:                                                     # it lost its top when it fell
+            a = rk.uniform(0, TAU)
+            t = rad(rk.uniform(14.0, 26.0))
+            _ice_cut(solid, Vector((mid.x, mid.y, max(p.z for p in upper) - lop)), Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t))))
         # the pieces the block has broken into
-        pieces, slid = [solid], [Vector((0.0, 0.0, 0.0))]
-        for (bear, off, gap) in breaks:
-            n = Vector((cos(rad(bear)), sin(rad(bear)), rk.uniform(-0.18, 0.18))).normalized()
-            at = Vector((mid.x, mid.y, 0.0)) + n * off
+        pieces, moves = [solid], [None]
+        for (bear, off, gap, drop, tip) in breaks:
+            n = Vector((cos(rad(bear)), sin(rad(bear)), rk.uniform(-0.22, 0.12))).normalized()
+            at = Vector((mid.x, mid.y, 0.5)) + n * off
             other = solid.copy()
             _ice_cut(solid, at - n * (gap / 2), n)
             _ice_cut(other, at + n * (gap / 2), -n)
+            if not other.faces or abs(other.calc_volume()) < 0.02:
+                other.free()
+                continue
             pieces.append(other)
-            slid.append(Vector((n.x, n.y, 0.0)) * rk.uniform(0.02, 0.07))
+            moves.append((n, drop, tip, rk.uniform(0.02, 0.06)))
         lean_axis = Vector((-sin(rad(lean_to)), cos(rad(lean_to)), 0.0))
         M_block = (T(mid.x, mid.y, -sink) @ Matrix.Rotation(rad(lean), 4, lean_axis) @ R('Z', turn) @ T(-mid.x, -mid.y, 0.0))
-        body, bands = bm_new(), bm_new()
-        dusty = []                                                  # points of the old surface that kept their skin of dust
+        body, bands, veins = bm_new(), bm_new(), bm_new()
         for pi_, piece in enumerate(pieces):
             c = sum((v.co for v in piece.verts), Vector()) / len(piece.verts)
-            reach = max((Vector((v.co.x - c.x, v.co.y - c.y))).length for v in piece.verts)
-            top_z = high
-            if not skinned or pi_ > 0:                              # the top went with the break: one or two fresh faces across it
-                for _ in range(1 if skinned else 2):
-                    a = rk.uniform(0, TAU)
-                    t = rad(rk.uniform(9.0, 24.0))
-                    _ice_cut(piece, Vector((c.x, c.y, high - rk.uniform(0.03, 0.14))) + Vector((cos(a), sin(a), 0.0)) * reach * rk.uniform(-0.2, 0.3),
-                             Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t))))
-            for _ in range(5 if pi_ == 0 else 4):                   # corners and edges knocked off
+            c.z = max(c.z, 0.3)
+            top = max(v.co.z for v in piece.verts)
+
+            def far(a, zmin=0.2):
+                return max((v.co for v in piece.verts if v.co.z > zmin), key=lambda q: (q.x - c.x) * cos(a) + (q.y - c.y) * sin(a), default=c).copy()
+
+            if pi_ > 0:                                             # what broke off stands lower
+                top -= rk.uniform(0.06, 0.26)
                 a = rk.uniform(0, TAU)
-                n = Vector((cos(a + rk.uniform(-0.5, 0.5)), sin(a + rk.uniform(-0.5, 0.5)), rk.uniform(0.35, 1.25))).normalized()
-                rim_pt = max((v.co for v in piece.verts if v.co.z > 0.2), key=lambda q: (q.x - c.x) * cos(a) + (q.y - c.y) * sin(a))
-                _ice_cut(piece, rim_pt - n * rk.uniform(0.05, 0.20), n)
-            for _ in range(3):                                      # and a slab spalled off a side
+                t = rad(rk.uniform(9.0, 30.0))
+                _ice_cut(piece, Vector((c.x, c.y, top)) + Vector((cos(a), sin(a), 0.0)) * rk.uniform(-0.25, 0.1), Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t))), keep=0.6)
+            for _ in range(2 if pi_ == 0 else 1):                   # the crown: little is left of the old flat surface, breaks cross it at their own slants
                 a = rk.uniform(0, TAU)
-                far = max((v.co.x - c.x) * cos(a) + (v.co.y - c.y) * sin(a) for v in piece.verts)
-                _ice_cut(piece, Vector((c.x, c.y, 0.3)) + Vector((cos(a), sin(a), 0.0)) * far * rk.uniform(0.80, 0.94),
-                         Vector((cos(a), sin(a), rk.uniform(-0.22, 0.30))).normalized())
-            bmesh.ops.recalc_face_normals(piece, faces=piece.faces[:])
+                t = rad(rk.uniform(14.0, 40.0))
+                n = Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t)))
+                _ice_cut(piece, far(a, top * 0.6) - n * rk.uniform(0.06, 0.22), n, keep=0.84)
+            a = rk.uniform(0, TAU)                                  # a shoulder: an upper corner gone along a steep break
+            t = rad(rk.uniform(40.0, 64.0))
+            n = Vector((sin(t) * cos(a), sin(t) * sin(a), cos(t)))
+            _ice_cut(piece, far(a, top * 0.5) - n * rk.uniform(0.07, 0.24), n, keep=0.8)
+            for _ in range(3):                                      # a slab spalled off a side, leaning in or out
+                a = rk.uniform(0, TAU)
+                reach = max((v.co.x - c.x) * cos(a) + (v.co.y - c.y) * sin(a) for v in piece.verts)
+                _ice_cut(piece, Vector((c.x, c.y, 0.35)) + Vector((cos(a), sin(a), 0.0)) * reach * rk.uniform(0.80, 0.95),
+                         Vector((cos(a), sin(a), rk.uniform(-0.28, 0.36))).normalized(), keep=0.8)
+            for j in range(7 if pi_ == 0 else 5):                   # flakes struck off the edges, and now and then a whole corner
+                if j % 4 == 3:
+                    _ice_flake(piece, rk, deep=(0.03, 0.09), tilt=(16.0, 32.0), keep=0.86)
+                else:
+                    _ice_flake(piece, rk)
             # each piece has shifted a little on its own
             M = M_block
-            if pi_ > 0:
-                a = rk.uniform(0, TAU)
-                M = (M_block @ T(c.x + slid[pi_].x, c.y + slid[pi_].y, -rk.uniform(0.04, 0.16)) @ Matrix.Rotation(rad(rk.uniform(4.0, 10.0)), 4, Vector((cos(a), sin(a), 0.0)))
-                     @ T(-c.x, -c.y, 0.0))
-            for (z, thick) in STRATA:                               # its share of the dust layers, as it lay before it moved
-                if z + thick > top_z - 0.05:
-                    continue
-                strip = _ice_between(piece, Vector((0.25, 0.45, z)), DIP, thick)
-                strip.normal_update()
-                for v in strip.verts:
-                    v.co = M @ (v.co + v.normal * 0.004)
-                bmesh.ops.bisect_plane(strip, geom=strip.verts[:] + strip.edges[:] + strip.faces[:], dist=1e-5, plane_co=(0, 0, 0.035), plane_no=(0, 0, 1),
-                                       clear_inner=True)
-                me = bpy.data.meshes.new('strip')
-                strip.to_mesh(me)
-                strip.free()
-                bands.from_mesh(me)
-                bpy.data.meshes.remove(me)
-            skin = [f for f in piece.faces if f.normal.z > 0.999 and abs(f.calc_center_median().z - high) < 1e-4] if skinned else []
-            if skin:
-                bmesh.ops.inset_individual(piece, faces=skin, thickness=0.075, use_even_offset=True)
-                dusty += [M @ v.co for f in skin for v in f.verts]
+            if moves[pi_] is not None:
+                n, drop, tip, slide = moves[pi_]
+                axis = Vector((-n.y, n.x, 0.0)).normalized()
+                M = (M_block @ T(c.x + n.x * slide, c.y + n.y * slide, -drop) @ Matrix.Rotation(rad(tip), 4, axis) @ T(-c.x, -c.y, 0.0))
             bmesh.ops.transform(piece, matrix=M, verts=piece.verts[:])
             _ice_cut(piece, (0.0, 0.0, FOOT), (0.0, 0.0, -1.0), close=False)             # the foot: buried, open
-            bmesh.ops.bisect_plane(piece, geom=piece.verts[:] + piece.edges[:] + piece.faces[:], dist=1e-5, plane_co=(0, 0, 0.075), plane_no=(0, 0, 1))
-            me = bpy.data.meshes.new('piece')                       # ... a ring of points where it meets the floor, for the grime and the shade there
-            piece.to_mesh(me)
-            piece.free()
-            body.from_mesh(me)
-            bpy.data.meshes.remove(me)
-        inv = M_block.inverted()
-        for v in body.verts:
-            was = (inv @ v.co).z / high                             # how high in the slab this ice lay
-            if any((v.co - q).length < 1e-4 for q in dusty):
-                col = mix(CLEAN, MANTLE, 0.55 + 0.45 * mantle(v.co.x, v.co.y))
-            elif v.co.z < 0.08:
-                col = mix(CLEAN, GRIME, 0.75 if v.co.z > 0.0 else 1.0)
-            else:
-                col = mix(DEEP, CLEAN, 0.25 + 0.75 * was + 0.25 * (hash01(k, round(v.co.x * 40), round(v.co.y * 40)) - 0.5))
-            P.add(v.co, col)
-        for v in bands.verts:
-            P.add(v.co, BAND)
+            fid, inside = _ice_facets(piece, rk)
+            Mn = M.to_3x3()
+            dip = (Mn @ DIP).normalized()
+            pending = []
+            for (dz, thick, dark, bear, grow) in STRATA:            # its share of the dust layers, where they now lie
+                lo_co, hi_co = M @ (TOP - DIP * (dz + thick)), M @ (TOP - DIP * dz)
+                hi_no = (Mn @ (DIP - Vector((cos(rad(bear)), sin(rad(bear)), 0.0)) * grow)).normalized()
+                strip = _ice_between(piece, lo_co, dip, co2=hi_co, no2=hi_no)
+                strip.normal_update()
+                # (not where a break runs along the bedding: there one layer would spread over the whole face in rings)
+                bmesh.ops.delete(strip, geom=[f for f in strip.faces if abs(f.normal.dot(dip)) > 0.86], context='FACES')
+                pending.append((strip, bands, 0.04, (lo_co, hi_co, hi_no, dark)))
+            a = rk.uniform(0, TAU)                                  # an old fracture that healed: a pale seam through the ice
+            n = Vector((cos(a), sin(a), rk.choice((-1, 1)) * rk.uniform(0.35, 0.9))).normalized()
+            pc = sum((v.co for v in piece.verts), Vector()) / len(piece.verts)
+            pending.append((_ice_between(piece, pc + n * rk.uniform(-0.2, 0.2), n, 0.009), veins, 0.09, None))
+            _ice_triangulate(piece)
+            tree = BVHTree.FromBMesh(piece)
+            for strip, dst, zmin, how in pending:
+                strip.normal_update()
+                for v in strip.verts:
+                    v.co += v.normal * 0.005
+                _ice_lift(strip, tree)
+                bmesh.ops.bisect_plane(strip, geom=strip.verts[:] + strip.edges[:] + strip.faces[:], dist=1e-5, plane_co=(0, 0, zmin), plane_no=(0, 0, 1),
+                                       clear_inner=True)
+                for v in _bm_into(dst, strip):
+                    if how is None:
+                        PI.add(v.co, CLEAN)
+                        continue
+                    lo_co, hi_co, hi_no, dark = how
+                    h0, h1 = max(0.0, (v.co - lo_co).dot(dip)), max(0.0, (hi_co - v.co).dot(hi_no))
+                    up = h0 / max(1e-4, h0 + h1)                    # 0 at the base of the layer, 1 at its top: dust settles, so the base is the darker
+                    PD.add(v.co, mix(BAND_PALE, BAND_DARK, dark * (0.55 + 0.45 * (1.0 - up)) + 0.35 * noise3(v.co, 2.1, 2.0)))
+            sharp = _ice_edges(piece, fid)
+            inv = M.inverted()
+            piece.normal_update()
+            for v in piece.verts:
+                ins, tone = inside.get(v, (0.3, 0.5))
+                dz = depth_of(inv @ v.co)                           # how deep in the slab this ice lay
+                col = mix(BODY, DEEP, 0.12 + 0.50 * dz + 0.45 * ins * ins + 0.40 * (tone - 0.5) + 0.20 * noise3(v.co, 2.3, 0.7))
+                col = mix(col, DIRTY, 0.5 * _smooth01(0.3, 0.9, 0.5 + 0.5 * sin(dz * 17.0 + 1.0) + 0.3 * noise3(v.co, 1.7, 2.9)))   # some layers are cloudier than others
+                col = mix(col, CLEAN, 0.42 * max(sharp[v], 0.20 * (1.0 - ins) ** 2))                # light gets out at the edges
+                if dz < 0.035 and v.normal.z > 0.5:                 # what is left of the old surface still has its dust on it
+                    col = mix(col, DUSTY, 0.35 + 0.6 * _smooth01(-0.3, 0.4, noise3(v.co, 2.6, 5.0)))
+                col = mix(col, GRIME, 0.85 * _smooth01(0.30, -0.10, v.co.z))                         # dust has drifted against its foot
+                PI.add(v.co, col)
+            _bm_into(body, piece)
+        # (bands and seams inside the block's own cracks are never seen: its pieces go together)
+        tree = BVHTree.FromBMesh(body)
+        for bm in (bands, veins):
+            bm.normal_update()
+            hidden = [f for f in bm.faces if tree.ray_cast(f.calc_center_median() + f.normal * 0.012, f.normal, 0.10)[0] is not None]
+            bmesh.ops.delete(bm, geom=hidden, context='FACES')
+            stray, seen = [], set()                                 # (and a scrap of band on a chip of a face reads as a scratch: only runs of it stay)
+            for f in bm.faces:
+                if f in seen:
+                    continue
+                run, todo = [], [f]
+                seen.add(f)
+                while todo:
+                    g = todo.pop()
+                    run.append(g)
+                    for h in (h for e in g.edges for h in e.link_faces if h not in seen):
+                        seen.add(h)
+                        todo.append(h)
+                pts = [v.co for g in run for v in g.verts]
+                if max((a - pts[0]).length for a in pts) < 0.22:
+                    stray += run
+            bmesh.ops.delete(bm, geom=stray, context='FACES')
         node = part(f'block_{k}', parent=root, loc=(sx, sy, 0))
-        for nm, bm in (('ice', body), ('bands', bands)):
+        for nm, bm, material, smooth in (('ice', body, 'ice', 24.0), ('veins', veins, 'ice', 24.0), ('bands', bands, 'dust_lag', 30.0)):
+            if not bm.faces:
+                bm.free()
+                continue
             bmesh.ops.translate(bm, verts=bm.verts[:], vec=(-sx, -sy, 0.0))
-            mesh_obj(f'block_{k}.{nm}', bm, 'ice', parent=node, smooth_angle=12.0)
+            if os.environ.get('TRIS'):
+                print(f'    block_{k}.{nm:8s} {sum(len(f.verts) - 2 for f in bm.faces):6d}')
+            mesh_obj(f'block_{k}.{nm}', bm, material, parent=node, smooth_angle=smooth)
 
-    # ---- what stays: the scraped floor of the ice table, the berm of spoil round it, fallen pieces ----
+    # ---- what stays: the floor of the ice table, the skirt of soil round it, talus and frost ----
     K = Kit('bank', root)
     ox_, oy_ = 0.25, 0.45                                      # middle of the exposure
 
@@ -2634,42 +2841,41 @@ def build_ice_outcrop():
                 best = min(best, t)
         return best
 
+    def dusted(x, y):
+        """How much dust lies on the floor here: patches, thicker toward the back of the bank."""
+        return _smooth01(0.30, 0.62, 0.26 + 0.42 * _smooth01(-1.6, 2.4, y) + 0.45 * noise3((x, y, 0.2), 1.9, 1.0))
+
     NU = 48
-    PF = Paint()                                               # the floor: shaded as it will be once the blocks are gone
-    fl = K.bm('ice', smooth=30.0)
-
-    def floor_pt(x, y):
-        z = 0.05 + 0.030 * noise3((x, y, 0.0), 2.6, 0.9) + 0.018 * noise3((x, y, 0.5), 6.5, 2.2)     # scraped and pitted, not planed
-        p_ = (x, y, z)
-        P.add(p_, mix(CLEAN, MANTLE, 0.15 + 0.75 * mantle(x * 1.7 + 3.0, y * 1.7 - 1.0)))
-        PF.add(p_, (1, 1, 1))
-        return fl.verts.new(p_)
-
-    fc = floor_pt(ox_, oy_)
-    frs = (0.34, 0.68, 0.97)
-    fr_rows = [[floor_pt(ox_ + rim(TAU * (i + 0.5 * (j % 2)) / NU) * fr * cos(TAU * (i + 0.5 * (j % 2)) / NU),
-                         oy_ + rim(TAU * (i + 0.5 * (j % 2)) / NU) * fr * sin(TAU * (i + 0.5 * (j % 2)) / NU)) for i in range(NU)]
-               for j, fr in enumerate(frs)]
-    for i in range(NU):
-        i2 = (i + 1) % NU
-        fl.faces.new((fc, fr_rows[0][i], fr_rows[0][i2]))
-        for j in range(len(frs) - 1):
-            a, b = fr_rows[j], fr_rows[j + 1]
-            if j % 2 == 0:
-                fl.faces.new((a[i], b[i], a[i2]))
-                fl.faces.new((a[i2], b[i], b[i2]))
+    PFL = Paint()                                              # the floor: shaded as it will be once the blocks are gone
+    fl = K.bm('ice', smooth=20.0)
+    for stump in stumps:                                       # the floor of the ice table: the stump of each block, its top a fresh cut
+        middle = set(bmesh.ops.poke(stump, faces=[f for f in stump.faces if f.normal.z > 0.9])['verts'])
+        for v in stump.verts:
+            x, y = v.co.x, v.co.y
+            if v in middle:
+                v.co.z -= 0.025
+                col = mix(DEEP, BODY, 0.35 + 0.4 * noise3((x, y, 0.3), 1.1, 0.5))
+            elif v.co.z > 0.0:
+                col = mix(mix(BODY, CLEAN, 0.45), GRIME, 0.6 * dusted(x * 1.7 + 3.0, y * 1.7 - 1.0))
             else:
-                fl.faces.new((a[i], b[(i - 1) % NU], b[i]))
-                fl.faces.new((a[i], b[i], a[i2]))
+                col = mix(DEEP, GRIME, 0.5)
+            PI.add(v.co, col)
+            PFL.add(v.co, (1, 1, 1))
+        _bm_into(fl, stump)
     bermb = K.bm('ground_dust', smooth=50.0)
     rows = []
+
+    def crest_at(th):
+        back = 0.5 + 0.5 * sin(th)                                  # 1 behind the scarp, 0 in front of its face
+        return (0.13 + 0.31 * back ** 0.8) * (1.0 + 0.35 * noise3((cos(th), sin(th), 0.0), 3.4, 1.7))
+
     for i in range(NU):
         th = TAU * i / NU
         rb = rim(th)
-        back = 0.5 + 0.5 * sin(th)                                  # 1 behind the bank, 0 in front of its face
-        crest = (0.085 + 0.30 * back ** 0.8) * (1.0 + 0.35 * noise3((cos(th), sin(th), 0.0), 3.4, 1.7))
-        w = 0.45 + 0.40 * back - 0.15 * max(0.0, cos(th)) ** 2      # narrower in front and on the +X side
-        prof = ((-0.26, 0.03, DAMP), (-0.09, 0.62 * crest, DAMP), (0.12, crest, SPOIL), (0.36 * w + 0.05, 0.42 * crest, SPOIL),
+        back = 0.5 + 0.5 * sin(th)
+        crest = crest_at(th)
+        w = 0.66 + 0.30 * back - 0.12 * max(0.0, cos(th)) ** 2      # narrower in front and on the +X side
+        prof = ((-0.30, 0.03, DAMP), (-0.12, 0.66 * crest, DAMP), (0.10, crest, SPOIL), (0.36 * w + 0.05, 0.42 * crest, SPOIL),
                 (0.60 * w + 0.07, 0.03, mix(SPOIL, GROUND, 0.6)), (0.80 * w + 0.09, -0.012, GROUND), (0.85 * w + 0.10, FOOT, GROUND))
         col = []
         for (dr, z, c_) in prof:
@@ -2677,73 +2883,101 @@ def build_ice_outcrop():
             x, y = ox_ + r_ * cos(th), oy_ + r_ * sin(th)
             if 0.0 < z:
                 z *= 1.0 + 0.22 * noise3((x, y, 0.3), 5.0, 0.6)
-            col.append(bermb.verts.new(P.add((x, y, z), c_)))
+            col.append(bermb.verts.new(PG.add((x, y, z), c_)))
         rows.append(col)
+    # (the soil carries on under the ice, closed in the middle: the game fades soil out toward any open edge, and an open
+    #  inner edge would leave the skirt a film over the feet of the blocks)
+    under = bermb.verts.new(PG.add((ox_, oy_, 0.03), DAMP))
     for i in range(NU):
         a, b = rows[i], rows[(i + 1) % NU]
+        bermb.faces.new((under, a[0], b[0]))
         for j in range(len(a) - 1):
             bermb.faces.new((a[j], a[j + 1], b[j + 1], b[j]))
-    # shards and frost rubble where they fell at the blocks' feet (they stay when the blocks have gone), and clods and stones on the berm
-    def shard(x, y, z, L, W, Ht):
-        """A splinter of ice: a long sharp wedge lying on its broadest face, with a few crumbs of frost beside it."""
-        pts = [(-L * 0.5, -W * rng.uniform(0.2, 0.5), 0.0), (-L * rng.uniform(0.2, 0.45), W * 0.5, 0.0), (L * 0.5, W * rng.uniform(-0.2, 0.2), 0.0),
-               (L * rng.uniform(-0.1, 0.25), W * rng.uniform(-0.15, 0.15), Ht), (-L * rng.uniform(0.15, 0.35), W * rng.uniform(-0.1, 0.2), Ht * rng.uniform(0.45, 0.8))]
-        M = T(x, y, z) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-14, 14))
-        col = mix(DEEP, CLEAN, rng.random())
-        for q in pts:
-            P.add(M @ Vector(q), col)
-        K.hull('ice', pts, M, smooth=12.0)
-        for _ in range(rng.choice((2, 2, 3))):
-            g = rng.uniform(0.022, 0.05)
-            Mc = T(x + rng.uniform(-1, 1) * (L * 0.5 + 0.08), y + rng.uniform(-1, 1) * (L * 0.5 + 0.08), z) @ R('Z', rng.uniform(0, 360))
-            crumb = [(-g, -g * 0.7, 0.0), (g, -g * 0.5, 0.0), (0.0, g, 0.0), (g * 0.2, 0.0, g * rng.uniform(0.7, 1.3))]
-            for q in crumb:
-                P.add(Mc @ Vector(q), (1.0, 1.0, 1.0))
-            K.hull('ice', crumb, Mc, smooth=12.0)
 
-    for k, (sx, sy) in enumerate(seeds):                             # round each block, most of it in the cracks between them
-        for i in range(4):
-            a = rng.uniform(0, TAU)
-            x, y = sx + rng.uniform(0.85, 1.25) * cos(a), sy + rng.uniform(0.85, 1.25) * sin(a)
-            th = math.atan2(y - oy_, x - ox_)
-            r_ = min(math.hypot(x - ox_, y - oy_), rim(th) - 0.12)
-            shard(ox_ + r_ * cos(th), oy_ + r_ * sin(th), 0.06, rng.uniform(0.12, 0.34), rng.uniform(0.06, 0.15), rng.uniform(0.04, 0.12))
-    for i in range(8):                                                # and tumbled out over the low berm in front of the face
-        a = rad(-152 + 18 * i + rng.uniform(-6, 6))
-        r_ = rim(a) + rng.uniform(0.02, 0.34)
-        shard(ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.07, rng.uniform(0.16, 0.44), rng.uniform(0.09, 0.20), rng.uniform(0.06, 0.17))
-    for i in range(10):                                               # broken lumps too big to call shards, in the cracks and along the face
-        sx, sy = seeds[i % 6]
-        a = rng.uniform(0, TAU)
-        x, y = sx + rng.uniform(0.9, 1.2) * cos(a), sy + rng.uniform(0.9, 1.2) * sin(a)
-        th = math.atan2(y - oy_, x - ox_)
-        r_ = min(math.hypot(x - ox_, y - oy_), rim(th) + (0.18 if sin(th) < -0.3 else -0.15))
-        s_ = rng.uniform(0.09, 0.19)
-        pts = [(rng.uniform(-1, 1) * s_, rng.uniform(-1, 1) * s_ * 0.8, rng.uniform(-0.25, 1.0) * s_ * 0.9) for _ in range(8)]
-        M = T(ox_ + r_ * cos(th), oy_ + r_ * sin(th), 0.07) @ R('Z', rng.uniform(0, 360))
-        col = mix(DEEP, CLEAN, rng.random())
+    # talus: broken ice where it fell, in the cracks and banked against the foot of the scarp; it stays when the blocks have gone
+    def chunk(x, y, z, s, flat=1.0, tone=None):
+        """An angular lump of ice lying on its broadest face."""
+        pts = [(rng.uniform(-1, 1) * s, rng.uniform(-1, 1) * s * rng.uniform(0.55, 0.9), rng.uniform(-0.25, 1.0) * s * flat * rng.uniform(0.5, 0.9)) for _ in range(7)]
+        M = T(x, y, z) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-18, 18)) @ R('Y', rng.uniform(-12, 12))
+        col = mix(BODY, CLEAN, rng.uniform(0.1, 1.0) if tone is None else tone)
         for q in pts:
-            P.add(M @ Vector(q), col)
-        K.hull('ice', pts, M, smooth=12.0)
-    for i in range(12):
+            PI.add(M @ Vector(q), col)
+        K.hull('ice', pts, M, smooth=14.0)
+
+    def frost(x, y, z, r, h, n=9):
+        """Frost and ground ice-dust banked in a hollow: a low white drift."""
+        bmf = K.bm('frost', smooth=60.0)
+        a0 = rng.uniform(0, TAU)
+        h *= 0.7
+        r0 = []
+        for i in range(n):                                          # (a ragged outline: a drift, not a dome)
+            rr = r * (0.55 + 0.9 * rng.random())
+            r0.append(bmf.verts.new((x + rr * cos(a0 + TAU * i / n), y + rr * sin(a0 + TAU * i / n), z - 0.015)))
+        r1 = [bmf.verts.new((x + (v.co.x - x) * 0.6, y + (v.co.y - y) * 0.6, z + h * rng.uniform(0.5, 0.9))) for v in r0]
+        ct = bmf.verts.new((x + rng.uniform(-0.2, 0.2) * r, y + rng.uniform(-0.2, 0.2) * r, z + h))
+        for i in range(n):
+            j = (i + 1) % n
+            bmf.faces.new((r0[i], r0[j], r1[j], r1[i]))
+            bmf.faces.new((r1[i], r1[j], ct))
+
+    def on_floor(x, y, margin=0.12):
+        th = math.atan2(y - oy_, x - ox_)
+        r_ = min(math.hypot(x - ox_, y - oy_), rim(th) - margin)
+        return ox_ + r_ * cos(th), oy_ + r_ * sin(th)
+
+    for a in range(len(seeds)):                                     # in the cracks between the blocks
+        for b in range(a + 1, len(seeds)):
+            pa, pb = Vector(seeds[a]), Vector(seeds[b])
+            if (pb - pa).length > 2.9:
+                continue
+            m, d = (pa + pb) / 2, (pb - pa).normalized()
+            side = Vector((-d.y, d.x))
+            for i in range(4):
+                t = rng.uniform(-0.75, 0.75)
+                x, y = on_floor(*(m + side * t + d * rng.uniform(-0.10, 0.10)))
+                chunk(x, y, 0.10, rng.uniform(0.07, 0.17))
+            x, y = on_floor(*(m + side * rng.uniform(-0.5, 0.5)))
+            frost(x, y, 0.10, rng.uniform(0.22, 0.36), rng.uniform(0.05, 0.10))
+    for i in range(26):                                             # banked against the foot of the scarp and of the slumped blocks, biggest at the bottom
+        a = rad(-170 + 6.2 * i + rng.uniform(-3, 3))
+        heap = 0.5 + 0.5 * sin(3.1 * a + 0.8)
+        r_ = rim(a) + rng.uniform(-0.28, 0.16)
+        x, y = ox_ + r_ * cos(a), oy_ + r_ * sin(a)
+        chunk(x, y, 0.10 + 0.05 * heap, rng.uniform(0.09, 0.15) + 0.12 * heap * rng.random(), flat=0.8)
+        if i % 3 == 0:
+            frost(x + rng.uniform(-0.2, 0.2), y + rng.uniform(-0.2, 0.2), 0.10, rng.uniform(0.2, 0.34), rng.uniform(0.05, 0.09))
+    for i in range(12):                                             # and a few thrown further, onto the skirt
+        a = rad(-165 + 14 * i + rng.uniform(-6, 6))
+        r_ = rim(a) + rng.uniform(0.2, 0.5)
+        chunk(ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.05 + 0.5 * crest_at(a) * 0.5, rng.uniform(0.05, 0.11), flat=0.7, tone=rng.uniform(0.6, 1.0))
+    stone = K.bm('dust_lag', smooth=30.0)
+    for i in range(12):                                             # stones and clods on the skirt
         a = rng.uniform(0, TAU)
-        r_ = rim(a) + rng.uniform(0.05, 0.75) * (0.5 + 0.5 * (0.5 + 0.5 * sin(a)))
+        r_ = rim(a) + rng.uniform(0.10, 0.75) * (0.5 + 0.5 * (0.5 + 0.5 * sin(a)))
         s_ = rng.uniform(0.035, 0.085)
-        vs = rock(bermb, s_, (ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.03 + s_ * 0.3 + (0.12 if r_ - rim(a) < 0.3 and sin(a) > 0 else 0.0)), seed=70 + i,
+        vs = rock(stone, s_, (ox_ + r_ * cos(a), oy_ + r_ * sin(a), 0.03 + s_ * 0.3 + (0.6 * crest_at(a) if r_ - rim(a) < 0.3 else 0.0)), seed=70 + i,
                   scale=(1.1, 0.9, 0.6), subdiv=1, rough=0.3)
         for v in vs:
-            P.add(v.co, (0.40, 0.39, 0.40) if i % 3 == 0 else SPOIL)
+            PD.add(v.co, (0.80, 0.86, 0.95) if i % 3 == 0 else LAG)
     K.finish()
 
     def tint(co, name, a):
-        rgb = P.at(co, 0.01)
-        if rgb is None:
-            rgb = CLEAN if name == 'ice' else SPOIL
-        if PF.at(co, 0.004) is not None:
-            a = 0.90                            # not the shadow of blocks that will be taken away
-        k = a * (1.0 + 0.06 * noise3(co, 4.0, 0.2))
+        k = a * (1.0 + 0.05 * noise3(co, 4.0, 0.2))
         if name == 'ice':                       # light that has travelled through ice comes out blue: cracks and hollows are bluer
-            return (min(1.0, k ** 1.7 * rgb[0]), min(1.0, k ** 1.25 * rgb[1]), min(1.0, k ** 0.9 * rgb[2]))
+            rgb = PI.at(co, 0.01) or BODY
+            if PFL.at(co, 0.004) is not None:
+                k = 0.90                        # not the shadow of blocks that will be taken away
+            return (min(1.0, k ** 1.6 * rgb[0]), min(1.0, k ** 1.2 * rgb[1]), min(1.0, k ** 0.8 * rgb[2]))
+        if name == 'ground_dust':
+            rgb = PG.at(co, 0.01) or SPOIL
+            if rgb == GROUND:
+                k = max(k, 0.94)
+            return tuple(min(1.0, k * c) for c in rgb)
+        if name == 'frost':
+            k = 1.0 - (1.0 - a) * 0.6
+            return (k ** 1.7, k ** 1.25, k ** 0.9)
+        rgb = PD.at(co, 0.01) or LAG
+        k = 0.35 + 0.65 * k                     # (a band in a crack is still seen: do not let the shade swallow it)
         return tuple(min(1.0, k * c) for c in rgb)
     return finish(root, 'ice_outcrop', samples=32, distance=0.8, tint=tint)
 

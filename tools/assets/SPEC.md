@@ -42,7 +42,14 @@ library should gain.
   `light_*` (switched and blinked), `glass_clear` (alpha-blended), `ground_dust` (soil that
   belongs to the ground: a heap, a berm, a scorched patch. The game draws it in the colour of the
   ground where the model stands, multiplied by the vertex tint, so tint it down to dug soil or
-  soot and bring the tint back to 1 at the hem). Baked ambient occlusion is
+  soot and bring the tint back to 1 at the hem. The game also fades it to nothing toward every
+  open edge of its surface, so leave open only the edge that should vanish into the ground: where
+  soil runs under something that stands on it, carry the surface on underneath and close it),
+  `ice` (water ice: the game makes it a glossy pale blue with a faint blue glow of its own, times
+  the vertex colour. Lit hard and with that glow on top, a body lighter than about a fifth
+  washes out to white, so paint the body dark, darker with depth and in cracks, and keep
+  near-white for edges and seams; brown painted on it comes out mauve, so dust in ice is a matte
+  material of its own). Baked ambient occlusion is
   stored per vertex and multiplied into the colour; dust and weathering are added by the game's
   shader, so model clean hardware.
 - Detail comes from geometry: bevelled edges, panel seams, fasteners, handrails, cable runs,
@@ -267,9 +274,12 @@ airbags around the base, ramps; the Sojourner rover is a part `sojourner` beside
 Opportunity; part `mast`), `phoenix.glb`, `insight.glb` (with the domed seismometer and the
 heat probe on the ground beside it), `msl.glb` (Curiosity; parts `mast` and `arm`), `m2020.glb`
 (Perseverance; the same parts and collider, with its own wheels, mast head, turret and sample
-housing), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site: a shattered
-descent module, scorched fragments and a torn parachute on a blast patch of `ground_dust` about
-7.6 m across).
+housing), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site, ≤ 12,000 triangles: the
+crushed 1.65 m lander tilted in a low crater, a third of its drum still standing under torn gold
+blanket and the rest blown out across the ground; a slab of the tiled back shell, with a second
+collider `col_backshell`; a torn parachute; all on a blast patch of `ground_dust` about 7.6 m
+across. Soot is painted per vertex after the bake: metal, foil and blanket keep their own
+colours away from the burst).
 Lander builders start with `weathered()`, which roughens the palette metals: flat polished facets
 mirror the sun into the bloom. Solar cells on landers are matte and sit on a `cell_grid`.
 
@@ -291,6 +301,12 @@ open, deflated airbags, a part `lid`, a strobe (`light_amber`).
 caps, lifting lugs and warning bands.
 `debris_a.glb`, `debris_b.glb`, `debris_c.glb` (≤ 2,500 each): wreckage from the descent
 vehicle: a torn hull panel, a bent truss section, a ruptured tank.
+`ice_outcrop.glb` (≤ 12,000): water ice standing out of the ground in a low scarp of layered
+ice, about 7 m across with its skirt of soil and 1.4 m high, broken into six blocks. Each block
+is a part, `block_0` … `block_5`, its origin on the ground under it: the game puts a collider
+there and takes the blocks away one at a time, the last first, so no block rests on a later
+one. What stays (the root) is the floor of stumps, talus, frost and the skirt (`ground_dust`).
+Materials `ice`, `dust_lag` (the dust layers), `frost`, `ground_dust`.
 
 ## Family F — comforts for the Hab (`comforts.py`)
 

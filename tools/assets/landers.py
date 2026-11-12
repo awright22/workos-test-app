@@ -4,7 +4,7 @@ one that did not), at real size, authored headlessly in Blender through tools/as
 
 Run:   /home/user/blender-venv/bin/python tools/assets/landers.py [pathfinder] [viking] [mars3] ...
 Look:  node tools/assets/preview.mjs pathfinder viking ...
-       TRIS=1 before the command prints the triangle count of every bucket of geometry.
+       TRIS=1 before the command prints the triangle count of every bucket of geometry, and its top.
 
 Models: pathfinder viking mars3 beagle2 mer phoenix insight msl m2020 ingenuity zhurong
 schiaparelli_wreck. msl is Curiosity and m2020 is Perseverance: one builder, two variants.
@@ -472,7 +472,7 @@ class Kit:
             mname = material if isinstance(material, str) else '+'.join(material)
             name = f'{self.tag}_{mname}_{int(smooth)}_{int(bevel * 1000)}'
             if os.environ.get('TRIS'):
-                print(f'    {name:44s} {sum(len(f.verts) - 2 for f in bm.faces):6d}')
+                print(f'    {name:44s} {sum(len(f.verts) - 2 for f in bm.faces):6d}   top {max(v.co.z for v in bm.verts):.2f}')
             mesh_obj(name, bm, material if isinstance(material, str) else list(material), parent=self.parent, bevel=bevel,
                      bevel_segments=1, smooth_angle=smooth)
         self.b = {}
@@ -2670,58 +2670,6 @@ def burst_tank(shell, fit, M, r=0.19, seed=1, seg=16, split=(15.0, 150.0), gape=
         lathe(fit, [(0.0, -0.009), (0.009, -0.009), (0.009, 0.009), (0.0, 0.009)], 6, halves[0] @ R('Z', u) @ T(r + 0.022, 0, -0.035) @ AX['Y'])
 
 
-def shield_chunk(char, comb, skin, M, size=0.27, seed=1, core=0.046, ablator=0.020):
-    """A fragment of the heat shield: a sandwich broken out of the aeroshell, lying with its outer face along local +Z.
-    The charred ablator has spalled back from the broken edge, which shows the honeycomb core as a fluted band (a
-    cell every 24 mm) on the inner skin. A piece this size is as good as flat. Hand-wound faces: `char`, `comb` and `skin`
-    must not be recalculated."""
-    rng = random.Random(seed)
-    n = 11
-    corners = []
-    for i in range(n):
-        a = TAU * (i + rng.uniform(-0.3, 0.3)) / n
-        rr = size * rng.uniform(0.66, 1.12)
-        if rng.random() < 0.28:
-            rr *= rng.uniform(0.50, 0.72)                                 # a bite out of the edge
-        corners.append(Vector((rr * cos(a), rr * sin(a))))
-    edge = []                                                              # the broken edge, cell by cell
-    for i in range(n):
-        p, q = corners[i], corners[(i + 1) % n]
-        m = max(2, int(round((q - p).length / 0.024 / 2)) * 2)
-        out = Vector(((q - p).y, -(q - p).x)).normalized()
-        for kk in range(m):
-            edge.append(p.lerp(q, kk / m) - out * (0.0065 if kk % 2 else 0.0) + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1))) * 0.0015)
-    ne = len(edge)
-
-    def lift(pt, z):
-        return M @ Vector((pt.x, pt.y, z))
-
-    def ring(bm, pts, z):
-        return [bm.verts.new(lift(pt, z + dz)) for pt, dz in pts]
-
-    flat = [(pt, 0.0) for pt in edge]
-    # how far the ablator has spalled back from each point of the edge
-    back = [0.016 + 0.022 * noise3(pt.x * 6 + 3, pt.y * 6 + 3, 0.4, seed) + 0.12 * smooth01(0.60, 0.74, noise3(pt.x * 2.1 + 9, pt.y * 2.1 + 9, 0.7, seed + 1))
-            for pt in edge]
-    inner = [(pt * (1.0 - min(0.6, b / max(pt.length, 1e-6))), 0.0) for pt, b in zip(edge, back)]
-    blister = [(pt * 0.5, 0.006 * (noise3(pt.x * 9, pt.y * 9, 1.0, seed + 2) - 0.5)) for pt, _ in inner]       # the char has blistered a little
-    # inner skin (underneath), the core's broken edge and the ledge the ablator left
-    c0 = skin.verts.new(lift(Vector((0, 0)), 0.0))
-    s0 = ring(skin, flat, 0.0)
-    w0, w1, w2 = ring(comb, flat, 0.0), ring(comb, flat, core), ring(comb, inner, core)
-    a0, a1 = ring(char, inner, core), ring(char, [(pt * 0.985, dz) for pt, dz in inner], core + ablator)
-    a2 = ring(char, blister, core + ablator)
-    c1 = char.verts.new(lift(Vector((0, 0)), core + ablator))
-    for i in range(ne):
-        i2 = (i + 1) % ne
-        skin.faces.new((c0, s0[i2], s0[i]))
-        comb.faces.new((w0[i], w0[i2], w1[i2], w1[i]))
-        comb.faces.new((w1[i], w1[i2], w2[i2], w2[i]))
-        char.faces.new((a0[i], a0[i2], a1[i2], a1[i]))
-        char.faces.new((a1[i], a1[i2], a2[i2], a2[i]))
-        char.faces.new((a2[i], a2[i2], c1))
-
-
 def kinked(bm, p0, direction, length, r=0.02, seed=1, seg=5, kinks=2, bend=0.35):
     """A bent strut or pipe: a tube with a couple of random kinks."""
     rng = random.Random(seed)
@@ -2772,13 +2720,17 @@ def _canopy(bm, M, rx, ry, h, seed=1, nu=44, gores=10, tears=((0.07, 0.21, 4), (
 
 
 def _blast_ground(x, y):
-    """Height of the scorched crater dish at (x, y): a shallow bowl with a low raised rim about
-    2.2 m out, a few centimetres proud of the ground everywhere so that it never z-fights."""
+    """Height of the ground the wreck lies on at (x, y): the floor of a shallow crater (the model
+    cannot dig below the ground, so the crater is its raised rim of thrown soil, about 1.4 m out
+    from the middle), and beyond the rim a thin blanket of ejecta. A few centimetres proud of the
+    ground everywhere so that it never z-fights."""
     d = sqrt(x * x + y * y)
+    th = math.atan2(y, x)
     n = noise3(x * 0.9 + 4, y * 0.9 + 4, 0.4, 31)
-    rim = math.exp(-((d - 2.15 - 0.35 * (n - 0.5)) / 0.55) ** 2)
-    bowl = 0.026 + 0.012 * noise3(x * 2.4, y * 2.4, 1.1, 32)
-    return bowl + 0.055 * rim * (0.6 + 0.8 * n)
+    rr = 1.38 + 0.24 * (noise3(1.3 * cos(th) + 3, 1.3 * sin(th) + 3, 0.7, 34) - 0.5)
+    rim = math.exp(-((d - rr) / (0.20 if d < rr else 0.46)) ** 2)      # steep inside, a long back slope
+    bowl = 0.028 + 0.012 * noise3(x * 2.4, y * 2.4, 1.1, 32)
+    return bowl + 0.12 * rim * (0.65 + 0.7 * n)
 
 
 def _blast_radius(th):
@@ -2786,10 +2738,16 @@ def _blast_radius(th):
     return 3.55 + 0.55 * (noise3(1.8 * cos(th) + 7, 1.8 * sin(th) + 7, 0.2, 33) - 0.5) + 0.30 * abs(sin(5.5 * th + 0.7)) ** 6
 
 
+def _blast_ray(th):
+    """Where soil dug out from under the dust was thrown in rays (0..1): paler than the soot it lies on."""
+    return max(0.0, sin(7.0 * th + 2.1)) ** 9
+
+
 def _scorch_dish(bm, nu=48):
-    """The blast patch: fused, blackened soil in a ragged disc, thrown out in rays, tucked into
-    the ground at its edge. Returns nothing; the tint is painted after the occlusion bake."""
-    fr = (0.0, 0.10, 0.22, 0.36, 0.50, 0.62, 0.74, 0.86, 0.95, 1.0, 1.012)
+    """The blast patch: a low crater rim, fused and blackened soil inside it, soot and thrown soil
+    outside in a ragged disc with rays, tucked into the ground at its edge. Returns nothing; the
+    tint is painted after the occlusion bake."""
+    fr = (0.0, 0.10, 0.22, 0.30, 0.36, 0.42, 0.50, 0.62, 0.74, 0.86, 0.95, 1.0, 1.012)
     rows = []
     for j, f in enumerate(fr):
         row = []
@@ -2797,7 +2755,8 @@ def _scorch_dish(bm, nu=48):
             th = TAU * (i + 0.5 * (j % 2)) / nu
             r = _blast_radius(th) * f
             x, y = r * cos(th), r * sin(th)
-            z = _blast_ground(x, y) * min(1.0, (1.0 - f) / 0.14) ** 0.8 if f < 1.0 else -0.02 if f == 1.0 else -0.30   # ... and a buried hem
+            z = _blast_ground(x, y) + 0.010 * _blast_ray(th) * smooth01(0.36, 0.50, f)        # a ray is a low ridge of clods
+            z = z * min(1.0, (1.0 - f) / 0.14) ** 0.8 if f < 1.0 else -0.02 if f == 1.0 else -0.30   # ... and a buried hem
             row.append(bm.verts.new((x, y, z)))
         rows.append(row)
     c = bm.verts.new((0.0, 0.0, _blast_ground(0, 0)))
@@ -2817,178 +2776,500 @@ def _scorch_dish(bm, nu=48):
         bm.verts.remove(v)
 
 
+class Wound:
+    """Buckets for geometry whose faces are wound as they are made (open skins, sheets with a
+    different material on each side), which the Kit must not re-orient: w('gold_foil', 22) is a
+    bmesh for that material and smoothing angle; flush() turns each into a helper mesh as it is."""
+
+    def __init__(self, parent, tag='wound'):
+        self.parent, self.tag, self.b = parent, tag, {}
+
+    def __call__(self, material, smooth=38.0):
+        if (material, smooth) not in self.b:
+            self.b[(material, smooth)] = bm_new()
+        return self.b[(material, smooth)]
+
+    def flush(self):
+        for (material, smooth), bm in self.b.items():
+            if not bm.faces:
+                bm.free()
+                continue
+            if os.environ.get('TRIS'):
+                print(f'    {self.tag + "_" + material + "_" + str(int(smooth)):44s} {sum(len(f.verts) - 2 for f in bm.faces):6d}   top {max(v.co.z for v in bm.verts):.2f}')
+            mesh_obj(f'{self.tag}_{material}_{int(smooth)}', bm, material, parent=self.parent, smooth_angle=smooth)
+        self.b = {}
+
+
+def skin(bm, P, keep=None, fan=None):
+    """One skin over a grid of points P[j][i] (None where there is none), facing the way i x j
+    points. keep(j, i) -> False leaves a cell out. `fan`: a point the last row closes up to."""
+    V = [[None if p is None else bm.verts.new(p) for p in row] for row in P]
+    for j in range(len(P) - 1):
+        for i in range(len(P[0]) - 1):
+            q = (V[j][i], V[j][i + 1], V[j + 1][i + 1], V[j + 1][i])
+            if None not in q and (keep is None or keep(j, i)):
+                bm.faces.new(q)
+    if fan is not None:
+        c = bm.verts.new(fan)
+        for i in range(len(P[0]) - 1):
+            if V[-1][i] is not None and V[-1][i + 1] is not None:
+                bm.faces.new((V[-1][i], V[-1][i + 1], c))
+    return V
+
+
+def torn_sheet(top, back, edge, P, t=0.006, keep=None, fresh=None):
+    """Sheet metal (or a sandwich panel, or a blanket) with real thickness, from a grid of points
+    P[j][i] on its mid-surface; None where it is torn away, and keep(j, i) -> False tears a cell
+    out. The upper skin (the way i x j points) goes to the bmesh `top`, the lower to `back`, and
+    the torn edge all round, which shows what the sheet is made of, to `edge`. Wound by
+    construction. `fresh` collects the points of the torn edge."""
+    nj, ni = len(P), len(P[0])
+    cells = [(j, i) for j in range(nj - 1) for i in range(ni - 1)
+             if None not in (P[j][i], P[j][i + 1], P[j + 1][i + 1], P[j + 1][i]) and (keep is None or keep(j, i))]
+    have = set(cells)
+    nrm = {}
+    for (j, i) in cells:
+        a, b, c, d = P[j][i], P[j][i + 1], P[j + 1][i + 1], P[j + 1][i]
+        n = (b - a).cross(d - a) + (d - c).cross(b - c)
+        for q in ((j, i), (j, i + 1), (j + 1, i + 1), (j + 1, i)):
+            nrm[q] = nrm.get(q, Vector()) + n
+    up = {q: P[q[0]][q[1]] + n.normalized() * (t / 2) for q, n in nrm.items()}
+    dn = {q: P[q[0]][q[1]] - n.normalized() * (t / 2) for q, n in nrm.items()}
+    made = {}
+
+    def vert(bm, pts, q):
+        key = (id(bm), id(pts), q)
+        if key not in made:
+            made[key] = bm.verts.new(pts[q])
+        return made[key]
+
+    for (j, i) in cells:
+        ring = ((j, i), (j, i + 1), (j + 1, i + 1), (j + 1, i))
+        top.faces.new([vert(top, up, q) for q in ring])
+        back.faces.new([vert(back, dn, q) for q in reversed(ring)])
+        for e, (dj, di) in enumerate(((-1, 0), (0, 1), (1, 0), (0, -1))):
+            if (j + dj, i + di) in have:
+                continue
+            a, b = ring[e], ring[(e + 1) % 4]
+            edge.faces.new((vert(edge, up, a), vert(edge, dn, a), vert(edge, dn, b), vert(edge, up, b)))
+            if fresh is not None:
+                fresh.extend((up[a], dn[a], up[b], dn[b]))
+
+
+def scrap(M, w, h, nx=4, ny=3, seed=1, crumple=0.16, curl=0.9, bite=0.35, twist=0.3):
+    """The grid of a piece of sheet torn out of a structure, for torn_sheet: 2w by 2h in local XY,
+    its outline ragged (corners and bites missing), buckled, and curled: its two ends in x lift,
+    by `curl` radians at the tips, one more than the other."""
+    rng = random.Random(seed)
+    side = rng.uniform(0.35, 1.0), rng.uniform(0.35, 1.0)
+    P = []
+    for j in range(ny + 1):
+        v = -1 + 2 * j / ny
+        xs, zs = [0.0] * (nx + 1), [0.0] * (nx + 1)
+        mid = nx // 2
+        for s, order in ((1, range(mid + 1, nx + 1)), (-1, range(mid - 1, -1, -1))):
+            x = z = 0.0
+            for i in order:
+                um = -1 + 2 * (i - 0.5 * s) / nx
+                a = curl * side[s > 0] * um * abs(um) * (1.0 + twist * v)
+                x += s * (2 * w / nx) * cos(a)
+                z += (2 * w / nx) * abs(sin(a))
+                xs[i], zs[i] = x, z
+        row = []
+        for i in range(nx + 1):
+            u = -1 + 2 * i / nx
+            rim = abs(u) == 1 or abs(v) == 1
+            if (abs(u) == 1 and abs(v) == 1 and rng.random() < 0.75) or (rim and rng.random() < bite * 0.35):
+                row.append(None)
+                continue
+            jx, jy = rng.uniform(-0.22, 0.22) * (2 * w / nx), rng.uniform(-0.22, 0.22) * (2 * h / ny)
+            y = v * h * (1.0 + (0.25 * rng.uniform(-1, 0.4) if rim else 0.0))
+            z = zs[i] + crumple * w * 2 * (noise3((xs[i] + jx) * 2.6 / w + 3, (y + jy) * 2.6 / w + 1, 0.5, seed) - 0.5)
+            row.append(M @ Vector((xs[i] + jx, y + jy, z)))
+        P.append(row)
+    return P
+
+
+def wad(bm, M, r, seed=1, subdiv=1, flat=0.6):
+    """A scrap of foil or blanket screwed up into a ball: sharp random facets."""
+    rng = random.Random(seed)
+    vs = bmesh.ops.create_icosphere(bm, subdivisions=subdiv, radius=1.0)['verts']
+    for v in vs:
+        d = v.co.normalized()
+        s = r * rng.uniform(0.5, 1.25)
+        v.co = Vector((d.x * s, d.y * s * rng.uniform(0.8, 1.0), max(-0.3 * r, d.z * s * flat)))
+    bmesh.ops.transform(bm, matrix=M, verts=vs)
+
+
 def build_schiaparelli_wreck():
-    """The Schiaparelli impact site: the lander struck at 150 m/s with its tanks nearly full and
-    blew up. A blackened blast patch with a low rim; in it a crushed, burnt-out core, deck plates
-    and structure thrown outward, pieces of back shell and heat shield, and the torn parachute.
-    Everything is sooted; nothing is clean, white or shiny."""
+    """The Schiaparelli impact site. The lander, a 1.65 m disc, came down at 150 m/s with its
+    hydrazine tanks nearly full: it dug a shallow crater, crushed its honeycomb base flat, and the
+    tanks burst and blew one side of it out. What is left sits tilted in the crater and can
+    still be read as the machine it was. A third of the drum still stands (its carbon deck, its
+    side wall under torn gold blanket, the white-blanketed equipment bay with the stub of the
+    mast, the dome of a tank coming through the deck); next to that the deck has peeled up and
+    back in a curl and the wall is splayed flat, over a tank burst open at its weld; the rest
+    is gone, open to the crushed honeycomb floor, the bent struts of the frame that held the
+    tanks and thrusters, hanging harness, soot. The missing side lies across the ground the way
+    the blast went: pieces of sandwich deck, curled wall plate, foil and blanket, struts, a
+    thruster cluster, the third tank. A slab of the back shell lies to one side with what is
+    left of the parachute. The ground is the blast patch: a low crater rim, black inside, soot
+    and thrown soil outside in rays.
+    Metal stays metal, foil gold and blanket white where the fire did not reach; the soot is
+    painted on after the occlusion bake, heaviest toward the burst and underneath, and never on
+    a torn edge (bright, fresh metal). Every sheet has thickness and both its faces."""
     weathered()
-    mat('foil_burnt', color=(0.30, 0.17, 0.05), metallic=0.25, roughness=0.75)          # what is left of the blankets
+    mat('carbon', color=(0.035, 0.035, 0.04), metallic=0.3, roughness=0.5)             # carbon-fibre skins of the deck and walls
+    mat('ejecta', color=(0.60, 0.44, 0.33), metallic=0.0, roughness=1.0)               # soil from under the dust, thrown out in rays
+    mat('aluminium_bare', color=(0.70, 0.71, 0.74), metallic=0.6, roughness=0.5)       # torn structure: brighter than a lander that has only stood in the dust
     root = part('schiaparelli_wreck')
-    k = Kit(root)
-    white, steel, foil = k('painted_white', 32), k('steel', 32), k('foil_burnt', 25)
-    ti, char = k('titanium', 45), k('scorched', 32)
-    comb = k('canvas', 30)
-    cloth = k(('canvas', 'suit_orange'), 50)
-    # pieces whose faces are wound as they are made (shells with an inside, layered slabs): not for the Kit, which re-orients
-    tank, slab_char, slab_comb, slab_skin = bm_new(), bm_new(), bm_new(), bm_new()
+    k, w = Kit(root), Wound(root)
+    alu, char, cfk = k('aluminium_bare', 32), k('scorched', 32), k('carbon', 32)
+    gold_k, white_k = k('gold_foil', 14), k('blanket_white', 22)
+    wc, wa, wg, ww = w('carbon', 30), w('aluminium_bare', 30), w('gold_foil', 20), w('blanket_white', 34)
+    tank = w('aluminium_bare', 40)                                  # the tanks (titanium: tinted after the bake)
     rng = random.Random(16)
+    fresh = []                                                      # points of torn edges: bright whatever the soot round them
+    charred = []                                                    # points of edges that burnt: black whatever is round them
+    titanium = []                                                   # ((x, y, z), radius): what is inside these balls is tank
 
-    # --- the core: crushed central bay, three tanks, broken deck plates, ribs, thruster clusters ---
-    Mc = T(-0.10, 0.05, 0.0) @ R('Y', 13) @ R('X', -8)
-    vs = prism(char, ngon(0.40, 8, 10), 0.36, Mc, z0=-0.06)
-    for v in vs[8:]:
-        v.co += Vector((rng.uniform(-0.07, 0.07), rng.uniform(-0.07, 0.07), rng.uniform(-0.12, 0.03)))
-    vs = prism(steel, ngon(0.24, 6, 0), 0.20, Mc @ T(0.03, 0.02, 0.22) @ R('X', 12), z0=0.0)
-    for v in vs[6:]:
-        v.co += Vector((rng.uniform(-0.05, 0.05), rng.uniform(-0.05, 0.05), rng.uniform(-0.06, 0.02)))
-    for i, (a, rr, zz, sc) in enumerate(((20, 0.56, 0.17, (1, 1, 0.9)), (145, 0.60, 0.15, (1.0, 0.8, 0.7)), (262, 0.78, 0.16, (1, 1, 1)))):
-        Mt = T(*polar(rr, a, zz)) @ R('Z', a) @ S(*sc) @ R('X', 70 + 30 * i)
-        burst_tank(tank, steel, Mt, 0.19, seed=11 + i, seg=12, split=((10.0, 220.0), (220.0, 400.0), (60.0, 300.0))[i],      # the tanks: burst at the weld, dented
-                   gape=(16.0, 10.0, 24.0)[i], crack=(95.0, 330.0, 200.0)[i],
-                   dents=(((0.6, 0.2 * (i - 1), 0.75), 46.0, 0.06), ((-0.3, -0.8, -0.4), 38.0, 0.035)), lugs=((250.0, 320.0), (60.0, 150.0), (20.0, 340.0))[i])
-    plates = ((75, 0.62, 0.52, 18, -24, white), (118, 0.70, 0.46, -30, 20, char), (200, 0.66, 0.56, 22, 16, white), (318, 0.74, 0.50, -16, -30, char),
-              (240, 0.42, 0.40, 55, 10, steel), (0, 0.50, 0.38, -48, 8, char), (160, 0.35, 0.34, 65, -20, char))
-    for i, (a, rr, sz, tx, ty, bm_p) in enumerate(plates):
-        Mp = T(*polar(rr, a, 0.14 + 0.05 * (i % 3))) @ R('Z', a + 20 * i) @ R('X', tx) @ R('Y', ty)
-        shard(bm_p, Mp, sz, t=0.028, seed=30 + i, n=9, crumple=0.24, curl=0.45 * (1 if i % 2 else -1), back=char)
-        shard(foil, Mp @ T(0.03, 0.02, -0.04), sz * 0.6, t=0.006, seed=50 + i, n=7, crumple=0.40)
-    for i, a in enumerate((35, 95, 170, 215, 285, 335)):                                           # radial ribs, sprung and bent
-        p0 = Vector(polar(0.30, a, 0.10 + 0.04 * (i % 2)))
-        dv = Vector(polar(1.0, a + rng.uniform(-25, 25), rng.uniform(0.1, 0.9)))
-        kinked(steel, p0, dv, rng.uniform(0.6, 1.05), 0.022, seed=70 + i, seg=4, kinks=2, bend=0.5)
-    for i, (a, rr) in enumerate(((60, 0.95), (190, 1.05), (300, 0.50))):                           # thruster clusters torn loose
-        Mn = T(*polar(rr, a, 0.07)) @ R('Z', a * 2) @ R('X', 70 + 25 * i)
-        cbox(steel, (0.26, 0.10, 0.06), (0, 0, 0), Mn, c=0.02)
+    # the lander's own frame: its axis is local Z, its base on local z = 0. It lies tilted, the blown side low in the crater.
+    ML = T(0.03, -0.02, 0.045) @ R('Z', -10) @ R('Y', -8) @ R('X', 6)
+    TURN = R('Z', -95)                                              # (applied to the lander and its thrown wreckage together, further down)
+    ZB, ZD, RD = 0.10, 0.30, 0.825                                  # top of the crushed base, the deck, the deck's radius
+
+    def L(th, r, z):
+        return ML @ Vector(polar(r, th, z))
+
+    def lump(th, r, s=1.0, seed=40):
+        return noise3(1.6 * r * cos(rad(th)) * s + 5, 1.6 * r * sin(rad(th)) * s + 5, 0.3, seed) - 0.5
+
+    # --- the crushed base: what was a quarter-metre of honeycomb is a ragged, fluted band a hand high, and the floor over it ---
+    NB = 48
+    P = []
+    for j, (rr, zz) in enumerate(((0.78, -0.05), (0.875, 0.035), (0.80, ZB), (0.58, ZB + 0.008), (0.30, ZB))):
+        row = []
+        for i in range(NB + 1):
+            th = 360.0 * (i % NB) / NB
+            crush = 0.5 + lump(th, 1.0, 0.9, 41)                    # how hard this side was hit
+            flute = ((0.020 if i % 2 else -0.020) if j < 3 else 0.0) + (0.07 * (crush - 0.5) if j < 3 else 0.0)
+            row.append(L(th, rr + flute, zz * (1.0 - 0.3 * crush * (zz > 0)) + 0.02 * lump(th, rr, 3.0, 42) * (j >= 2)))
+        P.append(row)
+    skin(wa, P, keep=lambda j, i: not (j < 2 and i in (9, 22, 23, 37)), fan=L(0, 0, ZB - 0.01))      # (split where it burst)
+
+    # --- the drum that still stands: side wall, deck, and next to it the wall splayed flat and the deck peeled back ---
+    def wall_grid(th0, th1, rows):
+        return [[L(th, *rows(th, j)) for th in range(th0, th1 + 1, 10)] for j in range(3)]
+
+    def wall_a(th, j):                                              # buckled but upright
+        b = lump(th, 1.0, 2.2, 43 + j)
+        return RD + (0.0, 0.07 * b, 0.03 * b)[j] + 0.012 * sin(rad(th * 9.0)) * (j == 1), (ZB - 0.01, 0.20, ZD + 0.005)[j] + 0.012 * b * j
+
+    def wall_b(th, j):                                              # pushed out and down, most in the middle of the gap
+        s = sin(pi * (th - 80) / 90.0) ** 0.7 if 80 < th < 170 else 0.0
+        b = lump(th, 1.0, 2.6, 46 + j)
+        return RD + (0.01, 0.05 + 0.11 * s, 0.07 + 0.26 * s)[j] + 0.03 * b, (ZB - 0.01, 0.17 - 0.03 * s, 0.235 - 0.13 * s)[j] + 0.02 * b * j
+
+    torn_sheet(wc, wa, wa, wall_grid(300, 440, wall_a), 0.014, keep=lambda j, i: not (j == 1 and i in (0, 13)), fresh=fresh)
+    torn_sheet(wc, wa, wa, wall_grid(80, 170, wall_b), 0.014, keep=lambda j, i: not (j == 1 and i in (0, 5, 8)), fresh=fresh)
+
+    def foil_panel_on(rows, th_c, dth, f0, f1, off, seed, nx=7, ny=3):
+        """A panel of gold blanket over a wall, from the fraction f0 to f1 of the wall's height (f0 < 0: it hangs below the
+        wall, loose). Crinkled, standing off the wall, its outline torn."""
+        rf = random.Random(seed)
+        P = []
+        for j in range(ny + 1):
+            row = []
+            for i in range(nx + 1):
+                rimp = i in (0, nx) or j in (0, ny)
+                if (i in (0, nx) and j in (0, ny) and rf.random() < 0.4) or (rimp and rf.random() < 0.07):
+                    row.append(None)
+                    continue
+                th = th_c + dth * (-1 + 2 * i / nx) + rf.uniform(-0.22, 0.22) * 2 * dth / nx
+                f = f0 + (f1 - f0) * j / ny + rf.uniform(-0.22, 0.22) * (f1 - f0) / ny * (1.6 if rimp else 1.0)
+                (r0, z0), (r1, z1), (r2, z2) = rows(th, 0), rows(th, 1), rows(th, 2)
+                t = max(0.0, min(1.0, f)) * 2
+                r_, z_ = (r0 + (r1 - r0) * t, z0 + (z1 - z0) * t) if t <= 1 else (r1 + (r2 - r1) * (t - 1), z1 + (z2 - z1) * (t - 1))
+                hang = max(0.0, -f)
+                row.append(L(th, r_ + off * (1.0 + 1.6 * rf.random() * (rimp or hang > 0)) + rf.uniform(-0.014, 0.014) + 0.25 * hang,
+                             z_ - 0.20 * hang + rf.uniform(-0.008, 0.008)))
+            P.append(row)
+        torn_sheet(wg, wg, wg, P, 0.004)
+
+    for i, (th_c, dth, f0, f1) in enumerate(((320, 18, -0.12, 0.96), (355, 16, 0.04, 1.0), (391, 19, -0.22, 0.9), (425, 13, 0.0, 0.94))):
+        foil_panel_on(wall_a, th_c, dth, f0, f1, 0.02, 3 + i)
+    for i, (th_c, dth, f0, f1) in enumerate(((106, 15, 0.0, 0.9), (143, 15, -0.1, 0.85))):
+        foil_panel_on(wall_b, th_c, dth, f0, f1, 0.03, 13 + i)
+
+    # the deck that held: a carbon sandwich, buckled, torn along two ragged lines
+    RS = (0.33, 0.50, 0.67, RD + 0.012)
+    P = [[L(th, r, ZD + 0.05 * lump(th, r, 2.4, 50) * (r / RD) + (0.012 if r > 0.8 else 0.0)) for r in RS] for th in range(300, 441, 10)]
+    torn_sheet(wc, wc, wa, P, 0.026, keep=lambda j, i: not ((j == 0 and i in (1, 2)) or (j == 13 and i == 2)), fresh=fresh)
+    # the deck that did not: peeled up from the bay and curled back over itself
+    P = []
+    for th in range(80, 171, 10):
+        amax = rad(28.0 + 56.0 * sin(pi * (th - 80) / 90.0))
+        r_, z_ = 0.33, ZD
+        row = [L(th, r_, z_)]
+        for s in range(3):
+            a = amax * ((s + 0.5) / 3.0) ** 1.2
+            r_ += 0.165 * cos(a)
+            z_ += 0.165 * sin(a)
+            row.append(L(th + 5.0 * lump(th, s, 1.0, 51), r_ + 0.03 * lump(th, r_, 3.0, 52), z_ + 0.03 * lump(th, r_, 3.0, 53)))
+        P.append(row)
+    torn_sheet(wc, wa, wa, P, 0.026, keep=lambda j, i: not ((j in (0, 8) and i == 2) or (j == 4 and i == 2)), fresh=fresh)
+    # on the deck that held: the stub of an antenna, a reflector dome, a connector box
+    disc(alu, 0.045, 0.0, 0.11, 8, ML @ T(*polar(0.62, 62, ZD + 0.01)) @ R('X', 9))
+    lathe(alu, dome_profile(0.055, 0.045, 3, 0.0), 8, ML @ T(*polar(0.66, 335, ZD + 0.012)))
+    cbox(cfk, (0.16, 0.10, 0.06), (0, 0, 0.03), ML @ T(*polar(0.60, 395, ZD + 0.012)) @ R('Z', 30), c=0.015)
+
+    # --- the equipment bay in the middle: a six-sided box under white blanket, stove in on the side the tanks went ---
+    P = []
+    for j, zz in enumerate((ZB - 0.01, ZD, 0.47)):
+        row = []
+        for i in range(13):
+            th = 30.0 * i
+            stove = math.exp(-(((th - 235.0 + 180.0) % 360.0 - 180.0) / 50.0) ** 2)
+            r_ = 0.33 * 0.93 / cos(rad((th % 60.0) - 30.0)) - 0.11 * stove * (0.5 + 0.5 * j) + 0.012 * lump(th, zz * 3, 4.0, 54)
+            row.append(L(th, r_, zz - 0.05 * stove * (j == 2) + 0.012 * lump(th, zz, 5.0, 55) * (j == 2)))
+        P.append(row)
+    skin(ww, P, keep=lambda j, i: not (j == 0 and i in (7,)), fan=L(240, 0.05, 0.43))
+    prism(char, ngon(0.22, 6, 0), 0.30, ML, z0=ZB)                  # (what shows through the hole in it)
+    # the mast: bent over at the root, a sensor head still on it
+    mast = [L(40, 0.10, 0.46), L(42, 0.11, 0.53), L(62, 0.17, 0.56), L(82, 0.31, 0.515)]
+    tube(alu, mast, 0.015, 6, round_r=0.04, steps=2)
+    cbox(white_k, (0.06, 0.06, 0.08), (0, 0, 0), T(*mast[-1]) @ R('Z', 30) @ R('X', 80), c=0.012)
+    disc(alu, 0.03, 0.0, 0.02, 8, ML @ T(*polar(0.10, 40, 0.455)))
+
+    # --- the tanks: one whole under the deck that held, its dome through the deck; one burst under the peeled deck; one thrown clear ---
+    tc = L(10, 0.50, 0.275)
+    ball(tank, tc, 0.19, 12, 6)
+    lathe(alu, [(0.0, 0.0), (0.05, 0.0), (0.05, 0.014), (0.03, 0.02), (0.03, 0.04), (0.0, 0.04)], 8, T(*tc) @ ML.to_3x3().to_4x4() @ R('X', 16) @ T(0, 0, 0.182))
+    titanium.append((tc, 0.26))
+    tb = L(128, 0.52, 0.27)
+    burst_tank(tank, alu, T(*tb) @ ML.to_3x3().to_4x4() @ R('Z', 128) @ R('Y', 62) @ R('Z', 20), 0.19, seed=12, seg=14, split=(215.0, 395.0), gape=30.0, crack=300.0,
+               dents=(((0.6, 0.1, 0.75), 46.0, 0.05), ((-0.3, -0.8, -0.4), 38.0, 0.035)), lugs=(60.0, 150.0))
+    titanium.append((tb, 0.34))
+
+    # --- the frame that carried the tanks and thrusters, where the side is gone: posts, rafters to the bay, braces; sprung and bent ---
+    node = k('aluminium_bare', 40)
+    for i, th in enumerate((185, 212, 242, 270, 296)):
+        foot, head, hub = L(th, 0.72, ZB), L(th + rng.uniform(-6, 6), 0.74 + 0.16 * rng.random(), ZD - 0.03 * rng.random()), L(th + 4, 0.34, ZD - 0.03)
+        ball(node, foot, 0.032, 5, 2)
+        if i == 2:                                                  # this bay took the burst: the post is thrown back, the rafter stands up bare
+            tip = L(th - 6, 0.60, 0.60)
+            tube(alu, [hub, hub.lerp(tip, 0.45) + Vector((0, 0, 0.05)), tip], 0.016, 5, round_r=0.08, steps=2)
+            ball(node, tip, 0.03, 5, 2)
+            kinked(alu, foot, L(th, 1.0, 0.25) - foot, 0.34, 0.016, seed=91, seg=5, kinks=1, bend=0.7)
+            continue
+        post = [foot, foot.lerp(head, 0.5) + (head - hub).normalized() * 0.05 * rng.uniform(-1, 1.6), head]
+        tube(alu, post, 0.016, 5, round_r=0.07, steps=2)
+        ball(node, head, 0.032, 5, 2)
+        if i != 4:
+            tube(alu, [head, head.lerp(hub, 0.5) + Vector((0, 0, 0.05 * rng.uniform(-1, 1))), hub], 0.014, 5, round_r=0.06, steps=2)     # rafter
+        if i < 4:
+            tube(alu, [foot, L(th + 14, 0.74, ZD - 0.06)], 0.011, 4)                                                                    # brace
+    for th, r_ in ((228, 0.50), (262, 0.56)):                       # avionics boxes loose on the floor
+        cbox(cfk, (0.20, 0.13, 0.09), (0, 0, 0.045), ML @ T(*polar(r_, th, ZB + 0.005)) @ R('Z', th + 30) @ R('X', 12), c=0.02)
+    for i, th in enumerate((205, 236, 251, 283)):                   # harness: out of the bay, across the floor, over the edge to the ground
+        a, b = L(th, 0.26, ZD - 0.08), L(th + 8, 0.60, ZB + 0.03)
+        g = L(th + 14 * (i % 2 * 2 - 1), 1.02 + 0.12 * i, 0.0)
+        g.z = 0.012
+        tube(cfk, [a, a.lerp(b, 0.5) - Vector((0, 0, 0.05)), b, L(th + 10, 0.86, ZB - 0.03), g], 0.009, 4, round_r=0.07, steps=2)
+    blob(char, ML @ T(-0.25, -0.35, ZB - 0.03), 0.34, 0.28, 0.07, seed=5, nu=10, pleats=4, rough=0.5)        # slag where the hydrazine burnt
+
+    def thrusters(Mn):
+        """A cluster of three: bracket, valves, nozzles."""
+        cbox(alu, (0.26, 0.10, 0.06), (0, 0, 0), Mn, c=0.02)
         for dx in (-0.085, 0.0, 0.085):
-            lathe(char, [(0.022, -0.03), (0.02, -0.06), (0.05, -0.17), (0.044, -0.17), (0.014, -0.06)], 8, Mn @ T(dx, 0, 0), close=True)
-    for i in range(5):                                                                             # harness spilling out
-        a = 72 * i + 10
-        tube(char, [polar(0.25, a, 0.22), polar(0.55, a + 14, 0.20 + 0.1 * (i % 2)), polar(0.85, a + 30, 0.03), polar(1.05, a + 24, 0.012)],
-             0.009, 4, round_r=0.12, steps=2)
-    blob(char, T(-0.05, 0.0, 0.0), 0.72, 0.64, 0.12, seed=5, nu=14, pleats=5, rough=0.5)           # slag and soot under the core
-    for i, (a0, arc, rr, tilt, zz) in enumerate(((210, 105, 0.82, 16, 0.02), (55, 70, 0.86, -22, 0.06))):   # what is left of the platform's rim
-        Mr = T(0.05 * i, 0.04, zz) @ R('Z', a0) @ R('X', tilt)
-        vs = lathe(white, [(rr, 0.0), (rr + 0.03, 0.0), (rr + 0.03, 0.22), (rr, 0.22)], 8, Mr, arc=rad(arc), close=True, caps=True)
-        for v in vs:
-            v.co += Vector((rng.uniform(-0.035, 0.035), rng.uniform(-0.035, 0.035), rng.uniform(-0.03, 0.03)))
-        vs = lathe(comb, [(rr - 0.22, 0.02), (rr - 0.005, 0.02), (rr - 0.005, 0.10), (rr - 0.22, 0.06)], 8, Mr, arc=rad(arc * 0.9), close=True, caps=True)
-        for v in vs:                                                                               # crushable honeycomb, burst
-            v.co += Vector((rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03), rng.uniform(-0.03, 0.03)))
+            lathe(char, [(0.022, -0.03), (0.02, -0.06), (0.05, -0.17), (0.044, -0.17), (0.014, -0.06)], 6, Mn @ T(dx, 0, 0), close=True)
 
-    # --- a section of the back shell lying on its side, burnt blanket hanging out of it ---
+    thrusters(ML @ T(*polar(0.80, 200, ZB + 0.04)) @ R('Z', 200 + 90) @ R('X', -118))           # one still hangs from the edge of the floor
+
+    # --- the side that went, across the ground the way the blast threw it (mostly toward -x, -y) ---
+    # pieces of the sandwich deck: black skins, a pale core in the torn edge
+    for i, (rr, a, sz, tilt) in enumerate(((1.62, 232, 0.31, 24), (2.35, 205, 0.27, -14), (2.05, 262, 0.28, 34), (2.9, 240, 0.20, 10))):
+        M = T(*polar(rr, a, 0.05 + 0.06 * (tilt > 20))) @ R('Z', a + 40 * i) @ R('Y', tilt)
+        torn_sheet(wc, wc, wa, scrap(M, sz, sz * 0.7, 4, 3, seed=20 + i, crumple=0.14, curl=0.6), 0.026, fresh=fresh)
+    # wall and structure plate: aluminium, buckled and curled
+    plates = ((1.25, 188, 0.26, 0.9, 1.3), (1.55, 300, 0.22, 0.8, 1.6), (1.95, 232, 0.30, 0.6, 1.1), (2.55, 276, 0.24, 0.9, 1.8), (2.7, 192, 0.20, 0.7, 1.4),
+              (1.3, 258, 0.17, 0.9, 2.0), (3.05, 222, 0.16, 0.8, 1.5), (1.5, 120, 0.20, 0.7, 1.4), (1.7, 20, 0.18, 0.9, 1.7), (2.3, 330, 0.17, 0.8, 1.2),
+              (2.6, 100, 0.15, 0.7, 1.9), (1.35, 60, 0.14, 0.9, 1.5))
+    for i, (rr, a, sz, asp, curl) in enumerate(plates):
+        M = T(*polar(rr, a + rng.uniform(-5, 5), 0.02 + sz * 0.18)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-22, 22)) @ R('Y', rng.uniform(-16, 16))
+        torn_sheet(wa if i % 3 else wc, wa, wa, scrap(M, sz, sz * asp * 0.7, 4, 3, seed=40 + i, crumple=0.24, curl=curl * 1.25), 0.007, fresh=fresh)
+    # blanket: gold foil screwed up and caught on things, white cloth in rags
+    for i, (rr, a, sz) in enumerate(((1.15, 215, 0.13), (1.8, 245, 0.11), (2.45, 225, 0.09), (1.45, 285, 0.10), (2.15, 180, 0.08), (1.25, 150, 0.08), (2.8, 255, 0.07),
+                                     (1.75, 340, 0.07), (0.95, 250, 0.10))):
+        wad(gold_k, T(*polar(rr, a, sz * 0.22)) @ R('Z', 40 * i), sz, seed=60 + i, subdiv=2 if i < 3 else 1, flat=0.55)
+    for i, (rr, a, sz) in enumerate(((1.4, 236, 0.21), (2.2, 252, 0.16))):
+        M = T(*polar(rr, a, 0.05)) @ R('Z', 70 * i)
+        torn_sheet(ww, ww, ww, scrap(M, sz, sz * 0.75, 4, 3, seed=70 + i, crumple=0.55, curl=1.1), 0.014)
+    for i, (rr, a, sz) in enumerate(((1.9, 196, 0.10), (1.1, 100, 0.09), (2.6, 218, 0.08), (1.55, 268, 0.07))):
+        wad(white_k, T(*polar(rr, a, sz * 0.22)) @ R('Z', 55 * i), sz, seed=170 + i, subdiv=1, flat=0.6)
+    torn_sheet(wg, wg, wg, scrap(T(*polar(1.72, 222, 0.06)) @ R('Z', 15), 0.24, 0.17, 4, 3, seed=75, crumple=0.34, curl=0.7), 0.004)
+    torn_sheet(wg, wg, wg, scrap(T(*polar(2.5, 292, 0.05)) @ R('Z', 80), 0.18, 0.13, 4, 3, seed=76, crumple=0.34, curl=0.9), 0.004)
+    # struts, a ring segment, the other thruster clusters
+    for i, (rr, a) in enumerate(((1.7, 214), (2.2, 268), (1.5, 185), (2.6, 235), (2.1, 300), (1.2, 125), (2.75, 48))):
+        kinked(alu, polar(rr, a, 0.02), polar(1.0, a + 80 + 40 * i, 0.15 * (i % 2)), 0.40 + 0.14 * (i % 4), 0.015 + 0.003 * (i % 2),
+               seed=130 + i, seg=5, kinks=1 + i % 2, bend=0.6)
+        ball(node, polar(rr, a, 0.03), 0.028, 5, 2)
+    lathe(alu, [(0.50, 0.0), (0.53, 0.0), (0.53, 0.04), (0.50, 0.04)], 9, T(-1.25, -1.85, 0.01) @ R('X', 5), arc=rad(150), close=True, caps=True)   # part of a separation ring
+    thrusters(T(*polar(1.95, 248, 0.07)) @ R('Z', 130) @ R('X', 76))
+    thrusters(T(*polar(1.05, 172, 0.07)) @ R('Z', 20) @ R('X', 100))
+    for i in range(18):                                             # small stuff: chips of plate and carbon
+        rr, a = 0.95 + 2.2 * rng.random() ** 0.8, rng.uniform(0, 360) if i % 3 == 0 else rng.uniform(170, 310)
+        lies = TURN @ Vector(polar(rr, a))
+        if 0.6 < lies.x < 2.9 and 1.0 < lies.y < 3.2:
+            continue                                                # (not on the canopy)
+        shard((alu, cfk, alu)[i % 3], T(*polar(rr, a, 0.012)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-30, 30)), 0.05 + 0.08 * rng.random(), t=0.014,
+              seed=200 + i, n=5, crumple=0.12, simple=True)
+    # All of the above was laid out with the blast going toward -x, -y. It is turned as one, lander and thrown wreckage:
+    # seen from the side of the site that the back shell and the canopy leave clear, the standing arc of the drum is then
+    # on the right and the open side on the left, and the wreckage fans away toward the third tank.
+    for bm in list(k.b.values()) + list(w.b.values()):
+        bmesh.ops.transform(bm, matrix=TURN, verts=bm.verts[:])
+    fresh = [TURN @ p for p in fresh]
+    titanium = [(TURN @ c, r_) for c, r_ in titanium]
+    thrown = Vector((-2.28, 0.32, 0.176))                           # the third tank, thrown clear
+    burst_tank(tank, alu, T(*thrown) @ R('Z', 205) @ R('X', 66), 0.19, seed=7, seg=14, split=(-52.0, 232.0), gape=36.0, crack=84.0,
+               dents=(((0.75, -0.55, 0.35), 50.0, 0.055), ((-0.5, 0.3, -0.8), 44.0, 0.04), ((0.0, -1.0, 0.0), 30.0, 0.022)), lugs=(250.0, 290.0), bolts=True)
+    titanium.append((thrown, 0.34))
+
+    # --- a slab of the back shell on its side: white tiles outside, bare structure inside, a blanket hanging out of it ---
     Mb = T(2.25, 0.25, -0.57) @ R('Z', 200) @ R('Y', -52) @ R('Z', -52)
-    vs = lathe(white, [(1.18, 0.0), (0.94, 0.27), (0.70, 0.53), (0.46, 0.80), (0.43, 0.775), (0.67, 0.51), (0.91, 0.25), (1.14, -0.02)], 13, Mb,
-               arc=rad(104), close=True, caps=True)
-    for i, v in enumerate(vs):                                           # ragged ends, a buckled skin
-        e = 1.0 if (i < 8 or i >= len(vs) - 8) else 0.35
-        v.co += Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), rng.uniform(-0.03, 0.07))) * e
-    lathe(steel, [(0.47, 0.80), (0.47, 0.86), (0.42, 0.86), (0.42, 0.78)], 7, Mb, arc=rad(104), close=True, caps=True)
-    for i in range(3):
-        Mi = Mb @ R('Z', 22 + 30 * i) @ T(0.80, 0, 0.40) @ R('Y', 90 - 42)
-        shard(foil, Mi @ T(0, 0, -0.05), 0.30, t=0.006, seed=80 + i, n=7, crumple=0.3)
-    blob(foil, T(2.0, 0.55, 0) @ R('Z', 40), 0.34, 0.24, 0.10, seed=9, nu=10, pleats=4, rough=0.6)
-    # --- a slab of heat shield, charred, face down ---
-    Mh = T(-2.05, 1.35, 0.235) @ R('Z', 70) @ R('X', 180) @ R('Y', 4) @ R('Z', -40)
-    vs = lathe(char, [(1.15, 0.26), (0.30, 0.05), (0.30, 0.0), (1.17, 0.20)], 8, Mh, arc=rad(80), close=True, caps=True)
-    for i, v in enumerate(vs):
-        e = 1.0 if (i < 4 or i >= len(vs) - 4) else 0.3
-        v.co += Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), rng.uniform(-0.02, 0.03))) * e
-    lathe(comb, [(1.14, 0.255), (0.32, 0.052), (0.32, 0.03), (1.15, 0.225)], 6, Mh, arc=rad(76), close=True, caps=True, phase=rad(2))
-
-    # --- scattered fragments: burnt plate with a paler face, foil, struts ---
-    spots = ((1.25, 30), (1.6, 75), (2.6, 110), (1.45, 150), (2.3, 172), (1.15, 205), (2.75, 215), (1.9, 248), (2.85, 262), (1.3, 292),
-             (2.35, 305), (1.75, 338), (2.9, 20), (0.95, 255), (2.9, 330), (2.45, 140))
-    for i, (rr, a) in enumerate(spots):
-        size = (0.36 - 0.07 * rr / 3) * (0.6 + 0.8 * rng.random())
-        bm_f = (white, char, char, white, foil, steel)[i % 6]
-        Mf = T(*polar(rr, a + rng.uniform(-6, 6), 0.02)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-26, 26)) @ R('Y', rng.uniform(-18, 18))
-        if i == 4:                                                         # a tank thrown clear, split open along its weld
-            thrown = Vector((Mf.translation.x, Mf.translation.y, 0.0))
-            burst_tank(tank, steel, T(Mf.translation.x, Mf.translation.y, 0.176) @ R('Z', 205) @ R('X', 66), 0.19, seed=7, seg=20, split=(-52.0, 232.0),
-                       gape=36.0, crack=84.0, dents=(((0.75, -0.55, 0.35), 50.0, 0.055), ((-0.5, 0.3, -0.8), 44.0, 0.04), ((0.0, -1.0, 0.0), 30.0, 0.022)),
-                       lugs=(250.0, 290.0), bolts=True)
-        elif i == 10:                                                      # a chunk of the heat shield, charred face up, propped on its edge
-            shield_chunk(slab_char, slab_comb, slab_skin, T(Mf.translation.x, Mf.translation.y, 0.062) @ R('Z', 118) @ R('X', 15) @ R('Y', -7), 0.27,
-                         seed=3)
-        else:
-            shard(bm_f, Mf @ T(0, 0, size * 0.20), size, t=0.024, seed=100 + i, n=8 + i % 3, crumple=0.28, curl=0.5 * (1 if i % 2 else -1),
-                  back=char)
-    for i, (rr, a) in enumerate(((1.7, 10), (2.2, 95), (1.5, 185), (2.6, 235), (2.1, 280), (1.2, 125), (2.75, 48))):
-        kinked(steel if i % 2 else ti, polar(rr, a, 0.02), polar(1.0, a + 80 + 40 * i, 0.15 * (i % 2)), 0.35 + 0.12 * (i % 4), 0.014 + 0.004 * (i % 2),
-               seed=130 + i, seg=4, kinks=1 + i % 2, bend=0.6)
-    lathe(steel, [(0.50, 0.0), (0.53, 0.0), (0.53, 0.04), (0.50, 0.04)], 9, T(-1.25, -1.85, 0.01) @ R('X', 5), arc=rad(150), close=True, caps=True)   # part of a separation ring
-    for i in range(26):                                                                            # small stuff: chips of tile, plate and foil
-        rr, a = 0.8 + 2.25 * rng.random() ** 0.8, rng.uniform(0, 360)
-        if 0.6 < polar(rr, a)[0] < 2.6 and 1.2 < polar(rr, a)[1] < 3.0:
-            continue                                                                               # (not on the canopy)
-        bm_f = (char, char, steel, white)[i % 4]
-        shard(bm_f, T(*polar(rr, a, 0.012)) @ R('Z', rng.uniform(0, 360)) @ R('X', rng.uniform(-30, 30)), 0.05 + 0.09 * rng.random(), t=0.016,
-              seed=200 + i, n=5, crumple=0.12, back=char, simple=True)
+    P = []
+    for j in range(5):
+        f = j / 4.0
+        row = []
+        for i in range(12):
+            a = rad(8.0 * i)
+            r_ = 1.18 - 0.72 * f + 0.03 * (noise3(i * 0.7, j * 0.9, 0.3, 80) - 0.5) * 2
+            ends = 0.028 if i in (0, 11) or j in (0, 4) else 0.008
+            row.append(Mb @ Vector((r_ * cos(a) + rng.uniform(-ends, ends), r_ * sin(a) + rng.uniform(-ends, ends), 0.80 * f + rng.uniform(-ends, ends) * 0.6)))
+        P.append(row)
+    shell_keep = lambda j, i: not ((j == 3 and i == 0) or (j == 0 and i == 10))
+    torn_sheet(wc, wa, wc, P, 0.03, keep=shell_keep, fresh=charred)
+    for j in range(4):                                              # its cork tiles, white-painted: each stands a little proud, some have gone
+        for i in range(11):
+            if not shell_keep(j, i) or _hash(i, j, 5, 83) < 0.14:
+                continue
+            q = (P[j][i], P[j][i + 1], P[j + 1][i + 1], P[j + 1][i])
+            mid = (q[0] + q[1] + q[2] + q[3]) / 4
+            n = ((q[1] - q[0]).cross(q[3] - q[0]) + (q[3] - q[2]).cross(q[1] - q[2])).normalized()
+            tile = [mid + (c - mid) * 0.92 + n * (0.015 + 0.007) for c in q]
+            ww.faces.new([ww.verts.new(c) for c in tile])
+            if j in (0, 3) or i in (0, 10):
+                charred.extend(tile[:2] if j == 0 else tile[2:] if j == 3 else (tile[0], tile[3]) if i == 0 else (tile[1], tile[2]))
+    lathe(alu, [(0.47, 0.80), (0.47, 0.86), (0.42, 0.86), (0.42, 0.78)], 6, Mb, arc=rad(88), close=True, caps=True)
+    torn_sheet(wg, wg, wg, scrap(T(2.02, 0.62, 0.05) @ R('Z', 40), 0.26, 0.2, 4, 3, seed=81, crumple=0.34, curl=0.6), 0.004)
+    wad(gold_k, T(1.82, 0.20, 0.03), 0.11, seed=82, subdiv=2)
 
     # --- the parachute: canopy collapsed in a heap, torn, lines trailing back to the shell ---
-    Mcan = T(1.05, 2.05, 0.0) @ R('Z', 25)
-    rim = _canopy(cloth, Mcan, 1.55, 0.95, 0.22, seed=6)
+    cloth = k(('blanket_white', 'suit_orange'), 50)
+    Mcan = T(1.15, 2.05, 0.0) @ R('Z', 25)
+    rim = _canopy(cloth, Mcan, 1.25, 0.80, 0.24, seed=6, nu=36)
     conf = Vector((2.05, 0.75, 0.10))
-    lines = k('canvas', 60)
-    for i in range(0, 44, 3):
-        if 0.05 < i / 44 < 0.23 or 0.41 < i / 44 < 0.53 or 0.61 < i / 44 < 0.80:
+    lines = k('blanket_white', 60)
+    for i in range(0, 36, 3):
+        if 0.05 < i / 36 < 0.23 or 0.41 < i / 36 < 0.53 or 0.61 < i / 36 < 0.80:
             continue
         p = rim[i].co.copy()
         mid = p.lerp(conf, 0.5) + Vector((rng.uniform(-0.15, 0.15), rng.uniform(-0.15, 0.15), 0))
         mid.z = 0.008
         sweep(lines, [Vector((p.x, p.y, 0.02)), Vector((p.x, p.y, 0.01)).lerp(mid, 0.5), mid, mid.lerp(conf, 0.6), conf], circ(0.006, 3), caps=False)
     tube(lines, [conf, conf + Vector((0.10, -0.12, 0.10)), Vector((2.22, 0.42, 0.40))], 0.016, 5)
-    ball(steel, (2.05, 0.75, 0.10), 0.03, 6, 3)
-    for i, (x, y) in enumerate(((0.2, 2.95), (-0.5, 2.3))):                                         # ripped-off panels of canopy
-        shard(k('canvas', 50) if i else k('suit_orange', 50), T(x, y, 0.04) @ R('Z', 40 * i), 0.36, t=0.006, seed=160 + i, n=7, crumple=0.3)
+    ball(node, (2.05, 0.75, 0.10), 0.03, 5, 2)
+
+    # --- rays of soil thrown out from under the dust: lines of pale clods across the soot ---
+    ej = k('ejecta', 30)
+    for i in range(7):
+        th = (TAU * i + pi / 2 - 2.1) / 7.0                          # where _blast_ray peaks
+        rr = 1.45 + 0.25 * rng.random()
+        for m in range(6):
+            rr += rng.uniform(0.08, 0.50)
+            c = Vector(polar(rr, math.degrees(th) + rng.uniform(-3.5, 3.5), 0.012))
+            sz = (0.085 - 0.008 * m) * rng.uniform(0.6, 1.25)
+            vs = [ej.verts.new(c + Vector((rng.uniform(-1, 1) * sz, rng.uniform(-1, 1) * sz * 0.8, rng.uniform(-0.1, 0.55) * sz))) for _ in range(7)]
+            res = bmesh.ops.convex_hull(ej, input=vs)
+            junk = list({e for e in res.get('geom_interior', []) + res.get('geom_unused', []) if isinstance(e, bmesh.types.BMVert)})
+            if junk:
+                bmesh.ops.delete(ej, geom=junk, context='VERTS')
 
     # everything lies ON the blast patch: lift each vertex by the height of the dish under it
-    wound = ((tank, 'titanium', 40.0), (slab_char, 'scorched', 50.0), (slab_comb, 'canvas', 30.0), (slab_skin, 'painted_white', 32.0))
-    for bm in list(k.b.values()) + [w[0] for w in wound]:
+    for bm in list(k.b.values()) + list(w.b.values()):
         for v in bm.verts:
             v.co.z += _blast_ground(v.co.x, v.co.y)
+    fresh = [p + Vector((0.0, 0.0, _blast_ground(p.x, p.y))) for p in fresh]
+    charred = [p + Vector((0.0, 0.0, _blast_ground(p.x, p.y))) for p in charred]
+    titanium = [(c + Vector((0.0, 0.0, _blast_ground(c.x, c.y))), r_) for c, r_ in titanium]
+    burst = TURN @ L(238, 0.35, 0.2)                                # where the tanks went
+    burst.z += _blast_ground(burst.x, burst.y)
     _scorch_dish(k('ground_dust', 60))
-    for bm, material, smooth in wound:
-        mesh_obj('wound_' + material, bm, material, parent=root, smooth_angle=smooth)
-
-    for kk in (k,):
-        kk.flush()
+    k.flush()
+    w.flush()
     collapse(root)
     bake_ao(root, samples=24, distance=0.7)
-    # Soot. The dish is the ground's own colour at its hem and fused black in the middle, with
-    # rays; the wreckage is blackened toward the centre of the blast, in ragged patches, and
-    # nothing is left clean (a clean white plate facing the sun burns out to a glint).
+
+    # Soot and tone, per vertex. The dish is the ground's own colour at its hem and fused black inside the rim, with dark
+    # rays and paler ones of thrown soil. The wreckage: black where the hydrazine burnt (round the burst, and low down
+    # inside), smeared further out, clean metal, gold and white beyond; torn edges stay bright.
+    from mathutils.kdtree import KDTree
+    marks = [None] * len(fresh) + [0.9] * len(charred)             # None: bright metal; a number: at least that sooted
+    kd = KDTree(len(marks))
+    for i, p in enumerate(fresh + charred):
+        kd.insert(p, i)
+    kd.balance()
     for o in [root] + lib._descendants(root):
         if o.type != 'MESH':
             continue
         attr = o.data.color_attributes.get('Col')
         mw = o.matrix_world
-        soil = {i for i, ms in enumerate(o.data.materials) if ms.name.startswith('ground_dust')}
-        ground_v = set()
+        names = [ms.name for ms in o.data.materials]
+        mat_of = {}
         for pl in o.data.polygons:
-            if pl.material_index in soil:
-                ground_v.update(pl.vertices)
+            for vi in pl.vertices:
+                mat_of[vi] = names[pl.material_index]
         for i, v in enumerate(o.data.vertices):
             p = mw @ v.co
+            name = mat_of.get(i, '')
             d = sqrt(p.x * p.x + p.y * p.y)
             th = math.atan2(p.y, p.x)
             n = noise3(p.x * 1.7 + 3, p.y * 1.7 + 3, p.z * 2.5, 21)
+            smear = noise3(p.x * 3.1 + 8, p.y * 3.1 + 2, p.z * 4.0, 22)
             c = attr.data[i].color
-            if i in ground_v:
+            if name.startswith('ground_dust'):
                 f = d / _blast_radius(th)
                 ray = 0.10 * abs(sin(5.5 * th + 0.7)) ** 3                 # dark rays reach further out
-                burn = max(0.0, min(1.0, (0.90 + ray - f) / 0.42)) ** 0.8 * (0.80 + 0.35 * n)
+                burn = max(0.0, min(1.0, (0.86 + ray - f) / 0.40)) ** 0.8 * (0.82 + 0.36 * n)
+                burn = max(burn, smooth01(1.75, 1.2, d))                   # inside the rim: fused black
+                burn *= 1.0 - 0.85 * _blast_ray(th) * smooth01(0.34, 0.46, f)      # thrown soil lies over the soot
                 burn = max(0.0, min(1.0, burn))
-                k_r, k_g, k_b = 1 - 0.88 * burn, 1 - 0.84 * burn, 1 - 0.76 * burn   # burnt soil goes grey-black, not red
-                attr.data[i].color = (c[0] * k_r, c[1] * k_g, c[2] * k_b, 1.0)
-            else:
-                burn = max(0.0, min(1.0, (3.4 - d) / 2.4)) * (0.55 + 0.9 * n)
-                smear = noise3(p.x * 3.1 + 8, p.y * 3.1 + 2, p.z * 4.0, 22)             # soot lies in smears, no plate is evenly dirty
-                f = min(0.24 * (0.40 + 0.60 * smear), 1.0 - 0.85 * max(0.0, min(1.0, burn)))
-                if (Vector((p.x, p.y, 0.0)) - thrown).length < 0.36:        # the tank thrown clear was scorched, not buried in soot: its metal still shows
-                    f = 0.34 + 0.30 * smear
-                attr.data[i].color = (c[0] * f, c[1] * f * 0.96, c[2] * f * 0.90, 1.0)
+                attr.data[i].color = (c[0] * (1 - 0.90 * burn), c[1] * (1 - 0.87 * burn), c[2] * (1 - 0.80 * burn), 1.0)
+                continue
+            if name == 'ejecta':
+                attr.data[i].color = (c[0] * (0.82 + 0.18 * smear), c[1] * (0.82 + 0.18 * smear), c[2] * (0.82 + 0.18 * smear), 1.0)
+                continue
+            # how sooted: by the burst, underneath and low down, in smears; thinning with distance from the crater
+            near = smooth01(0.72, 0.18, (p - burst).length) * (0.5 + 0.5 * smooth01(0.44, 0.14, p.z - _blast_ground(p.x, p.y)))
+            low = smooth01(0.12, 0.0, p.z - _blast_ground(p.x, p.y)) * smooth01(2.6, 0.9, d)
+            soot = max(near * (0.60 + 0.6 * n), 0.5 * low, smooth01(0.55, 0.9, smear) * smooth01(3.0, 1.0, d) * 0.6)
+            soot = max(0.0, min(1.0, soot + 0.06 * smooth01(3.2, 0.8, d)))
+            hit = kd.find(p)
+            if hit[2] < 0.004:
+                soot = soot * 0.15 if marks[hit[1]] is None else max(soot, marks[hit[1]] * (0.7 + 0.5 * smear))
+            f = (1.0 - soot) * (0.84 + 0.16 * smear) + soot * 0.08
+            tone = (1.0, 1.0, 1.0)
+            if name == 'aluminium_bare' and any((p - tcn).length < tr for tcn, tr in titanium):
+                tone = (0.80, 0.77, 0.73)                                  # the tanks are titanium
+            elif name == 'gold_foil':
+                tone = (1.0, 0.92 - 0.25 * soot, 0.85 - 0.45 * soot)       # scorched foil goes brown before it goes black
+                f = max(f, 0.22)
+            elif name == 'suit_orange':
+                tone = (0.80, 0.74, 0.70)                                  # the canopy's colour has faded
+            elif name == 'blanket_white':
+                f *= 0.90 * (0.86 + 0.14 * noise3(p.x * 7.0, p.y * 7.0, p.z * 7.0, 23))   # (never a clean, even white: that burns out in the sun)
+            attr.data[i].color = (c[0] * f * tone[0], c[1] * f * tone[1], c[2] * f * tone[2], 1.0)
     anchor('col_body', root, loc=(0, 0, 0), radius=1.25)
     anchor('col_backshell', root, loc=(2.2, 0.3, 0), radius=0.75)
     info = export_model(root, 'schiaparelli_wreck', ao=False, do_collapse=False)
