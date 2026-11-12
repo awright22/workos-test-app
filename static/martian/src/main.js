@@ -18,6 +18,7 @@ import { updateAudio } from './audio/driver.js';
 import { devils, spawnDevil, updateDevils } from './game/devils.js';
 import { MACHINES, dawnFaults, service, serviceCost, wearMachines, wearRover } from './game/machines.js';
 import { machineEff } from './game/state.js';
+import { initDiag } from './ui/diag.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
 import { setGlow, preloadModels } from './world/models.js';
@@ -313,6 +314,7 @@ function installDebug() {
   };
 }
 
+initDiag(() => (ctx.engine ? { quality: ctx.engine.qualityName, ...ctx.engine.info() } : {}));
 boot().catch((e) => {
   console.error(e);
   showOverlay({ title: 'SOMETHING BROKE', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload the page to try again.`, buttons: [] });

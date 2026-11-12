@@ -5,6 +5,8 @@
  *   node tools/publish.mjs "what changed, in a line"      build, check, publish
  *   node tools/publish.mjs --dry-run "..."                 everything except the push
  *   node tools/publish.mjs --skip-tests "..."              when the tests were just run
+ *   node tools/publish.mjs --to next "..."                 publish into the folder next/ and leave the
+ *                                                          rest of the branch alone: a preview beside the live game
  *
  * It makes a production build, runs lint and the tests, then replaces the contents of
  * gh-pages with exactly the files the game ships (the same list the service worker precaches)
@@ -23,7 +25,10 @@ const repo = path.dirname(tools);
 const game = path.join(repo, 'static', 'martian');
 const args = process.argv.slice(2);
 const dry = args.includes('--dry-run'), skipTests = args.includes('--skip-tests');
-const message = args.filter((a) => !a.startsWith('--')).join(' ').trim();
+const toAt = args.indexOf('--to');
+const sub = toAt >= 0 ? String(args[toAt + 1] || '').replace(/[^a-z0-9_-]/gi, '') : '';
+if (toAt >= 0 && !sub) { console.error('--to needs a folder name'); process.exit(2); }
+const message = args.filter((a, i) => !a.startsWith('--') && !(toAt >= 0 && i === toAt + 1)).join(' ').trim();
 if (!message) { console.error('usage: publish.mjs [--dry-run] [--skip-tests] "what changed"'); process.exit(2); }
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 const run = (cmd, a) => { const r = spawnSync(cmd, a, { cwd: tools, stdio: 'inherit' }); if (r.status !== 0) { console.error(`\n${a.join(' ')} failed; not publishing.`); process.exit(1); } };
@@ -39,11 +44,14 @@ const work = mkdtempSync(path.join(os.tmpdir(), 'stranded-pages-'));
 try {
   git(repo, 'fetch', '--quiet', 'origin', 'gh-pages');
   git(repo, 'worktree', 'add', '--quiet', '--detach', work, 'origin/gh-pages');
-  for (const e of await readdir(work)) if (e !== '.git' && e !== '.nojekyll') await rm(path.join(work, e), { recursive: true, force: true });
+  // the whole branch is replaced, or only the preview folder; a preview already published stays when the root is replaced
+  const dest = sub ? path.join(work, sub) : work;
+  if (sub) await rm(dest, { recursive: true, force: true });
+  else for (const e of await readdir(work)) if (e !== '.git' && e !== '.nojekyll' && e !== 'next') await rm(path.join(work, e), { recursive: true, force: true });
   let bytes = 0;
   for (const f of files) {
-    await mkdir(path.dirname(path.join(work, f)), { recursive: true });
-    await cp(path.join(game, f), path.join(work, f));
+    await mkdir(path.dirname(path.join(dest, f)), { recursive: true });
+    await cp(path.join(game, f), path.join(dest, f));
     bytes += (await stat(path.join(game, f))).size;
   }
   await writeFile(path.join(work, '.nojekyll'), '');
@@ -53,7 +61,7 @@ try {
     git(work, 'commit', '--quiet', '-m', `${message}\n\nBuilt from ${sha}${dirty ? ' (plus uncommitted changes)' : ''}; ${files.length} files, ${(bytes / 1e6).toFixed(1)} MB.`);
     console.log(`\n${files.length} files, ${(bytes / 1e6).toFixed(1)} MB, from ${sha}${dirty ? ' + uncommitted changes' : ''}`);
     if (dry) console.log('dry run: not pushed. Commit is', git(work, 'rev-parse', '--short', 'HEAD'));
-    else { git(work, 'push', '--quiet', 'origin', 'HEAD:gh-pages'); console.log('published to gh-pages:', git(work, 'rev-parse', '--short', 'HEAD')); }
+    else { git(work, 'push', '--quiet', 'origin', 'HEAD:gh-pages'); console.log(`published to gh-pages${sub ? '/' + sub : ''}:`, git(work, 'rev-parse', '--short', 'HEAD')); }
   }
 } finally {
   try { git(repo, 'worktree', 'remove', '--force', work); } catch { /* leave it for inspection */ }

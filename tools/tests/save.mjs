@@ -29,9 +29,13 @@ const s = await g.eval(async (G) => { await G.settle(); return { sol: G.S.sol, p
 check('progress carried over', s.started && s.sol === 7 && s.potatoes === 9 && s.scrap === 7 && s.tank1 && s.pf, s);
 check('greenhouse and its crops rebuilt', s.built[0] === 'greenhouse' && s.plots === 10 && s.plot6 === 'growing', s);
 check('astronaut stands on the new ground', Math.abs(s.alt) < 0.01, s.alt);
-await sleep(8200);
-const logText = await g.page.locator('#mg-log').innerText();
-check('player is told what changed', /real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText), logText.slice(0, 300));
+// the notices are typed into the log one after the other and fade: watch the log until both have been seen
+let logText = '';
+for (let i = 0; i < 60 && !(/real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText)); i++) {
+  await sleep(500);
+  logText += '\n' + await g.page.locator('#mg-log').innerText();
+}
+check('player is told what changed', /real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText), logText.slice(-300));
 const resaved = await g.eval((G) => { G.saveGame(); return JSON.parse(localStorage.getItem('stranded2-save')).v; });
 check('re-saved in the current format', resaved === 4, resaved);
 // an unreadable save is reported on the title screen

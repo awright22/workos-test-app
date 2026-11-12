@@ -77,7 +77,7 @@ async function writeServiceWorker() {
   await writeFile(path.join(game, 'sw.js'), sw);
   let bytes = 0;
   for (const f of files) bytes += (await stat(path.join(game, f))).size;
-  console.log(`sw.js: cache stranded-${version}, ${files.length} files, ${(bytes / 1e6).toFixed(2)} MB to precache`);
+  console.log(`sw.js: cache stranded2-${version}, ${files.length} files, ${(bytes / 1e6).toFixed(2)} MB to precache`);
   return version;
 }
 
