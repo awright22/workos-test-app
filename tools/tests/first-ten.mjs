@@ -41,7 +41,10 @@ await tapSel('[data-diff="survival"]');
 await page.waitForFunction(() => window.__MG && window.__MG.S.started, null, { timeout: 180000 });
 await ev(async (G) => { await G.settle(); });
 await shot('crash-first-seconds', 'The game begins: he comes to on the sand, 85 m from the Hab, suit leaking.', 2500);
-await shot('crash-after-ten-seconds', 'Ten seconds in, nothing touched.', 8000);
+// (ten seconds of the game's own time, stepped: left to run, software rendering got through about one of them, and
+// the suit's countdown looked stuck)
+await ev((G) => { G.paused = true; G.tick(0.05, 180); });
+await shot('crash-after-ten-seconds', 'Ten seconds in, nothing touched.', 1200);
 await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 10); });
 await shot('approaching-hab', 'Walking toward the Hab.');
 await ev((G) => { G.tpLocal(0, 10.0, 0); G.tick(0.05, 6); });
@@ -83,6 +86,8 @@ await hold(2.2);
 await shot('water-made', 'After the burn.', 3000);
 for (const [key, id, what] of [['m', 'map', 'The map, opened for the first time.'], ['c', 'colony', 'The colony screen.'], ['j', 'journal', 'The journal.']]) {
   if (size.touch) await tapSel(`#mg-trow [data-t="${id}"]`); else await page.keyboard.press(key);
+  // (the screen fades in over the HUD fading out: wait for the HUD to be gone, however slowly this machine draws)
+  await page.waitForFunction(() => +getComputedStyle(document.getElementById('mg-hud')).opacity < 0.02, null, { timeout: 30000 }).catch(() => {});
   await shot(id, what, 1500);
   await page.keyboard.press('Escape');
   await sleep(400);
@@ -91,7 +96,7 @@ await ev((G) => { if (G.S.uiOpen) { const b = document.querySelector('#mg-panel 
 await shot('bunk-at-night', 'Evening, at the bunk.', 2500);
 await hold(1.4);
 await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
-await shot('night-summary', 'Sleeping until dawn: the account of the night, which waits to be read.', 600);
+await shot('night-summary', 'Sleeping until dawn: the account of the night, which waits to be read.', 2200);       // (past its fade-in, which software rendering stretches)
 await tapSel('#mg-panel .sleep .wake');
 await shot('woken', 'Awake again.', 4000);
 await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 20000);

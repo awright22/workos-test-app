@@ -29,6 +29,9 @@ export async function openGame(o = {}) {
     hasTouch: !!o.touch, isMobile: !!o.touch,
   });
   const page = await context.newPage();
+  // (software rendering on a shared machine: a click that reloads the game can take minutes to settle, and the
+  // 30-second default failed runs that had nothing wrong with them)
+  page.setDefaultTimeout(240000); page.setDefaultNavigationTimeout(240000);
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));

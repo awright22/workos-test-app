@@ -90,7 +90,10 @@ s = await ev((G) => {
   G.hold(2.6);
   return { before, label, pods0 };
 });
-await sleep(9000);
+// (the capsule comes on a timer, about five seconds after the analysis: on a loaded machine nine seconds was not always
+// enough, so wait for it, up to a minute, and then a moment more for a second one)
+await g.page.waitForFunction((n) => window.__MG.World.pods.length > n, s.pods0, { timeout: 60000 }).catch(() => {});
+await sleep(4000);
 const after = await ev((G) => ({ sum: G.science.scienceSummary(), pods: G.World.pods.length, cat: G.science.catalogue().filter((c) => c.count > 0).map((c) => c.id), found: G.S.science.found }));
 check('the Hab analyser identifies the samples and credits them', /Analyse samples \(2\)/.test(s.label || '') && after.sum.bagged === 0 && after.sum.kinds >= 1 && after.sum.points > 24, { label: s.label, after: after.sum, cat: after.cat });
 // 25 credit brings the first grant; a lucky find can cross the second (60) in the same analysis

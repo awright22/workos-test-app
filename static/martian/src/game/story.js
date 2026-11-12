@@ -25,10 +25,13 @@ export function connectPathfinder() {
   checkpoint();
   const mavDist = fmtDist(groundDist(World.hab.position, World.mav.position));
   const convo = [
-    ['n', 'MARK? MARK, IS THAT YOU? — JPL. We\'re receiving Pathfinder telemetry. The whole world is watching, Mark.'],
+    // (it was signed "— JPL" under the name HOUSTON)
+    ['n', 'MARK? MARK, IS THAT YOU? This is Houston. We\'re receiving Pathfinder telemetry. The whole world is watching, Mark.'],
     ['w', 'Alive and well. Ish. Growing potatoes on a dead planet. Air holds, food\'s tight, morale is potato-based.'],
-    ['n', `Copy. New plan: Ares 4\'s MAV is fueled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
-    ['w', `So the plan is "don\'t die for ${Math.max(0, S.rescueSol - S.sol)} more sols, then drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`],
+    ['n', `Copy. New plan: Ares 4\'s MAV is fuelled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
+    ['w', S.sol >= S.rescueSol
+      ? `So the plan is "drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`
+      : `So the plan is "don\'t die for ${S.rescueSol - S.sol} more sol${S.rescueSol - S.sol === 1 ? '' : 's'}, then drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`],
     ['n', 'We\'re also uploading survey tasks — old landers with parts worth salvaging. Help us close some files, we drop supplies. And Mark: everything you type is broadcast live on Earth. Language.'],
     ['w', 'Acknowledged. [REDACTED BY NASA]. [ALSO REDACTED]. Boy, am I glad you warned me.'],
   ];
@@ -260,21 +263,24 @@ export function winGame() {
     ['survive', 'Outlasted the wait for the Hermes']];
   const steps = STEPS.filter(([id]) => marks[id]).map(([id, text]) => `<li><b class="t-num">Sol ${marks[id]}</b><span>${text}</span></li>`).join('') +
     `<li class="last"><b class="t-num">Sol ${S.sol}</b><span>Lifted off from Schiaparelli</span></li>`;
-  const fed = grown >= 30 ? 'fed himself from Martian soil' : grown > 0 ? 'grew food where nothing grows' : 'lived on what the mission left behind';
-  const went = st.driven > 30000 ? 'drove further than any rover had gone' : 'crossed the plains to Schiaparelli';
-  const mood = S.morale >= 70 ? ' He left in better spirits than anyone had a right to expect.' : S.morale < 30 ? ' He left worn thin, and he left.' : '';
+  // The interface says "you"; the log is his own voice. The closing line is the last entry of his log, so it is
+  // in the first person. (It was a third-person "mission record", beside a death screen that says "You died".)
+  const fed = grown >= 30 ? 'fed myself from Martian soil' : grown > 0 ? 'grew food where nothing grows' : 'lived on what the mission left behind';
+  const went = st.driven > 30000 ? 'drove further than any rover has gone' : 'crossed the plains to Schiaparelli';
+  const mood = S.morale >= 70 ? ' In better spirits than anyone had a right to expect.' : S.morale < 30 ? ' Worn thin. Going home anyway.' : '';
   showOverlay({
     kind: 'win',
     kicker: `Hermes intercept confirmed · Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}`,
     title: 'Rescued',
-    subtitle: 'Watney is off the surface.',
+    subtitle: 'You are off the surface.',
+    // (each statistic has one name, here, in the journal and on the death screen)
     stats: [
       ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
-      ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Landmarks discovered', st.discoveries],
+      ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Discoveries', st.discoveries],
       ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,
-    quote: `${S.sol} sols alone on a planet. He ${fed}, ${went}, and came home.${mood}<cite>Ares 3 mission record, closing entry</cite>`,
+    quote: `${S.sol} sols alone on a planet. I ${fed}, ${went}, and I am going home.${mood}<cite>Log, Sol ${S.sol}: the last entry from the surface</cite>`,
     buttons: [{ label: 'Back to the title', keep: true, fn: () => tryReload() }],
   });
 }

@@ -69,7 +69,7 @@ export function useCandle() {
     S.inv.candle--;
     S.suit = clamp(S.suit + 40, 0, suitCap());
     Snd.play('candle');
-    log('Cracked an O2 candle. Chemistry: still my favorite roommate.');
+    log('Cracked an O2 candle. Chemistry: still my favourite roommate.');
   }
 }
 window.addEventListener('keydown', (ev) => { if (ev.key.toLowerCase() === 'x') useCandle(); });

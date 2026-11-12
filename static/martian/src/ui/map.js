@@ -8,13 +8,13 @@ import { reducedMotion } from './settings.js';
 import { fmtDist, groundDist, llToVec, vecToLl } from '../planet/geo.js';
 import { _v1 } from '../core/scratch.js';
 import { FEATURES, REGIONS, regionName } from '../planet/features.js';
-import { S } from '../game/state.js';
+import { BAL, S, roverPowerCap } from '../game/state.js';
 import { R } from '../planet/constants.js';
 import { World } from '../world/build.js';
 import { player } from '../game/player.js';
 import { QUEST_DEFS } from '../game/story.js';
 import { ctx as gctx } from '../game/ctx.js';
-import { absBearing, headingOf } from './hud.js';
+import { absBearing, distTo, headingOf } from './hud.js';
 import { roverF } from '../game/rover.js';
 
 const IMG_PPD = 8;                      // the atlas is 2880 x 1440: 8 pixels per degree
@@ -86,10 +86,9 @@ function zoomAt(x, y, factor, smooth) {
 // ------------------------------------------------------------------------------------------
 function buildMarkers() {
   const out = [];
-  const pp = player.pos;
   const add = (o) => {
     const ll = vecToLl(_v1.copy(o.pos).normalize());
-    out.push({ lon: ll.lon, lat: ll.lat, dist: groundDist(pp, o.pos), ...o, pos: o.pos.clone ? o.pos.clone() : o.pos });
+    out.push({ lon: ll.lon, lat: ll.lat, dist: distTo(o.pos), ...o, pos: o.pos.clone ? o.pos.clone() : o.pos });
   };
   const questTargets = {};
   for (const q of QUEST_DEFS) if (S.quests[q.id] === 'active' && q.target) questTargets[q.target] = q;
@@ -124,9 +123,9 @@ function buildMarkers() {
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
   add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink3, pos: World.mav.position, label: 'Ares 4 MAV', pri: S.flags.mavRevealed ? 1 : 5, main: !!S.flags.mavRevealed,
-    title: 'Ares 4 MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'Schiaparelli crater', note: S.flags.mavRevealed ? 'Fueled and waiting. This is the way off the planet.' : 'The next mission\'s ascent vehicle, pre-landed in Schiaparelli.' });
+    title: 'Ares 4 MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'Schiaparelli crater', note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : 'The next mission\'s ascent vehicle, pre-landed in Schiaparelli.' });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
-    title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower)}, O2 tank ${Math.round(S.roverO2)}.` });
+    title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
   add({ id: 'hab', icon: 'hab', color: col.accent, pos: World.hab.position, label: 'Hab', pri: 2, home: true,
     title: 'The Hab', type: 'Home', note: 'Air, water, the farm, the fabricator and a bunk.' });
   out.sort((a, b) => b.pri - a.pri);              // drawn back to front: the important ones on top
@@ -155,21 +154,23 @@ function placeLabels(you, storms) {
     if (m.x < -40 || m.x > W + 40 || m.y < -20 || m.y > H + 20) continue;
     const text = ((m.label || (m === selected ? m.title : '')) + (m.group ? ' +' + (m.group.length - 1) : '')).trim().toUpperCase();
     const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = 15 * U;
-    const spots = [[m.x + r + 3 * U, m.y - h / 2], [m.x - r - 3 * U - w, m.y - h / 2], [m.x - w / 2, m.y + r + 2 * U], [m.x - w / 2, m.y - r - 2 * U - h]];
+    // (beside it, under it, over it, and then off each corner: on a small map a lander between two others went unnamed)
+    const spots = [[m.x + r + 3 * U, m.y - h / 2], [m.x - r - 3 * U - w, m.y - h / 2], [m.x - w / 2, m.y + r + 2 * U], [m.x - w / 2, m.y - r - 2 * U - h],
+      [m.x + r * 0.6, m.y - r - h - U], [m.x + r * 0.6, m.y + r + U], [m.x - r * 0.6 - w, m.y - r - h - U], [m.x - r * 0.6 - w, m.y + r + U]];
     for (const [x, y] of spots) {
       // (a label keeps inside the map: at an edge it goes to the marker's other side)
       if ((x >= 2 && x + w <= W - 2 && free(x, y, w, h)) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
     }
   }
   // storm cells are named where there is room
-  c.font = `600 ${11 * U}px "Barlow Condensed", sans-serif`;
+  c.font = `600 ${Math.max(11, 11 * U)}px "Barlow Condensed", sans-serif`;
   for (const st of storms) {
     const text = 'DUST STORM';
     const w = c.measureText(text).width + (text.length * 1.4 + 8) * U, h = 15 * U;
     const x = st.x - w / 2, y = st.y - h / 2;
     if (x < 4 || x + w > W - 4 || y < 4 || y + h > H - 4 || !free(x, y, w, h)) continue;
     boxes.push([x, y, w, h]);
-    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: 11 * U, bold: true, spacing: 1.4 * U });
+    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: Math.max(11, 11 * U), bold: true, spacing: 1.4 * U });
   }
   // place names: the largest first; small ones appear as you zoom in
   const places = [];
@@ -181,12 +182,13 @@ function placeLabels(you, storms) {
     if (px < 26) continue;
     const lat = Math.abs(p.lat) > 86 ? Math.sign(p.lat) * 84 : p.lat;
     const x = sx(p.lon), y = sy(lat);
-    if (x < 0 || x > W || y < 8 || y > H - 8) continue;
-    const size = clampN(9 + px / 28, 10, 15) * U;
+    const size = Math.max(11, clampN(9 + px / 28, 10, 15) * U);
     const spacing = size * 0.22;
     c.font = `500 ${size}px "Barlow Condensed", sans-serif`;
     const text = p.name.toUpperCase();
     const w = c.measureText(text).width + text.length * spacing + 8 * U, h = size + 4 * U;
+    // (the whole name inside the map, or not at all: PHOENIX was cut by the header)
+    if (x < 0 || x > W || y - h / 2 < 3 || y + h / 2 > H - 3) continue;
     if (x - w / 2 < 4 || x + w / 2 > W - 4 || !free(x - w / 2, y - h / 2, w, h)) continue;
     boxes.push([x - w / 2, y - h / 2, w, h]);
     out.push({ text, x: x - w / 2 + 4 * U, y, color: col.place, size, spacing });
@@ -254,7 +256,7 @@ function draw() {
   const latTop = view.lat + H / 2 / ppd, latBot = view.lat - H / 2 / ppd;
   for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = Math.round(sy(lat)) + 0.5; c.moveTo(0, y); c.lineTo(W, y); }
   c.stroke();
-  c.font = `500 ${10 * U}px "JetBrains Mono", monospace`; c.fillStyle = 'rgba(245,240,232,.55)'; c.textBaseline = 'alphabetic';
+  c.font = `500 ${Math.max(11, 10 * U)}px "JetBrains Mono", monospace`; c.fillStyle = 'rgba(245,240,232,.55)'; c.textBaseline = 'alphabetic';
   c.textAlign = 'left';
   for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = sy(lat); if (y > 14 * U && y < H - 6 && lat % (step * (step === 30 ? 1 : 2)) === 0) c.fillText(lat === 0 ? '0°' : fmtLat(lat).replace('.0', ''), 6 * U, y - 3 * U); }
   c.textAlign = 'center';
@@ -364,17 +366,24 @@ function draw() {
 function showInfo(s) {
   selected = s;
   if (!s) { info.hidden = true; request(); return; }
-  const from = player.pos;
+  const from = S.mode === 'rover' ? World.rover.group.position : player.pos;
   const pos = s.pos || llToVec(s.lat, s.lon).multiplyScalar(R);
-  const dist = groundDist(from, pos);
+  const dist = distTo(pos);
   const ll = { lat: s.lat, lon: s.lon };
   const grp = s.group || (s.under && s.under.group);
+  // what else stands at this spot, like things counted together ("Rover, Beacon, 3 Debris", not Debris three times)
+  const others = [];
+  if (grp) for (const m of grp) {
+    if (m === s) continue;
+    const name = m.label || m.title, e = others.find((o) => o.name === name);
+    if (e) e.n++; else others.push({ name, n: 1 });
+  }
   info.innerHTML = `<div class="mi-hd">${icon(s.icon || 'pin')}<div><h2>${esc(s.title)}</h2><div class="ty">${esc(s.type || '')}</div></div>` +
     `<button type="button" class="x" aria-label="Close details">${icon('close')}</button></div>` +
     `<dl><dt>Distance</dt><dd class="t-num">${fmtDist(dist)}</dd><dt>Bearing</dt><dd>${dist > 5 ? bearingText(absBearing(from, pos)) : '—'}</dd>` +
     `<dt>Position</dt><dd class="t-mono">${fmtLL(ll)}</dd></dl>${s.note ? `<p>${esc(s.note)}</p>` : ''}` +
     // a marker standing for several says what the others are
-    (grp && grp.length > 1 ? `<p class="grp"><b>Here too</b> ${grp.filter((m) => m !== s).map((m) => esc(m.label || m.title)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
+    (others.length ? `<p class="grp"><b>Also here (+${grp.length - 1})</b> ${others.map((o) => esc(o.n > 1 ? `${o.n} × ${o.name}` : o.name)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
   info.hidden = false;
   info.querySelector('.x').addEventListener('click', () => showInfo(null));
   request();
@@ -427,7 +436,8 @@ export function initMap(body) {
     '<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><i></i><span></span></span>');
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
   scaleEl = status.querySelector('.map-scale i'); scaleLbl = status.querySelector('.map-scale span');
-  statusHint.textContent = layout.touch ? 'Drag to pan · pinch to zoom · tap for details' : 'Drag to pan · wheel to zoom · click for details';
+  // (short enough to show whole beside the position on the narrowest phone, where it ended "tap for…")
+  statusHint.textContent = layout.touch ? 'Pinch to zoom · tap for details' : 'Drag to pan · wheel to zoom · click for details';
   const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); };
   setLegend(false);                     // (closed until asked for: open, it covered a corner of the map)
 
