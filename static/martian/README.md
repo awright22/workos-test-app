@@ -19,8 +19,13 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 - **Real elevation.** The ground is NASA's MOLA laser altimetry of Mars; its colour is the
   Viking orbiter mosaic. Olympus Mons, Valles Marineris, Hellas, Gale and both ice caps are
   where they really are. See `CREDITS.md`. Below about 40 m the ground is generated to suit the
-  place: craters, layered cliffs with ledges, ripple fields, frost polygons toward the poles,
-  and on the seven shield volcanoes lava flows with rubble at their edges and leveed channels.
+  place: craters, ripple fields, frost polygons toward the poles; on steep ground, spurs and
+  gullies running down the fall line with ledges of layered rock cropping out across them (the
+  walls of Valles Marineris); on the seven shield volcanoes, tongues of dark lava with rubble at
+  their edges and leveed channels, and at five summits the caldera itself: a level floor of
+  frozen lava inside a cliff, where the elevation data has it.
+- **Dust hangs low.** The haze thickens toward low ground and thins with height: thick looking
+  down into a canyon, clear from the top of Olympus.
 - **A whole sphere**, 75 km around at this scale (1:282), with relief exaggerated four times so
   that volcanoes and canyons read at walking pace. You can walk or drive all the way round.
   Day and night depend on where you stand. At night Phobos crosses the sky twice a sol, west to
@@ -139,7 +144,7 @@ tools/
 
 Rendering is three.js r187 (WebGL 2): HDR with a single final tone-mapping pass, a Mars sky
 model, a reflection environment captured from that sky, two cascaded sun shadow maps, bloom
-and dynamic resolution. The terrain is a cube-sphere quadtree whose chunks are built in workers
+and dynamic resolution, and fog that knows how high the camera and the thing seen are. The terrain is a cube-sphere quadtree whose chunks are built in workers
 from the same height function the physics uses, so what you stand on is what is drawn.
 
 To work on it: `cd tools && npm ci`, then `node build.mjs --watch` and `node serve.mjs`.

@@ -11,13 +11,15 @@
  *      is rough (old highlands) and sparse on the smooth northern plains.
  *   3. Fractal relief, 96 m down to 3 m wavelength, amplitude scaled by the same roughness.
  *   4. Wind ripples and low dunes on the smooth ground.
- *   5. On the shield volcanoes, lava: flow lobes lying on one another and leveed channels.
+ *   5. On the shield volcanoes, lava: flow lobes lying on one another and leveed channels, and at
+ *      the summits the calderas, each a level floor of frozen lava inside a cliff.
+ *   6. On steep ground, spurs and gullies running down the fall line, and ledges of layered rock.
  * Everything below 3 m is drawn by the terrain shader and is not part of the collision surface.
  */
 import { unzlibSync } from 'fflate';
 import { R, HM } from './constants.js';
 import { gnoise3, hashU, clamp } from '../core/math.js';
-import { LAVA_FIELDS } from './volcanoes.js';
+import { LAVA_FIELDS, CALDERAS } from './volcanoes.js';
 
 const PI_4 = Math.PI / 4;
 const INV_PI_4 = 4 / Math.PI;
@@ -88,8 +90,41 @@ export function faceToDir(face, s, t, out) {
 
 // scratch for the current sample: face, equi-angular coords, gnomonic coords
 let _f = 0, _s = 0, _t = 0, _sc = 0, _tc = 0;
-// slope (rise over run, exaggerated like the heights) of the elevation data at the last sample
-let _slope = 0;
+// slope (rise over run, exaggerated like the heights) of the elevation data at the last sample,
+// and its two parts along the face's texels (for the direction of the fall line)
+let _slope = 0, _du = 0, _dv = 0;
+/** How far the place last asked about lies out on a caldera's level floor, 0..1 (set by _caldera). */
+let _floor = 0;
+// The gnomonic face coordinates as vectors: a face's directions are A + sc·B + tc·C (see faceToDir).
+const FACE_B = [[0, 0, -1], [0, 0, 1], [1, 0, 0], [1, 0, 0], [1, 0, 0], [-1, 0, 0]];
+const FACE_C = [[0, -1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, -1, 0]];
+/**
+ * Spurs and gullies come in sizes: buttresses and alcoves that carry across a canyon, the spurs
+ * between them, and the chutes on those. Each row: metres between crests, and how far a spur stands
+ * out from the wall, in metres (its height is that times the slope: on a cliff a spur a few metres
+ * high is a ripple, and on a hillside one twenty metres high is a mountain).
+ */
+const GULLIES = [[150, 13], [56, 5], [21, 1.8]];
+/** Headings of the patches of spur and gully last asked about: a small direct-mapped table (see _gully). */
+const GULLY_SLOTS = 4093;
+const _gk = new Int32Array(GULLY_SLOTS * 4).fill(0x7fffffff), _gd = new Float64Array(GULLY_SLOTS * 3);
+/**
+ * The level direction across the slope at the place last sampled by _mola (unit direction x, y, z):
+ * up × uphill. Uphill comes from the two partial slopes along the face's texels, through the face's own
+ * (skewed) tangent vectors. Writes three numbers at out[at].
+ */
+function acrossSlope(x, y, z, out, at) {
+  const B = FACE_B[_f], C = FACE_C[_f];
+  const inv = 1 / Math.sqrt(1 + _sc * _sc + _tc * _tc), pb = _sc * inv, pc = _tc * inv;
+  const e1x = B[0] - pb * x, e1y = B[1] - pb * y, e1z = B[2] - pb * z, e2x = C[0] - pc * x, e2y = C[1] - pc * y, e2z = C[2] - pc * z;
+  const h1 = _du / (1 + _sc * _sc), h2 = _dv / (1 + _tc * _tc);
+  const a = (1 - pc * pc) * h1 + pb * pc * h2, b = (1 - pb * pb) * h2 + pb * pc * h1;
+  const gx = a * e1x + b * e2x, gy = a * e1y + b * e2y, gz = a * e1z + b * e2z;
+  let cx = y * gz - z * gy, cy = z * gx - x * gz, cz = x * gy - y * gx;
+  const cl = Math.sqrt(cx * cx + cy * cy + cz * cz);
+  if (cl < 1e-12) { cx = -z; cy = 0; cz = x; } else { cx /= cl; cy /= cl; cz /= cl; }
+  out[at] = cx; out[at + 1] = cy; out[at + 2] = cz;
+}
 /** How much of the ground last asked about is a volcano's lava field, 0..1 (set by _flows). */
 let _lava = 0;
 /** How nearly it lies on the edge of a lava flow, 0..1: where a flow's rubble gathers (set by _flows). */
@@ -104,9 +139,9 @@ let _padW = 0;
  * half-width of the flow's edge in noise units, and how much of the flank the flow leaves bare.
  */
 const LOBES = [
-  [320, 130, 4.5, 0.06, 0.02],
-  [120, 46, 2.4, 0.04, 0.0],
-  [52, 21, 1.0, 0.04, 0.08],
+  [700, 95, 5.5, 0.05, 0.02],
+  [320, 36, 3.0, 0.045, 0.0],
+  [130, 15, 1.2, 0.05, 0.08],
 ];
 /** The cone is cut into this many sectors, each with its own field of flows (see _flows). */
 const SECTORS = 8;
@@ -193,10 +228,20 @@ export class Planet {
    *  minW is the finest wavelength to include (FINEST for collision; larger for far meshes). */
   radius(x, y, z, minW = this.finest) {
     locate(x, y, z);
-    const base = this._ledges(this._mola(), x, y, z, minW);
+    return this._surface(x, y, z, minW);
+  }
+
+  /** The layers in order, for the place locate() or radiusFace() has just set up. */
+  _surface(x, y, z, minW) {
+    // The land as the elevation data has it; calderas cut level; spurs and gullies worn into what is steep;
+    // then the rock's own layers, which crop out as ledges along the contours of that worn slope.
+    let base = this._caldera(this._mola(), x, y, z, minW);
+    if (_slope > 0.22 && _floor < 1) base += this._gully(x, y, z, minW) * (1 - _floor);
+    base = this._ledges(base, x, y, z, minW);
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
-    const r = R + base + flows + this._detail(x, y, z, rough, minW);
+    // (a lava field is smoother than old cratered ground between its flow fronts, and a caldera's floor is level)
+    const r = R + base + flows + this._detail(x, y, z, rough, minW) * (1 - 0.4 * _lava) * (1 - 0.93 * _floor);
     _padW = 0;
     return this.pads.length ? this._pad(x, y, z, r) : r;
   }
@@ -236,7 +281,8 @@ export class Planet {
       if (m > _lava) _lava = m;
       if (minW >= 400 || s < 1e-9) continue;
       const ca = a / s, sa = b / s;
-      const k0 = m * (d < 30 ? d / 30 : 1);                // (the angle means nothing at the very top)
+      // (the angle means nothing at the very top; and no flow lies in the caldera or on its brim)
+      const k0 = m * (v.pit ? clamp((d - v.pit) / 40, 0, 1) : d < 30 ? d / 30 : 1);
       const warp = gnoise3(x * R / 85 + 3.3, y * R / 85 - 1.7, z * R / 85 + 9.1) * 0.55;
       // Coordinates on the cone: metres down the flank, and metres round it measured from the middle of
       // the sector the place is in. Each sector has its own field of flows and neighbours are blended
@@ -275,7 +321,7 @@ export class Planet {
         const ed = 4 * e * (1 - e) * w * k0 * Math.min(1, L[2] / 2.2);
         if (ed > _edge) _edge = ed;
       }
-      cover *= m;
+      cover = Math.max(cover * m * (v.pit ? clamp((d - v.pit * 0.9) / 30, 0.45, 1) : 1), _floor);
       if (cover > _cover) _cover = cover;
       // channels: each keeps to its own slice of the cone, wanders in it, and comes and goes down the flank
       if (minW < 8 && t > 0.2 && t < 0.92) {
@@ -297,6 +343,98 @@ export class Planet {
       }
     }
     return h;
+  }
+
+  /**
+   * A caldera is where a volcano's summit fell in on its emptied chamber, and the pit then flooded with
+   * lava that froze level. The elevation data holds each as a soft bowl some tens of metres deep. Inside
+   * a caldera's reach, heights below its brim are redrawn: the low part of the bowl becomes the level
+   * floor and the rest of the fall is gathered into a cliff standing where the bowl's side was, so the
+   * pit keeps its true outline. Leaves in _floor how far out on the floor the place is.
+   */
+  _caldera(base, x, y, z, minW) {
+    _floor = 0;
+    for (let i = 0; i < CALDERAS.length; i++) {
+      const c = CALDERAS[i];
+      const dot = x * c.x + y * c.y + z * c.z;
+      if (dot <= c.cos) continue;
+      const u = (base - c.floor) / c.depth;
+      if (u >= 1) return base;
+      const d = Math.sqrt(Math.max(0, 2 - 2 * dot)) * R;
+      let zone = d <= c.reach * 0.86 ? 1 : (c.reach - d) / (c.reach * 0.14);
+      zone = zone * zone * (3 - 2 * zone);
+      // the cliff takes the upper share of the bowl's side, and (as with ledges) no less than three cells of the mesh asking
+      const share = Math.min(1, Math.max(0.42, 2.4 * _slope * minW / c.depth));
+      let v = (u - (1 - share)) / share, g = 0, dg = 0;
+      if (v > 0) {
+        // a scree foot, then the wall: the lower third of the rise is a ramp, the rest stands steep
+        g = v < 0.4 ? 0.3 * v * v / 0.16 : 0.3 + 0.7 * ((v - 0.4) / 0.6) * ((v - 0.4) / 0.6) * (3 - 2 * (v - 0.4) / 0.6);
+        dg = (v < 0.4 ? 0.6 * v / 0.16 : 0.7 * 6 * ((v - 0.4) / 0.6) * (1 - (v - 0.4) / 0.6) / 0.6) / share;
+      }
+      const flat = v <= 0 ? 1 : v >= 0.25 ? 0 : 1 - v * 4;
+      _floor = zone * flat;
+      _slope *= 1 + zone * (dg - 1);
+      return base + (c.floor + c.depth * g - base) * zone;
+    }
+    return base;
+  }
+
+  /**
+   * Steep ground does not stay smooth. Rockfall and dust avalanches wear chutes straight down it,
+   * and what is left between stands out as spurs: the walls of Valles Marineris are spur and gully
+   * from rim to floor. The pattern is waves that run across the slope, so that their crests point
+   * down the fall line of the real elevation, laid in patches that do not line up (so spurs fork and
+   * die out), in three sizes. Returns the height to add; steepens _slope by what it adds.
+   */
+  _gully(x, y, z, minW) {
+    let m = _slope >= 0.48 ? 1 : (_slope - 0.22) / 0.26;
+    if (m <= 0 || minW >= GULLIES[0][0] / 4) return 0;
+    m = m * m * (3 - 2 * m);
+    const px = x * R, py = y * R, pz = z * R, rise = _slope < 0.35 ? 0.35 : _slope > 2.2 ? 2.2 : _slope;
+    let h = 0, steeper = 0;
+    for (let o = 0; o < 3; o++) {
+      const lam = GULLIES[o][0], amp = GULLIES[o][1] * rise;
+      if (minW >= lam / 4) break;
+      const w = minW <= lam / 8 ? 1 : (lam / 4 - minW) / (lam / 8);
+      // Patches of wave on a jittered grid, each with its own phase and its own heading (the fall line at the
+      // patch's middle: were the heading taken at every point, the waves would bunch into spikes wherever
+      // the fall line turns), blended by nearness.
+      const cell = lam * 1.7, k = 2 * Math.PI / (2 * lam);                 // (a ridged wave has a crest every half period)
+      const qx = px / cell - 0.5, qy = py / cell - 0.5, qz = pz / cell - 0.5;
+      const ix = Math.floor(qx), iy = Math.floor(qy), iz = Math.floor(qz);
+      let sum = 0, wsum = 0;
+      for (let n = 0; n < 8; n++) {
+        const jx = ix + (n & 1), jy = iy + ((n >> 1) & 1), jz = iz + (n >> 2);
+        const hs = hashU(jx, jy, jz, 71 + o);
+        const mx = (jx + 0.5 + ((hs & 255) / 255 - 0.5) * 0.5) * cell, my = (jy + 0.5 + (((hs >>> 8) & 255) / 255 - 0.5) * 0.5) * cell,
+          mz = (jz + 0.5 + (((hs >>> 16) & 255) / 255 - 0.5) * 0.5) * cell;
+        const ox = mx - px, oy = my - py, oz = mz - pz;
+        let f = 1 - (ox * ox + oy * oy + oz * oz) / (cell * cell * 1.21);
+        if (f <= 0) continue;
+        f *= f;
+        // the patch's heading, worked out once and kept
+        const slot = (hs % GULLY_SLOTS) * 4;
+        if (_gk[slot] !== jx || _gk[slot + 1] !== jy || _gk[slot + 2] !== jz || _gk[slot + 3] !== o) {
+          _gk[slot] = jx; _gk[slot + 1] = jy; _gk[slot + 2] = jz; _gk[slot + 3] = o;
+          const f0 = _f, s0 = _s, t0 = _t, sc0 = _sc, tc0 = _tc, sl0 = _slope, du0 = _du, dv0 = _dv;
+          const il = 1 / Math.sqrt(mx * mx + my * my + mz * mz);
+          locate(mx * il, my * il, mz * il);
+          this._mola();
+          acrossSlope(mx * il, my * il, mz * il, _gd, (hs % GULLY_SLOTS) * 3);
+          _f = f0; _s = s0; _t = t0; _sc = sc0; _tc = tc0; _slope = sl0; _du = du0; _dv = dv0;
+        }
+        const g = (hs % GULLY_SLOTS) * 3;
+        sum += f * Math.cos((ox * _gd[g] + oy * _gd[g + 1] + oz * _gd[g + 2]) * k + (hs >>> 24) * (Math.PI / 128));
+        wsum += f;
+      }
+      if (wsum < 1e-6) continue;
+      const wave = sum / wsum;
+      // sharp crests (the spurs), round hollows (the chutes, floored with what fell down them); 0.52 is the mean
+      h += (1 - Math.abs(wave) - 0.52) * amp * w;
+      steeper += amp * w * 2 / lam;
+    }
+    _slope += steeper * m * 0.8;
+    return h * m;
   }
 
   /**
@@ -337,12 +475,7 @@ export class Planet {
   /** As radius(), for a direction given as face coordinates; faster for mesh grids. */
   radiusFace(face, s, t, x, y, z, minW) {
     _f = face; _s = s; _t = t; _sc = Math.tan(s * PI_4); _tc = Math.tan(t * PI_4);
-    const base = this._ledges(this._mola(), x, y, z, minW);
-    const rough = this._rough();
-    const flows = this._flows(x, y, z, minW);
-    const r = R + base + flows + this._detail(x, y, z, rough, minW);
-    _padW = 0;
-    return this.pads.length ? this._pad(x, y, z, r) : r;
+    return this._surface(x, y, z, minW);
   }
 
   _mola() {
@@ -369,6 +502,7 @@ export class Planet {
     du += (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy2; k += size;
     du += (g[k] * dx0 + g[k + 1] * dx1 + g[k + 2] * dx2 + g[k + 3] * dx3) * wy3;
     const dv = r0 * dy0 + r1 * dy1 + r2 * dy2 + r3 * dy3;
+    _du = du; _dv = dv;
     _slope = Math.sqrt(du * du + dv * dv) * this.unit / (S_METRES * 2 / n);
     return (r0 * wy0 + r1 * wy1 + r2 * wy2 + r3 * wy3) * this.unit;
   }

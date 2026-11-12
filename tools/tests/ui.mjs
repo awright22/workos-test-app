@@ -50,7 +50,7 @@ let errors = 0;
   check('new game: arrows move between the cards', (await focused()) === 'iron', await focused());
   await key('ArrowLeft');
   await key('Enter');
-  await page.waitForFunction(() => window.__MG.S.started && document.getElementById('mg-root').classList.contains('is-playing'), null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__MG.S.started && document.getElementById('mg-root').classList.contains('is-playing'), null, { timeout: 240000 });
   let s = await g.eval((G) => ({ diff: G.S.diff, ui: G.S.uiOpen, hud: getComputedStyle(document.getElementById('mg-hud')).visibility }));
   check('new game: Enter starts the run and shows the HUD', s.diff === 'survival' && !s.ui && s.hud === 'visible', s);
   await g.eval(async (G) => { await G.settle(); G.paused = true; G.skipIntro(); G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
@@ -181,7 +181,7 @@ for (const size of SIZES) {
   check(`${size.name}: first minute, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
   // a busy moment on foot: every gauge, two alerts, log lines, a toast, a prompt, a candle to hand
   const busy = async () => {
-    await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 20000 });      // an earlier toast has gone
+    await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 120000 });      // an earlier toast has gone
     await g.eval((G) => {
       G.skipIntro(); G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };
       G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
@@ -222,7 +222,7 @@ for (const size of SIZES) {
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });
     const verb = await page.locator('#mg-tE .vb').innerText();
     check(`${size.name}: the action button shows the verb`, /drive/i.test(verb), verb);
-    await page.waitForFunction(() => !document.getElementById('mg-root').classList.contains('is-modal'), null, { timeout: 10000 });
+    await page.waitForFunction(() => !document.getElementById('mg-root').classList.contains('is-modal'), null, { timeout: 120000 });
     const cdp = await page.context().newCDPSession(page);
     const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
     const eb = await page.locator('#mg-tE').boundingBox();

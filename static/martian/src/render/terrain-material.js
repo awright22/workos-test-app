@@ -159,6 +159,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float hFar = nFar.a - 0.5, hMid = nMid.a - 0.5, hLump = nLump.a - 0.5;
         vec3 grad = (nFar.rgb - 0.5) * (0.40 * fFar) + (nMid.rgb - 0.5) * (0.36 * fMid * (0.35 + 0.65 * steep)) + (nLump.rgb - 0.5) * (0.80 * fLump);
         float tone = hFar * 0.22 + hMid * 0.34 * fMid + hLump * 0.75 * fLump;
+        // The top of a flow is bare basalt with dust only in its hollows; between flows the dust lies deep.
+        // (This is what makes a volcano's flank read as lava from any distance: dark tongues on red ground.)
+        float basalt = lava * max(smoothstep(0.30, 0.62, flowTop + hMid * 0.26 * fMid + hFar * 0.18), pond);
 
         // ---- 2D layers on level ground: slope of the surface in the texture's own axes ----
         vec2 flatSlope = vec2(0.0);
@@ -173,18 +176,20 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           // (and the land's own colour says what it is made of: the dark regions are basalt sand, which the wind works into
           // strong ripples and leaves strewn with gravel; the bright ones are deep dust, which lies smooth)
           float sandy = 1.0 - smoothstep(0.11, 0.26, albLum);
-          float ripples = (1.0 - ice * 0.85) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
+          float ripples = (1.0 - ice * 0.5) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
           flatSlope += (fld.rg - 0.5) * (4.0 * fField * ripples);
           tone += (fld.b - 0.56) * 1.5 * fField * (1.0 - ice * 0.6) * (0.35 + 0.65 * ripples);
-          gravelHere = min(1.0, fld.a * (1.0 - ice) * mix(0.7, 1.25, sandy) + lava * 0.3);      // clinker lies all over a flow
+          gravelHere = min(1.0, fld.a * (1.0 - ice) * mix(0.7, 1.25, sandy) + lava * 0.3 + basalt * (1.0 - pond) * 0.55);      // clinker lies all over a flow
           // patterned ground: polygons cracked by frost, from the mid-latitudes to the poles, and on all ice
           // (and lava that froze level cracked into columns as it cooled: the same pattern, larger meaning)
           float frosty = max(max(smoothstep(0.52, 0.76, abs(pDir.y)), ice), pond);
           // (sampled everywhere, weighted here: a texture read inside a branch has no defined mip level)
           vec4 cr = texture2D(uCrust, uv / 12.8);                 // every span divides the 64 m the coordinates wrap at
-          flatSlope += (cr.rg - 0.5) * (4.0 * fField * frosty);
-          tone += (cr.b - 0.56) * 1.25 * fField * frosty;
-          crack = cr.a * fField * frosty;
+          // (on ice the polygons are fine blue lines in a hard surface the wind has cut into ridges, not embossed plates:
+          // embossed, a cap looked like cracked plaster; and on soil the troughs are a hand deep, not a mud flat's cracks)
+          flatSlope += (cr.rg - 0.5) * (2.6 * fField * frosty * (1.0 - ice * 0.6));
+          tone += (cr.b - 0.56) * 0.95 * fField * frosty * (1.0 - ice * 0.6);
+          crack = cr.a * fField * frosty * (1.0 - 0.35 * pond);
           #ifdef TERRAIN_FINE
             // (pebbles do not survive being stretched down a steep face: there the field layer and the rock carry it)
             float fSand = (1.0 - smoothstep(10.0, 34.0, viewDist)) * level * (1.0 - smoothstep(0.16, 0.30, slope));
@@ -192,14 +197,14 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
             vec4 s2 = texture2D(uSand, vec2(uv.y, -uv.x) / 3.2 + vec2(0.37, 0.11));
             // pebbles only where the field says gravel lies; the sand between them everywhere
             float g1 = s1.a * smoothstep(0.34, 0.60, gravelHere + hFar * 0.6), g2 = s2.a * smoothstep(0.55, 0.80, gravelHere - hFar * 0.6);
-            flatSlope += ((s1.rg - 0.5) * mix(0.55, 1.0, g1) + vec2(-(s2.g - 0.5), s2.r - 0.5) * mix(0.45, 1.0, g2)) * (4.0 * fSand * (1.0 - ice * 0.6));
+            flatSlope += ((s1.rg - 0.5) * mix(0.55, 1.0, g1) + vec2(-(s2.g - 0.5), s2.r - 0.5) * mix(0.45, 1.0, g2)) * (5.2 * fSand * (1.0 - ice * 0.6));
             tone += ((s1.b - 0.56) * mix(0.55, 1.0, g1) + (s2.b - 0.56) * mix(0.45, 1.0, g2)) * 1.7 * fSand;
             stone = max(g1, g2) * fSand;
             // the last two metres: the same grit again at a quarter of the size, so the ground at his feet is not a blur
-            float fNear = (1.0 - smoothstep(1.5, 6.0, viewDist)) * level * (1.0 - ice * 0.7);
+            float fNear = (1.0 - smoothstep(1.5, 6.0, viewDist)) * level * (1.0 - ice * 0.35);
             vec4 s3 = texture2D(uSand, uv / 0.5 + vec2(0.21, 0.67));
-            flatSlope += (s3.rg - 0.5) * (2.6 * fNear);
-            tone += (s3.b - 0.56) * 1.5 * fNear;        // tone, not relief: it shows at noon, when no slope casts a shade
+            flatSlope += (s3.rg - 0.5) * (3.8 * fNear);
+            tone += (s3.b - 0.56) * 2.0 * fNear;        // tone, not relief: it shows at noon, when no slope casts a shade
           #endif
         }
 
@@ -213,13 +218,16 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // Near, the mesh's own slope says where: a ledge's riser is rock and its bench is dust. Far off, the land's
         // slope does, which every level of detail agrees on, so no edge shows where a fine mesh meets a coarse one.
         float rockSlope = mix(slope, max(landSlope, slope * 0.5), smoothstep(90.0, 320.0, viewDist));
-        float rock = smoothstep(0.12, 0.30, rockSlope * (1.0 + lava * 1.6) + hMid * 0.10 * fMid + hFar * 0.06);
+        float rock = smoothstep(0.12, 0.30, rockSlope * (1.0 + lava * 0.7) + hMid * 0.10 * fMid + hFar * 0.06);
         // and along each flow's edge lies the rubble it shed: a dark band, broken up by the noise so it does not follow the mesh
         float rubble = smoothstep(0.30, 0.66, vGeo.z + hMid * 0.5 * fMid + hFar * 0.3 + hLump * 0.4 * fLump);
         rock = max(rock, rubble * 0.9);
         grad += (nLump.rgb - 0.5) * (0.8 * (1.0 - smoothstep(24.0, 110.0, viewDist)) * rubble * level);
         // beds of uneven thickness with thin partings in them, undulating; far away they merge into one tone
+        // (beds are not evenly thick: the height is stretched and squeezed before the layers are looked up, or a
+        // wall shows the texture's period as pinstripes)
         float alt = length(vPlanetPos);
+        alt += 5.5 * sin(alt * 0.031) + 2.2 * sin(alt * 0.113 + 1.3);
         // (the wobble is finer than a distant mesh's triangles: without it each band's edge follows their
         // diagonals and the hillside shows rows of chevrons)
         float wob = hMid * 0.6 + (nLump.a - 0.5) * 0.3 * fLump;      // (the finest wobble only near: far off it would alias into hatching)
@@ -229,15 +237,15 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float bedTone = mix(0.5, smoothstep(0.30, 0.70, beds * 0.68 + band.a * 0.32), 1.0 - smoothstep(260.0, 1200.0, viewDist));
         vec3 rockCol = alb * mix(vec3(0.50, 0.45, 0.46), vec3(0.98, 0.88, 0.80), bedTone);
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
-        rockCol = mix(rockCol, alb * vec3(0.44, 0.41, 0.44) * (0.78 + 0.44 * bedTone), lava * 0.85);
-        // The top of a flow is bare basalt with dust only in its hollows; between flows the dust lies deep.
-        // (This is what makes a volcano's flank read as lava from any distance: dark tongues on red ground.)
+        // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
+        rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.105, 0.082, 0.076), 0.6) * mix(0.9 + 0.2 * bedTone, 0.72 + 0.56 * bedTone, smoothstep(0.10, 0.34, slope)), lava * 0.9);
         float nearLump = 1.0 - smoothstep(24.0, 110.0, viewDist);
-        float basalt = lava * max(smoothstep(0.30, 0.62, flowTop + hMid * 0.26 * fMid + hFar * 0.18), pond);
-        vec3 basaltCol = alb * vec3(0.46, 0.43, 0.47) * (0.86 + 0.5 * hMid * fMid + 0.55 * hLump * nearLump + 0.2 * clamp(tone, -0.5, 0.5));
+        vec3 basaltCol = mix(alb * vec3(0.46, 0.43, 0.47), vec3(0.092, 0.074, 0.070), 0.62) * (0.86 + 0.5 * hMid * fMid + 0.55 * hLump * nearLump + 0.3 * clamp(tone, -0.5, 0.5));
+        // (a frozen lava lake is not swept clean: dust lies on it in broad drifts)
+        float drift = pond * smoothstep(0.02, 0.26, hFar * 0.8 + hMid * 0.5 * fMid) * 0.7;
         // (the joints of a frozen lava lake are dark, where frost in an ice field's cracks is pale)
         basaltCol *= 1.0 - 0.45 * crack * pond;
-        col = mix(col, basaltCol, basalt * 0.84);
+        col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift));
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level);
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
         col = mix(col, col * vec3(0.80, 0.78, 0.78) * (1.0 + clamp(tone, -0.4, 0.4) * 0.35), worn * 0.75);
@@ -250,10 +258,10 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (bluer than the sky's light is warm, or it reads as cream; frost whitens the polygon troughs and the hollows)
         // old ice is blue where it is clean and deep, tan where a season's dust was laid into it, white only where frost lies
         float dusty = smoothstep(0.50, 0.70, iceBand + hFar * 0.5) * 0.6;
-        vec3 iceCol = mix(vec3(0.34, 0.50, 0.74), vec3(0.50, 0.43, 0.36), dusty) * (1.0 + tone * 0.30 + coarse * 0.08);
+        vec3 iceCol = mix(vec3(0.25, 0.43, 0.72), vec3(0.50, 0.43, 0.36), dusty) * (1.0 + tone * 0.30 + coarse * 0.08);
         // (a crack shows the ice's depth: darker and bluer than its face, not a pale scar)
-        iceCol = mix(iceCol, vec3(0.16, 0.30, 0.52), clamp(crack * 0.85, 0.0, 1.0) * (1.0 - dusty));
-        iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.08, 0.30, hMid * fMid + hFar * 0.5) * 0.55 * (1.0 - crack));
+        iceCol = mix(iceCol, vec3(0.09, 0.22, 0.48), clamp(crack * 0.9, 0.0, 1.0) * (1.0 - dusty));
+        iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.10, 0.34, hMid * fMid + hFar * 0.5) * 0.5 * (1.0 - crack));
         col = mix(col, iceCol, ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
@@ -263,7 +271,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           col = mix(col, vec3(0.62, 0.50, 0.40), uSpace * 0.7 * pow(graze, 3.5));
         }
         diffuseColor.rgb = col;
-        float terrainRough = mix(0.98, 0.90, max(max(rock, stone), basalt)) - ice * 0.70;
+        float terrainRough = mix(0.98, 0.90, max(max(rock, stone), basalt)) - ice * 0.78 - pond * (1.0 - drift) * 0.16;
         // light that has passed through ice comes back blue: it fills the shadows the warm sky would leave tan
         iceGlow = ice * (0.5 + 0.5 * crack);
         vec3 terrainGrad = grad * (1.0 - ice * 0.5);
@@ -292,6 +300,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain13' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain16' + (o.fine !== false ? 'F' : '');
   return mat;
 }

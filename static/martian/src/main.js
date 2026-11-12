@@ -41,7 +41,7 @@ import { roverF, updateRover, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
-import { updateDiscoveries, checkAchievements } from './game/story.js';
+import { updateDiscoveries, checkAchievements, startLaunch } from './game/story.js';
 import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
@@ -121,7 +121,9 @@ function titleCamera(dt) {
   _v2.set(-sun.z, 0, sun.x).normalize();
   _v1.copy(sun).multiplyScalar(Math.cos(phase)).addScaledVector(_v2, Math.sin(phase)).multiplyScalar(R * 2.6);
   cam.position.copy(_v1).setY(R * (0.45 + 0.25 * Math.sin(startOrbitA * 0.6)));
-  camLookAt(_v3.set(0, 0, 0), _v2.set(0, 1, 0));
+  // (the planet stands to the right of the menu, not behind it: look at a point to the left of its middle)
+  _v3.copy(cam.position).normalize().cross(_v2.set(0, 1, 0)).normalize().multiplyScalar(R * 0.78);
+  camLookAt(_v3, _v2.set(0, 1, 0));
 }
 
 const _roof = new THREE.Vector3();
@@ -242,12 +244,12 @@ function installDebug() {
     ctx, S, World, player, roverF, BAL, DIFFICULTIES, interactables, input, interaction,
     llToVec, surfaceAt, groundDist,
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
-    syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod,
+    syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod, startLaunch,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
     mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, photoSubjects, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
-    tick(dt, n = 1) { for (let i = 0; i < n; i++) lastFocus = tick(dt); },
+    tick(dt, n = 1) { for (let i = 0; i < n; i++) { lastFocus = tick(dt); if (ctx.vfx) ctx.vfx.time += dt; } },     // (dust kicked up in a tick ages by that tick)
     fixedResolution: new URLSearchParams(location.search).has('fixed'),
     /** Start a new game at a chosen crash site without the menus. */
     async start(lat, lon, diff = 'survival') {

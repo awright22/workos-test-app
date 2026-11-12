@@ -468,6 +468,24 @@ function cameraClear(p, room) {
   return true;
 }
 
+const _cl = new THREE.Vector3(), _cf = new THREE.Vector3();
+/** May the camera stand at `at` out of doors? It must be clear of the ground, with a clear line to his chest;
+ *  and when `boots` is asked, to his shins as well (so a rise he stands behind does not cut him off at the knee). */
+function cameraSees(at, boots) {
+  if (at.length() < surfaceAt(at) + 0.45) return false;
+  for (let t = 1 / 3; t < 0.9; t += 1 / 3) {
+    _cl.lerpVectors(cam.pivot, at, t);
+    if (_cl.length() < surfaceAt(_cl) + 0.15) return false;
+  }
+  if (!boots) return true;
+  _cf.copy(player.pos).addScaledVector(player.up, 0.25);
+  for (let t = 0.12; t < 0.8; t += 0.21) {
+    _cl.lerpVectors(_cf, at, t);
+    if (_cl.length() < surfaceAt(_cl) + 0.04) return false;
+  }
+  return true;
+}
+
 function updateWalkCamera(dt, running) {
   const c = ctx.engine.camera;
   const landDip = cam.land * 0.22;
@@ -481,20 +499,43 @@ function updateWalkCamera(dt, running) {
     // the pivot trails the astronaut slightly, so the camera has weight
     const indoors = S.inside || S.inAirlock;
     _p.copy(player.pos).addScaledVector(player.up, (indoors ? 1.5 : 1.62) - landDip);
-    if (!cam.init || cam.pivot.distanceTo(_p) > 6) { cam.pivot.copy(_p); cam.init = true; }
+    const jumped = !cam.init || cam.pivot.distanceTo(_p) > 6;
+    if (jumped) { cam.pivot.copy(_p); cam.init = true; }
     else cam.pivot.lerp(_p, damp(0.045, dt));
     _cq.copy(player.q).multiply(_q2.setFromAxisAngle(X_AXIS, player.pitch));
     const wantDist = indoors ? 3.1 : 5.4 + Math.min(1.2, player.speed * 0.08);
     const rise = indoors ? 0.2 : 0.42;
-    // shorten the boom until the camera is above the ground and on the astronaut's side of every wall
+    // Walls shorten the boom. Open ground does not: the camera swings up over it on the same boom, looking
+    // down at him, as far as it takes to clear the slope behind him (and, when a little is enough, to see his
+    // boots past the rise he stands behind). Only with its back to a cliff does it come in.
     const room = cameraRoom();
-    let dist = wantDist;
-    for (let i = 0; i < 7; i++) {
-      c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_cq));
-      if (c.position.length() >= surfaceAt(c.position) + 0.35 && cameraClear(c.position, room)) break;
-      dist *= 0.72;
+    let dist = wantDist, swing = 0;
+    if (room) {
+      for (let i = 0; i < 7; i++) {
+        c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_cq));
+        if (c.position.length() >= surfaceAt(c.position) + 0.35 && cameraClear(c.position, room)) break;
+        dist *= 0.72;
+      }
+    } else {
+      // In order: the smallest swing, up to twenty degrees, that shows his boots; the smallest that is clear at all;
+      // then boom and swing give way together, a shorter boom being allowed a steeper look down.
+      // (And the swing never fights his own look: it turns the view down, so the higher he looks the less of it
+      // there is, and looking well up at the sky there is none: the boom shortens and the view stays his.)
+      const most = Math.max(0, 0.5 - 1.7 * Math.max(0, player.pitch));
+      search: for (let i = 0; i < 6; i++, dist *= 0.72) {
+        for (let k = i ? 4 : 0, top = 8 + i; k < top; k++) {
+          swing = (k < 4 ? k : k - 4) * 0.12;
+          if (swing > most * (1 + 0.25 * i)) break;
+          _q2.setFromAxisAngle(X_AXIS, -swing);
+          c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_q1.copy(_cq).multiply(_q2)));
+          if (cameraSees(c.position, k < 4) && cameraClear(c.position, null)) break search;
+        }
+        swing = 0;
+      }
     }
     cam.dist = dist < cam.dist ? dist : lerp(cam.dist, dist, damp(0.25, dt));
+    cam.swing = room ? 0 : jumped ? swing : lerp(cam.swing || 0, swing, damp(swing > (cam.swing || 0) ? 0.3 : 0.05, dt));
+    if (cam.swing > 0.002) _cq.multiply(_q2.setFromAxisAngle(X_AXIS, -cam.swing));
     c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, cam.dist / 3), rise, cam.dist).applyQuaternion(_cq));
     // indoors, duck under whatever hangs from the roof rather than zooming in
     if (room) {

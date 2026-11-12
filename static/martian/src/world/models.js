@@ -12,7 +12,99 @@ import { detailTextures } from '../render/noise3d.js';
 import { GLSL_GROUND_GRADE } from '../render/terrain-material.js';
 
 const loaded = new Map();
-const _dustTint = new THREE.Color(0.30, 0.19, 0.115);           // name -> { scene, animations, skinned }
+const _dustTint = new THREE.Color(0.30, 0.19, 0.115);
+/** Models built of sheet with one face. */
+const TWO_SIDED = /mars3/;
+
+let _screenTex = null;
+/** What the monitors show: four panels in one picture (levels, a trace, the planet with a fix on it, a log). */
+function screenTexture() {
+  if (_screenTex) return _screenTex;
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S * 2;
+  const g = c.getContext('2d'), ink = '#7fd6e8', dim = '#2c6f82', rule = '#12313d', warm = '#f0a44a';
+  const panel = (i, draw) => { g.save(); g.translate((i % 2) * S, (i >> 1) * S); g.beginPath(); g.rect(0, 0, S, S); g.clip(); g.fillStyle = '#06131c'; g.fillRect(0, 0, S, S); draw(); g.restore(); };
+  panel(0, () => {
+    g.fillStyle = ink; g.fillRect(18, 16, 96, 12); g.fillStyle = dim; g.fillRect(180, 18, 56, 8);
+    [0.82, 0.64, 0.91, 0.38, 0.72, 0.55, 0.87].forEach((w, k) => {
+      const y = 48 + k * 28;
+      g.fillStyle = dim; g.fillRect(18, y + 2, 52, 8); g.fillStyle = rule; g.fillRect(84, y, 150, 12); g.fillStyle = k === 3 ? warm : ink; g.fillRect(84, y, 150 * w, 12);
+    });
+  });
+  panel(1, () => {
+    g.strokeStyle = rule; g.lineWidth = 1;
+    for (let k = 1; k < 8; k++) { g.beginPath(); g.moveTo(k * 32, 24); g.lineTo(k * 32, 236); g.moveTo(16, k * 30); g.lineTo(240, k * 30); g.stroke(); }
+    const trace = (col, w, f) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); for (let x = 16; x <= 240; x += 4) { const y = f(x); if (x === 16) g.moveTo(x, y); else g.lineTo(x, y); } g.stroke(); };
+    trace(ink, 3, (x) => 140 - 50 * Math.sin(x * 0.045) - 20 * Math.sin(x * 0.13 + 1) - (x > 170 ? (x - 170) * 0.5 : 0));
+    trace(warm, 2, (x) => 196 - 18 * Math.cos(x * 0.03));
+    g.fillStyle = ink; g.fillRect(18, 8, 70, 8);
+  });
+  panel(2, () => {
+    g.fillStyle = 'rgba(181, 87, 44, 0.4)'; g.beginPath(); g.arc(128, 132, 87, 0, 7); g.fill();
+    g.strokeStyle = dim; g.lineWidth = 1.5; g.beginPath(); g.arc(128, 132, 88, 0, 7); g.stroke();
+    for (const k of [0.35, 0.7]) { g.beginPath(); g.ellipse(128, 132, 88 * k, 88, 0, 0, 7); g.stroke(); g.beginPath(); g.ellipse(128, 132, 88, 88 * k, 0, 0, 7); g.stroke(); }
+    g.fillStyle = warm; g.beginPath(); g.arc(158, 112, 5, 0, 7); g.fill(); g.strokeStyle = warm; g.beginPath(); g.arc(158, 112, 11, 0, 7); g.stroke();
+    g.fillStyle = ink; g.fillRect(18, 14, 84, 10); g.fillStyle = dim; g.fillRect(18, 234, 120, 8);
+  });
+  panel(3, () => {
+    g.fillStyle = ink; g.fillRect(18, 16, 64, 10);
+    for (let k = 0; k < 11; k++) { g.fillStyle = k === 4 ? warm : k % 3 === 0 ? ink : dim; g.fillRect(18, 44 + k * 18, 60 + ((k * 73) % 150), 7); }
+  });
+  _screenTex = new THREE.CanvasTexture(c);
+  _screenTex.colorSpace = THREE.SRGBColorSpace;
+  _screenTex.anisotropy = 4;
+  return _screenTex;
+}
+const _sp = new THREE.Vector3(), _sn = new THREE.Vector3(), _sm = new THREE.Matrix3();
+/**
+ * Texture coordinates for a mesh of flat screens (the models carry none). Each separate screen in the mesh is
+ * laid on one of the four panels, the right way up and the right way round for whoever stands facing it.
+ */
+function screenUVs(o) {
+  const geo = o.geometry, pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, n = pos.count;
+  if (!nor) return;
+  o.updateWorldMatrix(true, false);
+  _sm.getNormalMatrix(o.matrixWorld);
+  const P = new Float32Array(n * 3), parent = new Int32Array(n), seen = new Map();
+  const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  for (let i = 0; i < n; i++) {
+    parent[i] = i;
+    _sp.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+    P[i * 3] = _sp.x; P[i * 3 + 1] = _sp.y; P[i * 3 + 2] = _sp.z;
+    const key = Math.round(_sp.x * 500) + ',' + Math.round(_sp.y * 500) + ',' + Math.round(_sp.z * 500), j = seen.get(key);
+    if (j === undefined) seen.set(key, i); else parent[find(i)] = find(j);
+  }
+  for (let t = 0, T = idx ? idx.count : n; t < T; t += 3) {
+    const a = find(idx ? idx.getX(t) : t);
+    parent[find(idx ? idx.getX(t + 1) : t + 1)] = a; parent[find(idx ? idx.getX(t + 2) : t + 2)] = a;
+  }
+  const groups = new Map();
+  for (let i = 0; i < n; i++) { const r = find(i); let list = groups.get(r); if (!list) groups.set(r, list = []); list.push(i); }
+  const uv = new Float32Array(n * 2);
+  let gi = 0;
+  for (const list of groups.values()) {
+    let nx = 0, ny = 0, nz = 0;
+    for (const i of list) { _sn.fromBufferAttribute(nor, i).applyMatrix3(_sm); nx += _sn.x; ny += _sn.y; nz += _sn.z; }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl; ny /= nl; nz /= nl;
+    // to the right of someone facing it (up × normal), and up the screen (normal × right)
+    let ux = 1, uz = 0;
+    if (Math.abs(ny) < 0.9) { const l = Math.hypot(nz, nx); ux = nz / l; uz = -nx / l; }
+    const vx = ny * uz, vy = nz * ux - nx * uz, vz = -ny * ux;
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const i of list) {
+      const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
+      if (a < u0) u0 = a; if (a > u1) u1 = a; if (b < v0) v0 = b; if (b > v1) v1 = b;
+    }
+    const tile = gi++ % 4, du = u1 - u0 || 1, dv = v1 - v0 || 1;
+    for (const i of list) {
+      const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
+      uv[i * 2] = ((tile & 1) + 0.03 + 0.94 * (a - u0) / du) / 2;
+      uv[i * 2 + 1] = (1 - (tile >> 1) + 0.03 + 0.94 * (b - v0) / dv) / 2;
+    }
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}           // name -> { scene, animations, skinned }
 const EMISSIVE = /^(light_|screen|flame|window_glow|helmet_light)/;
 /** Materials the game drives by name, or that cannot be folded into a shared one. */
 const SPECIAL = /^(light_|screen|flame|window_glow|glass_clear|solar_cell|void|visor|helmet_|head_|ice$)/;
@@ -251,7 +343,7 @@ function mergeSkinned(scene, dust) {
 }
 
 function prepare(gltf, name) {
-  const dust = DUST[name] === undefined ? DUST.default : DUST[name];
+  const dust = DUST[name] === undefined ? DUST.default : DUST[name], twoSided = TWO_SIDED.test(name);
   let skinned = false;
   gltf.scene.traverse((o) => { if (o.isSkinnedMesh) skinned = true; });
   if (skinned) mergeSkinned(gltf.scene, dust); else mergeStatic(gltf.scene, dust);
@@ -268,13 +360,20 @@ function prepare(gltf, name) {
       const name = m.name || '';
       if (name.startsWith('glass_clear')) {
         // (not mirror-smooth: a lamp a metre away would otherwise reflect as a white-out)
-        m.transparent = true; m.depthWrite = false; m.opacity = 0.28; m.roughness = 0.17; m.metalness = 0.0;
+        // (and dark in itself: a pane takes a glint from a lamp, it does not light up like a sheet of paper held to it)
+        m.transparent = true; m.depthWrite = false; m.opacity = 0.2; m.roughness = 0.12; m.metalness = 0.0;
+        m.color.setRGB(0.035, 0.045, 0.055);
         m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;
         m.userData.baseEmissive = m.emissiveIntensity || 1;
         o.castShadow = false;
+        if (name.startsWith('screen')) {
+          // a monitor shows something: the models carry no pictures, so the panels are drawn here and each screen laid on one
+          screenUVs(o);
+          m.emissiveMap = screenTexture(); m.emissive.setRGB(1, 1, 1); m.color.setRGB(0.02, 0.03, 0.04); m.roughness = 0.25;
+        }
       } else if (name === 'void') {
         m.color.set(0x000000); m.roughness = 1;
       } else if (name.startsWith('solar_cell')) {
@@ -290,6 +389,8 @@ function prepare(gltf, name) {
         m.color.setRGB(0.80, 0.50, 0.14); m.metalness = 1; m.roughness = 0.07; m.envMapIntensity = 1.9;
       }
       if (m.metalness > 0.5 && !name.startsWith('visor')) { m.envMapIntensity = 1.25; m.roughness = Math.max(m.roughness, 0.2); }
+      // (thin sheet seen from both sides: a petal with its back cut away showed only its ribs)
+      if (twoSided) m.side = THREE.DoubleSide;
       m.userData.modelMaterial = true;
     }
   });

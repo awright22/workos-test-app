@@ -21,7 +21,7 @@ const want = (n) => !only.length || only.includes(n);
 // pictures of the world: everything of the interface is hidden (the interface has its own screenshot set, tests/ui-shots.mjs)
 const hud = (on) => g.page.addStyleTag({ content: `#mg-root > *:not(canvas) { opacity: ${on ? 1 : 0} !important; }` });
 
-if (want('title')) { await snap('title'); await hud(false); await snap('title-globe'); await hud(true); }
+if (want('title')) { await sleep(2600); await snap('title'); await hud(false); await snap('title-globe'); await hud(true); }
 await ev(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.paused = true; G.S.storm.cells.forEach((c) => { c.peak = 0; }); G.setStorm(0); });   // the opening storm has blown out
 await hud(false);
 
@@ -52,18 +52,18 @@ const scenes = {
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'storm-sun': async () => ev(async (G) => { G.setLocalTime(15.5); G.faceSun(); G.look(0.28); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
-  'mav': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
-  'canyon': async () => ev(async (G) => { await G.tp(-11.3, 293, 3.14); G.setLocalTime(11); G.look(0.15); G.tick(0.05, 40); await G.settle(); }),
+  'mav': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 14); G.setLocalTime(9); G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
+  'canyon': async () => ev(async (G) => { await G.tp(-11.5, 293, 3.14); G.setLocalTime(15.5); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
   // the north wall of Valles Marineris at 296 E: about 13 m of drop in every 4 m of ground, a hundred metres in all
   'canyon-rim': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
-  'canyon-wall': async () => ev(async (G) => { await G.tp(-8.72, 296, 0); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
+  'canyon-wall': async () => ev(async (G) => { await G.tp(-12.19, 293, 3.14); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   // from forty-five metres up, looking along the flank: the lava tongues are a pattern no one sees from eye height
   'olympus-flows': async () => { await ev(async (G) => { await G.tp(16.6, 227.9, 2.4); G.tick(0.05, 5); }); return model((G) => G.player.pos.clone(), 110, 315, 8.5, { stand: [4, 100], height: 45, aim: 0.9 }); },
   '-camera-back-1': async () => ev((G) => { G.photo(null); }),          // (the raised camera must not stay on for the scenes that follow)
-  'olympus-caldera': async () => ev(async (G) => { await G.tp(17.76, 226.9, 0); G.setLocalTime(16); G.look(-0.25); G.tick(0.05, 40); await G.settle(); }),
-  'south-pole': async () => ev(async (G) => { await G.tp(-86.5, 200, 0.6); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
+  'olympus-caldera': async () => ev(async (G) => { await G.tp(17.712, 226.805, 0); G.setLocalTime(16); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
+  'south-pole': async () => ev(async (G) => { await G.tp(-87.6, 318, 0.6); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   'north-pole': async () => ev(async (G) => { await G.tp(87, 20, 1.9); G.setLocalTime(12); G.look(-0.04); G.tick(0.05, 40); await G.settle(); }),
   // every built model, seen by a free camera with the astronaut beside it for scale
   'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [3.6, 200], height: 2.4 }),
@@ -110,6 +110,10 @@ const scenes = {
   'dusk': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(17.95); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
   'twilight': async () => ev(async (G) => { G.setLocalTime(18.75); G.faceSun(); G.look(0.08); G.tick(0.05, 40); await G.settle(); }),
   'night-plain': async () => ev(async (G) => { G.setLocalTime(23); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
+  // the last act, and so the last pictures (the game is won at the end of it): lift-off, the climb, and the planet from the Hermes' height
+  'launch': async () => ev(async (G) => { G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 152); await G.settle(); }),
+  'launch-climb': async () => ev(async (G) => { G.tick(0.05, 150); await G.settle(); }),
+  'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 330); await G.settle(); }),
 };
 for (const [name, setup] of Object.entries(scenes)) {
   // scenes that only set something up (their name starts with '-', or is one of the old three) run always and take no picture

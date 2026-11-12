@@ -41,10 +41,19 @@ const FINAL_FRAGMENT = /* glsl */`
     // visor, thicker and thinner, and the whole frame dims and clears with the gusts. (Fog alone leaves a man
     // five metres off as crisp as on a clear day.)
     if (uVeil > 0.002) {
-      vec2 p = vUv * vec2(2.6, 1.5) - uVeilDir * (uTime * 0.55);
-      float sheet = vn(p) * 0.55 + vn(p * 2.7 + 7.1) * 0.3 + vn(p * 6.1 - 3.3) * 0.15;
+      // Along the wind and across it, on the screen. Dust at three depths streams past: the far murk slowly, sheets
+      // nearer by faster, and ragged streamers whipping across the visor, thickest low down where the sand runs
+      // along the ground. Each is drawn out along the wind, and the dense ones are paler than the murk behind
+      // them, lit from within, so the storm has a grain and a direction even in a still frame.
+      vec2 wq = vec2(dot(vUv - 0.5, uVeilDir) * 1.78, dot(vUv - 0.5, vec2(-uVeilDir.y, uVeilDir.x)));
       float gust = 0.6 + 0.4 * sin(uTime * 0.8 + vn(vec2(uTime * 0.17, 3.0)) * 6.0);
-      col = mix(col, uVeilCol, uVeil * (0.14 + 0.46 * smoothstep(0.25, 0.8, sheet) * gust));
+      float far = vn(vec2(wq.x * 0.9 - uTime * 0.22, wq.y * 3.2 + 1.7));
+      float mid = vn(vec2(wq.x * 1.6 - uTime * 0.7, wq.y * 9.0 + vn(vec2(wq.x * 2.0 - uTime * 0.5, 4.0)) * 1.4));
+      float near = vn(vec2(wq.x * 2.4 - uTime * 2.1, wq.y * 26.0 + vn(vec2(wq.x * 3.0 - uTime * 1.6, 9.0)) * 2.5));
+      near *= 0.45 + 0.55 * smoothstep(0.8, 0.15, vUv.y);
+      float sheet = far * 0.42 + mid * 0.36 + near * 0.3;
+      float thick = smoothstep(0.42, 0.8, mid * 0.55 + near * 0.6);
+      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust));
     }
     col *= uExposure;
     // scene-referred grade
@@ -136,6 +145,7 @@ export class Engine {
     // the sky is the first thing drawn in the main pass: whatever was drawn before it was shadow maps
     this.sky.mesh.onBeforeRender = () => { const i = this.renderer.info.render; if (!this._shadowMark) this._shadowMark = { calls: i.calls, triangles: i.triangles }; };
     this.scene.fog = new THREE.FogExp2(0xc98a5b, 0.0012);
+    airHaze();
 
     this.sunDir = new THREE.Vector3(1, 0, 0);
     // the sun casts two shadow cascades: a tight one around the camera, a wide one for the base
@@ -147,8 +157,10 @@ export class Engine {
     sh.camera.near = 1;
     sh.camera.far = this.q.shadowRange;
     sh.split = this.q.shadowSplit;
-    sh.bias = -0.0002;
-    sh.normalBias = 0.022;
+    // (a depth bias pushes a shadow away from its caster along the light: under a sun two degrees up, a few
+    // centimetres of it left a man's shadow starting metres from his boots. Most of the bias is along the normal.)
+    sh.bias = -0.00005;
+    sh.normalBias = 0.03;
     sh.radius = 1.6;
     this.scene.add(this.sun);
     this.hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
@@ -257,7 +269,8 @@ export class Engine {
     // a full storm closes visibility to a few tens of metres
     // ... and it comes in gusts: the murk thickens and thins every few seconds
     const gust = 1 + dust * (0.22 * Math.sin(this.time * 0.9) + 0.14 * Math.sin(this.time * 2.3 + 1.7) + 0.08 * Math.sin(this.time * 5.1));
-    fog.density = (0.0012 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-alt / 500) + 0.0000015;
+    // (how the dust thins with height is in the shader, see airHaze: this is the haze at the datum; from orbit it goes)
+    fog.density = (0.0012 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-Math.max(0, alt - 600) / 500) + 0.0000015;
     // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
     // light at a low angle), wider still at night, and steady indoors
     // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one
@@ -265,7 +278,8 @@ export class Engine {
     const facing = Math.max(0, _v.set(0, 0, -1).applyQuaternion(cam.quaternion).dot(this.sunDir));
     const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
     // (a high sun flattens everything: close down further toward noon, or the ground washes out to peach)
-    const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun));
+    // (and a camera with the sun in the frame stops down whatever the hour: the ground under it kept its exposure and bleached)
+    const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun)) * (1 - 0.2 * smoothstep(0.62, 0.98, facing));
     const target = (p.inside ? 0.95 : lerp(1.95 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
     this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
     if (this.snapLight > 0) this.snapLight--;
@@ -278,7 +292,9 @@ export class Engine {
     if (p.wind) { _v.copy(p.wind).transformDirection(cam.matrixWorldInverse); const l = Math.hypot(_v.x, _v.y); if (l > 0.2) fu.uVeilDir.value.set(_v.x / l, _v.y / l); }
     /** How much of the sky's fill light things men built take, out of doors: by day all of it, at night under half (white
      *  fabric under starlight was as bright as a lit porch). Indoors it is the room's own bounce and is left alone. */
-    this.modelAmbient = lerp(lerp(0.4, 1, sky.day), 1, io);
+    // (And by day less than all of it: white fabric in the shade stood out as bright as the lit sand beside it, as if
+    // pasted on. Least under a low sun, when a man seen against the light should be a dark figure with a bright edge.)
+    this.modelAmbient = lerp(lerp(0.22, lerp(0.56, 0.84, smoothstep(0.08, 0.7, sky.sunE)), sky.day), 1, io);
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
     const near = alt > 400 ? 2 : 0.12;
@@ -324,4 +340,47 @@ export class Engine {
     const f = this.frameStats || { calls: 0, triangles: 0 };
     return { calls: f.calls, triangles: f.triangles, shadowCalls: f.shadowCalls, shadowTriangles: f.shadowTriangles, geometries: i.memory.geometries, textures: i.memory.textures, scale: +(this.q.scale * this.dynScale).toFixed(2) };
   }
+}
+
+/**
+ * Dust hangs low. The haze along a line of sight is that of the air it passes through: thick looking
+ * down into a canyon five kilometres deep, thin from the top of a volcano that stands above most of
+ * the atmosphere. three.js's fog knows only distance, so its shader chunks are replaced (for every
+ * material at once) with ones that also know how high the camera and the thing seen are, and weight
+ * the density by the mean of the two. The scale height is 180 world metres (about 13 km of real relief).
+ */
+let hazed = false;
+function airHaze() {
+  if (hazed) return;
+  hazed = true;
+  const C = THREE.ShaderChunk;
+  C.fog_pars_vertex = `#ifdef USE_FOG
+    varying float vFogDepth;
+    varying float vFogAlt;
+  #endif`;
+  C.fog_vertex = `#ifdef USE_FOG
+    vFogDepth = - mvPosition.z;
+    vFogAlt = length(cameraPosition + mvPosition.xyz * mat3(viewMatrix)) - 12000.0;
+  #endif`;
+  C.fog_pars_fragment = `#ifdef USE_FOG
+    uniform vec3 fogColor;
+    varying float vFogDepth;
+    varying float vFogAlt;
+    #ifdef FOG_EXP2
+      uniform float fogDensity;
+    #else
+      uniform float fogNear;
+      uniform float fogFar;
+    #endif
+  #endif`;
+  C.fog_fragment = `#ifdef USE_FOG
+    #ifdef FOG_EXP2
+      float fogAir = 0.5 * (exp(-clamp(length(cameraPosition) - 12000.0, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
+      float fogThick = fogDensity * fogAir * vFogDepth;
+      float fogFactor = 1.0 - exp(-fogThick * fogThick);
+    #else
+      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+    #endif
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
+  #endif`;
 }

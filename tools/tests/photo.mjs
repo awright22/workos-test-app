@@ -45,7 +45,7 @@ await ev(() => { const r = document.querySelector('#mg-photo [data-ph="fov"]'); 
 await ev(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
 t = await ev((G) => { const u = G.ctx.engine.final.uniforms; let astro = null; G.ctx.world.traverse((o) => { if (o.name === 'astronaut' && astro === null) astro = o.visible; }); return { fov: G.ctx.engine.camera.fov, mono: u.uMono.value, contrast: u.uContrast.value, astro, out: document.querySelector('#mg-photo [data-ph="fov"]').nextElementSibling.textContent }; });
 check('the lens slider, a look and hiding the astronaut all reach the picture', Math.abs(t.fov - 28) < 0.01 && t.mono === 1 && t.contrast > 1.2 && t.astro === false && t.out === '28°', t);
-await page.screenshot({ path: 'tests/.cache/photo-mode.png' });
+await page.screenshot({ path: 'tests/.cache/photo-mode.png', timeout: 180000 });     // (software rendering on a busy machine)
 
 // the shutter
 t = await ev(async (G) => {

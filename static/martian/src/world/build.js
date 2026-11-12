@@ -67,7 +67,9 @@ export function setStainLight(k) { for (const st of stains) st.mat.color.copy(st
 const stainTextures = {};
 /**
  * A patch of disturbed ground under something. kind 'soft': darker, packed soil with a ragged edge.
- * kind 'blast': what a descent engine leaves, dust blown out in rays from under the nozzles.
+ * kind 'blast': what a descent engine leaves: the bright dust blown off, darker soil laid bare in a ragged patch
+ * with short streaks at its edge, darkest in a ring where the plumes struck (seen from orbit under Phoenix and InSight).
+ * kind 'scorch': the same under a big rocket, burnt black in the middle.
  */
 export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'soft') {
   if (!stainTextures[kind]) {
@@ -76,12 +78,14 @@ export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'so
     for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
       const dx = (i - 63.5) / 64, dy = (j - 63.5) / 64, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
       let v;
-      if (kind === 'blast') {
-        // rays: long and short, uneven round the circle, strongest a little out from the middle where the plume struck
-        const ray = 0.5 + 0.22 * Math.sin(a * 7 + 0.9) + 0.16 * Math.sin(a * 13 + 2.1) + 0.12 * Math.sin(a * 29 + 0.3) + 0.1 * Math.sin(a * 53 + 1.7);
-        const reach = 0.42 + 0.56 * Math.max(0, Math.min(1, ray));
-        const fall = Math.max(0, Math.min(1, (reach - d) / (0.30 * reach + 0.06)));
-        v = fall * (0.55 + 0.45 * Math.min(1, d / 0.22)) * (0.7 + 0.3 * hash3(i, j, 5));
+      if (kind === 'blast' || kind === 'scorch') {
+        // a ragged patch, not a star: its edge wanders, and only the outer third breaks into short streaks
+        const edge = 0.74 + 0.09 * Math.sin(a * 3 + 0.9) + 0.07 * Math.sin(a * 7 + 2.1) + 0.04 * Math.sin(a * 17 + 0.3);
+        const streak = 0.5 + 0.5 * Math.sin(a * 41 + 3 * Math.sin(a * 9 + 1.7));
+        const reach = edge * (1 - 0.22 * streak * Math.max(0, Math.min(1, (d - 0.4) / 0.3)));
+        const fall = Math.max(0, Math.min(1, (reach - d) / 0.34));
+        const ring = Math.exp(-((d - 0.3) / 0.2) * ((d - 0.3) / 0.2));
+        v = fall * (kind === 'scorch' ? 0.62 + 0.38 * Math.max(ring, Math.max(0, 1 - d / 0.3)) : 0.5 + 0.5 * ring) * (0.72 + 0.28 * hash3(i >> 1, j >> 1, 5));
       } else {
         const ragged = 0.80 + 0.10 * Math.sin(a * 5 + 1.3) + 0.06 * Math.sin(a * 11 + 0.4) + 0.04 * Math.sin(a * 23);
         v = Math.max(0, Math.min(1, (ragged - d) / 0.42)) * (0.75 + 0.25 * hash3(i, j, 3));
@@ -409,7 +413,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) groundStain(g, o.stain, 0x1e0f08, o.stainOpacity || 0.5, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.5, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -442,7 +446,7 @@ export function buildStorySites() {
   (flameAt || World.mavRocket).add(flame);
   flame.visible = false;
   World.mavFlame = flame;
-  groundStain(mav, 12, 0x140a06, 0.5, 0.03, 'blast');   // what four descent engines left in the dust, years old
+  groundStain(mav, 13, 0x0c0706, 0.72, 0.03, 'scorch');   // what four descent engines left: burnt ground, years old and still black
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
@@ -452,8 +456,9 @@ export function buildStorySites() {
     if (L.name === 'Pathfinder') { World.landers.push({ data: L, group: pf }); continue; }
     const g = placeAt(L.lat, L.lon, srand() * 6);
     // those that came down on engines left their blast in the dust; those that bounced in on airbags, a scuffed patch
-    const engines = !/Pathfinder|Spirit|Opportunity|Beagle|Schiaparelli/.test(L.name);
-    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 7.5 : 4.2, blast: engines, stainOpacity: engines ? 0.42 : 0.5 });
+    // (the rovers drove away from where they were set down, and the airbag landers rolled to where they lie)
+    const engines = /Viking|Mars 3|Mars 6|Phoenix|InSight/.test(L.name);
+    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 5.2 : 3.4, blast: engines, stainOpacity: engines ? 0.3 : 0.34 });
     if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }
