@@ -1,7 +1,124 @@
+/*
+ * 3D models. The real ones are .glb files built by tools/assets (see tools/assets/SPEC.md);
+ * a few props that have not been rebuilt yet still come from the first version's baked
+ * triangle data (legacyModel), and are replaced as their .glb arrives.
+ */
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { asset } from '../planet/load.js';
 import { MODELS_DATA } from './legacy-models.js';
-// Model construction. (First-version triangle-soup data; being replaced by .glb models.)
-export function buildModel(name, scale) {
+
+const loaded = new Map();           // name -> { scene, animations, skinned }
+const EMISSIVE = /^(light_|screen|flame|window_glow)/;
+
+function prepare(gltf) {
+  let skinned = false;
+  const seen = new Set();
+  gltf.scene.traverse((o) => {
+    if (o.isSkinnedMesh) { skinned = true; o.frustumCulled = false; }
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (seen.has(m)) continue;
+      seen.add(m);
+      const name = m.name || '';
+      if (name.startsWith('glass_clear')) {
+        m.transparent = true; m.depthWrite = false; m.opacity = 0.28; m.roughness = 0.06; m.metalness = 0.0;
+        m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
+        o.castShadow = false;
+      } else if (EMISSIVE.test(name)) {
+        m.toneMapped = true;
+        m.userData.baseEmissive = m.emissiveIntensity || 1;
+        o.castShadow = false;
+      } else if (name === 'void') {
+        m.color.set(0x000000); m.roughness = 1;
+      }
+      if (m.metalness > 0.5) m.envMapIntensity = 1.25;
+      m.userData.modelMaterial = true;
+    }
+  });
+  return { scene: gltf.scene, animations: gltf.animations || [], skinned };
+}
+
+/** Load a set of models before the world is built. Missing files are skipped (returns the
+ *  names that loaded), so a model that is still being made simply falls back. */
+export async function preloadModels(names, onProgress) {
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  let done = 0;
+  const ok = [];
+  await Promise.all(names.map(async (name) => {
+    if (!loaded.has(name)) {
+      try {
+        const gltf = await loader.loadAsync(asset(`assets/models/${name}.glb`));
+        loaded.set(name, prepare(gltf));
+      } catch (e) { /* not built yet */ }
+    }
+    if (loaded.has(name)) ok.push(name);
+    done++;
+    if (onProgress) onProgress(done / names.length);
+  }));
+  return ok;
+}
+
+export function hasModel(name) { return loaded.has(name); }
+
+/**
+ * A fresh instance of a loaded model.
+ * @param {string} name
+ * @param {{face?: boolean}} [o]  face: turn the model so its front points along -Z, the way
+ *        bodies and vehicles face in the game (models are authored facing +Z in glTF space)
+ * @returns {{root: THREE.Group, part: (n:string)=>THREE.Object3D, clips: THREE.AnimationClip[], inner: THREE.Object3D}}
+ */
+export function model(name, o = {}) {
+  const src = loaded.get(name);
+  if (!src) throw new Error(`Model not loaded: ${name}`);
+  const inner = src.skinned ? cloneSkinned(src.scene) : src.scene.clone(true);
+  if (o.face) inner.rotation.y = Math.PI;
+  const root = new THREE.Group();
+  root.name = name;
+  root.add(inner);
+  const part = (n) => inner.getObjectByName(n);
+  return { root, part, clips: src.animations, inner };
+}
+
+/** Give a part of an instance its own copies of its materials, so the game can drive it
+ *  (blink a lamp, switch a screen on) without changing every other instance. */
+export function ownMaterials(obj) {
+  const out = [];
+  if (!obj) return out;
+  obj.traverse((m) => {
+    if (!m.isMesh) return;
+    if (Array.isArray(m.material)) m.material = m.material.map((x) => { const c = x.clone(); c.userData = { ...x.userData }; out.push(c); return c; });
+    else { const c = m.material.clone(); c.userData = { ...m.material.userData }; m.material = c; out.push(c); }
+  });
+  return out;
+}
+
+/** Scale the glow of emissive materials (0 = off, 1 = as authored). */
+export function setGlow(materials, k) {
+  for (const m of materials) if (m.userData.baseEmissive !== undefined) m.emissiveIntensity = m.userData.baseEmissive * k;
+}
+
+/** Colliders described by a model: anchors named col_* with a radius, in the model's frame. */
+export function colliderAnchors(inst) {
+  const out = [];
+  inst.inner.traverse((n) => {
+    if (n.name && n.name.startsWith('col_') && n.userData && n.userData.radius) {
+      out.push({ name: n.name, x: n.position.x, z: n.position.z, r: n.userData.radius, node: n });
+    }
+  });
+  return out;
+}
+
+// ------------------------------------------------------------------------------------------
+// First-version models (triangle soup with flat colours)
+// ------------------------------------------------------------------------------------------
+export function legacyModel(name, scale) {
   const g = new THREE.Group();
   const byName = {};
   for (const p of MODELS_DATA[name]) {
@@ -10,21 +127,23 @@ export function buildModel(name, scale) {
     for (let i = 0; i < p.v.length; i++) v[i] = p.v[i] / 1000;
     geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
     geo.computeVertexNormals();
-    const mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(p.c[0], p.c[1], p.c[2]), side: THREE.DoubleSide });
-    if (p.o !== undefined) { mat.transparent = true; mat.opacity = p.o; }
-    if (p.e) mat.emissive = new THREE.Color(p.e[0], p.e[1], p.e[2]);
+    const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.c[0], p.c[1], p.c[2]), roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide });
+    if (p.o !== undefined) { mat.transparent = true; mat.opacity = p.o; mat.depthWrite = false; }
+    if (p.e) { mat.emissive = new THREE.Color(p.e[0], p.e[1], p.e[2]); mat.emissiveIntensity = 2; }
     const m = new THREE.Mesh(geo, mat);
     m.position.set(p.p[0] / 1000, p.p[1] / 1000, p.p[2] / 1000);
     m.name = p.n;
+    m.castShadow = p.o === undefined;
+    m.receiveShadow = true;
     byName[p.n] = m;
-    // parented parts attach to their parent (pivot-relative); others to the root
     if (p.par && byName[p.par]) byName[p.par].add(m);
     else g.add(m);
   }
-  // Blender -Y "forward" exports to three +Z; spin the whole model so it faces -Z
   g.rotation.y = Math.PI;
   if (scale) g.scale.setScalar(scale);
   const wrap = new THREE.Group();
   wrap.add(g);
   return wrap;
 }
+/** @deprecated name kept for the modules not yet moved to .glb models */
+export const buildModel = legacyModel;

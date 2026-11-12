@@ -6,7 +6,7 @@ import { ctx } from '../game/ctx.js';
 import { R } from '../planet/constants.js';
 import { S } from '../game/state.js';
 import { hash3, srand } from '../core/math.js';
-import { buildModel } from './models.js';
+import { buildModel, colliderAnchors, hasModel, model, ownMaterials } from './models.js';
 import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
 import { log } from '../ui/dom.js';
@@ -68,31 +68,41 @@ export function pickSpawn(rng) {
 }
 
 export function buildHabColony(spawn) {
-  const yaw = 0;
-  World.hab = placeAt(spawn.lat, spawn.lon, yaw);
-  World.hab = World.hab;
-  const wallMat = new THREE.MeshLambertMaterial({ color: 0xcfc0a8, side: THREE.DoubleSide });
-  const wall = new THREE.Mesh(
-    new THREE.CylinderGeometry(HAB_R, HAB_R, 3.4, 40, 1, true, DOOR_HALF, Math.PI * 2 - DOOR_HALF * 2), wallMat);
-  wall.position.y = 1.7;
-  World.hab.add(wall);
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(HAB_R, 40, 14, 0, Math.PI * 2, 0, Math.PI / 2), wallMat);
-  dome.scale.y = 0.55; dome.position.y = 3.4;
-  World.hab.add(dome);
-  const fx = Math.sin(DOOR_HALF) * HAB_R, fz = Math.cos(DOOR_HALF) * HAB_R;
-  mkBox(0.25, 2.6, 0.5, 0x8a8378, fx, 1.3, fz, World.hab);
-  mkBox(0.25, 2.6, 0.5, 0x8a8378, -fx, 1.3, fz, World.hab);
-  mkBox(2 * fx + 0.25, 0.9, 0.5, 0x8a8378, 0, 2.95, fz, World.hab);
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(HAB_R - 0.05, 40),
-    new THREE.MeshLambertMaterial({ color: 0x9a9284 }));
-  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.06;
-  World.hab.add(floor);
-  mkCyl(0.05, 0.07, 1.0, 0x8a8378, 0, 8.3, 0, World.hab, 6);   // beacon mast on the dome apex
-  World.beacon = mkBox(0.26, 0.26, 0.26, 0x33ff66, 0, 8.9, 0, World.hab, { emissive: 0x33ff66 });
-  const l1 = new THREE.PointLight(0xffe6c8, 70, 26, 2); l1.position.set(0, 3.0, 0); World.hab.add(l1);
-  const l2 = new THREE.PointLight(0xffd9b0, 30, 18, 2); l2.position.set(3, 2.4, -4); World.hab.add(l2);
-  World.habLights = [l1, l2];
+  World.hab = placeAt(spawn.lat, spawn.lon, 0);
+  const hab = model('hab');
+  World.hab.add(hab.root);
+  World.habModel = hab;
+  // furniture and machines carry their own collision circles
+  for (const c of colliderAnchors(hab)) {
+    c.node.updateWorldMatrix(true, false);
+    const w = c.node.getWorldPosition(new THREE.Vector3());          // hab-local (the Hab group is not yet moved by a parent)
+    const local = World.hab.worldToLocal(w);
+    addColliderAt(World.hab, local.x, local.z, c.r);
+  }
+  // parts the game drives
+  World.beaconMats = ownMaterials(hab.part('beacon'));
+  World.oxyMats = ownMaterials(hab.part('status_oxy'));
+  World.commsMats = ownMaterials(hab.part('comms_screen'));
+  World.hydFlame = hab.part('hydrazine_flame');
+  World.breachHole = hab.part('breach_hole');
+  World.breachPatch = hab.part('breach_patch');
+  for (const n of [World.hydFlame, World.breachHole, World.breachPatch]) if (n) n.visible = false;
+  World.habInterior = hab.part('interior');
+  World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
+    const d = hab.part(n);
+    return d ? { node: d, x0: d.position.x, dx: d.userData.open_dx || (n.endsWith('_L') ? -1.05 : 1.05), k: 0, outer: n.includes('outer') } : null;
+  }).filter(Boolean);
+  // room lights: a few real lights at the fixtures (fewer on low quality), the rest just glow
+  World.habLights = [];
+  const names = ctx.engine.q.scale < 0.7 ? ['light_0', 'light_2'] : ['light_0', 'light_1', 'light_2', 'light_3'];
+  for (const n of names) {
+    const anchor = hab.part(n);
+    if (!anchor) continue;
+    const l = new THREE.PointLight(0xffe4c4, 15, 26, 1.6);
+    l.userData.on = 15;
+    anchor.add(l);
+    World.habLights.push(l);
+  }
 
   // farm plots (6 base; greenhouses add more)
   for (let i = 0; i < 6; i++) {
@@ -100,83 +110,26 @@ export function buildHabColony(spawn) {
     addFarmPlot(World.hab, px, pz, true);
   }
 
-  // equipment
-  const oxy = new THREE.Group(); oxy.position.set(5.6, 0.06, -3.6); World.hab.add(oxy);
-  mkBox(1.6, 2.0, 1.1, 0x7a8a92, 0, 1.0, 0, oxy);
-  World.oxyLight = mkBox(0.16, 0.16, 0.1, 0x33ff66, 0.4, 1.6, 0.58, oxy, { emissive: 0x33ff66 });
-  mkCyl(0.1, 0.1, 1.6, 0x5a6a72, -0.5, 2.4, 0, oxy);
-  World.oxygenator = oxy;
-  addColliderAt(World.hab, 5.6, -3.6, 1.1);
-
-  const rec = new THREE.Group(); rec.position.set(5.9, 0.06, -0.4); World.hab.add(rec);
-  mkBox(1.3, 1.2, 1.0, 0x6a7a88, 0, 0.6, 0, rec);
-  mkCyl(0.45, 0.45, 1.5, 0x4a7ab0, 0, 1.95, 0, rec, 12);
-  World.reclaimer = rec;
-  addColliderAt(World.hab, 5.9, -0.4, 0.95);
-
-  const hyd = new THREE.Group(); hyd.position.set(5.5, 0.06, 2.6); World.hab.add(hyd);
-  mkCyl(0.5, 0.5, 1.4, 0xb0a24a, 0, 0.7, 0, hyd, 12);
-  mkBox(0.9, 0.5, 0.7, 0x4a4a4a, 0, 0.25, 0.85, hyd);
-  World.hydFlame = mkCyl(0.12, 0.26, 0.5, 0xffa030, 0, 0.75, 0.85, hyd, 8, { emissive: 0xff7020 });
-  World.hydFlame.visible = false;
-  World.hydrazineRig = hyd;
-  addColliderAt(World.hab, 5.5, 2.6, 0.95);
-
-  const comms = new THREE.Group(); comms.position.set(0, 0.06, -6.6); World.hab.add(comms);
-  mkBox(2.4, 0.1, 1.0, 0x8a8378, 0, 0.85, 0, comms);
-  mkBox(0.12, 0.85, 0.8, 0x6a655c, -1.0, 0.42, 0, comms);
-  mkBox(0.12, 0.85, 0.8, 0x6a655c, 1.0, 0.42, 0, comms);
-  World.commsScreen = mkBox(1.5, 0.9, 0.08, 0x101418, 0, 1.55, -0.15, comms, { emissive: 0x000000 });
-  World.comms = comms;
-  addColliderAt(World.hab, 0, -6.6, 1.2);
-
-  const bunk = new THREE.Group(); bunk.position.set(-5.0, 0.06, -4.9); World.hab.add(bunk);
-  mkBox(1.1, 0.4, 2.3, 0x7a7268, 0, 0.2, 0, bunk);
-  mkBox(1.0, 0.18, 2.1, 0xa89a80, 0, 0.5, 0, bunk);
-  mkBox(0.8, 0.16, 0.5, 0xcfc0a8, 0, 0.6, -0.75, bunk);
-  World.bunk = bunk;
-  addColliderAt(World.hab, -5.0, -4.9, 1.1);
-
-  const shelf = new THREE.Group(); shelf.position.set(4.2, 0.06, 4.8); World.hab.add(shelf);
-  mkBox(1.8, 1.7, 0.6, 0x7a7268, 0, 0.85, 0, shelf);
-  for (let i = 0; i < 6; i++)
-    mkBox(0.4, 0.3, 0.4, 0xc0842f, -0.6 + (i % 3) * 0.6, 0.5 + Math.floor(i / 3) * 0.75, 0.12, shelf);
-  World.shelf = shelf;
-  addColliderAt(World.hab, 4.2, 4.8, 1.0);
-
-  // workbench / fabricator
-  const bench = new THREE.Group(); bench.position.set(-4.6, 0.06, 3.9); World.hab.add(bench);
-  mkBox(2.0, 0.95, 0.9, 0x6a655c, 0, 0.48, 0, bench);
-  mkBox(0.5, 0.35, 0.5, 0xb0762f, -0.5, 1.13, 0, bench);
-  mkCyl(0.06, 0.06, 0.8, 0x9a9a9a, 0.5, 1.35, 0, bench, 6);
-  World.bench = bench;
-  addColliderAt(World.hab, -4.6, 3.9, 1.1);
-
-  // breach hole + patch (hidden until the event)
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.75, 20),
-    new THREE.MeshBasicMaterial({ color: 0x050505, side: THREE.DoubleSide }));
-  hole.position.set(0, 1.7, -HAB_R + 0.02);
-  hole.visible = false;
-  World.hab.add(hole);
-  World.breachHole = hole;
-  const patch = new THREE.Mesh(new THREE.CircleGeometry(0.9, 8),
-    new THREE.MeshLambertMaterial({ color: 0xb0b0b8, side: THREE.DoubleSide }));
-  patch.position.set(0, 1.7, -HAB_R + 0.04);
-  patch.visible = false;
-  World.hab.add(patch);
-  World.breachPatch = patch;
-
   // solar array, in its own group beside the hab
   const solar = placeOffset(World.hab, -30, 4, 0);
   for (let i = 0; i < 8; i++) {
     const px = -Math.floor(i / 4) * 5.5, pz = (i % 4) * 4.6;
     const g = new THREE.Group(); g.position.set(px, 0, pz); solar.add(g);
-    mkCyl(0.14, 0.18, 1.1, 0x5a5a5a, 0, 0.55, 0, g, 8);
-    const panel = mkBox(3.4, 0.1, 2.2, 0x1c2c50, 0, 1.15, 0, g);
-    panel.rotation.x = -0.42;
-    panel.material = panel.material.clone();
+    let rec;
+    if (hasModel('solar_panel')) {
+      const m = model('solar_panel');
+      g.add(m.root);
+      const cells = ownMaterials(m.part('panel') || m.root).filter((x) => x.name === 'solar_cell');
+      rec = { mesh: m.part('panel') || m.root, cells, dust: 0.22 + i * 0.05, group: g };
+    } else {
+      mkCyl(0.14, 0.18, 1.1, 0x5a5a5a, 0, 0.55, 0, g, 8);
+      const panel = mkBox(3.4, 0.1, 2.2, 0x1c2c50, 0, 1.15, 0, g);
+      panel.rotation.x = -0.42;
+      panel.material = panel.material.clone();
+      rec = { mesh: panel, cells: [panel.material], dust: 0.22 + i * 0.05, group: g };
+    }
     addColliderAt(solar, px, pz, 1.0);
-    World.panels.push({ mesh: panel, dust: 0.22 + i * 0.05, group: g });
+    World.panels.push(rec);
   }
   World.solarGroup = solar;
 
@@ -195,11 +148,14 @@ export function buildHabColony(spawn) {
 
   // uplink dish + pathfinder parking ring
   const up = placeOffset(World.hab, 11.5, 7.5, 0);
-  mkCyl(0.1, 0.14, 1.3, 0x6a6a6a, 0, 0.65, 0, up, 8);
-  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.6),
-    new THREE.MeshLambertMaterial({ color: 0xd8d0c0, side: THREE.DoubleSide }));
-  dish.position.y = 1.5; dish.rotation.x = -0.9;
-  up.add(dish);
+  if (hasModel('uplink_dish')) up.add(model('uplink_dish').root);
+  else {
+    mkCyl(0.1, 0.14, 1.3, 0x6a6a6a, 0, 0.65, 0, up, 8);
+    const dish = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.6),
+      new THREE.MeshStandardMaterial({ color: 0xd8d0c0, side: THREE.DoubleSide }));
+    dish.position.y = 1.5; dish.rotation.x = -0.9;
+    up.add(dish);
+  }
   World.uplink = up;
   colliders.push({ v: up.position.clone().normalize(), r: 0.8 });
   const ringG = placeOffset(World.hab, 7.0, 9.5, 0);
@@ -225,6 +181,23 @@ export function buildHabColony(spawn) {
 }
 
 // place a child group at a local tangent offset from a parent site, re-snapped to the terrain
+/** Airlock doors slide open as someone approaches; the interior is skipped when far away. */
+export function updateDoors(dt) {
+  if (!World.hab || !World.doors) return;
+  const pos = S.mode === 'rover' ? World.rover.group.position : (World.playerPos || World.hab.position);
+  const local = siteWorldToLocal(World.hab, pos, _pv);
+  const dist = Math.hypot(local.x, local.z);
+  if (World.habInterior) World.habInterior.visible = dist < 70;
+  for (const d of World.doors) {
+    const dz = local.z - (d.outer ? 11.6 : HAB_R);
+    const near = Math.abs(local.x) < 2.6 && Math.abs(dz) < 3.4 && S.mode === 'walk';
+    const target = near ? 1 : 0;
+    d.k += Math.sign(target - d.k) * Math.min(Math.abs(target - d.k), dt * 2.2);
+    const e = d.k * d.k * (3 - 2 * d.k);
+    d.node.position.x = d.x0 + d.dx * e;
+  }
+}
+
 /** Level the ground under everything that is built at a fixed place. Call before placing. */
 export function addSitePads(spawn) {
   const P = ctx.planet;
@@ -251,41 +224,54 @@ export function addFarmPlot(parent, px, pz, collide) {
   const plot = new THREE.Group();
   plot.position.set(px, 0.06, pz);
   parent.add(plot);
-  mkBox(1.6, 0.34, 1.9, 0x6b6459, 0, 0.17, 0, plot);
-  const soil = mkBox(1.42, 0.3, 1.72, 0x3a2418, 0, 0.24, 0, plot);
-  soil.visible = false;
-  const plants = new THREE.Group();
-  plants.position.y = 0.4;
-  plot.add(plants);
-  for (let p = 0; p < 4; p++) {
-    const stem = mkCyl(0.02, 0.03, 0.3, 0x3f7a2f, (p % 2) * 0.7 - 0.35, 0.15, Math.floor(p / 2) * 0.8 - 0.4, plants, 6);
-    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6),
-      new THREE.MeshLambertMaterial({ color: 0x4e9a3a }));
-    leaf.position.y = 0.32; leaf.scale.y = 0.75;
-    stem.add(leaf);
+  let soil, plants, dead = null;
+  if (hasModel('farm_plot')) {
+    const m = model('farm_plot');
+    plot.add(m.root);
+    soil = m.part('soil'); plants = m.part('plants'); dead = m.part('plants_dead');
+    if (dead) dead.visible = false;
+  } else {
+    mkBox(1.6, 0.34, 1.9, 0x6b6459, 0, 0.17, 0, plot);
+    soil = mkBox(1.42, 0.3, 1.72, 0x3a2418, 0, 0.24, 0, plot);
+    plants = new THREE.Group();
+    plants.position.y = 0.4;
+    plot.add(plants);
+    for (let p = 0; p < 4; p++) {
+      const stem = mkCyl(0.02, 0.03, 0.3, 0x3f7a2f, (p % 2) * 0.7 - 0.35, 0.15, Math.floor(p / 2) * 0.8 - 0.4, plants, 6);
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4e9a3a }));
+      leaf.position.y = 0.32; leaf.scale.y = 0.75;
+      stem.add(leaf);
+    }
   }
+  soil.visible = false;
   plants.visible = false;
   if (collide) addColliderAt(parent, px, pz, 0.85);
   const worldPos = new THREE.Vector3(px, 0, pz).applyQuaternion(parent.quaternion).add(parent.position);
-  World.plots.push({ group: plot, soilMesh: soil, plants, worldPos,
+  World.plots.push({ group: plot, soilMesh: soil, plants, plantsDead: dead, worldPos,
     state: 'empty', crop: 'potato', growth: 0, watered: 0 });
   return World.plots[World.plots.length - 1];
 }
 
 // ============================================================
-// 10. ROVER, PATHFINDER, MAV, LANDERS, ICE
+// ROVER, PATHFINDER, MAV, LANDERS, ICE
 // ============================================================
+export const WHEEL_RADIUS = 0.62;
 export function buildRover(group) {
-  const model = buildModel('rover');
-  group.add(model);
-  const wheels = [];
-  for (let i = 0; i < 6; i++) wheels.push(model.getObjectByName('wheel' + i));
-  const hl = new THREE.SpotLight(0xfff2d8, 0, 90, 0.55, 0.5, 1.6);
-  hl.position.set(0, 1.6, -2.1);
-  group.add(hl);
-  const hlT = new THREE.Object3D(); hlT.position.set(0, 0.6, -14);
-  group.add(hlT); hl.target = hlT;
-  World.rover = { group, wheels, headlight: hl, speed: 0 };
+  const m = model('rover', { face: true });
+  group.add(m.root);
+  const wheels = ['wheel_FL', 'wheel_ML', 'wheel_RL', 'wheel_FR', 'wheel_MR', 'wheel_RR'].map((n) => m.part(n)).filter(Boolean);
+  const steer = { FL: m.part('steer_FL'), FR: m.part('steer_FR'), RL: m.part('steer_RL'), RR: m.part('steer_RR') };
+  // one spotlight between the two headlamps, aimed down the road (the model's front is its +Z)
+  const hl = new THREE.SpotLight(0xfff2d8, 0, 110, 0.6, 0.55, 1.5);
+  const a = m.part('headlight_L'), b = m.part('headlight_R');
+  const at = new THREE.Vector3(0, 1.4, 2.6);
+  if (a && b) { m.inner.updateWorldMatrix(true, true); at.copy(a.getWorldPosition(new THREE.Vector3())).add(b.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5); m.inner.worldToLocal(at); }
+  hl.position.copy(at);
+  const hlT = new THREE.Object3D(); hlT.position.set(at.x, at.y - 1.2, at.z + 16);
+  m.inner.add(hl, hlT); hl.target = hlT;
+  const lamps = [];
+  m.inner.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && /^light_(white|red|amber)/.test(o.material.name)) { o.material = o.material.clone(); o.material.userData.baseEmissive = o.material.emissiveIntensity || 1; lamps.push(o.material); } });
+  World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish') };
   World.roverCollider = { v: group.position.clone().normalize(), r: 2.6 };
   colliders.push(World.roverCollider);
 }
@@ -300,21 +286,20 @@ export function buildStorySites() {
 
   // Ares 4 MAV waits inside Schiaparelli crater
   const mav = placeAt(-1.9, 15.9, 0);
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(7, 24),
-    new THREE.MeshLambertMaterial({ color: 0x5a5a5a }));
-  pad.rotation.x = -Math.PI / 2; pad.position.y = 0.08;
-  mav.add(pad);
-  const rocket = buildModel('mav');
-  rocket.position.y = 0.1;
-  mav.add(rocket);
-  World.mavNose = rocket.getObjectByName('nose');
-  World.mavStrobe = rocket.getObjectByName('strobe');
-  const flame = mkCyl(0.9, 0.25, 5, 0xffc060, 0, -1.8, 0, rocket, 10,
-    { emissive: 0xff9030, transparent: true, opacity: 0.95 });
+  const mm = model('mav');
+  mav.add(mm.root);
+  World.mavRocket = mm.part('ascent');
+  World.mavRocketY = World.mavRocket.position.y;
+  World.mavNose = mm.part('nose');
+  World.mavStrobeMats = ownMaterials(mm.part('strobe'));
+  const flameAt = mm.part('flame');
+  const flame = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.2, 7, 14, 1, true),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 4.2, 1.2), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+  flame.position.y = -3.5;
+  (flameAt || World.mavRocket).add(flame);
   flame.visible = false;
   World.mavFlame = flame;
   World.mav = mav;
-  World.mavRocket = rocket;
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
 
   // every real lander, at its real coordinates

@@ -13,7 +13,8 @@ import { ctx } from './game/ctx.js';
 import { S, BAL, DIFFICULTIES } from './game/state.js';
 import { root, UI, log, showOverlay } from './ui/dom.js';
 import { Snd } from './audio/sound.js';
-import { World, siteLocalToWorld } from './world/build.js';
+import { World, siteLocalToWorld, updateDoors } from './world/build.js';
+import { setGlow, preloadModels } from './world/models.js';
 import { input, initInput } from './game/input.js';
 import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, initRoverAt } from './game/rover.js';
@@ -59,6 +60,7 @@ async function boot() {
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
 
+  await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
   buildAstronaut();
   initInput();
   updateSunDir();
@@ -95,7 +97,7 @@ function draw(dt, focus) {
   const e = ctx.engine;
   e.camera.updateMatrixWorld();
   ctx.terrain.update(e.camera.position);
-  e.update({ dt, dust: S.started ? S.storm.i : 0, inside: S.started && S.inside, focus });
+  e.update({ dt, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus });
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();
@@ -124,8 +126,9 @@ function tick(dt) {
   }
   Snd.wind((S.inside ? 0.05 : 0.16) + S.storm.i * 0.65 + (S.breach.active && S.inside ? 0.4 : 0));
   blinkT += dt;
-  if (World.beacon) World.beacon.material.emissive.setHex(Math.sin(blinkT * 5) > 0 ? 0x33ff66 : 0x0a3315);
-  if (World.mavStrobe) World.mavStrobe.material.emissive.setHex(Math.sin(blinkT * 7) > 0 ? 0xff4020 : 0x330a05);
+  if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
+  if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
+  updateDoors(dt);
   updateSunDir();
   updateHud();
   updateCompass();

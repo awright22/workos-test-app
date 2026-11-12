@@ -545,9 +545,22 @@ def bake_ao(root, samples=24, distance=0.9, strength=0.8, floor=True, seed=7):
             hit = 0.0
             for d in dirs:
                 w = t * d.x + b * d.y + n * d.z
-                loc, _, _, dist = tree.ray_cast(p, w, distance)
-                if loc is not None:
-                    hit += (1.0 - dist / distance) ** 1.5
+                # A ray that meets the BACK of a face started inside another piece (the end of
+                # a strut in its joint, a plate let into a hull): carry on until it meets a
+                # front face or runs out of range, so buried vertices do not come out black.
+                origin, left = p, distance
+                for _ in range(5):
+                    loc, nrm, _, dist = tree.ray_cast(origin, w, left)
+                    if loc is None:
+                        break
+                    if nrm.dot(w) > 0.0:
+                        left -= dist + 2e-4
+                        if left <= 0.0:
+                            break
+                        origin = loc + w * 2e-4
+                        continue
+                    hit += (1.0 - (distance - left + dist) / distance) ** 1.5
+                    break
             ao = 1.0 - strength * (hit / samples)
             vals.append(max(0.08, min(1.0, ao)))
         for i, a in enumerate(vals):
@@ -570,7 +583,7 @@ def tri_count(root):
     return n
 
 
-def export_model(root, name, ao=True, animations=False, ao_samples=24, ao_distance=0.9, do_collapse=True):
+def export_model(root, name, ao=True, animations=False, ao_samples=24, ao_distance=0.9, do_collapse=True, pack_args=()):
     """Collapse helpers into parts, bake AO, export .glb, compress with gltfpack.
     Returns a dict with triangle count and file size; also prints it."""
     t0 = time.time()
@@ -607,7 +620,7 @@ def export_model(root, name, ao=True, animations=False, ao_samples=24, ao_distan
         bpy.ops.export_scene.gltf(**kwargs)
     out = os.path.join(OUT_DIR, name + '.glb')
     cmd = ['node', os.path.join(TOOLS, 'node_modules', 'gltfpack', 'cli.js'), '-i', raw, '-o', out,
-           '-cc', '-kn', '-km', '-ke', '-vp', '15', '-vn', '10', '-vc', '8']
+           '-cc', '-kn', '-km', '-ke', '-vp', '15', '-vn', '10', '-vc', '8', *pack_args]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         print(res.stdout, res.stderr)

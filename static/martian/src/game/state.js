@@ -42,7 +42,7 @@ export const BAL = {
   dustRate: 0.05, stormDustRate: 0.7, stormGenMult: 0.14,
   potatoYield: 4, growSols: 2.4, waterings: 2,
   healthMax: 100, starveDrain: 16, suffocateDrain: 10, healRegen: 4, sleepHeal: 10,
-  walkSpeed: 5.2, runSpeed: 9.2, jumpV: 4.6, gravity: 8.2,
+  walkSpeed: 5.1, runSpeed: 9.2, jumpV: 3.4, gravity: 3.72,       // Mars gravity; the gait clips are made for these speeds
   suitCap: 100,
   roverO2Cap: 300, roverPowerCap: 100, roverDrainPerMin: 5, roverChargeAtHab: 25,
 };

@@ -12,7 +12,7 @@ import { FEATURES } from '../planet/features.js';
 import { R } from '../planet/constants.js';
 import { closeScreens } from '../ui/screens.js';
 import { surfaceAt } from '../planet/surface.js';
-import { buildModel } from '../world/models.js';
+import { buildModel, hasModel, model } from '../world/models.js';
 import { ctx } from './ctx.js';
 import { clamp, smoothstep } from '../core/math.js';
 import { tryReload } from './flow.js';
@@ -200,7 +200,8 @@ export function startLaunch() {
   }
   [3, 2, 1].forEach((n, i) => setTimeout(() => { Snd.beep(700 + n * 60, 0.18, 'square', 0.15); log(`${n}...`, 'nasa'); }, 2000 + i * 1000));
   if (!hermes) {
-    hermes = buildModel('hermes', 1.4);
+    if (hasModel('hermes')) { const h = model('hermes'); hermes = h.root; World.hermesRing = h.part('ring'); hermes.scale.setScalar(30); }
+    else hermes = buildModel('hermes', 1.4);
     ctx.world.add(hermes);
   }
   hermes.position.copy(mavUp).multiplyScalar(R * 1.85).addScaledVector(_pe, R * 0.8);
@@ -217,7 +218,7 @@ export function startLaunch() {
     World.mavFlame.visible = true;
     Snd.rumble(clamp(lt * 0.5, 0, 0.85));
     alt = lt * lt * 14;
-    World.mavRocket.position.y = 0.1 + alt;
+    World.mavRocket.position.y = World.mavRocketY + alt;
     World.mavFlame.scale.y = 1 + Math.random() * 0.4;
     const rocketWorld = _v2.copy(World.mav.position).addScaledVector(mavUp, alt + 8);
     if (alt < 2200) {

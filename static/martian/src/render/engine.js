@@ -72,7 +72,7 @@ class FinalPass extends Pass {
 }
 
 const _v = new THREE.Vector3(), _u = new THREE.Vector3(), _r = new THREE.Vector3(), _f = new THREE.Vector3();
-const _m = new THREE.Matrix4();
+const _c1 = new THREE.Color();
 
 export class Engine {
   constructor(container, qualityName) {
@@ -159,8 +159,14 @@ export class Engine {
     this.sun.intensity = Math.max(sky.sunIntensity, 0.0);
     _u.copy(p.focus || cam.position).normalize();
     this._fitShadow(p.focus || cam.position, _u, night);
+    // indoors the sky cannot reach: the room is lit by its own lamps
+    this.indoor = lerp(this.indoor || 0, p.inside ? 1 : 0, damp(0.35, p.dt || 0.016));
     this.hemi.color.copy(sky.ambientSky);
     this.hemi.groundColor.copy(sky.ambientGround);
+    if (this.indoor > 0.001) {            // indoors: the room's own soft bounce light instead of the sky
+      this.hemi.color.lerp(_c1.setRGB(0.50, 0.46, 0.40).multiplyScalar(p.power === false ? 0.08 : 1), this.indoor);
+      this.hemi.groundColor.lerp(_c1.setRGB(0.26, 0.24, 0.21).multiplyScalar(p.power === false ? 0.08 : 1), this.indoor);
+    }
     this.hemi.intensity = 1.0;
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
@@ -170,7 +176,7 @@ export class Engine {
     const alt = Math.max(0, cam.position.length() - 12000);
     fog.density = (0.00085 + (p.dust || 0) * 0.011) * Math.exp(-alt / 500) + 0.0000015;
     // exposure: brighter at night and indoors, eased like an eye adapting
-    const target = (p.inside ? 1.15 : lerp(3.2, 1.0, sky.day)) * (p.exposureBias || 1);
+    const target = (p.inside ? 0.95 : lerp(3.2, 1.0, sky.day)) * (p.exposureBias || 1);
     this.exposure = lerp(this.exposure, target, damp(0.9, p.dt));
     const fu = this.final.uniforms;
     fu.uExposure.value = this.exposure;

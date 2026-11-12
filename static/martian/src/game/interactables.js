@@ -18,8 +18,16 @@ import { R } from '../planet/constants.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
 export function syncPlot(pl) {
   pl.soilMesh.visible = pl.state !== 'empty';
-  pl.plants.visible = pl.state === 'growing' || pl.state === 'ready' || pl.state === 'dead';
   const s = 0.25 + pl.growth * 1.05;
+  if (pl.plantsDead) {
+    // modelled plots carry a healthy crop (scaled as it grows) and a withered one
+    pl.plants.visible = pl.state === 'growing' || pl.state === 'ready';
+    pl.plantsDead.visible = pl.state === 'dead';
+    const k = Math.min(1, 0.25 + pl.growth * 0.75);
+    pl.plants.scale.set(k, k, k);
+    return;
+  }
+  pl.plants.visible = pl.state === 'growing' || pl.state === 'ready' || pl.state === 'dead';
   pl.plants.scale.set(s, s, s);
   pl.plants.traverse((o) => {
     if (o.material) {
@@ -121,7 +129,7 @@ addI({
 export function addInspect(id, lx, lz, name, doneLine) {
   addI({
     pos: () => siteLocalToWorld(World.hab, lx, 0, lz, _v2),
-    r: 2.6, hold: 0.7, mode: 'walk',
+    r: 2.6, hold: 0.7, mode: 'walk', pose: 'stand',
     visible: () => S.started && !S.flags.coldOpen && !S.checkedSystems[id],
     label: () => `Inspect the ${name}`,
     use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine); },
@@ -151,7 +159,7 @@ addI({
     const p = nearestOf(World.panels, panelPos, 3.0);
     return p ? panelPos(World._activePanel = p) : null;
   },
-  r: 3.0, hold: 1.6, mode: 'walk',
+  r: 3.0, hold: 1.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : 'Panel is clean',
   label: () => `Wipe solar panel (${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output)`,
@@ -191,7 +199,7 @@ addI({
 // hydrazine rig
 addI({
   pos: () => siteLocalToWorld(World.hab, 5.5, 0, 2.6, _v2),
-  r: 2.4, hold: 2.0, mode: 'walk',
+  r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => S.hydrazine > 0 ? true : 'Hydrazine tank is empty',
   label: () => `Burn hydrazine for water (+${BAL.hydrazineWater}L) — ${S.hydrazine} left`,
@@ -222,7 +230,7 @@ addI({
 // bunk
 addI({
   pos: () => siteLocalToWorld(World.hab, -5.0, 0, -4.9, _v2),
-  r: 2.3, hold: 1.2, mode: 'walk',
+  r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => {
     if (S.breach.active) return 'Not with the Hab screaming, no';
@@ -235,7 +243,7 @@ addI({
 // shelf
 addI({
   pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
-  r: 2.2, hold: 0.8, mode: 'walk',
+  r: 2.2, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => S.health > 92 ? 'Not hungry right now' : (S.potatoes > 0 || S.food > 0) ? true : 'The shelf is bare',
   label: () => `Eat a ${S.potatoes > 0 ? 'potato. Again.' : 'ration'} (+12 vitals)`,
@@ -248,7 +256,7 @@ addI({
 // comms desk: the math, NASA chatter, disco
 addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -6.6, _v2),
-  r: 2.4, hold: 0.8, mode: 'walk',
+  r: 2.4, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && !S.flags.didMath,
   label: () => 'Run the numbers',
   use: () => {
@@ -259,7 +267,7 @@ addI({
 });
 addI({
   pos: () => siteLocalToWorld(World.hab, -0.9, 0, -6.4, _v2),
-  r: 2.2, hold: 0.8, mode: 'walk',
+  r: 2.2, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && S.pf.connected,
   label: () => 'Message NASA',
   use: () => {
@@ -276,7 +284,7 @@ addI({
 });
 addI({
   pos: () => siteLocalToWorld(World.hab, 0.9, 0, -6.4, _v2),
-  r: 2.2, hold: 0.6, mode: 'walk',
+  r: 2.2, hold: 0.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && S.pf.connected,
   label: () => S.disco ? 'Mercifully stop the disco' : "Play Lewis's disco playlist",
   use: () => {
@@ -288,7 +296,7 @@ addI({
 // workbench — opens the colony screen
 addI({
   pos: () => siteLocalToWorld(World.hab, -4.6, 0, 3.9, _v2),
-  r: 2.4, hold: 0.5, mode: 'walk',
+  r: 2.4, hold: 0.5, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   label: () => 'Use the fabricator [C]',
   use: () => toggleScreen('colony'),
@@ -296,7 +304,7 @@ addI({
 // rover enter + exit + camp
 addI({
   pos: () => World.rover.group.position,
-  r: 3.8, hold: 0.6, mode: 'walk',
+  r: 3.8, hold: 0.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   label: () => 'Drive the rover',
   sub: () => `PWR ${Math.round(S.roverPower)}/${roverPowerCap()} · O2 tank ${Math.round(S.roverO2)}`,
@@ -333,7 +341,7 @@ addI({
 });
 addI({
   pos: () => World.uplink.position,
-  r: 5.0, hold: 2.6, mode: 'walk',
+  r: 5.0, hold: 2.6, mode: 'walk', pose: 'stand',
   visible: () => S.pf.loaded && !S.pf.connected,
   enabled: () => groundDist(World.rover.group.position, World.uplinkRing.position) < 9 ? true : 'Park the rover on the marked ring first',
   label: () => 'Connect Pathfinder to the uplink',
@@ -347,7 +355,7 @@ addI({
       l => l.data.name !== 'Pathfinder' && !S.salvaged[l.data.name]);
     return rec ? (World._activeLander = rec).group.position : null;
   },
-  r: 5.0, hold: 2.4, mode: 'walk',
+  r: 5.0, hold: 2.4, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   label: () => World._activeLander ? `Salvage ${World._activeLander.data.name} (${World._activeLander.data.year})` : '',
   use: () => {
@@ -409,7 +417,7 @@ addI({
 // the buried RTG
 addI({
   pos: () => World.rtgSite.group.position,
-  r: 4.0, hold: 3.0, mode: 'walk',
+  r: 4.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && !World.rtgSite.taken && S.flags.didMath,
   label: () => 'Dig up the RTG (radioactive. cozy.)',
   use: () => {
@@ -423,7 +431,7 @@ addI({
 // breach patch
 addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2, _v2),
-  r: 3.2, hold: 3.0, mode: 'walk',
+  r: 3.2, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.breach.active && S.inside,
   label: () => 'Seal the breach (canvas, tape, prayer)',
   use: () => {
@@ -449,7 +457,7 @@ addI({
     }
     return best ? (World._activeCache = best).group.position : null;
   },
-  r: 3.5, hold: 1.0, mode: 'walk',
+  r: 3.5, hold: 1.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   enabled: () => S.suit < suitCap() - 5 ? true : 'Suit is full',
   label: () => `Refill suit O2 (${World._activeCache ? World._activeCache.charges : 0} charges left)`,
@@ -492,20 +500,20 @@ addI({
 // MAV: strip + launch
 addI({
   pos: () => World.mav.position,
-  r: 8.0, hold: 3.0, mode: 'walk',
+  r: 8.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
   enabled: () => S.sol >= S.rescueSol ? true : `Launch window opens Sol ${S.rescueSol} — NASA was firm about this`,
   label: () => 'Strip excess weight (nose cone, seats, dignity)',
   use: () => {
     S.flags.mavStripped = true;
-    World.mavNose.visible = false;
+    if (World.mavNose) World.mavNose.visible = false;
     Snd.ok();
     log('Removed the nose cone. NASA says the tarp will hold. NASA is lying, and we both know it.');
   },
 });
 addI({
   pos: () => World.mav.position,
-  r: 8.0, hold: 1.6, mode: 'walk',
+  r: 8.0, hold: 1.6, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavStripped && !S.won,
   label: () => 'Climb in. Go home.',
   use: () => {
