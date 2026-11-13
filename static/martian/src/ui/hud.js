@@ -533,7 +533,7 @@ export function updateCompass() {
     m.x = mid + clamp(rel, -EDGE, EDGE) * ppd;
     m.gone = (m.lead ? (at ? at.near : 0) < 2.4 : m.d < 6) || (m.off && !m.pin);
     m.labelled = false;
-    if (m.lead && m.lead.urgent && !m.gone) urgent = true;
+    if (m.lead && m.lead.urgent) urgent = true;          // (also when he is standing on it: with his life in the balance the strip names nothing else)
     if (!m.gone && !m.off && Math.abs(rel) < focusRel) { focusRel = Math.abs(rel); focus = m; }
   }
   // Labels: what it is and how far. The mission's mark first, then the one he faces, then the rest while there is

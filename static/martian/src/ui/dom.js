@@ -529,7 +529,8 @@ function flag(name, on) {
 // there is more above). Without one, a list cut off by the bottom of a phone's screen looks like the end of
 // the list. (It used to fade its last rows instead, which read as rows that were switched off.)
 function scrollCue(n) {
-  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 4 ? 'down' : '')).trim();
+  // (more than a few pixels of it: the last of a box's own padding is not "more")
+  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 10 ? 'down' : '')).trim();
   if (n.dataset.more !== more) n.dataset.more = more;
   const last = n.lastElementChild;
   if (more && (!last || !last.classList.contains('more-cue'))) {

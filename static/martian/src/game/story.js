@@ -96,7 +96,7 @@ export function offerQuests() {
   for (const q of QUEST_DEFS) if (!S.quests[q.id]) S.quests[q.id] = 'active';
   // retro-complete survey tasks for landers already stripped before the uplink
   for (const name of Object.keys(S.salvaged)) onQuestEvent('salvage', name);
-  log('NASA uploaded survey tasks — old landers with parts worth saving. Check the journal [J]. They pay in supply pods.', 'nasa');
+  log('NASA uploaded survey tasks — old landers with parts worth saving. They are in the journal, and they pay in supply pods.', 'nasa');
   // the care package: ice drill blueprint arrives with the first pod
   dropSupplyPod({ scrap: 3, rations: 3, candle: 1, seedSoy: 2 }, 'Open NASA care package').blueprint = 'drill';   // Botany sent beans
 }
@@ -121,7 +121,7 @@ export function onQuestEvent(type, name) {
     if (q.bp) pod.blueprint = q.bp;
     if (q.reveal) {
       S.flags.mapRevealed = true;
-      log('InSight\'s data came with NASA\'s full survey map. Every landmark, revealed. [M]', 'nasa');
+      log('InSight\'s data came with NASA\'s full survey map. Every landmark, revealed: see the map.', 'nasa');
     }
     log(`Survey task complete: ${q.name}. NASA is sending a pod.`, 'nasa');
   }

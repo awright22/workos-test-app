@@ -134,12 +134,12 @@ export function showNewGame(o, back) {
 export function showBarsGuide(onDone) {
   const o2 = 'O<sub>2</sub>';
   const rows = [
-    ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains whenever you are outside, and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long the tank lasts at a walk: a run burns it faster, standing still slower. Empty, you start to die.`],
+    ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains outside and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long the tank lasts at a walk. Empty, you start to die.`],
     ['hab', `Hab ${o2}`, 'The air in the Hab. The oxygenator keeps it up while there is power; a breach lets it out.'],
     ['water', 'Water', 'Litres in the tank. You drink some every sol and the farm drinks more. Burning hydrazine makes it.'],
-    ['food', 'Food', 'Everything you could eat: rations, potatoes and the pantry. Breakfast takes one each dawn, and a second when there is something to go with it.'],
+    ['food', 'Food', 'Rations, potatoes and the pantry. Breakfast takes one each dawn, or two with something to go with it.'],
     ['power', 'Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night empty it.'],
-    ['vitals', 'Vitals', 'Your body. It falls when you go without air, water, food or sleep, and mends when you have them. At nothing, the run is over.'],
+    ['vitals', 'Vitals', 'Your body. It falls without air, water, food or sleep, and mends when you have them. At zero, the run is over.'],
     ['mood', 'Morale', 'Your spirits, out of 100. Variety on the plate, a cooked dinner, music, sights and comforts lift them; every sol alone lowers them. High, work goes a fifth faster; low, a fifth slower.'],
   ];
   // A sheet: the seven entries scroll between a fixed heading and a fixed foot, so "Got it" is on the screen at

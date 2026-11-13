@@ -135,8 +135,10 @@ function buildMarkers() {
 
 /** Marker and place-name labels, placed greedily so nothing overlaps. */
 function placeLabels(you, storms) {
-  const boxes = [];
+  const boxes = [], named = [];
   const free = (x, y, w, h) => { for (const b of boxes) if (x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1]) return false; return true; };
+  /** Not straight under or over another marker's label with less than a line between them (it read as that label's second line). */
+  const apart = (x, y, w, h) => { for (const b of named) if (x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] + h && y + h > b[1] - h) return false; return true; };
   const out = [];
   const r = 11 * U;
   // keep labels out from under the interface's own panels
@@ -164,10 +166,15 @@ function placeLabels(you, storms) {
     // (beside it, under it, over it, and then off each corner: on a small map a lander between two others went unnamed)
     const spots = [[m.x + r + 3 * U, m.y - h / 2], [m.x - r - 3 * U - w, m.y - h / 2], [m.x - w / 2, m.y + r + 2 * U], [m.x - w / 2, m.y - r - 2 * U - h],
       [m.x + r * 0.6, m.y - r - h - U], [m.x + r * 0.6, m.y + r + U], [m.x - r * 0.6 - w, m.y - r - h - U], [m.x - r * 0.6 - w, m.y + r + U]];
-    for (const [x, y] of spots) {
-      // (a label keeps inside the map: at an edge it goes to the marker's other side)
-      if ((x >= 2 && x + w <= W - 2 && free(x, y, w, h) && owned(x, y)) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
-    }
+    // (a label keeps inside the map: at an edge it goes to the marker's other side. The Hab and the objective are
+    //  always named: where no place is clear, beside the marker all the same; but only after the clear places have
+    //  been tried, or "HAB & 6 MORE" was written across the lander next to it.)
+    let at = spots.findIndex(([x, y], k) => x >= 2 && x + w <= W - 2 && free(x, y, w, h) && owned(x, y) && (k < 2 || apart(x, y, w, h)));
+    if (at < 0 && m.pri <= 2) at = 0;
+    if (at < 0) continue;
+    const [x, y] = spots[at];
+    boxes.push([x, y, w, h]); named.push([x, y, w, h]);
+    out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true });
   }
   // storm cells are named where there is room
   c.font = `600 ${Math.max(11, 11 * U)}px "Barlow Condensed", sans-serif`;
@@ -390,7 +397,7 @@ function showInfo(s) {
     `<dl><dt>Distance</dt><dd class="t-num">${fmtDist(dist)}</dd><dt>Bearing</dt><dd>${dist > 5 ? bearingText(absBearing(from, pos)) : '—'}</dd>` +
     `<dt>Position</dt><dd class="t-mono">${fmtLL(ll)}</dd></dl>${s.note ? `<p>${esc(s.note)}</p>` : ''}` +
     // a marker standing for several says what the others are
-    (others.length ? `<p class="grp"><b>Also here (+${grp.length - 1})</b> ${others.map((o) => esc(o.n > 1 ? `${o.n} × ${o.name}` : o.name)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
+    (others.length ? `<p class="grp"><b>Also here (${grp.length - 1})</b> ${others.map((o) => esc(o.n > 1 ? `${o.n} × ${o.name}` : o.name)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
   info.hidden = false;
   info.querySelector('.x').addEventListener('click', () => showInfo(null));
   request();
@@ -444,7 +451,8 @@ export function initMap(body) {
   statusBar = status;
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
   scaleEl = status.querySelector('.map-scale i'); scaleLbl = status.querySelector('.map-scale span');
-  const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); };
+  // (on a phone the key and a marker's card share the map: opening one puts the other away)
+  const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); if (on && layout.compact && selected) showInfo(null); };
   setLegend(false);                     // (closed until asked for: open, it covered a corner of the map)
 
   tools.addEventListener('click', (ev) => {

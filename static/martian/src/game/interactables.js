@@ -376,7 +376,7 @@ addI({
   pos: () => siteLocalToWorld(World.hab, -4.75, 0, 4.2, _v2),          // at the fabricator bench
   r: 2.4, hold: 0.5, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
-  label: () => 'Use the fabricator [C]',
+  label: () => (layout.touch ? 'Use the fabricator' : 'Use the fabricator [C]'),      // (a key's name is no use on a phone)
   use: () => toggleScreen('colony'),
 });
 // rover enter + exit + camp

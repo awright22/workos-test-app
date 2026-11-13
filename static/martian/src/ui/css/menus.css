@@ -225,17 +225,18 @@
 .mg-compact .stat { padding: .4375rem .5rem; gap: .1875rem; }
 .mg-compact .stat b { font-size: 1.125rem; }
 .mg-compact .stat span { font-size: .5625rem; }
-/* the rescue screen: the record of the run on the left, the numbers and the button on the right */
+/* the rescue screen: the record of the run on the left, the numbers on the right, his last entry across the foot
+   (down the left column it ran to five lines, and a phone held sideways had to scroll for the end of it) */
 #mg-overlay.k-win .dlg { width: 58rem; }
-#mg-overlay.k-win .dlg-bd { display: grid; grid-template-columns: 1fr 1fr; column-gap: 2.25rem; align-content: start; }
+#mg-overlay.k-win .dlg-bd { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto 1fr auto; column-gap: 2.25rem; align-content: start; }
 #mg-overlay.k-win .dlg-bd > * { grid-column: 1; }
 #mg-overlay.k-win .dlg-bd > .more-cue { grid-column: 1 / -1; }
 #mg-overlay.k-win .dlg .t-kicker { grid-column: 1 / -1; grid-row: 1; }
 #mg-overlay.k-win .dlg h1 { grid-row: 2; }
 #mg-overlay.k-win .dlg h2 { grid-row: 3; }
 #mg-overlay.k-win .dlg .steps { grid-row: 4; }
-#mg-overlay.k-win .dlg blockquote { grid-row: 5; }
-#mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 2 / span 4; margin-top: 0; align-self: start; }
+#mg-overlay.k-win .dlg blockquote { grid-column: 1 / -1; grid-row: 5; }
+#mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 2 / span 3; margin-top: 0; align-self: start; }
 #mg-overlay.k-win .dlg .btns { justify-content: flex-end; }
 .mg-compact #mg-overlay.k-win .dlg { width: 42rem; }
 .mg-compact #mg-overlay.k-win .dlg-bd { grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; }

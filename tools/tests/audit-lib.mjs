@@ -15,9 +15,11 @@ export function auditInPage(safe) {
   const styleOf = (n) => getComputedStyle(n);
   /** Shown at all: not display:none, hidden or transparent anywhere up the tree, and with a box. */
   const shown = (n) => {
+    // (visibility is inherited and a child can turn it back on: the thing's own computed value is the truth)
+    if (styleOf(n).visibility === 'hidden') return false;
     for (let a = n; a && a !== document.body; a = a.parentElement) {
       const cs = styleOf(a);
-      if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false;
+      if (cs.display === 'none' || +cs.opacity < 0.05) return false;
     }
     const r = n.getBoundingClientRect();
     return r.width > 1 && r.height > 1;
@@ -196,7 +198,7 @@ export function auditInPage(safe) {
   // ---- a scrolling region with more below says so (the "More" cue), and one that is at its end does not
   for (const n of root.querySelectorAll('.mg-scroll')) {
     if (!shown(n)) continue;
-    const below = n.scrollHeight - n.clientHeight - n.scrollTop > 6;
+    const below = n.scrollHeight - n.clientHeight - n.scrollTop > 12;
     const cue = n.querySelector(':scope > .more-cue');
     const cueShown = !!cue && getComputedStyle(cue).visibility === 'visible';
     if (below && !cueShown) out.clipped.push(`scrolls with nothing to say so: ${name(n)}`);

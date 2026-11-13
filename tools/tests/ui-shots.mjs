@@ -167,7 +167,10 @@ export async function walk(size, o = {}) {
   // (only the air is forced low here: forcing the vitals down too showed them "rising" beside a critical tank)
   await ev((G) => { G.S.suit = 8; G.tick(0.05, 40); });
   await shot('hud-oxygen-critical');
-  await ui((U, G) => { U.setSetting('colorBlind', true); G.S.water = 9; G.S.power = 18; G.tick(0.05, 3); });
+  // two gauges low, in the ordinary colours and then in the colour-blind-safe ones
+  await ev((G) => { G.S.water = 9; G.S.power = 18; G.tick(0.05, 3); });
+  await shot('hud-gauges-low', 300, 'b');
+  await ui((U, G) => { U.setSetting('colorBlind', true); G.tick(0.05, 3); });
   await shot('hud-colour-blind-safe', 300);
   await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; });
   // the most the HUD ever carries: two banners, a toast, a long line in the log and a critical tank
