@@ -70,13 +70,18 @@ function pickQuality() {
   return mobile ? 'medium' : 'high';
 }
 
+/** What the game was doing when it could not start: shown on the failure screen, so that a report from a phone says where. */
+let bootStage = 'starting';
 async function boot() {
   loading(0, 'Receiving orbital survey');
+  bootStage = 'starting the renderer';
   const engine = ctx.engine = new Engine(root, pickQuality());
   ctx.world = new THREE.Group();
   ctx.world.name = 'world';
   engine.scene.add(ctx.world);
+  bootStage = 'loading the planet';
   const data = await loadPlanet(loading, { maxColorFace: engine.q.scale < 0.7 ? 512 : 1024 });
+  bootStage = 'building the terrain';
   ctx.planet = data.planet;
   const material = makeTerrainMaterial(data.albedoCube, { fine: engine.q.fine, anisotropy: Math.min(engine.q.scale < 0.7 ? 4 : 8, engine.renderer.capabilities.getMaxAnisotropy()) });
   ctx.terrainMaterial = material;
@@ -99,9 +104,11 @@ async function boot() {
   mapImg.onload = () => { ctx.mapImage = mapImg; };
   mapImg.src = asset('assets/mars/map.jpg');
 
+  bootStage = 'loading the models';
   await preloadModels(['astronaut', 'rover', 'hab', 'mav', 'hermes', 'farm_plot', 'solar_panel', 'uplink_dish',
     'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'insight', 'msl', 'm2020', 'ingenuity', 'crop_radish', 'crop_lettuce', 'crop_soy', 'crop_tomato', 'hab_comforts', 'zhurong', 'schiaparelli_wreck',
     'greenhouse', 'solar_kit', 'beacon', 'o2_cache', 'supply_pod', 'rtg', 'debris_a', 'debris_b', 'debris_c', 'regolith_pile', 'ice_outcrop', 'uplink_pad'], (f) => loading(0.9 + f * 0.1, 'Unpacking equipment'));
+  bootStage = 'setting up the game';
   buildAstronaut();
   initInput();
   initPhotoUi(() => draw(0, lastFocus));
@@ -111,7 +118,9 @@ async function boot() {
   // title: the camera drifts over the day side while the first tiles arrive
   titleCamera(0);
   loading(1, 'Building terrain');
+  bootStage = 'drawing the first ground';
   await ctx.terrain.settle(engine.camera.position, 15000);
+  bootStage = 'showing the title';
   showStart();
   lastT = perf();
   requestAnimationFrame(frame);
@@ -418,6 +427,6 @@ async function reloadFresh() {
 boot().catch((e) => {
   console.error(e);
   window.__MG_FAILED = String(e && e.message || e);       // (the tests wait on this, to fail at once with the reason)
-  showOverlay({ kind: 'error', title: 'Something broke', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload to try again with a fresh copy of the game. Your saved game is kept.`,
+  showOverlay({ kind: 'error', title: 'Something broke', body: `The game could not start (it was ${bootStage}).\n\n${String(e && e.message || e)}\n\nReload to try again with a fresh copy of the game. Your saved game is kept.`,
     buttons: [{ label: 'Reload', keep: true, fn: () => { reloadFresh(); } }] });
 });
