@@ -196,7 +196,7 @@ function rockMaterial(uniforms, atlas, detail) {
         // Bare stone under whatever rind and film of dust it wears: the thinner, the darker and greyer. Each face has
         // its own, each bed of a layered rock, a fresh break least; and it comes and goes in stains.
         float film = clamp(rockTone * (1.0 + (rockB.g - 0.5) * 0.7) + (rockB.g - 0.5) * 0.3 - rockB.b * 0.16 + (rockStain - 0.5) * 0.36, 0.0, 1.0);
-        vec3 stone = mix(vec3(gl), rockDust, 0.46) * mix(0.40, 0.70, film);
+        vec3 stone = mix(vec3(gl), rockDust, 0.46) * mix(0.50, 0.80, film);
         // (on a lava field it is the flow's own rock: clinker and blocks of it, a shade paler than the flow's back)
         stone = mix(stone, mix(rockDust * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.062, 0.060), 0.72) * mix(0.95, 1.6, film), lava);
         stone = mix(stone, vec3(0.20, 0.19, 0.20), rockIcy * 0.8) * (1.0 - 0.3 * rockPits);
@@ -207,18 +207,20 @@ function rockMaterial(uniforms, atlas, detail) {
         // Where the land is bright the dust is deep and the rocks wear more of it; on dark sand the wind keeps them
         // barer, and on bare lava there is little to settle.
         float dusty = mix(-0.08, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - lava * 0.22 + (rockTone - 0.45) * 0.3;
-        float dust = smoothstep(0.36, 0.74, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rg1.a - 0.5) * 0.32 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
+        float dust = smoothstep(0.30, 0.68, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
         // and it is banked against the foot of the rock, in the colour of the ground there, so that rock and ground meet without a line
         float skirt = 1.0 - smoothstep(0.0, 0.05 + 0.1 * fract(vRockI.z * 7.9), rockHigh + (rg1.a - 0.5) * 0.08);
         vec3 rockLies = mix(mix(rockDust, rockGround, lava * 0.7), rockGround, skirt);
         dust = max(dust, skirt * 0.9);
         vec3 rockCol = mix(stone, rockLies, dust) * (1.0 + (rg1.a - 0.5) * 0.24 + (rgm.a - 0.5) * 0.3 + (rg2.a - 0.5) * 0.3);
         // creases are shaded by what stands round them, and the foot of the rock by the ground
-        float rockAo = mix(0.55, 1.0, smoothstep(0.12, 0.46, rockB.r)) * mix(0.62, 1.0, smoothstep(-0.02, 0.2, rockHigh));
+        float rockAo = mix(0.6, 1.0, smoothstep(0.12, 0.46, rockB.r)) * mix(0.72, 1.0, smoothstep(-0.02, 0.2, rockHigh));
         diffuseColor.rgb = rockCol * rockAo;`)
-      // stone scatters light; it has no sheen at grazing angles (as the ground has none)
+      // Dusty stone scatters light: it has no sheen. (With a quarter of a smooth surface's left to it, every rock
+      // mirrored the sky along its outline, where it is seen edge-on: a pale hairline round a boulder's foot against
+      // its own shadow, and a pale edge to every rock on a skyline.)
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
-        material.specularColor *= 0.25; material.specularColorBlended *= 0.25; material.specularF90 *= 0.25;`)
+        material.specularColor *= 0.03; material.specularColorBlended *= 0.03; material.specularF90 *= 0.03;`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         normal = normalize(vRockRot * rockN);`);
   };
@@ -435,14 +437,14 @@ class RockShade {
  * that starts inside the rock, a hand or two up its flank, follows the rock's own outline at the
  * ground (read from the shape atlas), and runs out and down to nothing, longest downwind. It is
  * lit and shadowed as the ground is, a little darker close under the rock, and fades out at its
- * edge so that it need not match the ground's ripples there. One draw call, sixty-four triangles a rock.
+ * edge so that it need not match the ground's ripples there. One draw call, a hundred and twenty triangles a rock.
  */
-const DRIFT_SEG = 16;
+const DRIFT_SEG = 20, DRIFT_RINGS = 4;
 class RockDrift {
   constructor(parent, uniforms, atlas, cap) {
     const pos = [], idx = [];
-    for (let ring = 0; ring < 3; ring++) for (let s = 0; s < DRIFT_SEG; s++) { const a = s / DRIFT_SEG * Math.PI * 2; pos.push(Math.cos(a), ring * 0.5, Math.sin(a)); }
-    for (let ring = 0; ring < 2; ring++) for (let s = 0; s < DRIFT_SEG; s++) {
+    for (let ring = 0; ring < DRIFT_RINGS; ring++) for (let s = 0; s < DRIFT_SEG; s++) { const a = s / DRIFT_SEG * Math.PI * 2; pos.push(Math.cos(a), ring, Math.sin(a)); }
+    for (let ring = 0; ring < DRIFT_RINGS - 1; ring++) for (let s = 0; s < DRIFT_SEG; s++) {
       const a = ring * DRIFT_SEG + s, b = ring * DRIFT_SEG + (s + 1) % DRIFT_SEG, c = a + DRIFT_SEG, e = b + DRIFT_SEG;
       idx.push(a, b, c, b, e, c);
     }
@@ -451,6 +453,7 @@ class RockDrift {
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((v, i) => (i % 3 === 1 ? 1 : 0)), 3));
     geo.setIndex(idx);
     this.cap = cap;
+    this.triangles = idx.length / 3;
     this.rock = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     this.drift = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);    // the lee, as a direction in the rock's own frame; how much dust
     this.rock.setUsage(THREE.DynamicDrawUsage); this.drift.setUsage(THREE.DynamicDrawUsage);
@@ -465,7 +468,7 @@ class RockDrift {
           uniform highp sampler2DArray uShapes;
           uniform vec4 uFeet;
           varying vec4 vDriftLies;
-          varying vec3 vDriftAt;                         // how far out along the drift (0 at the rock, 1 at its edge), how thick it is, how far in the lee
+          varying vec3 vDriftAt;                         // how far out along the drift (0 at the rock's foot, 1 at its edge; below 0 inside the rock), how much dust, how far in the lee
           varying vec3 vDriftPos;
           ${GLSL_SHAPE_UV}
           vec3 driftPos;`)
@@ -487,15 +490,19 @@ class RockDrift {
           float there = aRock.z < 0.0 || uFeet.w < 0.5 ? 1.0 : smoothstep(rad + 0.22, rad + 0.50, length(toFeet));
           float lee = max(0.0, dot(cs, aDrift.xy)), tail = lee * lee * lee;
           float amount = aDrift.z * there;
-          float L = amount * (0.26 + 0.9 * tail), H = amount * (0.12 + 0.07 * tail);
-          float t = position.y;                           // 0 inside the rock, a half out on the drift, 1 its edge
-          float outBy = t < 0.25 ? -0.22 : t < 0.75 ? 0.4 * L : L;
-          float high = t < 0.25 ? H * 1.3 : t < 0.75 ? H * 0.36 : -0.03;
+          // (its edge is ragged: no drift is a ring)
+          float bearing = atan(cs.y, cs.x), ragged = 1.0 + 0.26 * sin(bearing * 3.0 + abs(aRock.z) * 40.0) + 0.16 * sin(bearing * 7.0 + abs(aRock.z) * 91.0);
+          float L = amount * (0.34 + 1.0 * tail) * ragged, H = amount * (0.10 + 0.05 * tail);
+          // Four rings: one inside the rock above its foot, one at its foot, one half-way out, one at the edge,
+          // which stands a hair above the ground and is drawn as nothing: the drift fades out, it has no rim.
+          float ring = position.y;
+          float outBy = ring < 0.5 ? -0.24 : ring < 1.5 ? 0.0 : ring < 2.5 ? 0.46 * L : L;
+          float high = ring < 0.5 ? H * 1.3 : ring < 1.5 ? H * 0.82 : ring < 2.5 ? H * 0.24 : 0.004;
           driftPos = vec3(cs.x * (rho + outBy), g + high, cs.y * (rho + outBy));
-          // its slope, for the light: steep against the rock, easing out to level
-          float fall = t < 0.25 ? H * 0.94 / (0.22 + 0.4 * L) : t < 0.75 ? 0.5 * (H * 0.94 / (0.22 + 0.4 * L) + (H * 0.36 + 0.03) / max(0.6 * L, 0.01)) : 0.3 * (H * 0.36 + 0.03) / max(0.6 * L, 0.01);
+          // its slope, for the light: against the rock it falls away, at its edge it lies level with the ground
+          float fall = ring < 1.5 ? H * 0.58 / max(0.46 * L, 0.02) : ring < 2.5 ? 0.5 * (H * 0.58 / max(0.46 * L, 0.02) + H * 0.24 / max(0.54 * L, 0.02)) : 0.0;
           vec3 objectNormal = normalize(vec3(cs.x * fall, 1.0, cs.y * fall));
-          vDriftAt = vec3(t, amount, tail);
+          vDriftAt = vec3(ring < 0.5 ? -0.5 : ring < 1.5 ? 0.0 : ring < 2.5 ? 0.46 : 1.0, amount, tail);
           vDriftPos = driftPos * rockS;
           vDriftLies = vec4(normalize((modelMatrix * instanceMatrix)[3].xyz), floor(aRock.w) / 15.0);`)
         .replace('#include <begin_vertex>', 'vec3 transformed = driftPos;');
@@ -512,16 +519,16 @@ class RockDrift {
         .replace('#include <color_fragment>', `#include <color_fragment>
           rockLand(uAlbedo, vDriftLies, uHere);
           vec4 dg = texture(uGrain, vDriftPos * 1.3 + 0.41);
-          // drifted dust is the country's dust, finer and so a shade paler than the ground it lies on; shaded close under the rock
-          float inBy = 1.0 - smoothstep(0.0, 0.62, vDriftAt.x);
-          diffuseColor.rgb = mix(rockGround, rockDust, 0.35) * (1.03 + (dg.a - 0.5) * 0.16) * (1.0 - 0.3 * inBy * inBy);
-          diffuseColor.a = (1.0 - smoothstep(0.42, 0.97, vDriftAt.x + (dg.a - 0.5) * 0.22)) * smoothstep(0.02, 0.2, vDriftAt.y);`)
+          // drifted dust is the ground's own colour; close under the rock it is shaded by the rock
+          float inBy = 1.0 - smoothstep(-0.1, 0.5, vDriftAt.x);
+          diffuseColor.rgb = rockGround * (1.0 + (dg.a - 0.5) * 0.14) * (1.0 - 0.28 * inBy);
+          diffuseColor.a = (1.0 - smoothstep(0.28, 0.94, vDriftAt.x + (dg.a - 0.5) * 0.24)) * smoothstep(0.02, 0.2, vDriftAt.y);`)
         .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
-          material.specularColor *= 0.25; material.specularColorBlended *= 0.25; material.specularF90 *= 0.25;`)
+          material.specularColor *= 0.03; material.specularColorBlended *= 0.03; material.specularF90 *= 0.03;`)
         .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
-          normal = normalize(normal + mat3(viewMatrix) * ((dg.rgb - 0.5) * 0.35));`);
+          normal = normalize(normal + mat3(viewMatrix) * ((dg.rgb - 0.5) * 0.3));`);
     };
-    mat.customProgramCacheKey = () => 'rock-drift-1';
+    mat.customProgramCacheKey = () => 'rock-drift-2';
     const m = this.mesh = new THREE.InstancedMesh(geo, mat, cap);
     m.castShadow = false; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; m.renderOrder = -1;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -685,7 +692,7 @@ export class RockField {
       // The stone's tone, 0 swept bare and dark to 1 under a pale rind of weathering and dust. Most wear something;
       // the wind has swept some bare, broken basalt more often than the rest. (Neighbours differ: that is what
       // makes a field of them read as many rocks and not as one rock many times.)
-      const bare = fr(rnd * 11.3) < (cls === ROCK_ANGULAR ? 0.34 : cls === ROCK_SLAB ? 0.12 : 0.22);
+      const bare = fr(rnd * 11.3) < (cls === ROCK_ANGULAR ? 0.26 : cls === ROCK_SLAB ? 0.1 : 0.16);
       const tone = bare ? 0.03 + 0.3 * fr(rnd * 3.7) : 0.38 + 0.62 * fr(rnd * 3.7);
       // (below zero, the seed says the rock is never trodden in: a boulder, or a plate in the ground)
       inst[j + 12] = shape * 2; inst[j + 13] = ground; inst[j + 14] = big ? -Math.max(rnd, 1e-4) : rnd; inst[j + 15] = Math.round(lava * 15) + tone * 0.98;
@@ -710,10 +717,9 @@ export class RockField {
     this.shade.light();
     // Which ball a rock is drawn with depends on how near it is, so the lists are refilled every few steps (it is cheap:
     // what is slow about a rock was worked out when its chunk arrived).
-    const refill = this.dirty || camPos.distanceToSquared(this.lastCam) >= 3 * 3;
+    const refill = this.dirty || camPos.distanceToSquared(this.lastCam) >= 1.6 * 1.6;
     // instance matrices are stored relative to an anchor near the camera, to stay float32-exact
-    if (refill) { this.anchor.copy(camPos); this.gravel.at[0] = NaN; }
-    this.gravel.update(camPos, this.anchor);
+    if (refill) this.anchor.copy(camPos);
     // where his boots are, for the stones under them (on foot only: the rover's wheels ride over what they meet)
     const feet = this.uniforms.uFeet.value, onFoot = S.started && S.mode === 'walk';
     feet.set(player.pos.x - this.anchor.x, player.pos.y - this.anchor.y, player.pos.z - this.anchor.z, onFoot ? 1 : 0);
@@ -764,6 +770,9 @@ export class RockField {
         for (const c of set.colliders) if (Math.hypot(c.x - ax, c.y - ay, c.z - az) < 140) rockColliders.push(c);
       } else nSmall += drawn;
     }
+    // the pebbles round the camera: those at his feet with the stones (a ball of eighty triangles, the whole
+    // material, a shadow), the rest as specks of twenty
+    this.gravel.fill(camPos, this.anchor, lods[1].lod, shadowRange > 0);
     for (const l of lods) l.lod.end();
     shade.end(); drift.end();
     this.counts = { big: nBig, near: lods[3].lod.n + (lods[4] ? lods[4].lod.n : 0), small: nSmall, colliders: rockColliders.length, lods: lods.map((l) => l.lod.n), casters: lods.map((l) => l.lod.casters),
@@ -790,6 +799,7 @@ class GravelField {
     this.cap = o.cap || 2600;
     this.cells = new Map();                  // key -> Float64Array of pebbles: x, y, z, normal xyz, size, rnd
     this.at = [NaN, NaN, NaN];
+    this.close = 0;                          // how many pebbles were near enough last time to be drawn as stones
     this.lod = new RockLod(parent, material, depth, 1, this.cap, false, atlas);
   }
 
@@ -830,29 +840,40 @@ class GravelField {
     return k === out.length ? out : out.subarray(0, k);
   }
 
-  /** `anchor`: the point the rocks' meshes are drawn from; the pebbles are drawn from it too, so that one place for
-   *  his boots serves them all. */
-  update(camPos, anchor) {
+  /**
+   * Draw the pebbles round the camera. Called whenever the rocks' own lists are refilled.
+   * @param anchor  the point the rocks' meshes are drawn from; the pebbles are drawn from it too, so that one
+   *   place for his boots serves them all
+   * @param {RockLod} near  the mesh the pebbles nearest the camera go into (the rest go into the gravel's own)
+   * @param {boolean} cast  whether those near ones cast shadows
+   */
+  fill(camPos, anchor, near, cast) {
     const len = camPos.length(), lod = this.lod;
-    if (len - R > 400) { if (lod.n) { lod.begin(); lod.end(); this.cells.clear(); } this.at[0] = NaN; return; }
-    dirToFace(camPos.x / len, camPos.y / len, camPos.z / len, _fc);
-    const face = _fc[0], ci0 = Math.floor(_fc[1] * FACE_M / CELL), cj0 = Math.floor(_fc[2] * FACE_M / CELL);
-    if (face === this.at[0] && ci0 === this.at[1] && cj0 === this.at[2]) return;
-    this.at[0] = face; this.at[1] = ci0; this.at[2] = cj0;
-    const span = Math.ceil(this.reach / CELL), keep = new Set();
-    for (let dj = -span; dj <= span; dj++) for (let di = -span; di <= span; di++) {
-      if (di * di + dj * dj > span * span) continue;
-      const key = face + ':' + (ci0 + di) + ':' + (cj0 + dj);
-      keep.add(key);
-      if (!this.cells.has(key)) this.cells.set(key, this._cell(face, ci0 + di, cj0 + dj));
-    }
-    for (const key of this.cells.keys()) if (!keep.has(key)) this.cells.delete(key);
     lod.mesh.position.copy(anchor);
     lod.begin();
+    if (len - R > 400) { this.cells.clear(); this.at[0] = NaN; lod.end(); return; }
+    dirToFace(camPos.x / len, camPos.y / len, camPos.z / len, _fc);
+    const face = _fc[0], ci0 = Math.floor(_fc[1] * FACE_M / CELL), cj0 = Math.floor(_fc[2] * FACE_M / CELL);
+    if (face !== this.at[0] || ci0 !== this.at[1] || cj0 !== this.at[2]) {
+      this.at[0] = face; this.at[1] = ci0; this.at[2] = cj0;
+      const span = Math.ceil(this.reach / CELL), keep = new Set();
+      for (let dj = -span; dj <= span; dj++) for (let di = -span; di <= span; di++) {
+        if (di * di + dj * dj > span * span) continue;
+        const key = face + ':' + (ci0 + di) + ':' + (cj0 + dj);
+        keep.add(key);
+        if (!this.cells.has(key)) this.cells.set(key, this._cell(face, ci0 + di, cj0 + dj));
+      }
+      for (const key of this.cells.keys()) if (!keep.has(key)) this.cells.delete(key);
+    }
     const shapes = this.atlas.shapes, list = this.atlas.classes[ROCK_COBBLE];
+    let close = 0;
     for (const d of this.cells.values()) {
-      for (let i = 0; i < d.length && !lod.full; i += 9) {
+      for (let i = 0; i < d.length; i += 9) {
         const size = d[i + 6], rnd = d[i + 7];
+        // (how large it is on the screen: a pebble the size of a fist within three or four metres is seen as a stone is)
+        const seen = size / Math.max(0.5, Math.hypot(d[i] - camPos.x, d[i + 1] - camPos.y, d[i + 2] - camPos.z));
+        const isNear = seen > 0.016 && close < 260 && !near.full;
+        if (!isNear && lod.full) continue;
         const shape = list[Math.floor(fr(rnd * 61.7) * list.length)], sh = shapes[shape];
         const sy = size * (0.8 + fr(rnd * 13) * 0.4), bury = fr(rnd * 23);
         _s.set(size * (0.85 + fr(rnd * 7) * 0.35), sy, size * (0.85 + fr(rnd * 29) * 0.35));
@@ -864,9 +885,11 @@ class GravelField {
         _q2.multiply(_q.setFromAxisAngle(_ax, (fr(rnd * 3.3) - 0.5) * 0.5));
         _m.compose(_p.set(d[i] - anchor.x - _up.x * ground, d[i + 1] - anchor.y - _up.y * ground, d[i + 2] - anchor.z - _up.z * ground), _q2, _s);
         // (pebbles are darker than the sand they lie on: what is pale and fine has blown away from them)
-        lod.add(shape * 2, ground, rnd, Math.round(d[i + 8] * 15) + (0.05 + fr(rnd * 3.7) * 0.6) * 0.98, false);
+        const tone = Math.round(d[i + 8] * 15) + (0.05 + fr(rnd * 3.7) * 0.6) * 0.98;
+        if (isNear) { near.add(shape * 2, ground, rnd, tone, cast); close++; } else lod.add(shape * 2, ground, rnd, tone, false);
       }
     }
+    this.close = close;
     lod.end();
   }
 }

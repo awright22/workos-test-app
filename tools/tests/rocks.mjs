@@ -125,7 +125,7 @@ const survey = (reach) => g.eval((G, reach) => {
     }
   }
   out.counts = rocks.counts;
-  out.gravel = rocks.gravel.lod.n;
+  out.gravel = rocks.gravel.lod.n + rocks.gravel.close;
   out.colliders = G.rockColliders.map((c) => +c.r.toFixed(2));
   out.calls = [...rocks.lods.map((l) => l.lod.mesh), rocks.gravel.lod.mesh, rocks.shade.mesh, rocks.drift.mesh].filter((m) => m.visible && (m.isInstancedMesh ? m.count : m.geometry.instanceCount) > 0).length;
   // his boots: the shader treads in whatever lies within a boot's reach of this point (given from the rocks' anchor)

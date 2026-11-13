@@ -1,8 +1,9 @@
 // Close-ups for work on the rocks: runs a plan of steps in one game and takes a picture after each named one.
 //   node tools/tests/rock-look.mjs plan.mjs [--phone] [--quality medium] [--out dir] [--only a,b]
-// A plan is a module whose default export is a list of steps, { name?, run: (G, lib) => ... }. `run` is sent to
-// the page and called there with the debug hook (window.__MG); a step with no name takes no picture. Whatever a
-// step returns is printed. Pictures go to tools/tests/.cache/rock-look/ unless --out says otherwise.
+// A plan is a module whose default export is a list of steps, { name?, play?, run: (G) => ... }. `run` is sent to
+// the page and called there with the debug hook (window.__MG); a step with no name takes no picture (with `play` the
+// game is still let run for a moment after it, as it is before a picture: boulders load and colliders settle).
+// Whatever a step returns is printed. Pictures go to tools/tests/.cache/rock-look/ unless --out says otherwise.
 // (The standing pictures are tests/shots.mjs; this is for looking closely at one rock from where you choose.)
 import { openGame, sleep, outDir } from './lib.mjs';
 import { mkdir } from 'node:fs/promises';
@@ -41,17 +42,27 @@ await g.page.evaluate(() => {
       }
       return out.sort((a, b) => b.size - a.size);
     },
+    /** Put the free camera where a camera was: its position and quaternion (as arrays), from another run's print-out. */
+    pose(cam, quat) {
+      const T = G.player.pos.clone().set(0, 0, -1).applyQuaternion(G.ctx.engine.camera.quaternion.clone().set(quat[0], quat[1], quat[2], quat[3])).multiplyScalar(20);
+      const c = T.clone().set(cam[0], cam[1], cam[2]); T.add(c);
+      const up = T.clone().normalize(), e = up.clone().set(-up.z, 0, up.x).normalize(), n = up.clone().cross(e), cu = c.clone().normalize();
+      const R = up.length() * G.surfaceAt(up), dn = cu.clone().sub(up).dot(n) * R, de = cu.clone().sub(up).dot(e) * R;
+      G.photo(T, Math.hypot(dn, de), Math.atan2(de, dn) * 180 / Math.PI, c.length() - G.surfaceAt(cu), T.length() - G.surfaceAt(up));
+    },
     list(reach = 30, n = 12) { return this.near(reach).slice(0, n).map((r) => `${r.kind} ${r.size} m, class ${r.cls}, ${r.dist} m off at ${r.bearing} deg`); },
   };
 });
 for (const step of plan) {
   if (step.name && only.length && !only.includes(step.name)) continue;
+  if (step.name || step.play) await g.eval((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });      // nobody suffocates mid-shoot
   const r = await g.eval(step.run, step.arg);
   if (r !== undefined && r !== null) console.log(step.name || '-', JSON.stringify(r));
-  if (!step.name) continue;
+  if (!step.name && !step.play) continue;
   await g.eval((G) => { G.paused = false; });
   await sleep(700);
   await g.eval((G) => { G.paused = true; });
+  if (!step.name) continue;
   await sleep(900);
   await g.page.screenshot({ path: path.join(dir, `${step.name}.png`), timeout: 420000 });
   console.log('  shot', path.join(dir, `${step.name}.png`));
