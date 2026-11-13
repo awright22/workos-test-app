@@ -7,7 +7,7 @@ const results = [];
 const check = (name, ok, detail) => { results.push({ name, ok: !!ok, detail }); console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); };
 const ev = (fn, arg) => g.eval(fn, arg);
 const page = g.page;
-const click = async (text) => { await g.page.locator('#mg-panel button', { hasText: text }).first().click({ timeout: 20000 }); };
+const click = async (text) => { await g.page.locator('#mg-panel button', { hasText: text }).first().click({ timeout: 90000 }); };      // (a dialog still rising at a frame a second on a loaded machine is not "stable" for a long while)
 
 await ev(async (G) => { await G.start(2.0, 303.7); G.paused = true; });
 let s = await ev((G) => ({ cold: G.S.flags.coldOpen, suit: G.S.suit, sol: G.S.sol, habDist: G.groundDist(G.player.pos, G.World.hab.position) }));
@@ -107,7 +107,7 @@ check('NASA conversation offers survey quests and a care package', s.quests === 
 
 s = await ev((G) => { G.S.inv.scrap = 10; G.S.inv.regolith = 2; G.tpLocal(-3.4, 3.2); return { inside: G.S.inside }; });
 await g.page.keyboard.press('c');
-await g.page.locator('button[data-r="candle"]').click({ timeout: 20000 });
+await g.page.locator('button[data-r="candle"]').click({ timeout: 90000 });
 await g.page.keyboard.press('c');
 s = await ev((G) => ({ candle: G.S.inv.candle, scrap: G.S.inv.scrap, crafted: G.S.stats.crafted }));
 check('fabricating an O2 candle at the bench', s.candle === 1 && s.scrap === 8 && s.crafted === 1, s);
@@ -140,7 +140,7 @@ s = await ev((G) => {
   return { inside: G.S.inside };
 });
 await g.page.keyboard.press('c');
-await g.page.locator('.pane.on [data-deploy="beacon"]').click({ timeout: 20000 });
+await g.page.locator('.pane.on [data-deploy="beacon"]').click({ timeout: 90000 });
 s = await ev((G) => { G.tick(0.05, 2); G.hold(1.8); return { built: G.World.builtMeshes.map((b) => b.kind), kit: G.S.inv.kitBeacon }; });
 check('deploying a nav beacon', s.built.length === 1 && s.built[0] === 'beacon' && s.kit === 0, s);
 

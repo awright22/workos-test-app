@@ -172,7 +172,9 @@ export async function walk(size, o = {}) {
   await shot('hud-gauges-low', 300, 'b');
   await ui((U, G) => { U.setSetting('colorBlind', true); G.tick(0.05, 3); });
   await shot('hud-colour-blind-safe', 300);
-  await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; });
+  // (the two gauges are put back by hand, which the game takes for a refill and marks with an up arrow for five
+  //  seconds, as it should: those seconds are let pass, or the next picture showed power "rising" in a dust storm)
+  await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; G.tick(0.05, 120); });
   // the most the HUD ever carries: two banners, a toast, a long line in the log and a critical tank
   await ev((G) => { window.__keep = JSON.stringify(G.S.breach); G.setStorm(0.9); G.S.suit = 9; G.S.breach.active = true; G.tick(0.05, 6); });
   await toastsDone();
