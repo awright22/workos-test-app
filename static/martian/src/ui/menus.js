@@ -100,11 +100,11 @@ export function showNewGame(o, back) {
     const pips = [0, 1, 2].map((n) => `<i${n <= i ? ' class="on"' : ''}></i>`).join('');
     // (how fast air, water and power are used, against the rated pace: "go 13% sooner" read as a mistake)
     // ("Consumption: as rated" asked a new player what was consumed, and rated by whom)
-    const drain = d.drain < 0.995 ? `${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `${Math.round((d.drain - 1) * 100)}% faster` : 'Normal';
+    const drain = d.drain < 0.995 ? `Drain ${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `Drain ${Math.round((d.drain - 1) * 100)}% faster` : 'Normal drain';
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      `<dl><dt>Rescue on</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies drain</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
+      `<dl><dt>Rescue on</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
@@ -152,7 +152,7 @@ export function showBarsGuide(onDone) {
   // every size. (As a plain dialog it was taller than a phone, and its one button was below the fold.)
   const done = () => { hideOverlay(); if (onDone) onDone(); };
   const p = openOverlay('sheet',
-    '<div class="sheet wide"><header class="sheet-hd"><div><span class="t-kicker">Guide</span><h1 id="mg-dlg-title">What the bars mean</h1></div></header>' +
+    '<div class="sheet wide"><header class="sheet-hd"><h1 id="mg-dlg-title">Guide: what the bars mean</h1></header>' +
     `<div class="sheet-bd mg-scroll"><ul class="guide">${rows.map(([ic, name, lead, text]) => `<li>${icon(ic)}<b>${name}</b><span><em>${lead}</em> ${text}</span></li>`).join('')}</ul></div>` +
     `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Got it</button></footer></div>`,
     { label: 'Guide: what the bars mean', onEscape: done, guard: true });
@@ -214,13 +214,15 @@ function seg(id, label, options, value) {
     options.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === value}" tabindex="${v === value ? 0 : -1}" data-v="${v}">${l}</button>`).join('') + '</div>';
 }
 /**
- * A slider. `mark` is a value to notch on its track: 100% on a scale that runs from under it to well over it. (With
- * no notch, "100%" a third of the way along looked like a handle out of place.)
+ * A slider. `mark` is given for a scale that does not run evenly either side of its usual value (80% to 140%, about
+ * 100%): the two ends of such a scale are lettered, and where the usual value lies is notched on the track. (With
+ * neither, a handle standing at "100%" a third of the way along looked like a handle out of place.)
  */
 function range(id, label, min, max, step, value, fmt, mark) {
-  const at = (v) => ((v - min) / (max - min) * 100).toFixed(1);
-  return `<span class="mg-rangewrap"${mark !== undefined ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
-    `style="--fill:${at(value)}%"></span><output for="set-${id}">${fmt(value)}</output>`;
+  const at = (v) => ((v - min) / (max - min) * 100).toFixed(1), ends = mark !== undefined;
+  return (ends ? `<span class="range-end">${fmt(min)}</span>` : '') +
+    `<span class="mg-rangewrap"${ends ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
+    `style="--fill:${at(value)}%"></span>` + (ends ? `<span class="range-end">${fmt(max)}</span>` : '') + `<output for="set-${id}">${fmt(value)}</output>`;
 }
 function sw(id, label, onNow) {
   return `<button type="button" class="mg-switch" role="switch" aria-checked="${!!onNow}" aria-label="${label}" data-switch="${id}"></button>`;
@@ -313,7 +315,7 @@ export function showSettings(back, overTitle) {
     });
   });
   p.querySelectorAll('[data-range]').forEach((r) => {
-    const out = r.parentNode.nextElementSibling;
+    const out = r.closest('.ctl').querySelector('output');
     const key = r.dataset.range;
     const show = () => {
       r.style.setProperty('--fill', ((r.value - r.min) / (r.max - r.min) * 100).toFixed(1) + '%');

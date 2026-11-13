@@ -445,6 +445,7 @@
    text it labelled; and 13 px for the condensed face in lower case, which is narrow and small on its body. The name
    --t11 is kept for the rules that use it: what they set is now 12 px.) */
 .mg-compact { --t11: max(.75rem, 12px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); --tcap: max(.875rem, 14px); }
+#mg-root:not(.mg-compact) { --tcap: max(.8125rem, 13px); }
 .mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
 .mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
 .mg-compact .suit .st { font-size: var(--t13); }
@@ -722,3 +723,11 @@
 
 /* photo mode: the way out is the first of its buttons, at the left, as on every sheet */
 .ph-btns [data-act="done"] { order: -1; }
+
+/* capitals at 14 px on a phone: the labels that are set outside the section that lists the rest */
+.mg-compact .suit .cap, .mg-compact .suit .st, .mg-touch.mg-compact .suit .help { font-size: var(--tcap); }
+.mg-compact #mg-objectives .obj.primary .pl, .mg-compact #mg-objectives .obj.urgent.first .pl, .mg-compact #mg-objectives .obj .nx b { font-size: var(--tcap); }
+.mg-compact #mg-clock .sol .of:not(:empty) { font-size: var(--tcap); }
+
+/* (an arrowhead at the edge of the screen has no number, and no empty plate where one would be) */
+#mg-way b:empty { display: none; }

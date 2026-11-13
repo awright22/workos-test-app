@@ -204,7 +204,7 @@ export function objectiveThen(o, where) {
   return w && w.via === 'out' ? [placeOf(o) || 'Outside', fmtDist(w.on)] : null;
 }
 export const objDone = new Set();
-let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false;
+let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null;
 /** How long the reason under the first line stays open on a phone, in seconds of play, after it changes or is asked for. */
 const WHY_OPEN = 9;
 const objFrom = new THREE.Vector3();
@@ -415,7 +415,11 @@ export function updateObjectivesHud() {
   // (a jump in position, such as a checkpoint restored, does not wait for the list's next turn)
   // (or eighteen frames, whichever comes first: a game stepped by its debug hook runs many frames in no time at all, and a
   //  list rebuilt by the clock alone was left showing "get to air" beside a full tank in the pictures taken that way)
-  if (now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
+  // (or at once when what leads has changed: the marker and the compass follow the first task every frame, and for a
+  //  third of a second the card beside them named the task before: at nightfall the marker stood on the Hab's door
+  //  under a card that still said HEAP)
+  const lead = leadTask(), lk = lead ? lead.o.id : '';
+  if (lk !== objLead || now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objLead = lk; objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   for (const n of objNodes.values()) {
     let dist = '', place = n.place || '';
     let then = '';
@@ -649,8 +653,10 @@ export function updateCompass() {
   if (!cp.w) return;                                     // not laid out yet
   // what is out there changes slowly: refresh the list and the bearings a few times a second (or at once after a jump)
   // (or after a dozen frames, as with the mission list: a game stepped by its debug hook runs them in no time at all)
-  if (now - cp.listAt > 0.2 || (cp.calls = (cp.calls || 0) + 1) >= 12 || cp.from.distanceToSquared(pp) > 9) {
-    cp.listAt = now; cp.calls = 0; cp.from.copy(pp);
+  // (and at once when the mission's first task changes, or he goes in or out of the Hab: the strip names that task's place)
+  const lt = leadTask(), leadKey = (lt ? lt.o.id : '') + (S.inside ? '|in' : '');
+  if (leadKey !== cp.leadKey || now - cp.listAt > 0.2 || (cp.calls = (cp.calls || 0) + 1) >= 12 || cp.from.distanceToSquared(pp) > 9) {
+    cp.leadKey = leadKey; cp.listAt = now; cp.calls = 0; cp.from.copy(pp);
     cp.marks = compassTargets(pp);
     const seen = new Set();
     for (const m of cp.marks) {

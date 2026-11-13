@@ -452,7 +452,7 @@
 .chip.miss { border-color: rgba(255, 106, 92, .5); background: transparent; }
 /* (a page's first line of explanation is for the first visit: on a phone, once there is something on the page to see,
    the room is the cards') */
-.mg-compact .pane.on > .pane-note.first:not(:only-of-type) { display: none; }
+.mg-compact .pane.on > .pane-note.intro { display: none; }
 .pane-note.first { margin-top: 0; }
 .mg-compact .jr-body > .pane-note.first { margin-bottom: .5rem; }
 
@@ -465,3 +465,9 @@
 .mg-compact .map-legend { bottom: max(2rem, 32px); }
 .mg-touch.mg-compact .map-legend { left: 0; right: 0; bottom: max(2.75rem, 44px); border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
 .mg-compact .map-legend p { font-size: var(--t12); }
+
+/* capitals at 14 px on a phone, where they are set outside the section that lists the rest; and the condensed face
+   in lower case at 13 */
+.mg-compact .map-scale em, .mg-compact .map-scale span, .mg-compact .way b, .mg-compact .way strong { font-size: var(--tcap); }
+.mg-compact .chip, .mg-compact .card .prog, .mg-compact .inv-row .ct small, .mg-compact .stat-grid .stat b small, .mg-compact .map-info dd, .mg-compact .map-legend li, .mg-compact .card .dist { font-size: var(--t13); }
+.mg-compact .obj-list .obj .ds { font-size: var(--t13); }

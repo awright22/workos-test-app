@@ -266,6 +266,7 @@ function paragraphs(text) {
  * A plain dialog: title, text and buttons.
  * opts: { title, subtitle, kicker, body (HTML; line breaks kept), stats: [[label, value]...], extra (HTML, placed under the stats),
  *         later (a line set apart at the foot under the word LATER: where this is all going),
+ *         wide (a card with more to say is set wider, so that it stands whole on a phone held sideways),
  *         quote, kind: 'dialog' | 'death' | 'win' | 'error', buttons: [{ label, fn, ghost, keep, danger }] }
  * A button closes the dialog unless it has keep: true.
  */
@@ -278,7 +279,7 @@ export function showOverlay(opts) {
   // (the text is one part, which scrolls if it has to, and the buttons another, which is always on the screen: as one
   // scrolling box, the rescue screen on a small phone cut its last line and its only button)
   const panel = openOverlay(kind,
-    '<div class="dlg"><div class="dlg-bd mg-scroll">' +
+    `<div class="dlg${opts.wide ? ' wide' : ''}"><div class="dlg-bd mg-scroll">` +
     (opts.kicker ? `<div class="t-kicker">${opts.kicker}</div>` : '') +
     (opts.title ? `<h1 id="mg-dlg-title">${opts.title}</h1>` : '') +
     (opts.subtitle ? `<h2>${opts.subtitle}</h2>` : '') +

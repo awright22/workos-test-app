@@ -629,3 +629,20 @@
 .mg-compact #mg-overlay.k-title .menu { width: auto; max-width: 30rem; align-self: flex-start; }
 .mg-compact #mg-overlay.k-title .menu-item { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: .875rem; }
 .mg-compact #mg-overlay.k-title .menu-item .mi-s { white-space: nowrap; }
+
+/* capitals at 14 px on a phone, where they are set outside the section that lists the rest; and the condensed face
+   in lower case at 13 */
+.mg-compact .dlg-later b, .mg-compact .sleep .notes dt, .mg-compact .sleep .solbig span, .mg-compact .diff .go { font-size: var(--tcap); }
+.mg-compact .stat b small { font-size: var(--t13); }
+.range-end { font: 500 .8125rem/1 var(--f-cond); letter-spacing: .02em; color: var(--ink-3); }
+.mg-compact .range-end { font-size: var(--t13); color: var(--ink-2); }
+.set-row .ctl .range-end + .mg-rangewrap, .set-row .ctl .mg-rangewrap + .range-end { margin-left: -.25rem; }
+.mg-compact .set-row .ctl .range-end ~ output { min-width: 3rem; font-size: var(--t14); color: var(--ink); }
+
+/* A card with more to say (the numbers, with where it all leads) is the width of a phone held sideways, and its
+   name gives up its line there, so that all of it stands on the screen with its button. */
+.mg-compact .dlg.wide { width: 46rem; }
+.mg-compact .dlg.wide .t-kicker { display: none; }
+.mg-compact .dlg.wide .dlg-bd { padding-top: .75rem; }
+.mg-compact .dlg.wide .stats { margin-top: .5rem; }
+.mg-compact .dlg.wide .btns { padding-top: .5rem; padding-bottom: .625rem; }

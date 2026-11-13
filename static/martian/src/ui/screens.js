@@ -256,7 +256,7 @@ export function renderColony() {
     if (made) homeDone += card; else home += card;
   }
   home = `<div class="pane-hd">Home <span>${homeReady ? `${homeReady} ready · ` : ''}${madeN} of ${COMFORTS.length} made · morale +${halves(comfortCheer())} a sol</span></div>` +
-    '<p class="pane-note first">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
+    '<p class="pane-note intro">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');
 
   // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
