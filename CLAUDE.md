@@ -25,6 +25,17 @@ The owner's latest ask: "Get this to AAA quality." That means a game that looks,
 and holds together like a polished commercial release, on a desktop and on a phone. There is no
 deadline. Take the time to do it properly.
 
+Direction the owner has given since, in the owner's words:
+- The phone comes first. "Desktop is a bonus but I think this should be optimized for my iphone
+  (probably landscape?)". The iPhone held sideways is the machine the game is made for and judged
+  on. The desktop must keep working, and comes second.
+- Two modes. "you can either play through the books storyline" (Story mode: the game as it
+  stands, ending in rescue) or "build a base you start basically at the beginning of the book but
+  can build a whole mars base (lots more resources things to build etc)": "a build-a-base mode
+  where you never get rescued", "sorta like valheim-style game (but no enemies I guess)".
+- The order. "Finish the storyline mode first though." Base mode is not started until Story mode
+  meets its bar.
+
 ## What is yours
 This codebase is yours: what it's for and how it's built are your call, and you'll keep building
 on it. Within the five points above you have full authority over design, art direction, systems,

@@ -83,6 +83,11 @@ check('sleeping until dawn advances the sol; the night\'s account waits to be re
 
 s = await ev((G) => {
   G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8);
+  // (This checks the drive itself: speed, distance, drain. Whether a boulder stands in the rover's way depends on
+  // which stones have arrived by now, and that depends on how busy the machine is: on a quiet one a block 56 m
+  // out stopped the rover and failed the check, where on a busy one the stones had not come yet. So the boulders
+  // are lifted for this drive. That boulders are in the way and have colliders is checked in tests/rocks.mjs.)
+  G.rockColliders.length = 0;
   const mode1 = G.S.mode, p0 = G.S.roverPower;
   G.input.keys['w'] = true; G.tick(0.05, 160); G.input.keys['w'] = false;
   const out = { mode1, speed: +G.roverF.speed.toFixed(1), driven: Math.round(G.S.stats.driven), drained: +(p0 - G.S.roverPower).toFixed(2) };

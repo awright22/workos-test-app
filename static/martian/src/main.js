@@ -166,7 +166,11 @@ function draw(dt, focus) {
     tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;
     tu.uSpace.value = smoothstep(1500, 9000, high);
     tu.uRelief.value = 1 - 0.68 * smoothstep(2500, 12000, high);
+
   }
+  // the horizon line as this camera sees it: how far below level it lies, from the camera's height over the ground
+  // under it (the haze that lies along it is in the fog shader: see airHaze in the engine)
+  e.scene.fog.far = -Math.sqrt(2 * clamp(e.camera.position.length() - surfaceAt(e.camera.position), 0.5, 400) / e.camera.position.length());
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
@@ -396,8 +400,24 @@ function installDebug() {
 }
 
 initDiag(() => (ctx.engine ? { quality: ctx.engine.qualityName, ...ctx.engine.info() } : {}));
+/**
+ * Start again from the network. A build that cannot start may be sitting in this game's offline cache, and a plain
+ * reload would be handed the same files again: so the cache and its service worker go first. (Saves are not there:
+ * they are in the browser's local storage, and are not touched.)
+ */
+async function reloadFresh() {
+  try {
+    if (window.caches) await Promise.all((await caches.keys()).filter((k) => k.startsWith('stranded2-')).map((k) => caches.delete(k)));
+    if ('serviceWorker' in navigator) {
+      const here = new URL('.', location.href).href;
+      await Promise.all((await navigator.serviceWorker.getRegistrations()).filter((r) => r.scope === here).map((r) => r.unregister()));
+    }
+  } catch { /* private mode, or no service workers here: reload anyway */ }
+  location.reload();
+}
 boot().catch((e) => {
   console.error(e);
-  showOverlay({ kind: 'error', title: 'Something broke', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload the page to try again.`,
-    buttons: [{ label: 'Reload', keep: true, fn: () => location.reload() }] });
+  window.__MG_FAILED = String(e && e.message || e);       // (the tests wait on this, to fail at once with the reason)
+  showOverlay({ kind: 'error', title: 'Something broke', body: `The game could not start.\n\n${String(e && e.message || e)}\n\nReload to try again with a fresh copy of the game. Your saved game is kept.`,
+    buttons: [{ label: 'Reload', keep: true, fn: () => { reloadFresh(); } }] });
 });
