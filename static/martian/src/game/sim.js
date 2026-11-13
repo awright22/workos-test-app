@@ -412,7 +412,8 @@ export function sleepToDawn(inRover) {
   if (dawn) {
     notes.push(dawn.ate === 'skipped' ? 'No breakfast: there is nothing left to eat' : `Breakfast: ${dawn.ate} (−${dawn.took} food, ${foodTotal()} left)`);
     why.push(`another sol alone ${signed(dawn.alone)}`);
-    if (Math.round(dawn.meal)) why.push(`${dawn.ate === 'skipped' ? 'no breakfast' : 'breakfast'} ${signed(dawn.meal)}`);
+    // (what breakfast was, so that a loss has its reason: "breakfast −1" read as a mistake)
+    if (Math.round(dawn.meal)) why.push(`${dawn.ate === 'skipped' ? 'no breakfast' : dawn.meal > 0 ? 'variety at breakfast' : /ration/.test(dawn.ate) ? 'a plain ration for breakfast' : 'potato for breakfast again'} ${signed(dawn.meal)}`);
     if (dawn.sky) why.push(`no sky this morning ${signed(dawn.sky)}`);
     if (dawn.home) why.push(`home comforts ${signed(dawn.home)}`);
     if (Math.round(dawn.mail)) why.push(`word from home ${signed(dawn.mail)}`);
@@ -428,19 +429,27 @@ export function sleepToDawn(inRover) {
   { const meals = foodTotal(), wait = Math.max(0, S.rescueSol - S.sol);
     let coming = 0;
     for (const p of World.plots) if (p.state === 'growing' || p.state === 'ready') coming += (CROPS[p.crop] || CROPS.potato).yield;
+    // (What is in the ground counts toward the wait. Without it the gap grew with every bed planted, since a bed
+    //  takes a ration: "14 with nothing to eat" at the desk, then 15 the morning after doing as he was told.)
     const short = wait - meals, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
-    notes.push(short <= 0 ? `Food for ${sols(meals)}; the rescue is in ${wait}`
-      : `Food for ${sols(meals)}; the rescue is in ${wait}. ${sols(short)} with nothing to eat` +
-        (coming >= short ? `, unless the beds come in: they hold ${coming}` : coming > 0 ? `: the beds hold ${coming}, the farm must find ${short - coming} more` : ': the farm has to make them up')); }
+    // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
+    notes.push(short <= 0 ? `Food for ${sols(meals)}; the rescue is in ${wait}: enough`
+      : coming >= short ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: enough, if they come in`
+        : coming > 0 ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: ${sols(short - coming)} still with nothing to eat`
+          : `Food for ${sols(meals)}; the rescue is in ${wait}: ${sols(short)} with nothing to eat`); }
+  // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
+  // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
+  const later = rolled && S.sol === 2 && !S.pf.connected
+    ? `Find a radio and tell Earth you are alive. Then the Ares 4 rocket in Schiaparelli, ${fmtDist(groundDist(World.hab.position, World.mav.position))} away, by Sol ${S.rescueSol}` : '';
   if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
   const summary = {
-    sol: S.sol, notes, turned: rolled,
+    sol: S.sol, notes, turned: rolled, later,
     deltas: [
       { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
       { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
       { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
       { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: '', whole: true },
-      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', whole: true },
+      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '%', whole: true },
     ],
   };
   // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,

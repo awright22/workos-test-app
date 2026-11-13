@@ -1,6 +1,7 @@
 // The first ten minutes of a new player, on a phone, as a numbered sequence of screenshots.
 //
 //   node tools/tests/first-ten.mjs            iPhone landscape (844x390, notch and home bar simulated)
+//   node tools/tests/first-ten.mjs --small    the small phone (667x375, the same insets)
 //   node tools/tests/first-ten.mjs --desktop  1280x720 with a keyboard
 //
 // It starts a real new game from the title screen and takes each step of the opening in order
@@ -11,9 +12,10 @@
 import path from 'node:path';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { openGame, sleep, outDir } from './lib.mjs';
+import { settledInPage } from './audit-lib.mjs';
 
-const desktop = process.argv.includes('--desktop');
-const size = desktop ? { name: 'desktop-1280x720', w: 1280, h: 720 } : { name: 'phone-844x390', w: 844, h: 390, touch: true, safe: '0,47,21,47' };
+const desktop = process.argv.includes('--desktop'), small = process.argv.includes('--small');
+const size = desktop ? { name: 'desktop-1280x720', w: 1280, h: 720 } : small ? { name: 'phone-667x375', w: 667, h: 375, touch: true, safe: '0,47,21,47' } : { name: 'phone-844x390', w: 844, h: 390, touch: true, safe: '0,47,21,47' };
 const g = await openGame({ width: size.w, height: size.h, touch: size.touch, quality: 'low', query: size.safe ? 'safe=' + size.safe : '', noStart: true });
 const dir = path.join(outDir, 'first-ten', size.name);
 await rm(dir, { recursive: true, force: true });
@@ -24,6 +26,9 @@ let n = 0;
 const shot = async (name, what, wait = 900) => {
   await ev((G) => { G.paused = false; });
   await sleep(wait);
+  // (a picture is of a state at rest: this machine draws a frame a second, and a card that takes a quarter of a second
+  //  to arrive on a phone was photographed half-way there)
+  await page.waitForFunction(settledInPage, null, { timeout: 15000, polling: 100 }).catch(() => {});
   n++;
   const file = `${String(n).padStart(2, '0')}-${name}.png`;
   await page.screenshot({ path: path.join(dir, file) });

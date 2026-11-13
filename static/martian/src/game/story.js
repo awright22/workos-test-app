@@ -10,6 +10,7 @@ import { player } from './player.js';
 import { _v1, _v2 } from '../core/scratch.js';
 import { FEATURES } from '../planet/features.js';
 import { R } from '../planet/constants.js';
+import { discoveriesFound } from '../ui/screens.js';
 import { tryReload } from './flow.js';
 import { showComms } from '../ui/menus.js';
 // The story: Pathfinder and NASA, survey quests, discoveries, achievements, the launch.
@@ -130,7 +131,9 @@ export function discover(name, note, isLander) {
   S.discovered[name] = true;
   S.stats.discoveries++;
   Snd.discovery();
-  toast(isLander ? 'SITE DISCOVERED' : 'REGION DISCOVERED', name.toUpperCase(), note || '');
+  // (not while he is running for the airlock on a holed suit: the card for the region he woke up in landed on the Hab
+  //  in the middle of that, and repeated the name already at the top of the screen. The journal has it all the same.)
+  if (!S.flags.coldOpen) toast(isLander ? 'SITE DISCOVERED' : 'REGION DISCOVERED', name.toUpperCase(), note || '');
   checkAchievements();
 }
 export let discTimer = 0;
@@ -216,7 +219,7 @@ export function winGame() {
       ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
       // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
       //  and "3.4 / Km walked" here were the same number written two ways)
-      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', st.discoveries],
+      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', discoveriesFound()],
       ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,

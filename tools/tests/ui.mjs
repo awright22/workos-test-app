@@ -138,7 +138,7 @@ if (!onlySize || onlySize === 'keys') {
 if (!onlySize || onlySize === 'play') {
   const g = await openGame({ quality: 'low' });
   const page = g.page;
-  const secs = (s) => { const m = /^(\d+):(\d\d) left$/i.exec(String(s).trim()); return m ? +m[1] * 60 + +m[2] : null; };
+  const secs = (s) => { const m = /^(\d+):(\d\d) of air$/i.exec(String(s).trim()); return m ? +m[1] * 60 + +m[2] : null; };
   await page.evaluate(() => { window.__st = () => document.querySelector('#mg-vitals .suit .st').textContent.trim(); window.__UI.setSetting('reducedMotion', true); });
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.paused = true; G.tick(0.05, 10); });
   // the cold open: a holed suit, counting down from the first second
@@ -183,6 +183,7 @@ if (!onlySize || onlySize === 'play') {
   const where = () => g.eval(() => ({
     tag: document.querySelector('#mg-way b').textContent, shown: getComputedStyle(document.getElementById('mg-way')).display !== 'none',
     line: document.querySelector('#mg-objectives .obj:not(.done) .ds').textContent, lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent,
+    place: document.querySelector('#mg-objectives .obj:not(.done) .pl').textContent.toLowerCase(),
     compass: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase()),
   }));
   await g.eval((G) => { G.S.inv.regolith = 2; G.tpLocal(0, 30, 0); G.tick(0.05, 1); });       // (a bed to fill: the way leads in through the airlock door)
@@ -207,6 +208,56 @@ if (!onlySize || onlySize === 'play') {
   await g.eval((G) => { G.S.inv.regolith = 0; G.tpLocal(0, 0, 0); G.tick(0.05, 2); });
   const d3 = await where();
   check('distances: indoors the marker and the mission line still agree', d3.shown && d3.tag === d3.line, d3);
+  // ... and the distance is the distance to the thing named: the whole walk to the heap is the heap's, on the line
+  // and on the compass (it was labelled "Airlock": 46 m to a door that stood 13 m away)
+  check('distances: indoors, the walk to a thing outside is named for the thing, not for the airlock', d3.place === 'heap' && d3.compass.includes(`heap ${d3.tag}`) && !d3.compass.some((t) => /airlock/.test(t)), d3);
+
+  // the rule of the prompt: whatever cannot be done says why. Every interaction is asked, in states where it refuses,
+  // and each answer is a sentence: a reading, or what is wanting and, after a colon, what to do about it (the first
+  // part is what the action button shows). A bare "no" is not an answer.
+  const refusals = await g.eval((G) => {
+    const S = G.S, out = [];
+    const ask = (state) => {
+      for (const it of G.interactables) {
+        if (!it.enabled) continue;
+        let r; try { r = it.enabled(); } catch (e) { continue; }             // (nothing of its kind in reach: it would not be asked)
+        if (r !== true) out.push({ state, r: typeof r === 'string' ? r : String(r), isString: typeof r === 'string' });
+      }
+    };
+    G.farm.farm();
+    const keep = JSON.stringify({ inv: S.inv, water: S.water, breach: S.breach, sol: S.sol, potatoes: S.potatoes, food: S.food, seeds: S.seeds, pantry: S.pantry, up: S.upgrades, hyd: S.hydrazine });
+    const pl = G.World.plots[0], was = { state: pl.state, growth: pl.growth, watered: pl.watered };
+    G.tpLocal(-6.7, -3.2); G.tick(0.05, 2);
+    S.inv.regolith = 0; pl.state = 'empty'; ask('an empty bed and no regolith');
+    pl.state = 'soil'; S.water = 2; ask('a bed of soil and no water');
+    S.water = 60; S.potatoes = 0; S.food = 0; S.seeds = { radish: 0, lettuce: 0, soy: 0, tomato: 0 }; S.pantry = { radish: 0, lettuce: 0, soy: 0, tomato: 0 }; ask('a bed of soil and nothing to plant');
+    S.food = 5; pl.state = 'growing'; pl.growth = 0.45; pl.watered = 1; S.water = 2; ask('a thirsty bed and no water');
+    S.water = 60; pl.growth = 0.2; ask('a bed growing');
+    S.breach.active = true; S.hydrazine = 0; S.upgrades = {}; S.sol = 1; ask('a breach, an empty hydrazine tank, no drill, Sol 1');
+    const k = JSON.parse(keep);
+    Object.assign(S, { water: k.water, sol: k.sol, potatoes: k.potatoes, food: k.food, seeds: k.seeds, pantry: k.pantry, upgrades: k.up, hydrazine: k.hyd }); Object.assign(S.inv, k.inv); Object.assign(S.breach, k.breach);
+    Object.assign(pl, was); G.syncAllVisuals(); G.tick(0.05, 40);
+    return out;
+  });
+  {
+    const READING = '\u200b';
+    // (five refusals live in game files this test's author could not edit; they give their reason, in another form)
+    const elsewhere = /analyser|Sample case|Already sampled|Servicing the|has failed|in good order/;
+    const formed = (r) => r.startsWith(READING) ? r.length > 4 : /^[A-Z][^:—(]{2,21}?\s*[:—(]\s*\S/.test(r) && r.split(/[:—(]/)[0].trim().split(/\s+/).length <= 4;
+    const bare = refusals.filter((x) => !x.isString || !x.r.replace(READING, '').trim());
+    const unformed = refusals.filter((x) => x.isString && !elsewhere.test(x.r) && !formed(x.r));
+    const seen = [...new Set(refusals.map((x) => x.r.replace(READING, '(reading) ')))];
+    check('prompt: every refusal gives its reason, as "what is wanting: what to do about it" or as a reading', refusals.length >= 8 && bare.length === 0 && unformed.length === 0, { bare, unformed, seen });
+    // the empty bed, as a new player meets it: the reason in the prompt line, and what is wanting on the action button
+    const bed = await g.eval((G) => {
+      const pl = G.World.plots[0], was = pl.state, reg = G.S.inv.regolith;
+      pl.state = 'empty'; G.S.inv.regolith = 0; G.tpLocal(-6.7, -3.2); G.tick(0.05, 3);
+      const p = document.getElementById('mg-prompt'), out = { on: p.classList.contains('on') && getComputedStyle(p).visibility === 'visible' && +getComputedStyle(p).opacity > 0.99, no: p.classList.contains('no'), says: p.querySelector('.lb').textContent, button: document.querySelector('#mg-tE .vb').textContent };
+      pl.state = was; G.S.inv.regolith = reg; G.syncAllVisuals(); G.tick(0.05, 3);
+      return out;
+    });
+    check('prompt: an empty bed with no regolith says what it needs and where to get it, at once, and the button says NEEDS REGOLITH', bed.on && bed.no && /needs regolith: .*heap/i.test(bed.says) && bed.button === 'NEEDS REGOLITH', bed);
+  }
 
   // the journal: a task's reason is a line of its own under its title
   await page.keyboard.press('j');
@@ -225,7 +276,32 @@ if (!onlySize || onlySize === 'play') {
   }));
   check('journal: the log shows as many entries as its heading says, each with a speaker', jl.shown >= 9 && new RegExp(`\\b${jl.shown} entries`).test(jl.head) && jl.who.every((w) => /^[A-Z]+$/.test(w)), jl);
   await page.locator('.journal [data-tab="tasks"]').click();
+  // a tab's count is the number of things its page lists ("Tasks 6" stood over three tasks), and the page says where it all leads
+  const jc = await page.evaluate(() => ({
+    tab: parseInt((document.querySelector('#mg-journal [data-tab="tasks"] em') || { textContent: '0' }).textContent, 10),
+    listed: document.querySelectorAll('#mg-journal .obj-list:not(.done-list) .obj').length + document.querySelectorAll('#mg-journal .card.quest:not(.done)').length,
+    way: [...document.querySelectorAll('#mg-journal .way li strong')].map((n) => n.textContent), wayText: (document.querySelector('#mg-journal .way') || { textContent: '' }).textContent,
+    uplink: (document.querySelector('#mg-journal .empty') || { textContent: '' }).textContent,
+  }));
+  check('journal: the Tasks tab counts the tasks its page lists', jc.tab > 0 && jc.tab === jc.listed, jc);
+  check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /radio/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /\d\skm/.test(jc.wayText) && /radio/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
   await page.keyboard.press('Escape');
+  // FOOD on the HUD is the sum of the rows under Food in the inventory (13 was set against a list that came to 22)
+  await g.eval((G) => { const S = G.S; G.farm.farm(); window.__larder = JSON.stringify([S.pantry, S.potatoes]); S.pantry.radish = 3; S.pantry.soy = 2; S.potatoes = 4; G.tpLocal(0, 0, 0); G.tick(0.05, 3); });
+  const hudFood = await page.evaluate(() => parseInt(document.querySelector('#mg-vitals .res .row:nth-child(3) .val').textContent, 10));
+  await page.keyboard.press('c');
+  await page.locator('.colony [data-tab="inv"]').click();
+  const larder = await page.evaluate(() => {
+    let sum = 0, head = '', n = 0;
+    for (const row of document.getElementById('mg-inv').children) {
+      if (row.classList.contains('pane-hd')) { if (head) break; head = row.textContent; continue; }
+      if (row.classList.contains('inv-row')) { sum += parseInt(row.querySelector('.ct').textContent, 10); n++; }
+    }
+    return { head, sum, rows: n, packets: [...document.querySelectorAll('#mg-inv .inv-row .nm')].filter((x) => /seed packet/i.test(x.textContent) && !/^Seed packets/.test(x.textContent)).length };
+  });
+  check('colony: FOOD on the HUD is the sum of the inventory\'s food rows, and no food row counts seed packets', hudFood === larder.sum && new RegExp(`^Food\\s*${larder.sum} meals`).test(larder.head) && larder.rows >= 4 && larder.packets === 0, { hudFood, larder });
+  await page.keyboard.press('Escape');
+  await g.eval((G) => { const [p, n] = JSON.parse(window.__larder); G.S.pantry = p; G.S.potatoes = n; G.tick(0.05, 3); });
 
   // night: sleep leads the list and is said aloud; the account carries the new sol and explains itself; nothing more is taken on waking
   await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});
@@ -332,13 +408,19 @@ for (const size of SIZES) {
       tabs.push(await page.evaluate((tab) => {
         const bd = document.querySelector('#mg-panel .sheet-bd'), sec = document.querySelector(`#mg-panel .set-sec[data-sec="${tab}"]`);
         const vis = (n) => { const r = n.getBoundingClientRect(), b = bd.getBoundingClientRect(); return r.height > 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1; };
+        const top = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().top * 2) / 2;
         return { tab, shown: !!sec && !sec.hidden && [...document.querySelectorAll('#mg-panel .set-sec')].filter((s) => !s.hidden).length === 1, fits: bd.scrollHeight <= bd.clientHeight + 2,
-          rows: [...sec.querySelectorAll('.set-row')].every(vis), sliders: sec.querySelectorAll('input[type="range"]').length, cb: !!sec.querySelector('[data-switch="colorBlind"]') };
+          rows: [...sec.querySelectorAll('.set-row')].every(vis), sliders: sec.querySelectorAll('input[type="range"]').length, cb: !!sec.querySelector('[data-switch="colorBlind"]'),
+          strip: top('#mg-panel [data-seg="settab"]'), done: top('#mg-panel [data-act="back"]'), sheet: top('#mg-panel .sheet'),
+          gap: Math.round(document.querySelector('#mg-panel [data-seg="settab"]').getBoundingClientRect().left - document.querySelector('#mg-panel .sheet-hd h1').getBoundingClientRect().right) };
       }, t));
       bad0 = bad0.concat(await audit());
     }
     check(`${size.name}: settings, four tabs that each fit the screen; Sound has its four sliders and Interface the colour-blind switch`,
       tabs.every((t) => t.shown && t.fits && t.rows) && tabs[2].sliders === 4 && tabs[3].cb, tabs);
+    // (the sheet was centred on its rows: the strip stood at 97, 85, 40 and 55 px on the four tabs, and Done moved with it)
+    check(`${size.name}: settings, the tab strip and Done stand in the same place on all four tabs, and the title 16 px from the tabs`,
+      tabs.every((t) => t.strip === tabs[0].strip && t.done === tabs[0].done && t.sheet === tabs[0].sheet && t.gap >= 16), tabs.map((t) => [t.tab, t.sheet, t.strip, t.done, t.gap]));
     await page.locator('[data-switch="colorBlind"]').locator('xpath=ancestor::div[contains(@class,"set-row")]').tap({ position: { x: 20, y: 12 } });
     const cbOn = await page.evaluate(() => document.getElementById('mg-root').classList.contains('mg-cb'));
     await page.locator('[data-switch="colorBlind"]').tap();
@@ -353,6 +435,23 @@ for (const size of SIZES) {
   await sleep(700);
   let bad = layoutProblems(await rects(page), size);
   check(`${size.name}: first minute, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
+  if (phone) {
+    // every task's title stands on one line of the list, as the first line (they all ran to two: the title shared its row with the distance)
+    const titles = await page.evaluate(() => {
+      const row = document.querySelector('#mg-objectives .obj.first, #mg-objectives .obj.primary');
+      if (!row) return [{ t: 'no first line on the list' }];
+      const tx = row.querySelector('.tx'), keep = [row.className, tx.innerHTML], out = [];
+      for (const o of window.__UI.objectives) {
+        row.className = o.urgent ? 'obj urgent first' : 'obj primary';
+        tx.textContent = o.text().replace(/\d+\/(\d+)\)$/, '$1/$1)');
+        const lines = new Set([...(() => { const r = document.createRange(); r.selectNodeContents(tx); return r.getClientRects(); })()].map((b) => Math.round(b.top))).size;
+        if (lines !== 1) out.push({ t: tx.textContent, lines });
+      }
+      row.className = keep[0]; tx.innerHTML = keep[1];
+      return out;
+    });
+    check(`${size.name}: every task title stands on one line of the list`, titles.length === 0, titles);
+  }
   // a busy moment on foot: every gauge, two alerts, log lines, a toast, a prompt, a candle to hand
   const busy = async () => {
     await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 120000 });      // an earlier toast has gone
@@ -403,6 +502,21 @@ for (const size of SIZES) {
   let hn = await hudNow();
   check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
   if (phone) {
+    // the card stands 8 px under the bars and 8 px over the stick (it came to rest 3 px from the stick: it was measured while it was still sliding in)
+    // (a warning: with his life in the balance, as here, nothing else is said)
+    await page.evaluate(() => window.__UI.toast('WARNING', 'Storm cell overhead', 'Visibility is down to a few metres. Keep the Hab in sight. The panels will make next to nothing until it has passed.'));
+    await sleep(600);
+    await g.eval((G) => { G.tick(0.05, 2); });
+    // (at rest: until this machine has drawn a frame the card is still where its slide begins, 8 px up)
+    await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
+    const withCard = layoutProblems(await rects(page), size);
+    check(`${size.name}: with a card up as well, still nothing overlaps`, withCard.length === 0, withCard);
+    const gaps = await page.evaluate(() => {
+      const r = (sel) => { const n = document.querySelector(sel); return n ? n.getBoundingClientRect() : null; };
+      const v = r('#mg-vitals'), t = r('#mg-toast .toast'), j = r('#mg-joy');
+      return t ? { under: Math.round((t.top - v.bottom) * 10) / 10, over: Math.round((j.top - t.bottom) * 10) / 10, note: (document.querySelector('#mg-toast .t3') || { textContent: '' }).textContent } : null;
+    });
+    check(`${size.name}: a card stands 8 px under the bars and at least 8 px over the stick, and its note ends with a sentence`, !!gaps && gaps.under >= 7.5 && gaps.under <= 9 && gaps.over >= 7.5 && (!gaps.note || /[.!?]$/.test(gaps.note)), gaps);
     check(`${size.name}: both banners keep their instruction, and the first mission line its reason`, hn.notes.length === 2 && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
     const a = await audit();
     check(`${size.name}: the busy HUD has nothing under 11 px or 44 px, and nothing cut`, a.length === 0, a);

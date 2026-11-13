@@ -23,8 +23,13 @@ export function el(tag, id, cls, parent, html) {
 }
 /** Escape text for use inside HTML. */
 export function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-/** "O2", "CO2" and "H2O" with proper subscripts. */
-export function chem(s) { return String(s).replace(/\b(C?O)2\b/g, '<span class="chem">$1<sub>2</sub></span>').replace(/\bH2O\b/g, '<span class="chem">H<sub>2</sub>O</span>'); }
+/**
+ * A figure and its unit are written one way everywhere: a space between them ("28 L", "49 m", "3 km"), and one that
+ * does not break, so the unit never starts a line. (It was "+10L" on one screen and "+28 L" on the next.)
+ */
+export function units(s) { return String(s).replace(/(\d)\s?(L|km|m)\b(?!\w)/g, '$1\u00a0$2'); }
+/** "O2", "CO2" and "H2O" with proper subscripts, and figures spaced from their units. */
+export function chem(s) { return units(s).replace(/\b(C?O)2\b/g, '<span class="chem">$1<sub>2</sub></span>').replace(/\bH2O\b/g, '<span class="chem">H<sub>2</sub>O</span>'); }
 
 /** Hooks the game fills in (see game/flow.js), so this module never has to import game code. */
 export const uiHooks = { /** pause the game and show the pause menu */ pause: null };
@@ -42,14 +47,27 @@ const ring = (r, vb) => `<svg class="ring" viewBox="0 0 ${vb} ${vb}" aria-hidden
   `<circle class="arc" cx="${vb / 2}" cy="${vb / 2}" r="${r}" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>`;
 
 UI.vitals = el('div', 'mg-vitals', null, UI.hud);
+// (on a touch screen the panel is a control: pressed, it opens the guide to what it shows)
+if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'What the bars mean'); }
 UI.suit = el('div', null, 'suit', UI.vitals,
   `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
-  '<div class="st t-num"></div>');
+  // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
+  //  inside a 54 px ring the name was 9 px capitals)
+  '<div class="cap">SUIT <span class="chem">O<sub>2</sub></span></div><div class="st t-num"></div>');
+/**
+ * Where the panel of gauges ends. On a phone the log and the cards stand a fixed gap under it, by this figure. It is
+ * taken again whenever the panel's size changes (ui/hud.js watches it), when the panel gains or loses its bars, and
+ * before a card is fitted to the room under it: a card fitted against the figure from before the bars arrived was a
+ * line too tall, and came to rest on the stick.
+ */
+export function measureVitals() { const b = UI.vitals.getBoundingClientRect().bottom; if (b > 0) root.style.setProperty('--vit-b', Math.round(b) + 'px'); }
 UI.suitArc = UI.suit.querySelector('.arc');
 UI.suitNum = UI.suit.querySelector('.num');
 UI.suitState = UI.suit.querySelector('.st');
-// (on a touch screen the panel opens the guide to itself: the mark under the dial says so)
-el('span', null, 'help', UI.suit, '?').setAttribute('aria-hidden', 'true');
+// On a touch screen the whole panel is one control: pressed, it opens the guide to itself. It is framed like the
+// other touch buttons and carries a chip that says so. (The chip was a bare "?" in an 18 px ring, which read as a
+// button too small to press, and nothing else said the panel could be pressed once its pointer card had gone.)
+el('span', null, 'help', UI.suit, '<i>?</i>Guide').setAttribute('aria-hidden', 'true');
 /** The resource rows beside the suit dial: [state key, icon, label]. */
 export const BARS = [
   ['o2', 'hab', 'HAB <span class="chem">O<sub>2</sub></span>'],
@@ -96,7 +114,7 @@ UI.log.setAttribute('aria-live', 'polite');
 UI.rover = el('div', 'mg-rover', null, UI.hud,
   '<div class="spd"><b class="t-num">0</b><span>KM/H</span></div>' +
   '<div class="rv">' +
-  `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">POWER</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
+  `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">BATTERY</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   `<div class="row" data-k="o2">${icon('suit')}<span class="lb"><span class="chem">O<sub>2</sub></span> TANK</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   '</div>');
 UI.roverSpeed = UI.rover.querySelector('.spd b');
@@ -104,7 +122,7 @@ UI.roverBars = {};
 UI.rover.querySelectorAll('.row').forEach((r) => { UI.roverBars[r.dataset.k] = { wrap: r, fill: r.querySelector('.fl'), val: r.querySelector('.val') }; });
 
 UI.prompt = el('div', 'mg-prompt', null, UI.hud,
-  `<div class="pk">${ring(17, 40)}<span class="kc"><span class="k">E</span>${icon('hand')}${icon('lock')}</span></div>` +
+  `<div class="pk">${ring(17, 40)}<span class="kc"><span class="k">E</span>${icon('hand')}${icon('block')}</span></div>` +
   '<div class="pt"><div class="pl"><span class="ph">HOLD</span><span class="lb"></span></div><div class="sub"></div></div>');
 UI.promptArc = UI.prompt.querySelector('.arc');
 UI.promptLabel = UI.prompt.querySelector('.lb');
@@ -129,9 +147,10 @@ UI.touch = el('div', 'mg-touch', null, root);
 UI.joyZone = el('div', 'mg-joyzone', null, UI.touch);
 UI.joy = el('div', 'mg-joy', null, UI.touch, '<i class="n"></i><i class="e"></i><i class="s"></i><i class="w"></i>');
 UI.joyKnob = el('div', 'mg-joyknob', null, UI.joy);
-// (With nothing in reach it is an empty, dim ring: "USE / HOLD", "— / HOLD" and a bare icon each read as a control
-// with no name. With something in the way it is a padlock over the word LOCKED; with something to do, the verb and HOLD.)
-UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('lock')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
+// (With nothing in reach it is not there: an empty ring under the right thumb read as a control that was broken, and
+// "USE / HOLD", "— / HOLD" and a bare icon each read as a control with no name. With something to do it carries the
+// verb and HOLD; with something in the way, a barred ring over what is wanting, in the reason's own words.)
+UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('block')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
 UI.tEArc = UI.tE.querySelector('.arc');
 UI.tEVerb = UI.tE.querySelector('.vb');
 UI.tJump = tbtn('mg-tJump', 'sec', 'Jump', `${icon('jump')}<span>JUMP</span>`);
@@ -342,16 +361,23 @@ function nextToast() {
     `<div class="ti">${icon(kind === 'ach' ? 'trophy' : kind === 'disc' ? 'pin' : 'info')}</div>` +
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${chem(esc(t.title))}</div>${t.note ? `<div class="t3">${chem(esc(t.note))}</div>` : ''}</div>`);
   root.classList.add('has-toast');
-  // On a phone the card stands between the gauges and the stick. One that would reach the stick keeps one line of its
-  // note (whole sentences of it), or none: it never lies over the thing his thumb is on.
-  if (layout.compact && layout.touch && t.note) {
-    const joy = UI.joy.getBoundingClientRect(), t3 = node.querySelector('.t3');
-    const reaches = () => joy.height > 2 && node.getBoundingClientRect().bottom > joy.top - 4;
-    if (t3 && reaches()) {
-      node.classList.add('tight');
-      t3.innerHTML = chem(esc(fitSentences(t3, t.note)));
-      if (reaches()) t3.remove();
-    }
+  // On a phone the card stands between the gauges and the stick, and its note is whole sentences: as many as its two
+  // lines hold (measured, not counted). A card that would reach the stick is set closer; one that still would keeps
+  // one line of note, or none: it never lies over the thing his thumb is on. (The smallest phone's cards were all cut
+  // to one line, "Spend 60 seconds outside in a…", where closer setting has room for two.)
+  const t3 = node.querySelector('.t3');
+  if (layout.compact && t3) {
+    measureVitals();
+    const joy = UI.joy.getBoundingClientRect();
+    // (8 px clear of it, as everything on the HUD is of its neighbour. The card is measured where it will stand, not
+    //  where it is now: it arrives by sliding down, so its own box at this moment is 8 px too high.)
+    const reaches = () => layout.touch && joy.height > 2 && UI.toasts.getBoundingClientRect().top + node.offsetHeight > joy.top - 8;
+    const fit = () => { t3.innerHTML = chem(esc(fitSentences(t3, t.note, 8))); };
+    fit();
+    if (reaches()) { node.classList.add('tight'); fit(); }
+    if (reaches()) { node.classList.add('one'); fit(); }
+    // (a note is whole sentences or it is not there: one line that ends "outside in a…" says less than the title alone)
+    if (reaches() || /…\s*$/.test(t3.textContent)) t3.remove();
   }
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
@@ -368,13 +394,6 @@ export function dropPointer() { if (toastNow && toastNow.point) closeToast(toast
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
   if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
-  // a phone's card holds two short lines of note: give it whole sentences that fit, not a line cut mid-word
-  // (how much two lines hold depends on the card's width: fewer letters on the narrowest phones)
-  const room = window.innerWidth <= 760 ? 62 : 76;
-  if (layout.compact && note && note.length > room) {
-    const cut = note.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-    note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
-  }
   toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0 });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
@@ -405,7 +424,7 @@ export function restoreLog(lines) {
  * letters, an entry that ran a few letters over was cut by the clamp in the middle of a sentence; and "I'm just..."
  * was taken for the end of one.)
  */
-function fitSentences(tx, full) {
+function fitSentences(tx, full, least = 24) {
   tx.textContent = full;
   // (a log that is not on the screen just now, behind a toast or in the first minute, cannot be measured: count letters)
   const measured = tx.clientHeight > 0, room = window.innerWidth <= 760 ? 95 : 105;
@@ -413,7 +432,7 @@ function fitSentences(tx, full) {
   if (!over()) return full;
   const ends = [];
   const re = /[.!?]["')\]]?(?=\s)/g;
-  for (let m = re.exec(full); m; m = re.exec(full)) if (full[m.index - 1] !== '.' && m.index > 24) ends.push(m.index + m[0].length);      // (an ellipsis runs on)
+  for (let m = re.exec(full); m; m = re.exec(full)) if (full[m.index - 1] !== '.' && m.index > least) ends.push(m.index + m[0].length);      // (an ellipsis runs on)
   let text = full;
   for (let k = ends.length - 1; k >= 0 && over(); k--) { text = full.slice(0, ends[k]); tx.textContent = text; }
   if (over()) {
@@ -457,6 +476,25 @@ export function log(full, cls, o) {
   while (UI.log.children.length > 4) UI.log.firstChild.remove();
 }
 
+/*
+ * Things said a little later are said a number of seconds of play later: by the game's clock, which stops under a menu
+ * and runs at the game's pace, not by the wall's. (By the wall's clock, lines timed to follow one another arrived
+ * together after a pause, and on a slow machine before the thing they were meant to follow had been drawn.) The HUD
+ * runs the clock, every frame of play (ui/hud.js).
+ */
+const pending = [];
+/** Do `fn` after `seconds` of play. */
+export function after(seconds, fn) { pending.push({ t: seconds, fn }); }
+/** `dt` seconds of play have passed: do what has come due, the earliest first. */
+export function runAfter(dt) {
+  if (!pending.length || !(dt > 0)) return;
+  for (const p of pending) p.t -= dt;
+  pending.sort((a, b) => a.t - b.t);
+  while (pending.length && pending[0].t <= 0) pending.shift().fn();
+}
+/** Take what is showing off the HUD's log (the journal keeps it): for a moment that is about one thing. */
+export function clearLog() { UI.log.textContent = ''; }
+
 // ------------------------------------------------------------------------------------------
 // The interaction prompt (and the touch action button, which shows the same verb)
 // ------------------------------------------------------------------------------------------
@@ -475,11 +513,26 @@ function verbOf(label) {
   return v.toUpperCase().slice(0, 8);
 }
 /**
+ * What the action button says when something is in the way: what is wanting, which is how a reason begins
+ * ("Needs regolith: dig it at the heap…" gives NEEDS REGOLITH). A reason that does not begin that way, or begins at
+ * too great a length for the button, gives a plain NOT YET; the prompt line has the whole of it either way.
+ */
+export function refusalWord(reason) {
+  const m = /^([^:—(]{3,22}?)\s*[:—(]/.exec(reason);
+  return (m && m[1].trim().split(/\s+/).length <= 4 ? m[1].trim() : 'Not yet').toUpperCase();
+}
+/**
  * Show, update or hide (null) the interaction prompt.
  * p: { label, sub, disabled: false | reason string, hold: seconds to hold, progress: 0..1,
  *      minor: true for something always available here rather than something in reach }
+ *
+ * The rule of the prompt: a thing that cannot be done here says why, in the prompt line. `disabled` is therefore a
+ * sentence: what is wanting, and after a colon what to do about it ("Needs regolith: dig it at the heap outside the
+ * airlock"), or a reading made with statusText(). A refusal that gives no reason is not shown at all: a padlock
+ * with nothing beside it was the first thing a new player met at an empty farm bed.
  */
 export function setPrompt(p) {
+  if (p && p.disabled && (typeof p.disabled !== 'string' || !p.disabled.replace(STATUS_MARK, '').trim())) p = null;
   if (!p) {
     if (pr.on) {
       pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null;
@@ -500,7 +553,7 @@ export function setPrompt(p) {
     pr.label = label;
     UI.promptLabel.innerHTML = chem(esc(label));
   }
-  const verb = p.disabled ? (reading ? '' : 'LOCKED') : verbOf(p.label);
+  const verb = p.disabled ? (reading ? '' : refusalWord(label)) : verbOf(p.label);
   if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
   if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
   const sub = p.sub || '';
@@ -544,13 +597,16 @@ function flag(name, on) {
   if (flags[name] === on) return;
   flags[name] = on;
   root.classList.toggle(name, on);
+  if (name === 'is-cold') measureVitals();              // (the panel is one number in the first minute, and taller after)
 }
 // A scrolling region with more below carries a "More" mark at its foot (and a short fade at its head when
 // there is more above). Without one, a list cut off by the bottom of a phone's screen looks like the end of
 // the list. (It used to fade its last rows instead, which read as rows that were switched off.)
 function scrollCue(n) {
-  // (more than a few pixels of it: the last of a box's own padding is not "more")
-  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 10 ? 'down' : '')).trim();
+  // (more than the box's own padding at its foot, which is not "more": ten pixels where the padding is that much.
+  //  A box with next to no padding says so sooner: the rescue screen's last line was cut 8 px short with no mark.)
+  const pad = n.dataset.pad === undefined ? (n.dataset.pad = String(parseFloat(getComputedStyle(n).paddingBottom) || 0)) : n.dataset.pad;
+  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > Math.min(10, +pad + 3) ? 'down' : '')).trim();
   // (the mark sticks to the foot of the box's contents, which stops short of the box's own foot by its padding:
   //  the style sheet moves it down by that much, so nothing shows under its shelf)
   if (n.dataset.more !== more) { n.dataset.more = more; if (more) n.style.setProperty('--foot', getComputedStyle(n).paddingBottom); }

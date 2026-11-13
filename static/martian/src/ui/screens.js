@@ -2,10 +2,10 @@ import { COMFORTS, comfortBlock, comfortCheer, comfortCount, comforts, makeComfo
 import { syncAllVisuals } from '../game/visuals.js';
 import { catalogue, scienceSummary } from '../game/science.js';
 import { MACHINES, serviceCost } from '../game/machines.js';
-import { CROPS, MORALE_WORD, PRODUCE, farm, moraleBand } from '../game/farm.js';
+import { CROPS, MORALE_WORD, PRODUCE, farm, foodTotal, moraleBand } from '../game/farm.js';
 import { UI, VOICES, log, logHistory, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
 import { Snd } from '../audio/sound.js';
-import { fmtDist } from '../planet/geo.js';
+import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
 import { DIFFICULTIES, S } from '../game/state.js';
 import { World } from '../world/build.js';
@@ -149,17 +149,22 @@ export function renderColony() {
   // --- inventory ---
   const row = (ic, name, count, unit, note, extra) =>
     `<div class="inv-row ${count > 0 ? 'has' : 'zero'}">${icon(ic)}<span class="nm">${chem(esc(name))}${note ? `<small>${chem(esc(note))}</small>` : ''}</span>` +
-    `<span class="ct t-num">${count}${unit ? `<small>${unit}</small>` : ''}</span>${extra || ''}</div>`;
-  let inv = '<div class="pane-hd">Supplies</div>';
+    `<span class="ct t-num">${count}${unit ? `<small>\u00a0${unit}</small>` : ''}</span>${extra || ''}</div>`;
+  // Food is what the HUD's FOOD counts, row by row: the rows under this heading add up to the figure in it. Seed
+  // packets are not food and have a row of their own under Supplies. (A crop's row used to carry its packets in its
+  // note, a count of one thing beside a count of another, and the HUD's 13 was set against a list that came to 22.)
+  farm();
+  const meals = foodTotal();
+  let inv = `<div class="pane-hd">Food <span>${meals} ${meals === 1 ? 'meal' : 'meals'} in all</span></div>`;
   inv += row('box', 'Rations', S.food, '', 'One a sol, when the potatoes run out');
   inv += row('food', 'Potatoes', S.potatoes, '', 'Eaten first; also seed for the farm');
-  farm();
   for (const id of PRODUCE) {
-    const have = S.pantry[id], packets = S.seeds[id];
-    if (have + packets <= 0 && !(S.stats.produce > 0)) continue;                 // not met yet
-    inv += row('food', CROPS[id].name, have, '', packets > 0 ? `${packets} seed packet${packets > 1 ? 's' : ''} · ${CROPS[id].note}` : CROPS[id].note);
+    if (S.pantry[id] <= 0 && !(S.stats.grown && S.stats.grown[id])) continue;      // never grown and none in the pantry: not food yet
+    inv += row('food', CROPS[id].name, S.pantry[id], '', CROPS[id].note);
   }
-  if (PRODUCE.every((id) => S.pantry[id] + S.seeds[id] <= 0) && !(S.stats.produce > 0)) inv += row('seed', 'Seed packets', 0, '', 'NASA sends seeds with pods and science grants');
+  inv += '<div class="pane-hd">Supplies</div>';
+  { const packs = PRODUCE.filter((id) => S.seeds[id] > 0), n = packs.reduce((k, id) => k + S.seeds[id], 0);
+    inv += row('seed', 'Seed packets', n, '', n ? packs.map((id) => `${CROPS[id].name} ${S.seeds[id]}`).join(' · ') : 'NASA sends seeds with pods and science grants'); }
   inv += row('water', 'Water', Math.round(S.water), 'L');
   inv += row('power', 'Hydrazine burns', S.hydrazine, '', 'Each makes water at the rig');
   inv += '<div class="pane-hd">Morale <span>0 to 100</span></div>';
@@ -250,10 +255,11 @@ export function renderColony() {
     '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');
 
-  // (the number is how many things on that tab can be made now. The open tab says so in a word, and its own heading says
-  //  it again; the others carry the number alone, since three "ready" badges side by side were all anyone saw)
+  // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
+  //  this screen and of the journal carries its count the same way, a figure in a pill: there were three styles, a
+  //  filled "6 READY", round badges and bare numerals.)
   const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}` +
-    `${n ? ` aria-label="${label}: ${n} ready"` : ''}>${icon(ic)}${label}${n ? `<em>${n}${colonyTab === id ? '<i> ready</i>' : ''}</em>` : ''}</button>`;
+    `${n ? ` aria-label="${label}: ${n} ready"` : ''}>${icon(ic)}${label}${n ? `<em class="t-num">${n}</em>` : ''}</button>`;
   body.innerHTML = '<div class="colony">' +
     `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
     `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +
@@ -325,8 +331,37 @@ const ACH_PROGRESS = {
 const FEATURE_KIND = { volcano: 'Volcano', basin: 'Impact basin', crater: 'Crater', canyon: 'Canyon', cap: 'Polar cap' };
 const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1));
 
+/**
+ * The whole of the way home, in three steps, at the head of the journal's task page from the first sol: what the
+ * mission list's lines are for. (After ten minutes of play nothing had said that the rescue is a rocket a long drive
+ * away, or that Earth has to be told first.) A strip, not a page: each step is a few words and one line.
+ */
+function wayHomeHtml() {
+  const mav = fmtDist(groundDist(World.hab.position, World.mav.position));
+  const radio = S.pf.connected ? 'Houston knows. NASA’s tasks are below.'
+    : S.pf.loaded ? 'Pathfinder is aboard the rover: bring it to the uplink ring.'
+      : S.flags.pfRevealed ? `Pathfinder’s radio can: Ares Vallis, ${fmtDist(distTo(World.pathfinder.position))} away. Take the rover.`
+        : 'An old lander’s radio can. The charts will show where it lies in a few sols.';
+  const steps = [
+    ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
+    [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
+    [`Sol ${S.rescueSol}`, 'Fly home', `The Ares 4 rocket in Schiaparelli, ${mav} from the Hab.${S.flags.mavRevealed ? ' The window is open.' : ''}`, S.pf.connected ? 'next' : ''],
+  ];
+  return '<div class="pane-hd">The way home</div><ol class="way">' +
+    steps.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';
+}
+/** The places with a note in the journal: what the Discoveries page lists as places. */
+const journalPlaces = () => FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
+/**
+ * How many discoveries he has made: the landers found, the places visited and the sights seen, which is what the
+ * journal's Discoveries page lists. The tab, the statistics and the rescue screen all give this one number. (The tab
+ * gave one count and the statistics tile under the same word another.)
+ */
+export function discoveriesFound() {
+  return World.landers.filter((r) => S.discovered[r.data.name]).length + journalPlaces().filter((f) => S.discovered[f.name]).length + sightList().filter((x) => x.sol).length;
+}
 function tasksHtml() {
-  let h = '<div class="pane-hd">Mission</div><div class="obj-list">';
+  let h = wayHomeHtml() + '<div class="pane-hd">Mission</div><div class="obj-list">';
   let primary = false, open = '', closed = '', nDone = 0;
   // as on the HUD (the same list, the same distances): the most pressing first, each with its reason and how far
   for (const { o, done: d } of missionList()) {
@@ -343,7 +378,8 @@ function tasksHtml() {
   const done = QUEST_DEFS.filter((q) => S.quests[q.id] === 'done').length;
   h += `<div class="pane-hd">NASA survey tasks <span>${S.pf.connected ? `${active} active · ${done} complete` : 'No uplink'}</span></div>`;
   if (!S.pf.connected) {
-    return h + `<div class="empty">${icon('dish')}<b>No uplink</b>Restore Pathfinder to receive survey tasks from NASA. They pay in supply pods and blueprints.</div>` + doneHtml;
+    // (what an uplink is and how to come by one: "No uplink" stood over an empty box)
+    return h + `<div class="empty">${icon('dish')}<b>No uplink yet</b>Earth does not know you are alive. Once a radio is working (the second step of the way home), NASA sends survey tasks here, and pays for them in supply pods and blueprints.</div>` + doneHtml;
   }
   const list = QUEST_DEFS.map((q) => ({ q, st: S.quests[q.id], pos: questTargetPos(q) }))
     .map((x) => ({ ...x, d: x.pos ? distTo(x.pos) : -1 }))
@@ -376,7 +412,7 @@ function discoveriesHtml() {
       `<p>${esc(rec.data.note)}</p></article>`;
   }
   h += more(landers.length - found.length, 'lander', 'landers', S.flags.mapRevealed ? 'Their signals are on the map. Go and find them.' : 'Every machine sent to Mars is still where it stopped. Find them out there.');
-  const places = FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
+  const places = journalPlaces();
   const seen = places.filter((f) => S.discovered[f.name]);
   h += `</div><div class="pane-hd">Places <span>${seen.length} of ${places.length} visited</span></div><div class="jr-grid">`;
   for (const f of seen) {
@@ -414,7 +450,7 @@ function statsHtml() {
     tile(S.sol, '', 'Sols survived') + tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue') +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes + (st.produce || 0), '', 'Food grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
-    tile(st.mined, '', 'Ice chunks mined') + tile(st.discoveries, '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
+    tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
     tile(World.builtMeshes.length, '', World.builtMeshes.length === 1 ? 'Structure deployed' : 'Structures deployed') + tile(st.booms, '', 'Hydrazine burns') + tile(st.closeCalls, '', 'Close calls') +
     tile(Math.round(st.stormOut), 's', 'Out in storms') + (st.discoTime >= 1 ? tile(Math.round(st.discoTime), 's', 'Disco endured') : '') +
     '</div>';
@@ -452,13 +488,17 @@ const JOURNAL_TABS = [['tasks', 'target', 'Tasks', tasksHtml], ['disc', 'pin', '
 export function renderJournal() {
   wire();
   const body = UI.journalScreen.querySelector('.scr-body');
+  // A tab's count is the number of things its page lists as open or found, so the two always agree: the tasks still to
+  // do (the mission's and NASA's), the landers, places and sights found, the materials catalogued, the achievements
+  // earned. ("Tasks 6" stood over three mission tasks: it counted NASA's alone. And Samples had no count.)
   const counts = {
-    tasks: QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length || '',
-    disc: S.stats.discoveries || '', ach: Object.keys(S.achieved).length || '', samples: scienceSummary().bagged || '',
+    tasks: missionList().filter((e) => !e.done).length + QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length || '',
+    disc: discoveriesFound() || '',
+    ach: ACHIEVEMENTS.filter((a) => S.achieved[a.id]).length || '', samples: scienceSummary().kinds || '',
   };
   const cur = JOURNAL_TABS.find((t) => t[0] === journalTab) || JOURNAL_TABS[0];
   body.innerHTML = '<div class="journal"><div class="tabs" role="tablist">' +
-    JOURNAL_TABS.map(([id, ic, label]) => `<button type="button" role="tab" aria-selected="${id === cur[0]}" data-tab="${id}"${id === cur[0] ? ' data-autofocus' : ''}>${icon(ic)}${label}${counts[id] ? `<em>${counts[id]}</em>` : ''}</button>`).join('') +
+    JOURNAL_TABS.map(([id, ic, label]) => `<button type="button" role="tab" aria-selected="${id === cur[0]}" data-tab="${id}"${id === cur[0] ? ' data-autofocus' : ''}>${icon(ic)}${label}${counts[id] ? `<em class="t-num">${counts[id]}</em>` : ''}</button>`).join('') +
     `</div><div class="jr-body mg-scroll" role="tabpanel" aria-label="${cur[2]}">${cur[3]()}</div></div>`;
   body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
     journalTab = b.dataset.tab;

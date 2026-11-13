@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdir, rm } from 'node:fs/promises';
 import { openGame, sleep, outDir } from './lib.mjs';
+import { settledInPage } from './audit-lib.mjs';
 
 export const SIZES = [
   { name: '1280x720', w: 1280, h: 720 },
@@ -57,6 +58,9 @@ export async function walk(size, o = {}) {
     await sleep(wait);                                              // waited even when the state is filtered out: later steps rely on the timing
     if (only && !only.some((x) => name.includes(x))) return;
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // (a picture is of a state at rest: with software rendering a card's quarter-second arrival can still be half-way
+    //  a second later, and a reviewer was shown a dialog mid-fade and asked whether the fade was really that slow)
+    await page.waitForFunction(settledInPage, null, { timeout: 15000, polling: 100 }).catch(() => {});
     const label = `${String(n).padStart(2, '0')}${sub}-${name}`;
     if (shoot) { await page.screenshot({ path: path.join(dir, label + '.png'), timeout: 120000 }); total++; }
     if (o.onState) await o.onState(label, page);
@@ -233,6 +237,10 @@ export async function walk(size, o = {}) {
     Object.assign(S.achieved, { notdead: true, phone: true });
     Object.assign(S.stats, { walked: 3400, driven: 18200, potatoes: 16, panels: 7, crafted: 4, closeCalls: 2, booms: 2, mined: 3, stormOut: 22, discoveries: 8 });
     S.sol = 12; S.potatoes = 6; S.food = 7; S.suit = 150;
+    // (the larder is set here, with the rest of the run, before the first picture that shows FOOD: set later, the
+    //  HUD's figure in one picture was 13 and the inventory in another listed 22)
+    G.farm.farm();
+    S.pantry = { radish: 3, lettuce: 0, soy: 4, tomato: 2 }; S.seeds = { radish: 1, lettuce: 2, soy: 2, tomato: 1 }; S.stats.produce = 9; S.stats.grown = { potato: 16, radish: 3, soy: 4, tomato: 2 };
     G.tpLocal(0, 45, 0); G.tick(0.05, 3);
   });
   await key('c');
@@ -265,8 +273,7 @@ export async function walk(size, o = {}) {
   await ev((G) => {
     // a mid-game larder, catalogue and home, so the newer pages have something to show
     const S = G.S; G.farm.farm();
-    // (the seed packets are set here, once: changed between the inventory picture and the seed chooser, the two disagreed)
-    S.pantry = { radish: 3, lettuce: 0, soy: 4, tomato: 2 }; S.seeds = { radish: 1, lettuce: 2, soy: 2, tomato: 1 }; S.stats.produce = 9; S.morale = 71;
+    S.morale = 71;
     if (!S.science) G.science.scienceSummary();
     Object.assign(S.science, { found: { basalt: 2, dust: 1, hematite: 1, sulfate: 1 }, points: 52, serial: 5 });
     S.machines = { oxygenator: 88, reclaimer: 54, rover: 31, suit: 12 };

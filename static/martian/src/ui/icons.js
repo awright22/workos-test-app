@@ -30,6 +30,8 @@ export const ICONS = {
   locate: ['M12 2.5v4', 'M12 17.5v4', 'M2.5 12h4', 'M17.5 12h4', 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z'],
   layers: ['M12 4l9 5-9 5-9-5z', 'M3 14l9 5 9-5'],
   lock: ['M7.5 11V8a4.5 4.5 0 0 1 9 0v3', 'M5.5 11h13v9h-13z'],
+  // something is in the way (not "locked": a farm bed that wants soil has no lock on it)
+  block: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z', 'M6 6l12 12'],
   info: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 11v5.5', 'M12 7.5v.25'],
   warning: ['M12 4L2.75 19.5h18.5z', 'M12 10v4.5', 'M12 17v.25'],
   restart: ['M4.5 12a7.5 7.5 0 1 1 2.3 5.4', 'M4.5 18.5V14H9'],
