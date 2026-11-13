@@ -19,7 +19,7 @@ await mkdir(dir, { recursive: true });
 
 const g = await openGame({ quality, width: W, height: H, touch, dsf: phone ? 2 : 1, query: phone ? 'safe=0,47,21,47' : '' });
 const ev = (fn, a) => g.eval(fn, a);
-const snap = async (name) => { await sleep(900); await g.page.screenshot({ path: path.join(dir, `${name}.png`), timeout: 180000 }); console.log('  shot', name); };
+const snap = async (name) => { await sleep(900); await g.page.screenshot({ path: path.join(dir, `${name}.png`), timeout: 420000 }); console.log('  shot', name); };
 // --from name: take up a run that was cut short, at the named scene (set-up scenes before it still run)
 const from = arg('--from', '');
 let begun = !from;

@@ -13,6 +13,8 @@ for (const quality of (process.env.Q || 'low,medium,high').split(',')) {
     ['outside the Hab', (G) => { G.tpLocal(7, 24, 0); G.setLocalTime(10); G.look(-0.06); }],
     ['inside the Hab', (G) => { G.tpLocal(0, 4.5, 0); G.look(-0.2); }],
     ['open plain', (G) => { G.tpLocal(60, 400, 0.4); G.look(-0.08); }],
+    // the foot of a canyon wall, where the fallen blocks are: the most boulders the game draws
+    ['under a canyon wall', async (G) => { await G.tp(-12.205, 292.86, 1.9); G.setLocalTime(10.5); G.look(0.1); }],
   ]) {
     await g.eval(setup);
     await g.eval(async (G) => { G.tick(0.05, 3); await G.settle(); });
@@ -34,7 +36,7 @@ for (const quality of (process.env.Q || 'low,medium,high').split(',')) {
   for (const r of rows) {
     const ok = !b || (r.calls <= b.calls && r.main <= b.main && r.shadow <= b.shadow);
     if (!ok) failed = true;
-    console.log(`${quality.padEnd(7)} ${r.scene.padEnd(16)} calls ${String(r.calls).padStart(4)} (${r.shadowCalls} shadow)  main ${String(r.main).padStart(7)}  shadow ${String(r.shadow).padStart(7)}  tiles ${r.terrainTiles}  rocks ${r.rocks.big}+${r.rocks.small}  ${ok ? 'ok' : 'OVER BUDGET'}`);
+    console.log(`${quality.padEnd(7)} ${r.scene.padEnd(19)} calls ${String(r.calls).padStart(4)} (${r.shadowCalls} shadow)  main ${String(r.main).padStart(7)}  shadow ${String(r.shadow).padStart(7)}  tiles ${r.terrainTiles}  rocks ${r.rocks.big}+${r.rocks.small}  ${ok ? 'ok' : 'OVER BUDGET'}`);
   }
   if (g.errors.length) { failed = true; console.log('console errors:', g.errors.slice(0, 3)); }
   await g.close();
