@@ -1,5 +1,5 @@
 import { comfortCheer } from './comforts.js';
-import { CROPS, MORALE_WORD, breakfast, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
+import { CROPS, MORALE_WORD, breakfast, breakfastsLeft, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
 import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
 import { dawnFaults, wearMachines } from './machines.js';
@@ -186,10 +186,10 @@ export function applyRates(dt, sleeping) {
   if (!sleeping) {
     warnLow('suit', S.suit, suitCap() * 0.25, 'Suit O2 low: a quarter of a tank left. Head for air. Now-ish.', 'suit', { quiet: true });
     warnLow('suit2', S.suit, suitCap() * 0.1, 'Suit O2 critical. Run for air.', 'suit', { quiet: true });
-    warnLow('o2', S.o2, 25, 'Hab O2 low. Oxygenator needs power. Panels need wiping. You see where this is going.');
-    warnLow('water', S.water, 10, 'Water reserves critical. Hydrazine, ice, or thirst — pick one.');
-    warnLow('power', S.power, 15, 'Hab battery low. Life support idles at zero. Wipe the panels.');
-    warnLow('rpow', S.roverPower, 20, 'Rover battery low. It solar-trickles when parked in daylight.');
+    warnLow('o2', S.o2, 25, 'Hab O2 low. Oxygenator needs power. Panels need wiping. You see where this is going.', 'alarm');
+    warnLow('water', S.water, 10, 'Water reserves critical. Hydrazine, ice, or thirst — pick one.', 'alarm');
+    warnLow('power', S.power, 15, 'Hab power low. Life support idles at zero. Wipe the panels.', 'alarm');
+    warnLow('rpow', S.roverPower, 20, 'Rover battery low. It solar-trickles when parked in daylight.', 'alarm');
     warnLow('health', S.health, 40, 'Vitals degrading. Eat. Drink. Sleep. In any order.', 'suit');
     if (S.suit <= 12 || S.o2 <= 10) { if (!S.flags.closeCall) { S.flags.closeCall = true; S.stats.closeCalls++; cheer(-3); } }
     else S.flags.closeCall = false;
@@ -274,7 +274,7 @@ export function advanceTime(dt) {
     flashScreen('rgba(255,255,255,0.5)', 200);
     Snd.play('breach'); Snd.alarm(true);
     syncAllVisuals();
-    log('BREACH. The Hab canvas just blew. Air\'s screaming out. MOVE, WATNEY.', 'sys');
+    log('BREACH. The Hab canvas just blew. Air\'s screaming out. MOVE, WATNEY.', 'alarm');
   }
   if (S.breach.active) {
     S.breach.timer += dt;
@@ -283,12 +283,14 @@ export function advanceTime(dt) {
       cheer(-6);
       let killed = 0;
       for (const pl of World.plots) if (pl.state === 'growing') { pl.state = 'dead'; killed++; syncPlot(pl); }
-      if (killed) log('The cold got in. The growing crops are dead. Ready trays survived. Small mercies.', 'sys');
+      if (killed) log('The cold got in. The growing crops are dead. Ready trays survived. Small mercies.', 'alarm');
     }
   }
 }
 
 bindWorld(World);
+/** Food is counted in meals, on the FOOD bar and wherever a number of it is given. */
+const meals = (n) => `${n} meal${n === 1 ? '' : 's'}`;
 /** What the last dawn did: { sol, ate, alone, meal, sky, home } (morale changes; `ate` is breakfast's words). */
 let dawnAccount = null;
 export function newSol() {
@@ -304,7 +306,7 @@ export function newSol() {
   cheer(comfortCheer());                                 // what he has made of the place
   dawnAccount = { sol: S.sol, ate, took: larder - foodTotal(), alone, meal, sky, home: comfortCheer() };
   // awake at dawn (up all night, or camped far from home), nobody shows him the night's account: say it
-  if (!S.sleeping && ate !== 'skipped') toast(`SOL ${S.sol}`, 'Dawn', `Breakfast: ${ate} (−${dawnAccount.took} food, ${foodTotal()} left). Another sol alone: morale ${Math.round(S.morale)}.`, { yields: true });
+  if (!S.sleeping && ate !== 'skipped') toast(`SOL ${S.sol}`, 'Dawn', `Breakfast: ${ate} (${meals(dawnAccount.took)}, ${foodTotal()} left). Another sol alone: morale ${Math.round(S.morale)}.`, { yields: true });
   if (!S.flags.moraleTold) {
     S.flags.moraleTold = true;
     setTimeout(() => log('MORALE is how I am holding up. Bad days wear it down. Variety on the plate, a hot dinner, music and word from home lift it, and then I work faster.'), 16000);      // (his own voice: it is him he is talking about)
@@ -313,7 +315,7 @@ export function newSol() {
     const now = moraleBand();
     setTimeout(() => log(now === 'low' ? 'I am tired in a way sleep does not fix. A hot dinner, some music, a word from home: I need one of them.'
       : now === 'high' ? 'Good morning, Mars. You are still trying to kill me, and today I do not mind.'
-        : band === 'high' ? 'The shine has gone off the morning. Back to merely surviving.' : 'Better. Not good. Better.', 'sys'), 9000);
+        : band === 'high' ? 'The shine has gone off the morning. Back to merely surviving.' : 'Better. Not good. Better.'), 9000);
   }
   if (S.sol === S.rescueSol - 1) setTimeout(() => log(`Sol ${S.sol}. One more sol. Packing my potato. Singular. It's symbolic.`), 1200);
   else if (SOL_LOGS[S.sol]) setTimeout(() => log(SOL_LOGS[S.sol]), 1200);
@@ -362,9 +364,9 @@ export function revealMav() {
   S.flags.mavRevealed = true;
   const d = fmtDist(groundDist(player.pos, World.mav.position));
   if (S.pf.connected)
-    log(`Launch window is OPEN. The Ares 4 MAV is fuelled and waiting in Schiaparelli crater — ${d} out. Time to fly a convertible.`, 'nasa');
+    log(`Launch window is OPEN. The MAV is fuelled and waiting in Schiaparelli crater — ${d} out. Time to fly a convertible.`, 'nasa');
   else
-    log(`Sol ${S.rescueSol}. NASA's original plan had the Ares 4 MAV launching from Schiaparelli about now — ${d} away. That rocket is my ride, phone call or no phone call.`);
+    log(`Sol ${S.rescueSol}. NASA's original plan had the MAV launching from Schiaparelli about now — ${d} away. That rocket is my ride, phone call or no phone call.`);
   Snd.jingle();
 }
 
@@ -405,12 +407,15 @@ export function sleepToDawn(inRover) {
   const ready = World.plots.filter(p => p.state === 'ready').length;
   const bed = inRover ? -1 : 3;
   cheer(bed);                                             // a bunk is a bed; a driver's seat is not
-  // the account: what was eaten, and why morale stands where it does, part by part
+  // The account, as rows with a name each: what was eaten, where morale stands (and, asked for, why), the farm, how
+  // long the food lasts against the wait, and what today and later are for. (It was five to seven centred sentences,
+  // one of them a bracketed sum the length of the screen.)
   const signed = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v))}`;
-  const notes = [], why = [];
+  const rows = [], why = [];
   const dawn = rolled && dawnAccount && dawnAccount.sol === S.sol ? dawnAccount : null;
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   if (dawn) {
-    notes.push(dawn.ate === 'skipped' ? 'No breakfast: there is nothing left to eat' : `Breakfast: ${dawn.ate} (−${dawn.took} food, ${foodTotal()} left)`);
+    rows.push(['Breakfast', dawn.ate === 'skipped' ? 'None: there is nothing left to eat' : `${cap(dawn.ate.replace(/\.$/, ''))} (${meals(dawn.took)}, ${foodTotal()} left)`]);
     why.push(`another sol alone ${signed(dawn.alone)}`);
     // (what breakfast was, so that a loss has its reason: "breakfast −1" read as a mistake)
     if (Math.round(dawn.meal)) why.push(`${dawn.ate === 'skipped' ? 'no breakfast' : dawn.meal > 0 ? 'variety at breakfast' : /ration/.test(dawn.ate) ? 'a plain ration for breakfast' : 'potato for breakfast again'} ${signed(dawn.meal)}`);
@@ -418,38 +423,42 @@ export function sleepToDawn(inRover) {
     if (dawn.home) why.push(`home comforts ${signed(dawn.home)}`);
     if (Math.round(dawn.mail)) why.push(`word from home ${signed(dawn.mail)}`);
     if (Math.round(dawn.faults)) why.push(`a machine failing ${signed(dawn.faults)}`);
-  } else notes.push(`Still Sol ${S.sol}: the sol turns, and breakfast is eaten, at the Hab's dawn`);
+  } else rows.push(['No breakfast yet', `It is still Sol ${S.sol}: the sol turns, and breakfast is eaten, at the Hab's dawn`]);
   why.push(`${inRover ? 'a night in the driving seat' : 'a night in the bunk'} ${signed(bed)}`);
   // (whatever else the night did, so the parts always add up to the change shown above them)
   { const named = (dawn ? dawn.alone + dawn.meal + dawn.sky + dawn.home + dawn.mail + dawn.faults : 0) + bed, rest = S.morale - before.morale - named;
     if (Math.abs(rest) >= 0.75) why.push(`the night's other events ${signed(rest)}`); }
-  notes.push(`Morale ${Math.round(S.morale)}, ${MORALE_WORD[moraleBand()].toLowerCase()} (${why.join(', ')})`);
-  if (growing + ready > 0) notes.push(`Farm: ${growing} growing, ${ready} ready`);
-  // what the numbers mean for the days ahead: he eats one thing a sol, and the rescue is a fixed date
-  { const meals = foodTotal(), wait = Math.max(0, S.rescueSol - S.sol);
+  // (morale is a score out of 100, with no unit, in the figure above and in its parts)
+  rows.push(['Morale', `${Math.round(S.morale)} of 100: ${MORALE_WORD[moraleBand()].toLowerCase()}`, cap(why.join(', '))]);
+  if (growing + ready > 0) rows.push(['Farm', `${growing} growing, ${ready} ready`]);
+  // what the numbers mean for the days ahead: the rescue is a fixed date, and the larder gives so many breakfasts
+  { const have = foodTotal(), days = breakfastsLeft(), wait = Math.max(0, S.rescueSol - S.sol);
     let coming = 0;
     for (const p of World.plots) if (p.state === 'growing' || p.state === 'ready') coming += (CROPS[p.crop] || CROPS.potato).yield;
     // (What is in the ground counts toward the wait. Without it the gap grew with every bed planted, since a bed
     //  takes a ration: "14 with nothing to eat" at the desk, then 15 the morning after doing as he was told.)
-    const short = wait - meals, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
+    // (And the larder lasts as many sols as it gives breakfasts, which is fewer than its meals while there is
+    //  something to go with the staple: "−2 food, 20 left" was followed by "food for 20 sols".)
+    const short = wait - days, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
+    const lasts = days === have ? `Enough for ${sols(days)}` : `Enough for ${sols(days)}, eating as today`;
     // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
-    notes.push(short <= 0 ? `Food for ${sols(meals)}; the rescue is in ${wait}: enough`
-      : coming >= short ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: enough, if they come in`
-        : coming > 0 ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: ${sols(short - coming)} still with nothing to eat`
-          : `Food for ${sols(meals)}; the rescue is in ${wait}: ${sols(short)} with nothing to eat`); }
+    rows.push(['Food', short <= 0 ? `${lasts}; the rescue is in ${wait}`
+      : coming >= short ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${wait}`
+        : coming > 0 ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${wait}: ${sols(short - coming)} still with nothing to eat`
+          : `${lasts}; the rescue is in ${wait}: ${sols(short)} with nothing to eat`]); }
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
   const later = rolled && S.sol === 2 && !S.pf.connected
-    ? `Find a radio and tell Earth you are alive. Then the Ares 4 rocket in Schiaparelli, ${fmtDist(groundDist(World.hab.position, World.mav.position))} away, by Sol ${S.rescueSol}` : '';
-  if (inRover) notes.push('Slept curled around the driver seat. The chiropractor is 225 million km away.');
+    ? `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}` : '';
+  if (inRover) rows.push(['Night', 'Slept curled around the driver seat. The chiropractor is 225 million km away.']);
   const summary = {
-    sol: S.sol, notes, turned: rolled, later,
+    sol: S.sol, rows, turned: rolled, later,
     deltas: [
       { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
       { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
       { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
-      { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: '', whole: true },
-      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '%', whole: true },
+      { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: 'meals' },
+      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '' },
     ],
   };
   // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,

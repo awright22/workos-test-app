@@ -130,13 +130,22 @@ export function missionList() {
  */
 function hudList() {
   const list = missionList();
+  inHand = '';
   const i = list.findIndex((e) => !e.done);
-  if (i < 0 || list[i].o.urgent) return list;
-  const t = interaction.active && interaction.active.task, id = typeof t === 'function' ? t() : t;
-  const j = id ? list.findIndex((e) => !e.done && e.o.id === id) : -1;
+  if (i < 0) return list;
+  // (in hand: he is standing at a thing he can work now, and it belongs to a task that is on the list)
+  const it = interaction.active, t = it && it.task, id = typeof t === 'function' ? t() : t;
+  if (!id) return list;
+  let can = false;
+  try { can = !it.enabled || it.enabled() === true; } catch (e) { /* nothing of its kind in reach */ }
+  const j = can ? list.findIndex((e) => !e.done && e.o.id === id) : -1;
+  if (j < 0 || (j > i && list[i].o.urgent)) return list;
   if (j > i) list.splice(i, 0, list.splice(j, 1)[0]);
+  inHand = id;
   return list;
 }
+/** The task in hand, if there is one: its place is where he stands (the marker is put away and the list says "here"). */
+let inHand = '';
 let leadMemo = null, leadAt = -1;
 /**
  * The first thing still to do, as the card, the marker and the compass all lead with it: one answer a frame.
@@ -161,6 +170,9 @@ export function objectiveWhere(o) {
   if (!p) return null;
   _wh.pos.copy(p);
   const from = fromPos(), hab = World.hab.position, onFoot = S.mode === 'walk';
+  // (the task in hand is here, whichever of its things the list would have sent him to: wiping one panel, the card
+  //  gave the distance to another, the dustiest)
+  if (o.id === inHand) { _wh.pos.copy(from); _wh.via = ''; _wh.on = _wh.d = _wh.near = _wh.show = 0; return _wh; }
   const pIn = groundDist(_wh.pos, hab) < HAB_R - 0.3;
   const meIn = onFoot && S.inside && groundDist(from, hab) < HAB_R;
   _wh.via = ''; _wh.on = 0;
@@ -339,7 +351,7 @@ export const BAR_UNLOCKS = [
     card: () => ['Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night drain it.'] },
   { id: 'health', flag: 'barHealth', when: () => S.health < 96 || bedtime(),
     card: () => ['Vitals', 'Your body. Air, water, food and sleep keep it up. At zero the run is over.'] },
-  { id: 'morale', flag: 'barMorale', when: () => S.morale < 40,
+  { id: 'morale', flag: 'barMorale', when: () => S.sol > 1 || S.morale < 40,
     card: () => ['Morale', 'Your spirits, out of 100. Variety on the plate, music and comforts lift them. High, work goes faster.'] },
 ];
 /**
@@ -362,13 +374,18 @@ let unlocksSeeded = false, barsShown = -1;
 const shownScreens = {}, shownBars = {};
 function updateUnlocks() {
   if (!S.started) return;
-  const ready = !S.flags.coldOpen, all = ready && (S.sol > 1 || !!S.flags.uiBars);      // (uiBars: a save from when the six came together)
+  // (uiBars: a save from when the six came together, or a run whose opening was skipped: it has them all, and none
+  //  is news. Past the first dawn the rest come too, and of those only one that is met that moment has a card.)
+  const ready = !S.flags.coldOpen, legacy = !!S.flags.uiBars, late = S.sol > 1;
   let bars = 0;
   for (const b of BAR_UNLOCKS) {
-    if (!S.flags[b.flag] && ready && (all || b.when())) {
-      S.flags[b.flag] = true;
-      // (what a loaded game already had is not news)
-      if (unlocksSeeded && b.card) { const c = b.card(); toast('NEW', c[0], c[1], { lit: UI.bars[b.id].wrap, life: 7000 }); Snd.jingle(); }
+    if (!S.flags[b.flag] && ready) {
+      const met = b.when();
+      if (met || legacy || late) {
+        S.flags[b.flag] = true;
+        // (what a loaded game already had is not news)
+        if (unlocksSeeded && b.card && met && !legacy) { const c = b.card(); toast('NEW', c[0], c[1], { lit: UI.bars[b.id].wrap, life: 7000 }); Snd.jingle(); }
+      }
     }
     const on = !!S.flags[b.flag];
     if (on) bars++;
@@ -407,7 +424,8 @@ export function updateObjectivesHud() {
       //  Named only when the list was next rebuilt, the line read "FARM BED 34 m" for a moment with the heap's distance.)
       if (n.o) {
         const w = objectiveWhere(n.o);
-        dist = w ? fmtDist(n.lead ? w.show : w.d) : '';
+        // (on the place itself the first line says so: "RIG · 0 m" read as a reading gone wrong)
+        dist = !w ? '' : n.lead && !w.via && w.near < 2.4 ? 'here' : fmtDist(n.lead ? w.show : w.d);
         if (n.lead) { place = objectivePlace(n.o, w); const t = objectiveThen(n.o, w); if (t) then = `then <b>${esc(t[0])}</b> ${t[1]}`; }
       } else if (n.q) { const p = questTargetPos(n.q); dist = p ? fmtDist(distTo(p)) : ''; }
     }
@@ -677,6 +695,9 @@ export function updateCompass() {
   for (const m of cp.marks) {
     // (every frame, with the marker's and the mission line's: the lead's is the mission line's own number)
     const at = m.lead ? objectiveWhere(m.lead) : null;
+    // (its name too, in this frame: the list is looked at again five times a second, and between two looks the strip
+    //  said FARM BED while the line beside it said AIRLOCK)
+    if (at) m.name = objectivePlace(m.lead, at) || 'Task';
     m.d = at ? at.d : distTo(m.pos);
     const rel = wrapDeg(m.bearing - heading);
     m.off = Math.abs(rel) > EDGE;
@@ -862,7 +883,7 @@ export function updateHud() {
   // the arrows are said once, the first time one is on a bar he can see and nothing else is being said
   // (they were explained only in the guide: "what do the arrows mean" was a new player's question at the first bars)
   if (arrow && !S.flags.arrowTold && S.started && !S.flags.coldOpen) {
-    if (S.sol > 1) S.flags.arrowTold = true;
+    if (S.sol > 1 || S.flags.uiBars) S.flags.arrowTold = true;
     else if (toastsIdle() && (hud.arrowWait = (hud.arrowWait || 0) + dt) > 12) {
       S.flags.arrowTold = true;
       toast('Gauges', 'Rising or falling', 'An arrow beside a number shows which way it is going now.', { lit: arrow, life: 7000 });
@@ -873,7 +894,7 @@ export function updateHud() {
   setText('sol', UI.clockSol, String(S.sol));
   // (The second figure says what it is, and is not there before he knows of it: "SOL 1 / 25" stood on the screen from
   //  the first second, and nothing ever said that 25 was the rescue.)
-  setText('of', UI.clockOf, S.flags.didMath || S.sol > 1 ? `<i>Rescue</i> Sol ${S.rescueSol}` : '');
+  setText('of', UI.clockOf, S.flags.didMath || S.sol > 1 ? `<i>Rescue</i> <u>Sol </u>${S.rescueSol}` : '');
   setText('time', UI.clockTime, fmtClock());
   // (the temperature is the weather: in the Hab, or in the rover's cabin, it is not his, and it is not shown)
   const outTemp = !(S.inside && S.mode === 'walk');
@@ -938,7 +959,7 @@ export function updateHud() {
   const candles = S.inv.candle || 0;
   // the first minute teaches moving (on a phone the two hints go once he has walked: they sat on the prompt at the airlock); after that, the screens
   const keys = S.flags.coldOpen
-    ? (layout.touch ? (S.stats.walked > 8 ? '' : ':Left thumb moves|:Drag to look') : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
+    ? (layout.touch ? (S.stats.walked > 8 || playTime() > 30 ? '' : ':Left thumb moves|:Drag to look') : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
     : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? SCREEN_UNLOCKS.filter((s) => s.key && S.flags[s.flag]).sort((a, b) => 'JMC'.indexOf(a.key) - 'JMC'.indexOf(b.key)).map((s) => `${s.key}:${s.name}|`).join('') : '') + 'Esc:Menu';
   const keyState = keys + '#' + candles;
   if (keyState !== hud.keys) {

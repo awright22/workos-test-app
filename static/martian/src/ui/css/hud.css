@@ -440,7 +440,11 @@
 
 /* ================================================================ phones: nothing under 11 px
    (the interface's rem falls below 16 px on a small phone, so these are held in real pixels) */
-.mg-compact { --t11: max(.6875rem, 11px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); }
+/* (Sixth review: the floor is 12 px. Two more sizes are named for what they are for: --tcap, 14 px, for a label in
+   capitals, which is as tall as its capitals and no taller, so that 13 px of it measured as "about 10 px" beside the
+   text it labelled; and 13 px for the condensed face in lower case, which is narrow and small on its body. The name
+   --t11 is kept for the rules that use it: what they set is now 12 px.) */
+.mg-compact { --t11: max(.75rem, 12px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); --tcap: max(.875rem, 14px); }
 .mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
 .mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
 .mg-compact .suit .st { font-size: var(--t13); }
@@ -617,21 +621,21 @@
    footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
    under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
    holds both. */
-.mg-compact .row .lb { font-size: var(--t13); letter-spacing: .03em; }
+.mg-compact .row .lb { font-size: var(--tcap); letter-spacing: .03em; }
 .mg-compact { --grow: calc(.8 * var(--t14) + 1px + var(--gh)); }
-.mg-compact #mg-compass .dists span { font-size: var(--t13); letter-spacing: .02em; }
-.mg-compact #mg-region { font-size: var(--t13); letter-spacing: .12em; text-indent: .12em; }
+.mg-compact #mg-compass .dists span { font-size: var(--tcap); letter-spacing: .02em; }
+.mg-compact #mg-region { font-size: var(--tcap); letter-spacing: .12em; text-indent: .12em; }
 @keyframes mg-region-in-c { 0% { letter-spacing: .4em; text-indent: .4em; background: var(--accent-wash); } 100% { letter-spacing: .12em; text-indent: .12em; } }
-.mg-compact #mg-clock .sol .k { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact .alert { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact #mg-clock .sol .k { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact .alert { font-size: var(--tcap); letter-spacing: .08em; }
 .mg-compact .mg-line { grid-template-columns: 3rem 1fr; }
-.mg-compact .mg-line .who { font-size: var(--t13); letter-spacing: .04em; }
-.mg-compact .toast .t1 { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact #mg-rover .spd span { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--t13); letter-spacing: .12em; }
-.mg-compact #mg-keys { font-size: var(--t13); letter-spacing: .1em; }
-.mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .ph-title { font-size: var(--t13); }
+.mg-compact .mg-line .who { font-size: var(--tcap); letter-spacing: .04em; }
+.mg-compact .toast .t1 { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact #mg-rover .spd span { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--tcap); letter-spacing: .12em; }
+.mg-compact #mg-keys { font-size: var(--tcap); letter-spacing: .1em; }
+.mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .ph-title { font-size: var(--tcap); }
 @media (max-width: 760px) {
   /* (the narrowest phones: the name of the place stands between the bars and the mission list, in what room there is) */
   .mg-compact #mg-region { letter-spacing: 0; text-indent: 0; padding-left: .25rem; padding-right: .25rem; }
@@ -679,7 +683,12 @@
 .mg-compact .suit .num small { font-size: var(--t13); }
 
 /* The clock says what its second figure is: "SOL 1 · RESCUE SOL 25" (ui/hud.js leaves it out until he knows of it). */
+#mg-clock .sol, #mg-clock .meta { white-space: nowrap; flex: none; }
 #mg-clock .sol .of i { font-style: normal; color: var(--ink-3); margin-right: .25em; }
+#mg-clock .sol .of u { text-decoration: none; }
+/* (on a phone "SOL 1  RESCUE 25" has the room, and the sol the rescue falls on needs no second "sol") */
+.mg-compact #mg-clock .sol .of u { display: none; }
+@media (max-width: 760px) { .mg-compact #mg-clock { gap: .4375rem; } .mg-compact #mg-clock .meta .dn, .mg-compact #mg-clock .meta .sep { display: none; } }
 #mg-clock .sol .of:not(:empty) { margin-left: .625rem; text-transform: uppercase; letter-spacing: .08em; }
 .mg-compact #mg-clock .sol .of:not(:empty) { margin-left: .5rem; font-size: var(--t13); font-weight: 600; letter-spacing: .04em; color: var(--ink); }
 .mg-compact #mg-clock .sol .of i { color: var(--ink-2); font-weight: 500; }
@@ -710,3 +719,6 @@
 
 /* what is said on a card or in the log on a phone is 12 px at the least */
 .mg-compact .toast .t3, .mg-compact .mg-line { font-size: var(--t12); }
+
+/* photo mode: the way out is the first of its buttons, at the left, as on every sheet */
+.ph-btns [data-act="done"] { order: -1; }

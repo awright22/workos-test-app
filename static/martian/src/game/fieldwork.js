@@ -30,7 +30,7 @@ function boulderInReach() {
   }
   return best ? _rock.copy(best.v).multiplyScalar(surfaceAt(best.v) + 0.4) : null;
 }
-const bagged = () => { const s = scienceSummary(); return `${s.bagged}/${s.limit} bagged`; };
+const bagged = () => { const s = scienceSummary(); return `Bag ${Math.min(s.bagged + 1, s.limit)} of ${s.limit}`; };
 function hintOnce() {
   if (S.flags.sampleHint) return;
   S.flags.sampleHint = true;
@@ -42,7 +42,8 @@ addI({
   pos: boulderInReach, r: 99, hold: 2.2, mode: 'walk', priority: 5,
   visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
   enabled: () => canSample(_rock, 'rock'),
-  label: () => `Chip a rock sample (${bagged()})`,
+  label: () => 'Chip a rock sample',
+  sub: bagged,
   use: () => {
     const bag = takeSample(_rock, 'rock');
     if (!bag) return;

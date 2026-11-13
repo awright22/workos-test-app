@@ -20,8 +20,15 @@ import { roverF } from '../game/rover.js';
 const IMG_PPD = 8;                      // the atlas is 2880 x 1440: 8 pixels per degree
 const MAX_PPD = 72;
 const KM_PER_DEG = (2 * Math.PI * R) / 360 / 1000;
-/** How many times smaller than Mars this planet is: its scale, as a map gives one ("1:282"). */
+/** How many times smaller than Mars this planet is. */
 const PLANET_SCALE = Math.round(3389500 / R);
+/**
+ * What the map letters on its canvas, as { text, size, caps, mono }: the page's own text is measured by the audit
+ * (tests/audit-lib.mjs) and a canvas's cannot be, so the map says what it drew, and the audit holds it to the same
+ * sizes. (Latitudes and longitudes were 11 px and place names 12 where the page's labels were 13.)
+ */
+const lettering = [];
+UI.mapLettering = lettering;
 const R2D = 180 / Math.PI;
 const view = { lon: 180, lat: 0, ppd: 0 };      // centre and scale (CSS pixels per degree)
 let goal = null;                                 // the view being eased to, or null
@@ -138,7 +145,7 @@ function buildMarkers() {
 }
 
 /** Marker and place-name labels, placed greedily so nothing overlaps. */
-function placeLabels(you, storms) {
+function placeLabels(you, storms, stormBoxes) {
   const boxes = [], named = [];
   const free = (x, y, w, h) => { for (const b of boxes) if (x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1]) return false; return true; };
   /** Not straight under or over another marker's label with less than a line between them (it read as that label's second line). */
@@ -157,7 +164,7 @@ function placeLabels(you, storms) {
   // (What is lettered on the map is in capitals, and capitals are as tall as seven tenths of their size: a marker's
   //  name is 13 px at the least, as every label in capitals on a phone is; a place's name and a storm's, 12. The map
   //  is drawn on a canvas, which tests/audit-lib.mjs cannot measure: at 667 wide these were 10.8 and 11 px.)
-  const LS = Math.max(13, 12 * U);
+  const LS = Math.max(14, 13 * U);
   c.font = `600 ${LS}px "Barlow Condensed", sans-serif`;
   const byPri = markers.slice().sort((a, b) => a.pri - b.pri);
   for (const m of byPri) {
@@ -184,18 +191,20 @@ function placeLabels(you, storms) {
     if (at < 0) continue;
     const [x, y] = spots[at];
     m.named = true;
-    boxes.push([x, y, w, h]); named.push([x, y, w, h]);
+    // (with a margin at each end: two names 11 px apart on one line read as one, "MAV: THE WAY HOME MARS 6")
+    boxes.push([x - 7 * U, y, w + 14 * U, h]); named.push([x, y, w, h]);
     out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: LS, bold: true });
   }
   // storm cells are named where there is room
-  c.font = `600 ${Math.max(12, 11 * U)}px "Barlow Condensed", sans-serif`;
+  const SS = Math.max(14, 12 * U);
+  c.font = `600 ${SS}px "Barlow Condensed", sans-serif`;
   for (const st of storms) {
     const text = 'DUST STORM';
-    const w = c.measureText(text).width + (text.length * 1.4 + 8) * U, h = 15 * U;
+    const w = c.measureText(text).width + (text.length * 1.4 + 8) * U, h = SS + 3 * U;
     const x = st.x - w / 2, y = st.y - h / 2;
     if (x < 4 || x + w > W - 4 || y < 4 || y + h > H - 4 || !free(x, y, w, h)) continue;
     boxes.push([x, y, w, h]);
-    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: Math.max(12, 11 * U), bold: true, spacing: 1.4 * U });
+    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: SS, bold: true, spacing: 1.4 * U });
   }
   // place names: the largest first; small ones appear as you zoom in
   const places = [];
@@ -207,13 +216,16 @@ function placeLabels(you, storms) {
     if (px < 26) continue;
     const lat = Math.abs(p.lat) > 86 ? Math.sign(p.lat) * 84 : p.lat;
     const x = sx(p.lon), y = sy(lat);
-    const size = Math.max(12, clampN(9 + px / 28, 10, 15) * U);
+    const size = Math.max(14, clampN(9 + px / 28, 10, 15) * U);
     const spacing = size * 0.22;
     c.font = `500 ${size}px "Barlow Condensed", sans-serif`;
     const text = p.name.toUpperCase();
     const w = c.measureText(text).width + text.length * spacing + 8 * U, h = size + 4 * U;
     // (the whole name inside the map, or not at all: PHOENIX was cut by the header)
     if (x < 0 || x > W || y - h / 2 < 3 || y + h / 2 > H - 3) continue;
+    // (and not across a storm: pale capitals over pale hatching could not be read. The storm is news; the name of the
+    //  plain under it comes back when it has blown through.)
+    if (stormBoxes.some((b) => x + w / 2 > b[0] && x - w / 2 < b[0] + b[2] && y + h / 2 > b[1] && y - h / 2 < b[1] + b[3])) continue;
     if (x - w / 2 < 4 || x + w / 2 > W - 4 || !free(x - w / 2, y - h / 2, w, h)) continue;
     boxes.push([x - w / 2, y - h / 2, w, h]);
     out.push({ text, x: x - w / 2 + 4 * U, y, color: col.place, size, spacing });
@@ -231,6 +243,7 @@ function readColours() {
   col.ok = v('--ok', '#8be0a4'); col.danger = v('--danger', '#ff6a5c'); col.place = 'rgba(245,240,232,.8)';
 }
 function text(t, x, y, o) {
+  lettering.push({ text: t, size: o.size, caps: true });
   c.font = `${o.bold ? 600 : 500} ${o.size}px "Barlow Condensed", sans-serif`;
   c.textBaseline = 'middle'; c.textAlign = 'left';
   try { c.letterSpacing = (o.spacing !== undefined ? o.spacing : 0.9 * U) + 'px'; } catch (e) { /* older browsers */ }
@@ -281,14 +294,16 @@ function draw() {
   const latTop = view.lat + H / 2 / ppd, latBot = view.lat - H / 2 / ppd;
   for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = Math.round(sy(lat)) + 0.5; c.moveTo(0, y); c.lineTo(W, y); }
   c.stroke();
-  c.font = `500 ${Math.max(11, 10 * U)}px "JetBrains Mono", monospace`; c.fillStyle = 'rgba(245,240,232,.55)'; c.textBaseline = 'alphabetic';
+  lettering.length = 0;
+  const GS = Math.max(12, 11 * U);
+  c.font = `500 ${GS}px "JetBrains Mono", monospace`; c.fillStyle = 'rgba(245,240,232,.7)'; c.textBaseline = 'alphabetic';
   c.textAlign = 'left';
-  for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = sy(lat); if (y > 14 * U && y < H - 6 && lat % (step * (step === 30 ? 1 : 2)) === 0) c.fillText(lat === 0 ? '0°' : fmtLat(lat).replace('.0', ''), 6 * U, y - 3 * U); }
+  for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = sy(lat); if (y > 16 * U && y < H - 6 && lat % (step * (step === 30 ? 1 : 2)) === 0) { const t = lat === 0 ? '0°' : fmtLat(lat).replace('.0', ''); c.fillText(t, 6 * U, y - 3 * U); lettering.push({ text: t, size: GS, mono: true }); } }
   c.textAlign = 'center';
-  for (let lon = Math.ceil(lonL / step) * step; lon <= lonR; lon += step) { const x = W / 2 + (lon - view.lon) * ppd; if (x > 40 * U && x < W - 30 * U && lon % (step * 2) === 0) c.fillText(`${((lon % 360) + 360) % 360}°E`, x, H - 6 * U); }
+  for (let lon = Math.ceil(lonL / step) * step; lon <= lonR; lon += step) { const x = W / 2 + (lon - view.lon) * ppd; if (x > 40 * U && x < W - 30 * U && lon % (step * 2) === 0) { const t = `${((lon % 360) + 360) % 360}°E`; c.fillText(t, x, H - 6 * U); lettering.push({ text: t, size: GS, mono: true }); } }
 
   // storm cells
-  const stormLabels = [];
+  const stormLabels = [], stormBoxes = [];
   for (const cell of S.storm.cells) {
     const rLat = (cell.r / R) * R2D, rLon = rLat / Math.max(0.2, Math.cos(cell.lat * Math.PI / 180));
     const x = sx(cell.lon), y = sy(cell.lat);
@@ -297,9 +312,9 @@ function draw() {
       if (cx + rLon * ppd < 0 || cx - rLon * ppd > W) continue;
       c.save();
       c.beginPath(); c.ellipse(cx, y, rLon * ppd, rLat * ppd, 0, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(214,168,120,.22)'; c.fill();
+      c.fillStyle = 'rgba(214,168,120,.2)'; c.fill();
       c.clip();
-      c.strokeStyle = 'rgba(232,196,150,.5)'; c.lineWidth = 1;
+      c.strokeStyle = 'rgba(232,196,150,.34)'; c.lineWidth = 1;
       c.beginPath();
       for (let d = -rLat * ppd * 2 - rLon * ppd; d < rLon * ppd * 2; d += 7 * U) { c.moveTo(cx + d, y + rLat * ppd); c.lineTo(cx + d + rLat * ppd * 2, y - rLat * ppd); }
       c.stroke();
@@ -307,6 +322,7 @@ function draw() {
       c.beginPath(); c.ellipse(cx, y, rLon * ppd, rLat * ppd, 0, 0, Math.PI * 2);
       c.setLineDash([5, 4]); c.strokeStyle = 'rgba(240,210,170,.85)'; c.lineWidth = 1.25; c.stroke(); c.setLineDash([]);
       if (rLat * ppd > 16 * U) stormLabels.push({ x: cx, y });
+      stormBoxes.push([cx - rLon * ppd * 0.8, y - rLat * ppd * 0.8, rLon * ppd * 1.6, rLat * ppd * 1.6]);
     }
   }
 
@@ -319,7 +335,8 @@ function draw() {
   const radius = (m) => (m.unknown ? 8 : m.small ? 6 : 10) * U;
   for (const m of markers.slice().sort((a, b) => (b === selected) - (a === selected) || a.pri - b.pri)) {
     m.under = null; m.group = null; m.named = false;
-    for (const l of leads) if (Math.hypot(l.x - m.x, l.y - m.y) < Math.max(15 * U, radius(l) + radius(m) + 2 * U)) { m.under = l; (l.group || (l.group = [l])).push(m); break; }
+    // (or stand within 8 px of touching: two unknown signals 5 px apart read as one smudged mark)
+    for (const l of leads) if (Math.hypot(l.x - m.x, l.y - m.y) < Math.max(15 * U, radius(l) + radius(m) + 8 * U)) { m.under = l; (l.group || (l.group = [l])).push(m); break; }
     if (!m.under) leads.push(m);
   }
   const pll = vecToLl(_v1.copy(player.pos).normalize());
@@ -345,7 +362,7 @@ function draw() {
   // Names are placed before the markers are drawn, because a marker that has a name and found no room for it at this
   // zoom is drawn as a dot, not as a picture with no name beside it (the compass does the same): zoom in, or tap it,
   // and it says what it is. (A lander's icon stood unnamed between the Hab and the rocket on the whole-planet map.)
-  const labels = placeLabels(you, stormLabels);
+  const labels = placeLabels(you, stormLabels, stormBoxes);
   // markers
   for (const m of markers) {
     if (m.under || m.x < -20 || m.x > W + 20 || m.y < -20 || m.y > H + 20) continue;
@@ -444,9 +461,12 @@ function pick(x, y) {
 // ------------------------------------------------------------------------------------------
 // Set-up and input
 // ------------------------------------------------------------------------------------------
+// (Everything the map draws has its line here: the rocket and the dot a crowded marker shrinks to had none. And it
+//  is the Key, under the button of that name: it was headed "Legend".)
 const LEGEND = [
-  ['arrow', 'ink', 'You, and where you face'], ['hab', 'accent', 'The Hab'], ['rocket', 'accent', 'Objective'], ['target', 'cold', 'NASA survey target'],
-  ['cache', 'cold', 'Supply cache'], ['lander', 'ink', 'Lander'], ['question', 'ink-3', 'Unknown signal'], ['beacon', 'ok', 'Built by you'],
+  ['arrow', 'ink', 'You, and where you face'], ['hab', 'accent', 'The Hab'], ['rocket', 'ink', 'The MAV: the way home'], ['dish', 'accent', 'Pathfinder’s radio'],
+  ['target', 'cold', 'NASA survey target'], ['lander', 'ink', 'Lander you have found'], ['cache', 'cold', 'Supply cache or debris'], ['question', 'ink-3', 'Unknown signal'],
+  ['beacon', 'ok', 'Built by you'],
 ];
 export function initMap(body) {
   if (cv) return;
@@ -463,17 +483,20 @@ export function initMap(body) {
     `<button type="button" class="mg-iconbtn" data-a="out" aria-label="Zoom out" title="Zoom out">${icon('minus')}<span class="cap">Out</span></button><span class="gap"></span>` +
     `<button type="button" class="mg-iconbtn" data-a="me" aria-label="Centre on your position" title="Centre on your position">${icon('locate')}<span class="cap">You</span></button>` +
     `<button type="button" class="mg-iconbtn" data-a="hab" aria-label="Centre on the Hab" title="Centre on the Hab">${icon('hab')}<span class="cap">Hab</span></button><span class="gap"></span>` +
-    `<button type="button" class="mg-iconbtn" data-a="legend" aria-label="Legend" title="Legend" aria-pressed="false">${icon('layers')}<span class="cap">Key</span></button>`);
+    `<button type="button" class="mg-iconbtn" data-a="legend" aria-label="Key to the map" title="Key" aria-pressed="false">${icon('layers')}<span class="cap">Key</span></button>`);
   legend = el('div', null, 'map-legend', wrap,
-    '<h3>Legend</h3><ul>' + LEGEND.map(([ic, colour, label]) => `<li style="color:var(--${colour})"><i>${icon(ic)}</i><span>${label}</span></li>`).join('') +
-    '<li style="color:rgba(240,210,170,.9)"><i class="sw"></i><span>Dust storm</span></li><li><i class="night"></i><span>Night side</span></li></ul>');
+    '<h3>Key</h3><ul>' + LEGEND.map(([ic, colour, label]) => `<li style="color:var(--${colour})"><i>${icon(ic)}</i><span>${label}</span></li>`).join('') +
+    '<li><i class="dot"></i><span>A marker with no room for its name: zoom in</span></li>' +
+    '<li style="color:rgba(240,210,170,.9)"><i class="sw"></i><span>Dust storm</span></li><li><i class="night"></i><span>Night side</span></li></ul>' +
+    `<p>Amber marks where the mission leads. The planet is Mars at 1/${PLANET_SCALE} of its size, ${Math.round(2 * Math.PI * R / 1000)} km round: distances are as you will walk and drive them.</p>`);
   info = el('div', null, 'map-info', wrap);
   info.hidden = true;
   info.setAttribute('role', 'status');
   const status = el('div', null, 'map-status', wrap,
-    // (the bar measures this planet, which is Mars at 1:282 and 75 km round: "10 km" under a map of the whole of Mars
-    //  read as a mistake to anyone who knows Mars, so the scale is given beside it, as a map gives one)
-    `<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><em title="This planet is Mars at 1:${PLANET_SCALE}">Scale 1:${PLANET_SCALE}</em><i></i><span></span></span>`);
+    // (The bar measures this planet, which is Mars at 1/282 of its size and 75 km round: "10 km" under a map of the
+    //  whole of Mars reads as a mistake to anyone who knows Mars. So the bar says what it measures, in words. It was
+    //  "SCALE 1:282" for a while, which reads as the map's own ratio and is nonsense as one.)
+    `<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><em>Mars at 1/${PLANET_SCALE} size</em><i></i><span></span></span>`);
   statusBar = status;
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
   // (on a touch screen the hint is a chip of the map's own, over the status bar, not a part of the bar)
@@ -591,11 +614,21 @@ export function openMap() {
   // it where there is somewhere else for it to stand. (Names keep clear of it wherever it is: see placeLabels.)
   touchHint.classList.remove('low');
   if (!touchHint.classList.contains('gone')) {
+    // (clear of a marker by the marker's own size and 12 px more: the chip stood touching PHOENIX, whose centre was
+    //  just outside its box. Where the middle of the head is taken it tries along the head, then along the foot; and
+    //  with no room anywhere it is not shown: the map is touched to work it either way.)
     const clear = () => {
-      const hr = touchHint.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), pad = 12 * U;
-      return !markers.some((m) => !m.under && m.x > hr.left - wr.left - pad && m.x < hr.right - wr.left + pad && m.y > hr.top - wr.top - pad && m.y < hr.bottom - wr.top + pad);
+      const hr = touchHint.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), pad = 24 * U;
+      return hr.left - wr.left >= 6 && hr.right - wr.left <= W - 6 &&
+        !markers.some((m) => !m.under && m.x > hr.left - wr.left - pad && m.x < hr.right - wr.left + pad && m.y > hr.top - wr.top - pad && m.y < hr.bottom - wr.top + pad);
     };
-    if (!clear()) { touchHint.classList.add('low'); if (!clear()) touchHint.classList.remove('low'); }
+    touchHint.style.left = '';
+    let ok = false;
+    search: for (const low of [false, true]) {
+      touchHint.classList.toggle('low', low);
+      for (const f of [0.5, 0.3, 0.7, 0.22, 0.78]) { touchHint.style.left = (f * 100) + '%'; if (clear()) { ok = true; break search; } }
+    }
+    if (!ok) { touchHint.classList.remove('low'); touchHint.style.left = ''; touchHint.classList.add('gone'); }
     draw();
   }
 }

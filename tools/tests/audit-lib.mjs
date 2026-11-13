@@ -1,8 +1,14 @@
-// What a screenshot review measures by eye, measured in the page: text set under 11 px (capitals under 13: a
-// line of capitals is as tall as its capitals, seven tenths of its size), a figure run into its unit, touch targets
-// under 44 px (a slider's handle and a switch included, and anything drawn as a button), controls that reach outside
-// the safe area, text cut off by its box, text printed over other text, and content cut by the edge of the box or
-// dialog it is in, or by the screen.
+// What a screenshot review measures by eye, measured in the page: text set too small (on a phone: anything under
+// 12 px, capitals under 14, the condensed face under 13, and what the map letters on its canvas by the same rules), a
+// figure run into its unit, touch targets under 44 px (a slider's handle and a switch included, and anything drawn as a
+// button), round touch buttons standing closer than 12 px, controls that reach outside the safe area, text cut off by
+// its box, text printed over other text, and content cut by the edge of the box or dialog it is in, or by the screen.
+//
+// The sizes are what a reviewer's eye makes of type, not what the style sheet calls it. The sixth review named labels
+// this audit had passed: gauge units and a banner's second line (the condensed face in lower case at 11 px: its
+// lower case stands 5.5 px tall, and reads as 8 px type); the captions of the touch buttons (capitals at 12 px, which
+// the rule of the time excused as "half of a label"); tile labels and a card's field names (capitals at 13 px, read
+// as "about 10 px" beside 13 px text); and latitudes on the map (11 px on a canvas, which was not measured at all).
 // `auditInPage` runs inside the browser (pass it to page.evaluate with the safe-area insets); it must not
 // refer to anything outside itself.
 
@@ -61,20 +67,50 @@ export function auditInPage(safe) {
     const v = visiblePart(p);
     if (v.right - v.left < 1 || v.bottom - v.top < 1 || !onScreen(v)) continue;
     const cs = styleOf(p), size = parseFloat(cs.fontSize), said = t.nodeValue.trim();
-    if (size < 10.95) out.text.push(`${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
+    const phone = root.classList.contains('mg-compact');
+    // (A phone's rules, where they were found: the phone arrangement is the one held to them. A tablet's pixel is a
+    //  quarter larger and a desktop is read from further off at a larger scale: both are held to 11 px and no more.)
+    if (size < (phone ? 11.95 : 10.95)) out.text.push(`${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
     // A label in capitals has no ascenders or descenders: what the eye measures is the capitals' height, seven tenths
-    // of the type's size. At 11 px that is under 8 px of letter, and a reviewer reads it as 9 px type. Capitals are
-    // therefore held to 13 px (9 px of letter). A lone letter or figure is not a label (a key cap, a count). The
-    // caption under the icon of a round or square touch button is half of a label, the icon being the other half,
-    // and has 46 px to stand in: it is held to 12.
+    // of the type's size. At 11 px that is under 8 px of letter, and a reviewer reads it as 9 px type; at 13 px, as
+    // "about 10". Capitals are therefore held to 14 px (10 px of letter), on a touch button's caption as anywhere
+    // else. A lone letter or figure is not a label (a key cap, a count).
     // (An acronym at the head of a sentence, "EVA" before the rest of a line, is not a label: it is the whole of what
     //  the element says that is in capitals, or is made so by its style.)
-    // (This is a phone's rule, where it was found: the phone arrangement is the one held to it. A tablet's pixel is
-    //  a quarter larger and its labels are not yet held to more than the 11 px above.)
-    else if (root.classList.contains('mg-compact') && size < (p.closest('.mg-tbtn') ? 11.95 : 12.95) && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(p.textContent)))
+    else if (phone && size < 13.95 && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(p.textContent)))
       out.text.push(`capitals at ${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
+    // The condensed face is narrow, and small on its body: its words are held to 13 px in any case of letter. (A
+    // gauge's "meals" and a banner's "the tank is almost empty" were 11 px of it, and read as 8.)
+    else if (phone && size < 12.95 && /[A-Za-z]/.test(said) && /condensed/i.test(cs.fontFamily.split(',')[0]))
+      out.text.push(`condensed type at ${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
     // a figure and its unit are written apart, everywhere the same way ("28 L", not "28L")
     if (/\d(L|km|m)\b/.test(said) && !/\d(L|km|m)\b[-/]/.test(said)) out.text.push(`a figure run into its unit  ${name(p)}  “${said.slice(0, 28)}”`);
+  }
+
+  // ---- what the map letters on its canvas: the page cannot be asked, so the map says what it drew (ui/map.js), and
+  //      it is held to the page's own sizes
+  if (root.classList.contains('mg-compact') && (document.getElementById('mg-map') || { style: {} }).style.display === 'block') {
+    const told = new Set();
+    for (const l of (window.__UI && window.__UI.mapLettering) || []) {
+      const least = l.caps ? 13.95 : 11.95, key = `${l.caps ? 'capitals' : 'lettering'} at ${(+l.size).toFixed(1)}px`;
+      if (l.size < least && !told.has(key)) { told.add(key); out.text.push(`${key}  on the map's canvas  “${String(l.text).slice(0, 28)}”`); }
+    }
+  }
+
+  // ---- the round touch buttons stand apart: 12 px between any two, rim to rim. (The candle, which spends something,
+  //      stood 6 px from RUN, and JUMP 9 px from the action button.) Where they stand does not change with what they
+  //      show, so one that is out of sight just now (the action button with nothing in reach) is measured all the same.
+  {
+    const rounds = [...root.querySelectorAll('#mg-touch > .mg-tbtn')].filter((n) => {
+      if (styleOf(n).display === 'none' || styleOf(n.parentElement).display === 'none' || !root.classList.contains('is-playing') || root.classList.contains('is-modal')) return false;
+      const r = n.getBoundingClientRect();
+      return r.width > 20 && parseFloat(styleOf(n).borderTopLeftRadius) >= Math.min(r.width, r.height) / 2 - 1;
+    });
+    for (let i = 0; i < rounds.length; i++) for (let j = i + 1; j < rounds.length; j++) {
+      const a = rounds[i].getBoundingClientRect(), b = rounds[j].getBoundingClientRect();
+      const gap = Math.hypot((a.left + a.right - b.left - b.right) / 2, (a.top + a.bottom - b.top - b.bottom) / 2) - (a.width + b.width) / 2;
+      if (gap < 11.5) out.targets.push(`${Math.max(0, Math.round(gap))} px apart  ${name(rounds[i])} and ${name(rounds[j])}`);
+    }
   }
 
   // ---- things a thumb presses: 44 px each way (a switch is pressed by its row), and inside the safe area

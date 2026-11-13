@@ -417,24 +417,51 @@
    footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
    under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
    holds both. */
-.mg-compact .scr-nav button, .mg-compact .colony .tabs button, .mg-compact .journal .tabs button { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact .pane-hd { font-size: var(--t13); letter-spacing: .16em; }
+.mg-compact .scr-nav button, .mg-compact .colony .tabs button, .mg-compact .journal .tabs button { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact .pane-hd { font-size: var(--tcap); letter-spacing: .16em; }
 .mg-compact .pane-hd span { letter-spacing: .08em; color: var(--ink-2); }
-.mg-compact .col-bar b { font-size: var(--t13); }
-.mg-compact .badge { font-size: var(--t13); letter-spacing: .06em; padding: .125rem .375rem; }
-.mg-compact .card h4 small { font-size: var(--t13); }
+.mg-compact .col-bar b { font-size: var(--tcap); }
+.mg-compact .badge { font-size: var(--tcap); letter-spacing: .06em; padding: .125rem .375rem; }
+.mg-compact .card h4 small { font-size: var(--tcap); }
 .mg-compact .leads li { grid-template-columns: 2.625rem 1fr; }
-.mg-compact .leads b { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .leads b { font-size: var(--tcap); letter-spacing: .08em; }
 .mg-compact .jlog .mg-line { grid-template-columns: 4.5rem 1fr; }
-.mg-compact .jlog .mg-line .who, .mg-compact .jlog .mg-line .who small { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .map-status, .mg-compact .map-status .t-mono { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .jlog .mg-line .who, .mg-compact .jlog .mg-line .who small { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .map-status, .mg-compact .map-status .t-mono { font-size: var(--tcap); letter-spacing: .06em; }
 .mg-compact .map-status .t-mono { letter-spacing: -.02em; }
-.mg-compact .map-tools .cap { font-size: var(--t13); letter-spacing: .02em; }
-.mg-compact .map-legend h3, .mg-compact .map-info .ty, .mg-compact .map-info dt, .mg-compact .map-info .grp b { font-size: var(--t13); letter-spacing: .1em; }
-.mg-compact .map-info dd.t-mono { font-size: var(--t13); }
-.map-hint { font-size: max(.8125rem, 13px); }
-.mg-compact .empty b { font-size: max(.875rem, 13px); }
+.mg-compact .map-tools .cap { font-size: var(--tcap); letter-spacing: .02em; }
+.mg-compact .map-legend h3, .mg-compact .map-info .ty, .mg-compact .map-info dt, .mg-compact .map-info .grp b { font-size: var(--tcap); letter-spacing: .1em; }
+.mg-compact .map-info dd.t-mono { font-size: var(--tcap); }
+.map-hint { font-size: var(--tcap); }
+.mg-compact .empty b { font-size: var(--tcap); }
 @media (max-width: 760px) {
   .mg-compact .journal .tabs button { letter-spacing: .02em; }
   .mg-compact .scr-nav button { letter-spacing: .04em; }
 }
+
+/* ================================================================ sixth review */
+/* The colony: its tabs stand first and never move; away from the Hab one line under them says the fabricator is out
+   of reach. A card's button stands at its foot, so the buttons of a row are in a line whatever the cards say. What
+   is missing is said in the plain colour: the chips already mark it, and a first visit was a page of red. */
+.colony .col-bar { border-bottom: 1px solid var(--line-2); }
+.mg-compact .col-bar.off { display: flex; }
+.rcp { display: flex; flex-direction: column; }
+.rcp-ft { margin-top: auto; padding-top: .6875rem; }
+.mg-compact .rcp-ft { margin-top: auto; padding-top: .4375rem; }
+.rcp-ft .why.bad { color: var(--ink-2); }
+.chip.miss { border-color: rgba(255, 106, 92, .5); background: transparent; }
+/* (a page's first line of explanation is for the first visit: on a phone, once there is something on the page to see,
+   the room is the cards') */
+.mg-compact .pane.on > .pane-note.first:not(:only-of-type) { display: none; }
+.pane-note.first { margin-top: 0; }
+.mg-compact .jr-body > .pane-note.first { margin-bottom: .5rem; }
+
+/* The map's key: solid, so nothing shows through its words, and seated on the status bar, so the longitudes are
+   under it whole and not cut in half by its foot. */
+.map-legend { background: #100e0d; }
+.map-legend p { margin-top: .5rem; padding-top: .4375rem; border-top: 1px solid var(--line-2); font-size: .8125rem; line-height: 1.4; color: var(--ink-2); }
+.map-legend li i.dot { border: 0; background: none; }
+.map-legend li i.dot::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px rgba(12, 10, 8, .88); }
+.mg-compact .map-legend { bottom: max(2rem, 32px); }
+.mg-touch.mg-compact .map-legend { left: 0; right: 0; bottom: max(2.75rem, 44px); border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
+.mg-compact .map-legend p { font-size: var(--t12); }

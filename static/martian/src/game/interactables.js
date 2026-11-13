@@ -195,7 +195,7 @@ addI({
     // Hab's line comes when that has been read, and his own log entry when the Hab's has. (All of it used to land
     // within a second, on top of the old prompt and the old task struck through.)
     clearLog();                                          // (a line from the run to the door is not left to surface now)
-    after(2.8, () => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'));
+    after(2.8, () => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'suit'));
     after(9, () => log(SOL_LOGS[1]));
   },
 });

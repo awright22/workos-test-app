@@ -24,7 +24,7 @@ export function connectPathfinder() {
     // (it was signed "— JPL" under the name HOUSTON)
     ['n', 'MARK? MARK, IS THAT YOU? This is Houston. We\'re receiving Pathfinder telemetry. The whole world is watching, Mark.'],
     ['w', 'Alive and well. Ish. Growing potatoes on a dead planet. Air holds, food\'s tight, morale is potato-based.'],
-    ['n', `Copy. New plan: Ares 4\'s MAV is fuelled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
+    ['n', `Copy. New plan: the MAV, Ares 4\'s rocket, is fuelled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
     ['w', S.sol >= S.rescueSol
       ? `So the plan is "drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`
       : `So the plan is "don\'t die for ${S.rescueSol - S.sol} more sol${S.rescueSol - S.sol === 1 ? '' : 's'}, then drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`],
@@ -46,6 +46,7 @@ export function connectPathfinder() {
       title: 'Pathfinder uplink', subtitle: 'Signal delay: 11 minutes, mercifully compressed',
       lines: convo, index: i,
       onNext: () => { i++; Snd.click(); step(); },
+      onSkip: () => { i = convo.length - 1; Snd.click(); step(); },
     });
     if (i === 0) Snd.ok();
   };
@@ -153,10 +154,11 @@ export function updateDiscoveries(dt) {
   }
 }
 export const ACHIEVEMENTS = [
+  // (each says what to do, in the same form: "Five hydrazine burns survived" sat among "Harvest 50 potatoes")
   { id: 'notdead', name: 'Not Dead Yet', desc: 'Reach the dawn of Sol 2', check: () => S.sol >= 2 },
   { id: 'phone', name: 'Phone Home', desc: 'Restore the Pathfinder uplink', check: () => S.pf.connected },
   { id: 'botanist', name: 'Greatest Botanist on This Planet', desc: 'Harvest 50 potatoes', check: () => S.stats.potatoes >= 50 },
-  { id: 'eyebrows', name: 'Both Eyebrows', desc: 'Five hydrazine burns survived', check: () => S.stats.booms >= 5 },
+  { id: 'eyebrows', name: 'Both Eyebrows', desc: 'Survive 5 hydrazine burns', check: () => S.stats.booms >= 5 },
   { id: 'arch', name: 'Archaeologist of the Future', desc: 'Salvage 8 historic landers', check: () => Object.keys(S.salvaged).length >= 8 },
   { id: 'olympus', name: 'Peak Performance', desc: 'Stand on the summit of Olympus Mons',
     check: () => { const f = FEATURES.find(f => f.name === 'Olympus Mons'); _v2.copy(player.pos).normalize(); return angDist(_v2.x, _v2.y, _v2.z, f.v.x, f.v.y, f.v.z) * R < 120; } },
@@ -175,6 +177,13 @@ export const ACHIEVEMENTS = [
   { id: 'home', name: 'No Place Like Hab', desc: 'Make 6 comforts for the Hab', check: () => !!S.comforts && Object.keys(S.comforts).length >= 6 },
   { id: 'pirate', name: 'Space Pirate', desc: 'Leave Mars', check: () => S.won },
 ];
+const DONE = { Reach: 'Reached', Restore: 'Restored', Harvest: 'Harvested', Survive: 'Survived', Salvage: 'Salvaged', Stand: 'Stood', Drive: 'Drove', Mine: 'Mined', Spend: 'Spent',
+  Walk: 'Walked', Endure: 'Endured', Catalogue: 'Catalogued', Find: 'Found', Cook: 'Cooked', Make: 'Made', Leave: 'Left' };
+/**
+ * What an achievement was earned for, as a thing done: "Spent 60 seconds outside in a dust storm". Its description
+ * says what to do, which is right until it is done. (The card that announces one read "Spend 60 seconds…".)
+ */
+export function achievementDone(a) { const w = a.desc.split(' ')[0]; return DONE[w] ? DONE[w] + a.desc.slice(w.length) : a.desc; }
 export function checkAchievements() {
   for (const a of ACHIEVEMENTS) {
     if (S.achieved[a.id]) continue;
@@ -183,7 +192,7 @@ export function checkAchievements() {
     if (ok) {
       S.achieved[a.id] = true;
       Snd.play('achievement');
-      toast('ACHIEVEMENT', a.name, a.desc);
+      toast('ACHIEVEMENT', a.name, achievementDone(a));
     }
   }
 }
@@ -220,10 +229,11 @@ export function winGame() {
       // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
       //  and "3.4 / Km walked" here were the same number written two ways)
       ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', discoveriesFound()],
-      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
+      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}<small>of ${ACHIEVEMENTS.length}</small>`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,
-    quote: `${S.sol} sols alone on a planet. I ${fed}, ${went}, and I am going home.${mood}<cite>Log, Sol ${S.sol}: the last entry from the surface</cite>`,
+    // (whose words these are comes first, as a log entry's date does: after them it ran on from the last sentence)
+    quote: `<cite>Log, Sol ${S.sol}, the last entry from the surface</cite>${S.sol} sols alone on a planet. I ${fed}, ${went}, and I am going home.${mood}`,
     buttons: [{ label: 'Back to the title', keep: true, fn: () => tryReload() }],
   });
 }

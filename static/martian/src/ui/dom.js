@@ -177,7 +177,8 @@ for (const [k, label] of [['journal', 'Journal'], ['map', 'Map'], ['colony', 'Co
 // ------------------------------------------------------------------------------------------
 // Full screens: map, colony, journal (filled by ui/screens.js)
 // ------------------------------------------------------------------------------------------
-export const SCREENS = [['map', 'Map', 'Orbital Survey'], ['colony', 'Colony', 'Colony'], ['journal', 'Journal', 'Mission Journal']];
+// (in the order of their buttons on the HUD, left to right)
+export const SCREENS = [['colony', 'Colony', 'Colony'], ['map', 'Map', 'Orbital Survey'], ['journal', 'Journal', 'Mission Journal']];
 function screenShell(key, title) {
   const s = el('section', 'mg-' + key, 'mg-screen', root,
     `<header class="scr-hd"><div class="scr-title">${icon(key)}<h1>${title}</h1></div>` +
@@ -423,10 +424,11 @@ export function toast(kicker, title, note, o) {
 // ------------------------------------------------------------------------------------------
 // The log feed: three voices (the astronaut, the Hab's systems, NASA) and survey notes
 // ------------------------------------------------------------------------------------------
-// (The Hab's voice is the Hab reporting: in the plain colour. Its alarms, a breach or a reserve running out, are the
-// same voice in red. A remark with no speaker, a passing dust devil, is a NOTE. All three used to be "HAB" in red,
-// which read as an alarm over a line about the weather.)
-export const VOICES = { nasa: 'NASA', sys: 'HAB', alarm: 'HAB', note: 'NOTE', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
+// (What the Hab's systems report as an alarm, a breach or a reserve running out, is the HAB, in red. Everything else
+// that is not his own entry, the suit's, NASA's or a survey's is a NOTE, in the plain colour: a sample bagged, a
+// machine's condition, a passing dust devil. All of it used to be "HAB" in red, an alarm over a line about the
+// weather, and nothing said who HAB was.)
+export const VOICES = { nasa: 'NASA', sys: 'NOTE', alarm: 'HAB', note: 'NOTE', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
 /** A line of his own log as it is shown: the label beside it already says LOG ("LOG  Log, Sol 1." said it twice). */
 export const logText = (l) => (l.voice === 'log' ? l.text.replace(/^Log, /, '') : l.text);
 /** What has been said, newest last: { text, voice, sol }. The journal shows it, and the last of it is kept with the saved game. */

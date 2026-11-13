@@ -104,7 +104,10 @@ await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
 await shot('night-summary', 'Sleeping until dawn: the account of the night, which waits to be read.', 2200);       // (past its fade-in, which software rendering stretches)
 await tapSel('#mg-panel .sleep .wake');
 await shot('woken', 'Awake again.', 4000);
-await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 20000);
+// (twenty seconds of the game's own time, stepped, as with the first ten: left to run, this machine drew a handful of
+// frames in twenty seconds of the wall clock, and what goes after a few seconds of play was photographed still there)
+await ev((G) => { G.paused = true; G.tick(0.05, 400); });
+await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 1200);
 
 await writeFile(path.join(dir, 'steps.txt'), steps.join('\n') + '\n');
 console.log('console errors:', g.errors.length, g.errors.slice(0, 5));

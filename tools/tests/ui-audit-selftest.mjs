@@ -72,7 +72,26 @@ await page.evaluate(() => window.__UI.hideOverlay());
 await sleep(300);
 check('a mark drawn as a button, 18 px across', await audit(),
   await withFault('', '<span style="display:grid;place-items:center;width:17px;height:17px;border:1px solid rgba(245,240,232,.58);border-radius:50%;font:600 11px/1 sans-serif">?</span>', '#mg-vitals .suit'), /^target: 1\dx1\d  drawn as a button/);
-check('a label in capitals at 11 px', await audit(), await withFault('.mg-compact .suit .cap { font-size: 11px !important; }'), /^text: capitals at 11/);
+check('a label in capitals at 11 px', await audit(), await withFault('.mg-compact .suit .cap { font-size: 11px !important; }'), /^text: 11\.0px .*suit/);
+// The sixth review measured more that the audit of the time had passed: a touch button's caption at 12 px and tile and
+// field labels at 13 (capitals, read as "about 10 px"); gauge units at 11 px in the condensed face (read as 8); the
+// candle 6 px from RUN; and latitudes at 11 px on the map's canvas, which the audit did not measure at all.
+await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 6); });
+await sleep(300);
+check('a label in capitals at 13 px', await audit(), await withFault('.mg-compact .suit .cap { font-size: 13px !important; }'), /^text: capitals at 13\.0px .*suit/);
+check('a touch button\'s caption at 12 px', await audit(), await withFault('#mg-trow .mg-tbtn span { font-size: 12px !important; }'), /^text: capitals at 12\.0px .*mg-tbtn/);
+check('a gauge\'s unit at 12 px in the condensed face', await audit(), await withFault('.mg-compact .row .val small { font-size: 12px !important; }'), /^text: condensed type at 12\.0px .*small/);
+check('the candle 6 px from RUN', await audit(), await withFault('#mg-tCandle { right: calc(var(--sar) + 9.5rem) !important; bottom: calc(var(--sab) + 6.125rem) !important; }'), /^target: \d+ px apart .*(tCandle.*tSprint|tSprint.*tCandle)/);
+await page.keyboard.press('m');
+await sleep(600);
+{
+  const clean = await audit();
+  await page.evaluate(() => window.__UI.mapLettering.push({ text: '30°N', size: 11, mono: true }, { text: 'THARSIS RISE', size: 12, caps: true }));
+  const broken = await audit();
+  check('lettering on the map\'s canvas at 11 and 12 px', clean, broken, /^text: (lettering at 11|capitals at 12).*canvas/);
+}
+await page.keyboard.press('Escape');
+await ev((G) => { G.tpLocal(-3.4, 3.2); G.tick(0.05, 3); });
 kinds = /^(over|clipped|outside)/;
 
 // the colony's inventory: rows that do not grow with their text
@@ -106,5 +125,5 @@ check('a card that cuts its own last line and button', await audit(), await with
 
 if (g.errors.length) { failed++; console.log('  console errors: ' + JSON.stringify(g.errors.slice(0, 4))); }
 await g.close();
-console.log(failed ? `\n${failed} failed` : '\nThe audit catches all seven.');
+console.log(failed ? `\n${failed} failed` : '\nThe audit catches all twelve.');
 process.exit(failed ? 1 : 0);

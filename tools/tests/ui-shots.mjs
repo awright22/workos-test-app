@@ -120,25 +120,39 @@ export async function walk(size, o = {}) {
   await shot('hud-airlock', 400, 'b');
   await ev((G) => { G.hold(2.6); G.tick(0.05, 24); });
   await shot('hud-suit-sealed', 300, 'c');
-  await ev((G) => { G.tpLocal(0, 3, 0); G.tick(0.05, 30); });
+  // (the first bar arrives with the machine it measures, lit while the card that names it is up)
+  await ev((G) => { G.tpLocal(4.0, -3.0); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
   await shot('hud-bars-arrive', 900, 'd');
-  await ev((G) => { G.S.checkedSystems = { oxy: true, rec: true }; G.tpLocal(0, -5.0); G.tick(0.05, 6); });
+  await toastsDone();
+  await ev((G) => { G.tpLocal(4.3, -0.4); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
+  await toastsDone();
+  await ev((G) => { G.tpLocal(0, -5.0); G.tick(0.05, 6); });
   await shot('hud-comms-desk', 300, 'e');
   await ev((G) => { G.hold(1.1); });
   await shot('the-numbers', 600, 'f');
   await ev(() => { const b = document.querySelector('#mg-panel .btns button'); if (b) b.click(); });
+  // (a new button, lit while its card is up: the Journal, which comes with the numbers after the FOOD bar's card)
+  await ev((G) => { G.tick(0.05, 4); });
+  await page.waitForFunction(() => /journal/i.test((document.querySelector('#mg-toast .toast') || { textContent: '' }).textContent), null, { timeout: 40000 }).catch(() => {});
+  await shot('hud-new-button', 300, 'g');
   await toastsDone();
 
   // ---------------------------------------------------------------- on foot by day
   await ev((G) => { G.skipIntro(); G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
   await ui((U) => {
     U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.');
-    U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys');
+    U.log('Hab power low. Life support idles at zero. Wipe the panels.', 'alarm');
     U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
   });
   await sleep(5200);                                              // (past the moment the skipped intro's last objective stays ticked on the list)
   await ev((G) => { G.tick(0.05, 8); });
   await shot('hud-day', 300);
+  // (and a quarter of a minute on, with nothing new to say: the task card closed to its title and its place, the name
+  //  of the region gone, the log's line faded; the pictures above and below are all of first moments)
+  await sleep(9500);
+  await ev((G) => { G.tick(0.05, 300); });
+  await shot('hud-day-settled', 1500, 'b');
+  await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
 
   // the interaction prompt: ready, being held, and refused
   await ev((G) => {
@@ -182,7 +196,7 @@ export async function walk(size, o = {}) {
   // the most the HUD ever carries: two banners, a toast, a long line in the log and a critical tank
   await ev((G) => { window.__keep = JSON.stringify(G.S.breach); G.setStorm(0.9); G.S.suit = 9; G.S.breach.active = true; G.tick(0.05, 6); });
   await toastsDone();
-  await ui((U) => { U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.toast('WARNING', 'Storm cell overhead', 'Visibility is down to a few metres. Keep the Hab in sight.'); });
+  await ui((U) => { U.log('Hab power low. Life support idles at zero. Wipe the panels.', 'alarm'); U.toast('WARNING', 'Storm cell overhead', 'Visibility is down to a few metres. Keep the Hab in sight.'); });
   await sleep(900);
   await ev((G) => { G.tick(0.05, 4); });                          // (the game is stopped here: a step, so the marker has seen the toast)
   await shot('hud-everything-at-once', 300, 'b');
@@ -298,6 +312,14 @@ export async function walk(size, o = {}) {
   await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 3); });
   await key('j');
   await shot('journal-tasks');
+  // (This run was put together in a minute: it went from Sol 1 to Sol 12 in one step, so every entry since was made
+  //  "on Sol 12", and so was every step of the mission the game then saw done. A run really played has them spread
+  //  over its sols: they are spread here, as the larder and the catalogue are staged above.)
+  await ui((U, G) => {
+    const n = U.logHistory.length;
+    U.logHistory.forEach((l, i) => { l.sol = Math.max(1, Math.min(12, Math.round(1 + 11 * Math.pow(i / Math.max(1, n - 1), 1.6)))); });
+    G.S.stats.marks = { ...(G.S.stats.marks || {}), reach: 1, systems: 1, math: 1, farm: 1, hydra: 2, panels: 3, harvest: 4, dinner: 6, pf: 9 };
+  });
   for (const [t, name] of [['disc', 'discoveries'], ['samples', 'samples'], ['ach', 'achievements'], ['stats', 'statistics'], ['log', 'log']]) {
     await click(`.journal [data-tab="${t}"]`);
     await shot('journal-' + name, 250);

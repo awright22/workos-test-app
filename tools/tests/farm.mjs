@@ -52,7 +52,7 @@ s = await ev((G) => {
   return out;
 });
 check('radishes show their own plants, ripen in 1.1 sols on one watering, and go to the pantry',
-  s.shown.radish && !s.shown.potato && s.before === 'growing' && s.after === 'ready' && s.label === 'Harvest radishes' && s.pantry === 3 && s.state === 'soil' && s.produce === 3 && s.morale === 64 && s.potatoes === 0, s);
+  s.shown.radish && !s.shown.potato && s.before === 'growing' && s.after === 'ready' && s.label === 'Harvest the radishes' && s.pantry === 3 && s.state === 'soil' && s.produce === 3 && s.morale === 64 && s.potatoes === 0, s);
 
 s = await ev((G) => {
   const F = G.farm, S = G.S, out = {};
