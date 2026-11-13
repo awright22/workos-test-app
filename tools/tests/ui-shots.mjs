@@ -65,7 +65,7 @@ export async function walk(size, o = {}) {
   const toastsDone = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});
   const ev = g.eval;
   const ui = (fn, a) => page.evaluate(`(${fn.toString()})(window.__UI, window.__MG, ${JSON.stringify(a === undefined ? null : a)})`);
-  const click = (sel, opts) => page.locator(sel).first().click({ timeout: 20000, ...opts });
+  const click = (sel, opts) => page.locator(sel).first().click({ timeout: 60000, ...opts });      // (a dialog still rising at one frame a second is not "stable" for a long while)
   const key = (k) => page.keyboard.press(k);
   const visible = (sel) => page.locator(sel).first().isVisible();
   /** Let the game run in real time for a moment (the renderer's exposure only adapts while it runs). */

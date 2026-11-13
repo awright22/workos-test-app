@@ -63,7 +63,7 @@ await shot('comms-desk', 'At the comms desk.');
 await hold(1.1);
 await shot('the-numbers', 'Running the numbers.', 2500);
 await ev(() => { const b = document.querySelector('#mg-panel .btns button, #mg-panel button.primary'); if (b) b.click(); });
-await shot('after-the-numbers', 'Back in the room after the numbers: the done line is struck through, and the farm is the next task.', 2500);
+await shot('after-the-numbers', 'Back in the room after the numbers: the farm is the task now.', 2500);
 await ev((G) => { G.tpLocal(-6.7, -3.2); G.tick(0.05, 6); });
 await shot('empty-bed', 'At a farm bed with no soil.');
 await ev((G) => { G.tpNear(G.World.soilPiles[0].group.position, 1.2); G.tick(0.05, 10); });

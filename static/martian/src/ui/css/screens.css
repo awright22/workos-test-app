@@ -62,7 +62,7 @@
 /* each tool has its word under it, at every size */
 .map-tools .mg-iconbtn { grid-template-rows: auto auto; align-content: center; gap: .1875rem; }
 .map-tools .mg-iconbtn .ic { width: 1.0625rem; height: 1.0625rem; }
-.map-tools .cap { display: block; font: 600 .625rem/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.map-tools .cap { display: block; font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .map-info .grp { color: var(--ink-3); }
 .map-info .grp b { font: 600 .6875rem/1 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin-right: .25rem; }
 .map-legend { position: absolute; left: 1rem; bottom: 3.25rem; width: 13.5rem; padding: .75rem .875rem .8125rem; background: rgba(14, 12, 11, .86); border: 1px solid var(--line-2); border-radius: .1875rem; }
