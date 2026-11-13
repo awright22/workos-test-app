@@ -32,6 +32,8 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   east, and goes dark when it passes into Mars's shadow; Deimos drifts the other way for days.
 - **Fourteen historic landing sites**, from Mars 3 (1971) to Zhurong (2021), each with a model
   of the machine that landed there, each salvageable, each with a journal entry.
+- **What you stand on is what is drawn**: feet, wheels and everything placed rest on the very triangles
+  of the terrain mesh, so nothing hovers or sinks whatever the graphics setting.
 - Pathfinder is in Ares Vallis. The ascent vehicle is in Schiaparelli. Your own crash site is
   random, so the length of both expeditions is whatever you are dealt.
 

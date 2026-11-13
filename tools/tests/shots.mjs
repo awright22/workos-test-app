@@ -61,7 +61,9 @@ const scenes = {
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'storm-sun': async () => ev(async (G) => { G.setLocalTime(16.6); G.faceSun(); G.look(0.2); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
-  'mav': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 14); G.setLocalTime(9); G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
+  'mav': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 14); G.setLocalTime(9);
+    { const up = G.player.pos.clone().normalize(), d = G.World.mav.position.clone().sub(G.player.pos); d.addScaledVector(up, -d.dot(up)).normalize(); const side = up.clone().cross(d); G.lookAt({ x: d.x + side.x * 0.3, y: d.y + side.y * 0.3, z: d.z + side.z * 0.3 }); }      // (the rocket beside him, not behind him)
+    G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
   'canyon': async () => ev(async (G) => { await G.tp(-11.5, 293, 3.14); G.setLocalTime(15.5); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
   // the north wall of Valles Marineris at 296 E: about 13 m of drop in every 4 m of ground, a hundred metres in all
   'canyon-rim': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
