@@ -69,7 +69,9 @@ export function auditInPage(safe) {
     // and has 46 px to stand in: it is held to 12.
     // (An acronym at the head of a sentence, "EVA" before the rest of a line, is not a label: it is the whole of what
     //  the element says that is in capitals, or is made so by its style.)
-    else if (size < (p.closest('.mg-tbtn') ? 11.95 : 12.95) && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(p.textContent)))
+    // (This is a phone's rule, where it was found: the phone arrangement is the one held to it. A tablet's pixel is
+    //  a quarter larger and its labels are not yet held to more than the 11 px above.)
+    else if (root.classList.contains('mg-compact') && size < (p.closest('.mg-tbtn') ? 11.95 : 12.95) && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(p.textContent)))
       out.text.push(`capitals at ${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
     // a figure and its unit are written apart, everywhere the same way ("28 L", not "28L")
     if (/\d(L|km|m)\b/.test(said) && !/\d(L|km|m)\b[-/]/.test(said)) out.text.push(`a figure run into its unit  ${name(p)}  “${said.slice(0, 28)}”`);

@@ -284,7 +284,7 @@ if (!onlySize || onlySize === 'play') {
     uplink: (document.querySelector('#mg-journal .empty') || { textContent: '' }).textContent,
   }));
   check('journal: the Tasks tab counts the tasks its page lists', jc.tab > 0 && jc.tab === jc.listed, jc);
-  check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /Pathfinder/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /Pathfinder/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
+  check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /radio/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /\d km/.test(jc.wayText) && /radio/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
   await page.keyboard.press('Escape');
   // FOOD on the HUD is the sum of the rows under Food in the inventory (13 was set against a list that came to 22)
   await g.eval((G) => { const S = G.S; G.farm.farm(); window.__larder = JSON.stringify([S.pantry, S.potatoes]); S.pantry.radish = 3; S.pantry.soy = 2; S.potatoes = 4; G.tpLocal(0, 0, 0); G.tick(0.05, 3); });
@@ -502,6 +502,21 @@ for (const size of SIZES) {
   let hn = await hudNow();
   check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
   if (phone) {
+    // the card stands 8 px under the bars and 8 px over the stick (it came to rest 3 px from the stick: it was measured while it was still sliding in)
+    // (a warning: with his life in the balance, as here, nothing else is said)
+    await page.evaluate(() => window.__UI.toast('WARNING', 'Storm cell overhead', 'Visibility is down to a few metres. Keep the Hab in sight. The panels will make next to nothing until it has passed.'));
+    await sleep(600);
+    await g.eval((G) => { G.tick(0.05, 2); });
+    // (at rest: until this machine has drawn a frame the card is still where its slide begins, 8 px up)
+    await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
+    const withCard = layoutProblems(await rects(page), size);
+    check(`${size.name}: with a card up as well, still nothing overlaps`, withCard.length === 0, withCard);
+    const gaps = await page.evaluate(() => {
+      const r = (sel) => { const n = document.querySelector(sel); return n ? n.getBoundingClientRect() : null; };
+      const v = r('#mg-vitals'), t = r('#mg-toast .toast'), j = r('#mg-joy');
+      return t ? { under: Math.round((t.top - v.bottom) * 10) / 10, over: Math.round((j.top - t.bottom) * 10) / 10, note: (document.querySelector('#mg-toast .t3') || { textContent: '' }).textContent } : null;
+    });
+    check(`${size.name}: a card stands 8 px under the bars and at least 8 px over the stick, and its note ends with a sentence`, !!gaps && gaps.under >= 7.5 && gaps.under <= 9 && gaps.over >= 7.5 && (!gaps.note || /[.!?]$/.test(gaps.note)), gaps);
     check(`${size.name}: both banners keep their instruction, and the first mission line its reason`, hn.notes.length === 2 && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
     const a = await audit();
     check(`${size.name}: the busy HUD has nothing under 11 px or 44 px, and nothing cut`, a.length === 0, a);

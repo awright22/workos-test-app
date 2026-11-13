@@ -61,7 +61,7 @@ function farmStep() {
  * instruction: the banner at the top of the screen has already said what is wrong, and the two used to say it twice.
  */
 export const OBJECTIVES = [
-  { id: 'reach', urgent: true, place: 'Hab', icon: 'hab', text: () => 'Suit breach — get to the Hab', why: 'The suit is losing air. Seal it at the airlock door.',
+  { id: 'reach', urgent: true, place: 'Airlock', icon: 'hab', text: () => 'Suit breach: get to the Hab', why: 'The suit is losing air. Seal it at the airlock door.',
     pos: () => habPoint(0, 1.3, 11.7), shown: () => true, done: () => S.flags.suitSealed },
   // out of doors with a quarter of a tank left: nothing else is the mission until he is breathing something else
   { id: 'air', urgent: true, text: () => (S.suit < suitCap() * 0.12 ? 'Run for air' : 'Get to air'), why: () => (airAtRover() ? 'The rover has air: get in and the suit refills.' : 'The airlock refills the suit. An empty tank is the end.'),
@@ -71,7 +71,7 @@ export const OBJECTIVES = [
   { id: 'breach', urgent: true, place: 'Breach', icon: 'warning', text: () => 'Seal the breach', why: 'It is in the far wall, behind the comms desk. Hold to patch it.',
     pos: () => habPoint(0, 1.6, -HAB_R + 0.5), shown: () => S.breach.active, done: () => !S.breach.active },
   // (nothing said it was time to sleep: at 20:16 and 89 below, the list still led with the solar panels)
-  { id: 'sleep', press: () => true, place: () => (farAfield() ? 'Rover' : 'Bunk'), text: () => (S.mode === 'rover' || farAfield() ? 'Camp in the rover until dawn' : 'Sleep until dawn'),
+  { id: 'sleep', press: () => true, place: () => (farAfield() ? 'Rover' : 'Bunk'), text: () => (S.mode === 'rover' || farAfield() ? 'Camp until dawn' : 'Sleep until dawn'),
     why: 'The night is deadly cold. Sleep skips to dawn and mends you.',
     pos: () => (S.mode === 'rover' ? null : farAfield() ? above(World.rover.group.position, 1.6) : habPoint(-5.0, 1.1, -4.9)), shown: bedtime, done: () => false },
   { id: 'systems', place: () => (S.checkedSystems.oxy ? 'Reclaimer' : 'Oxygenator'), text: () => `Inspect both machines (${Object.keys(S.checkedSystems).length}/2)`, why: 'The oxygenator and the reclaimer make your air and your water.',
@@ -89,7 +89,7 @@ export const OBJECTIVES = [
   { id: 'panels', place: 'Panels', press: () => S.power < 45, text: () => `Wipe the solar panels (${Math.min(S.stats.panels, 3)}/3)`, why: 'Dust on the panels starves the Hab of power.',
     pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? above(p.group.getWorldPosition(_wv), 1.2) : null; },
     shown: () => !!S.flags.suitSealed && (plantedPlots() > 0 || S.sol > 1 || S.power < 55), done: () => S.stats.panels >= 3 },
-  { id: 'pf', place: () => (S.pf.loaded ? 'Uplink' : 'Pathfinder'), icon: 'dish', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink' : 'Fetch Pathfinder, Ares Vallis'), why: 'Its radio is the only way to tell Earth you are alive.',
+  { id: 'pf', place: () => (S.pf.loaded ? 'Uplink' : 'Pathfinder'), icon: 'dish', text: () => (S.pf.loaded ? 'Bring Pathfinder home' : 'Drive to Ares Vallis'), why: () => (S.pf.loaded ? 'Park the rover on the ring by the Hab and connect it.' : 'Pathfinder’s radio is the only way to tell Earth you are alive.'),
     pos: () => above(S.pf.loaded ? World.uplink.position : World.pathfinder.position, 2), shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
   { id: 'harvest', place: 'Farm bed', text: () => 'Bring in the first harvest',
     why: () => (World.plots.some((p) => p.state === 'ready') ? 'A bed is ripe: bring it in.' : 'Beds take about two and a half sols, and a second watering.'),
@@ -98,7 +98,7 @@ export const OBJECTIVES = [
   { id: 'dinner', place: 'Food shelf', text: () => 'Cook a dinner', why: 'A cooked meal lifts morale; in good spirits work goes faster.',
     pos: () => habPoint(4.2, 1.4, 4.8), shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: 'The Hermes is coming back for you.', shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
-  { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Get to the MAV, Schiaparelli', why: 'It is the only rocket on the planet.',
+  { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on the planet.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
 /** The reason an objective gives (some change with what is in hand). */
