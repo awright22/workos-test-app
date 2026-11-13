@@ -593,8 +593,10 @@ function flag(name, on) {
 // there is more above). Without one, a list cut off by the bottom of a phone's screen looks like the end of
 // the list. (It used to fade its last rows instead, which read as rows that were switched off.)
 function scrollCue(n) {
-  // (more than a few pixels of it: the last of a box's own padding is not "more")
-  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 10 ? 'down' : '')).trim();
+  // (more than the box's own padding at its foot, which is not "more": ten pixels where the padding is that much.
+  //  A box with next to no padding says so sooner: the rescue screen's last line was cut 8 px short with no mark.)
+  const pad = n.dataset.pad === undefined ? (n.dataset.pad = String(parseFloat(getComputedStyle(n).paddingBottom) || 0)) : n.dataset.pad;
+  const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > Math.min(10, +pad + 3) ? 'down' : '')).trim();
   // (the mark sticks to the foot of the box's contents, which stops short of the box's own foot by its padding:
   //  the style sheet moves it down by that much, so nothing shows under its shelf)
   if (n.dataset.more !== more) { n.dataset.more = more; if (more) n.style.setProperty('--foot', getComputedStyle(n).paddingBottom); }

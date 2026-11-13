@@ -309,7 +309,8 @@ export function auditInPage(safe) {
   // ---- a scrolling region with more below says so (the "More" cue), and one that is at its end does not
   for (const n of root.querySelectorAll('.mg-scroll')) {
     if (!shown(n)) continue;
-    const below = n.scrollHeight - n.clientHeight - n.scrollTop > 12;
+    // (more than its own padding at the foot: a line cut 8 px short in a box with no padding is "more" too)
+    const below = n.scrollHeight - n.clientHeight - n.scrollTop > Math.min(12, (parseFloat(styleOf(n).paddingBottom) || 0) + 5);
     const cue = n.querySelector(':scope > .more-cue');
     const cueShown = !!cue && getComputedStyle(cue).visibility === 'visible';
     if (below && !cueShown) out.clipped.push(`scrolls with nothing to say so: ${name(n)}`);

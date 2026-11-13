@@ -552,3 +552,9 @@
 .mg-compact #mg-overlay.k-win .dlg .steps { margin-top: .375rem; }
 .mg-compact #mg-overlay.k-win .dlg blockquote { margin-top: .375rem; }
 .mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 0 0 .5em; white-space: nowrap; }
+@media (max-width: 760px) {
+  /* (the smallest phone: the heading and the tiles a little closer, so that a three-line entry fits as well) */
+  .mg-compact #mg-overlay.k-win .dlg h1 { font-size: 1.625rem; }
+  .mg-compact #mg-overlay.k-win .dlg .t-kicker { margin-bottom: .3125rem; }
+  .mg-compact #mg-overlay.k-win .stat { padding-top: .25rem; padding-bottom: .25rem; }
+}
