@@ -370,8 +370,9 @@ function rebuildObjectives(now) {
     rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls, why, place });
   }
   // night: said once as it falls, as well as listed
+  // (not when he is already standing at the bunk: there the task, the prompt and the button say it, and the card was a fourth)
   const night = list.some((e) => e.o.id === 'sleep');
-  if (night && !sleepTold && objSeeded) toast('Night', 'Time to sleep', '', { yields: true });
+  if (night && !sleepTold && objSeeded) { const w = objectiveWhere(list.find((e) => e.o.id === 'sleep').o); if (!w || w.near > 6) toast('Night', 'Time to sleep', '', { yields: true }); }
   sleepTold = night;
   objSeeded = true;
   // the two nearest active survey tasks

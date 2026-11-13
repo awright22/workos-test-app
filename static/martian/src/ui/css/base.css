@@ -155,7 +155,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
    to come. It is not a control (the list is dragged), so it is not drawn as one. (It was a bordered pill, 20 px tall,
    which looked pressable and too small to press; and the shelf faded in over 12 px, so a button or a last line of
    text standing in the fade looked switched off.) */
-.more-cue::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.625rem; background: var(--cue-bg, #0f0d0c); border-top: 1px solid var(--line); }
+/* (a short shade over the shelf's edge: a line of text the edge runs through goes under it, where it was sliced by it) */
+.more-cue::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.625rem; background: var(--cue-bg, #0f0d0c); border-top: 1px solid var(--line);
+  box-shadow: 0 -.25rem .375rem var(--cue-bg, #0f0d0c); }
 .more-cue::after { content: "More below"; position: absolute; left: 50%; bottom: 0; height: 1.625rem; transform: translateX(-50%); padding: 0 0 0 1.125rem; display: flex; align-items: center;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f5f0e8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 9l7 7 7-7'/%3E%3C/svg%3E") no-repeat 0 50% / .75rem;
   color: var(--ink-2); font: 600 max(.8125rem, 13px)/1 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
