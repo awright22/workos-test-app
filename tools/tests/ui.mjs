@@ -614,7 +614,8 @@ for (const size of SIZES) {
     };
   });
   let hn = await hudNow();
-  check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
+  // (an arrowhead at the edge of the screen carries no number: the line has it)
+  check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === '' || hn.tag === hn.line, hn);
   if (phone) {
     // the card stands 8 px under the bars and 8 px over the stick (it came to rest 3 px from the stick: it was measured while it was still sliding in)
     // (a warning: with his life in the balance, as here, nothing else is said)
@@ -663,7 +664,8 @@ for (const size of SIZES) {
       G.World.soilPiles.forEach((h, i) => { h.left = k.piles[i]; }); G.World.plots.forEach((q, i) => { [q.state, q.growth, q.watered, q.crop] = k.plots[i]; });
       Object.assign(S.inv, k.inv); S.water = k.water; Object.assign(S.breach, k.breach); S.suit = k.suit; G.setStorm(k.storm); G.syncAllVisuals();
       const p = document.getElementById('mg-prompt'), lb = p.querySelector('.lb'), sb = p.querySelector('.sub'), out = [];
-      const lines = (n) => { const r = document.createRange(); r.selectNodeContents(n); return new Set([...r.getClientRects()].filter((b) => b.width > 1).map((b) => Math.round(b.top))).size; };
+      // (lines are counted by where their boxes stand, a line apart: the 2 of "O2" hangs a few pixels under its line and is not another)
+      const lines = (n) => { const r = document.createRange(); r.selectNodeContents(n); const tops = [...r.getClientRects()].filter((b) => b.width > 1).map((b) => b.top).sort((a, b) => a - b); let k = 0, last = -99; for (const t of tops) { if (t - last > 8) k++; last = t; } return k; };
       for (const v of seen.values()) {
         U.setPrompt(null); U.setPrompt(v);
         const a = lines(lb), b = sb.style.display === 'none' ? 0 : lines(sb), text = p.querySelector('.pt').getBoundingClientRect(), box = p.getBoundingClientRect();
@@ -680,7 +682,7 @@ for (const size of SIZES) {
   bad = await driving();
   check(`${size.name}: in the rover, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
   hn = await hudNow();
-  check(`${size.name}: in the rover, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
+  check(`${size.name}: in the rover, the marker's distance is the mission line's`, !hn.way || hn.tag === '' || hn.tag === hn.line, hn);
   // More text than usual: three long log entries, and a first mission line and a reason that would each run to three
   // lines on a phone. The log must still end short of the rover's panel (and of the stick), and the mission block
   // above the buttons under it. (Both failed with the content a long day produces, while passing with a quiet one.)

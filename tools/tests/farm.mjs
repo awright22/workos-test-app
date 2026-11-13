@@ -92,7 +92,7 @@ s = await ev((G) => {
   return out;
 });
 check('dinner needs a staple and two vegetables, once a sol, and lifts vitals and morale',
-  s.oneVeg.ok === false && /two different/.test(s.oneVeg.why) && s.plan.ok && s.plan.sides.join() === 'tomato,radish' && /Cook dinner: potato, tomatoes and radishes/.test(s.label || '') &&
+  s.oneVeg.ok === false && /two different/.test(s.oneVeg.why) && s.plan.ok && s.plan.sides.join() === 'tomato,radish' && /Cook a dinner/.test(s.label || '') &&
   s.after.potatoes === 0 && s.after.pantry.tomato === 1 && s.after.pantry.radish === 0 && s.after.morale === 62.2 && Math.abs(s.after.health - 85) < 0.2 && s.after.meals === 1 &&
   s.again.ok === false && /Already/.test(s.again.why) && /^Eat a /.test(s.labelAfter || ''), s);
 

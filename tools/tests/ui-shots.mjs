@@ -122,7 +122,7 @@ export async function walk(size, o = {}) {
   await shot('hud-suit-sealed', 300, 'c');
   // (the first bar arrives with the machine it measures, lit while the card that names it is up)
   await ev((G) => { G.tpLocal(4.0, -3.0); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
-  await shot('hud-bars-arrive', 900, 'd');
+  await shot('hud-bars-arrive', 200, 'd');                         // (while its card is up: on a slow machine 900 ms more was the card's whole life)
   await toastsDone();
   await ev((G) => { G.tpLocal(4.3, -0.4); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
   await toastsDone();

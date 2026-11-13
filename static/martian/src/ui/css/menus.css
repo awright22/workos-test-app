@@ -614,7 +614,11 @@
    line where the tiles are wide enough for the longest of them, and where they are not every row of tiles is the
    height of the tallest (one row stood a line taller than the other two). */
 .dlg blockquote cite { margin: 0 0 .375rem; }
-.mg-compact #mg-overlay.k-win .dlg blockquote cite { display: block; margin: 0 0 .125rem; white-space: normal; }
+/* (on a phone it is a run-in head, on the entry's own first line; and the card's second heading gives up its line:
+   a run with every step dated was a line too tall for the screen with both) */
+.mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 .625em 0 0; white-space: normal; }
+.mg-compact #mg-overlay.k-win .dlg h2 { display: none; }
+.mg-compact #mg-overlay.k-win .dlg .steps { grid-row: 3 / span 2; }
 #mg-overlay.k-win .stats { grid-auto-rows: 1fr; }
 @media (min-width: 761px) {
   .mg-compact #mg-overlay.k-win .dlg-bd { grid-template-columns: minmax(0, 1fr) auto; }

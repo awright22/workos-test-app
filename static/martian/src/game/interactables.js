@@ -80,7 +80,7 @@ addI({
   enabled: () => {
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
-      case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith: dig it at the heap outside the airlock';
+      case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith: dig it at the heap outside';
       case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig') : 'Needs seed: nothing left to plant from';
       case 'growing':
         if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig';
@@ -290,7 +290,7 @@ function digReason() {
   if (!S.flags.didMath) return null;
   const carried = S.inv.regolith || 0;
   if (!World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 400)) {
-    const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · slow going, with no heap near` });
+    const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · no heap near` });
     if (World.plots.filter((p) => p.state === 'empty').length > carried) return why('an empty farm bed');
     if (!carried) {
       // (a thing he has everything for but the regolith)
@@ -325,7 +325,7 @@ addI({
   // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
   //  gone, nothing said whether the second would cost air again. "Untried indoors" was the warning's old wording:
   //  untried by whom, and risking what?)
-  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
+  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
@@ -376,9 +376,9 @@ addI({
   r: 2.2, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && !dinnerPlan().ok,
   enabled: () => S.health > 92 ? statusText('The food shelf. Not hungry right now') : foodTotal() > 0 ? true : statusText('The food shelf is bare'),
-  label: () => `Eat a ${SNACK[nextSnack()] || 'ration'} (+12 vitals)`,
-  // once there is produce, say what a cooked dinner still wants
-  sub: () => (S.stats.produce > 0 ? `Dinner: ${dinnerPlan().why.toLowerCase()}` : ''),
+  label: () => `Eat a ${SNACK[nextSnack()] || 'ration'}`,
+  // what it gives; and once there is produce, what a cooked dinner still wants
+  sub: () => (S.stats.produce > 0 ? `Dinner ${dinnerPlan().why.toLowerCase()}` : '+12 vitals'),
   use: () => {
     if (!snack()) return;
     S.health = clamp(S.health + 12, 0, BAL.healthMax);
@@ -389,8 +389,8 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
   r: 2.2, hold: 2.4, mode: 'walk', pose: 'stand', priority: -1, task: 'dinner',
   visible: () => !S.flags.coldOpen && S.inside && dinnerPlan().ok,
-  label: () => { const p = dinnerPlan(); return `Cook dinner: ${p.staple === 'soy' ? 'soybeans' : 'potato'}, ${p.sides.map((id) => CROPS[id].name.toLowerCase()).join(' and ')}`; },
-  sub: () => '+25 vitals, lifts morale',
+  label: () => 'Cook a dinner',
+  sub: () => { const p = dinnerPlan(); return `${p.staple === 'soy' ? 'Soybeans' : 'Potato'}, ${p.sides.map((id) => CROPS[id].name.toLowerCase()).join(' and ')}`; },
   use: () => {
     const line = cookDinner();
     if (!line) return;
@@ -494,7 +494,7 @@ addI({
   r: 5.5, hold: 2.6, mode: 'walk',
   visible: () => S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected,
   enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Needs the rover: too heavy to carry, bring it closer',
-  label: () => 'Dig out Pathfinder and load it up',
+  label: () => 'Load Pathfinder onto the rover',
   use: () => {
     S.pf.loaded = true;
     S.pf.found = true;
@@ -509,7 +509,7 @@ addI({
   r: 5.0, hold: 2.6, mode: 'walk', pose: 'stand',
   visible: () => S.pf.loaded && !S.pf.connected,
   enabled: () => groundDist(World.rover.group.position, World.uplinkRing.position) < 9 ? true : 'Needs the rover: park it on the marked ring first',
-  label: () => 'Connect Pathfinder to the uplink',
+  label: () => 'Connect Pathfinder’s radio',
   use: () => connectPathfinder(),
 });
 // landers: salvage + quest hooks (dynamic — landers exist only after world build)
@@ -546,7 +546,8 @@ addI({
   r: 4.5, hold: 1.6, mode: 'walk',
   visible: () => !S.flags.coldOpen,
   enabled: () => S.upgrades.drill ? true : 'Needs the Ice Drill: an upgrade, made in Colony',
-  label: () => `Mine water ice (+1, ${World._activeIce ? World._activeIce.left : 0} left)`,
+  label: () => 'Mine water ice',
+  sub: () => `+1 ice chunk · ${World._activeIce ? World._activeIce.left : 0} left here`,
   use: () => {
     const site = World._activeIce;
     if (!site || site.left <= 0) return;
@@ -586,7 +587,8 @@ addI({
   pos: () => World.rtgSite.group.position,
   r: 4.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && !World.rtgSite.taken && S.flags.didMath,
-  label: () => 'Dig up the RTG (radioactive. cozy.)',
+  label: () => 'Dig up the RTG',
+  sub: () => 'Radioactive. Cozy.',
   use: () => {
     World.rtgSite.taken = true;
     syncAllVisuals();
@@ -602,7 +604,8 @@ addI({
   // which left the breach impossible to seal once Pathfinder was connected)
   r: 3.6, hold: 3.0, mode: 'walk', pose: 'stand', priority: -1, task: 'breach',
   visible: () => S.breach.active && S.inside,
-  label: () => 'Seal the breach (canvas, tape, prayer)',
+  label: () => 'Seal the breach',
+  sub: () => 'Canvas, tape, prayer',
   use: () => {
     S.breach.active = false;
     S.breach.done = true;
@@ -677,7 +680,8 @@ addI({
   r: 8.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
   enabled: () => S.sol >= S.rescueSol ? true : `Not before Sol ${S.rescueSol}: the launch window opens then. NASA was firm`,
-  label: () => 'Strip excess weight (nose cone, seats, dignity)',
+  label: () => 'Strip the MAV’s excess weight',
+  sub: () => 'Nose cone, seats, dignity',
   use: () => {
     S.flags.mavStripped = true;
     if (World.mavNose) World.mavNose.visible = false;

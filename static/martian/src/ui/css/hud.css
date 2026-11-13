@@ -731,3 +731,8 @@
 
 /* (an arrowhead at the edge of the screen has no number, and no empty plate where one would be) */
 #mg-way b:empty { display: none; }
+/* (the letters of the compass are read at a glance: 14 px on a phone, where N stood at 12.5) */
+.mg-compact #mg-compass .cards span { font-size: var(--t14); }
+
+/* the first minute's two hints, on the small phone: between the stick and JUMP, with a margin (at 14 px they reached 6 px into JUMP) */
+@media (max-width: 760px) { .mg-touch.is-cold #mg-keys { left: calc(50% - 1.5rem); letter-spacing: .03em; gap: .25rem; } .mg-touch.is-cold #mg-keys span { padding: .3125rem .5rem; } }

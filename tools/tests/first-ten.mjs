@@ -50,7 +50,9 @@ await shot('crash-first-seconds', 'The game begins: he comes to on the sand, som
 // the suit's countdown looked stuck)
 await ev((G) => { G.paused = true; G.tick(0.05, 180); });
 await shot('crash-after-ten-seconds', 'Ten seconds in, nothing touched.', 1200);
-await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 10); });
+// (he is put there, not walked: the 45 m he would have walked are counted, since the two hints about the stick go once
+//  he has walked a few metres, and a picture of him "walking" with them still up is not what a player sees)
+await ev((G) => { G.S.stats.walked += 45; G.tpLocal(0, 30, 0); G.tick(0.05, 10); });
 await shot('approaching-hab', 'Walking toward the Hab.');
 await ev((G) => { G.tpLocal(0, 10.0, 0); G.tick(0.05, 6); });
 await shot('at-the-airlock', 'At the airlock door.');

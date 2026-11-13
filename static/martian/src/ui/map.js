@@ -226,6 +226,8 @@ function placeLabels(you, storms, stormBoxes) {
     // (and not across a storm: pale capitals over pale hatching could not be read. The storm is news; the name of the
     //  plain under it comes back when it has blown through.)
     if (stormBoxes.some((b) => x + w / 2 > b[0] && x - w / 2 < b[0] + b[2] && y + h / 2 > b[1] && y - h / 2 < b[1] + b[3])) continue;
+    // (nor hard against a marker, where it reads as the marker's own name: "? ARCADIA PLANITIA")
+    { const pad = 16 * U; if (markers.some((m) => !m.under && m.x > x - w / 2 - pad && m.x < x + w / 2 + pad && m.y > y - h / 2 - pad && m.y < y + h / 2 + pad)) continue; }
     if (x - w / 2 < 4 || x + w / 2 > W - 4 || !free(x - w / 2, y - h / 2, w, h)) continue;
     boxes.push([x - w / 2, y - h / 2, w, h]);
     out.push({ text, x: x - w / 2 + 4 * U, y, color: col.place, size, spacing });

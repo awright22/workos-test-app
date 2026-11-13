@@ -471,3 +471,6 @@
 .mg-compact .map-scale em, .mg-compact .map-scale span, .mg-compact .way b, .mg-compact .way strong { font-size: var(--tcap); }
 .mg-compact .chip, .mg-compact .card .prog, .mg-compact .inv-row .ct small, .mg-compact .stat-grid .stat b small, .mg-compact .map-info dd, .mg-compact .map-legend li, .mg-compact .card .dist { font-size: var(--t13); }
 .mg-compact .obj-list .obj .ds { font-size: var(--t13); }
+/* A journal card's badges stand on the line under its name on a phone, on every card: beside the name where they
+   fitted and under it where they did not, a page of cards had its badges in two places. */
+.mg-compact .card-hd .tags { flex: 1 0 100%; }

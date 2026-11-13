@@ -352,7 +352,8 @@ function closeToast(cur, atOnce) {
   if (toastNow !== cur) return;
   clearTimeout(cur.timer);
   toastNow = null;
-  const done = () => { cur.node.remove(); root.classList.remove('has-toast'); if (cur.lit) cur.lit.classList.remove('fresh'); nextToast(); };
+  if (cur.lit) cur.lit.classList.remove('fresh');           // (as the card begins to go, not when it has gone)
+  const done = () => { cur.node.remove(); root.classList.remove('has-toast'); nextToast(); };
   if (atOnce) done();
   else { cur.node.classList.add('out'); setTimeout(done, 380); }
 }
