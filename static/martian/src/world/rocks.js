@@ -110,8 +110,8 @@ const GLSL_ROCK_GROUND = /* glsl */`
 /**
  * The rocks' material. Bare stone is basalt: darker and greyer than the dust of the country it lies in, each face
  * its own tone, a fresh break darkest. Dust lies on what faces the sky and in the hollows, and is banked against the
- * foot. So a rock is dark where the wind keeps it clean and the colour of its ground where it does not, and a lit
- * face of it is about as bright as the ground beside it, never brighter. On lava it is the flow's own dark rock.
+ * foot. So a rock is dark where the wind keeps it clean and near the colour of its ground where it does not, a
+ * shade darker than the ground even there. On a volcano it is the flow's own dark rock.
  * `uniforms.uHere` is the direction from the planet's centre to the camera.
  * `detail`: 0 for pebbles and for rocks a few pixels across (their shape and one grain are all that
  * can be seen of them, so that is all that is looked up), 1 for rocks on the cheapest preset, 2 for the rest.
@@ -119,10 +119,11 @@ const GLSL_ROCK_GROUND = /* glsl */`
 function rockMaterial(uniforms, atlas, detail) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0 });
   // A rock is drawn into the shadow maps by the faces the sun sees. (three.js draws a one-sided thing by its far
-  // faces, to keep its own shadow off its lit side. But a rock's far faces go down into the ground, and where the
-  // ground rises a little round its foot the shadow began behind that rise: a lit strip of sand between a boulder and
-  // its own shadow, which at a few pixels wide is a pale hairline along its base, and under a big one a pale wedge
-  // that made it look undercut. The shadow's slope bias keeps the lit faces clean.)
+  // faces, to keep its own shadow off its lit side. But a rock's far faces are the very faces its shadow starts
+  // from: they meet the ground along its foot, and with the shadow's bias the first few centimetres of sand beyond
+  // that line were left lit. A lit strip between a boulder and its own shadow: a pale hairline along its base. Cast
+  // from the sunlit faces, the shadow begins well inside the rock, and the bias along the normal keeps those faces
+  // clean of their own shadow: looked at under a grazing sun, no stripes.)
   mat.shadowSide = THREE.FrontSide;
   mat.defines.ROCK_DETAIL = detail;
   mat.userData.uniforms = uniforms;
@@ -218,7 +219,7 @@ function rockMaterial(uniforms, atlas, detail) {
         float film = clamp(rockTone * (1.0 + (rockB.g - 0.5) * 0.7) + (rockB.g - 0.5) * 0.3 - rockB.b * 0.16 + (rockStain - 0.5) * 0.36, 0.0, 1.0);
         // (from dark grey-brown where it is clean to nearly the dust's own colour under a thick rind: neighbours differ,
         // which is what makes a field of them read as many rocks and not as one rock many times)
-        vec3 stone = mix(vec3(gl), rockDust, mix(0.34, 0.76, film)) * mix(0.46, 0.90, film);
+        vec3 stone = mix(vec3(gl), rockDust, mix(0.34, 0.72, film)) * mix(0.46, 0.86, film);
         // (on a lava field it is the flow's own rock: clinker and blocks of it, a shade paler than the flow's back)
         stone = mix(stone, mix(rockDust * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.064, 0.062), 0.86) * mix(1.0, 1.7, film), basalt);
         stone = mix(stone, vec3(0.20, 0.19, 0.20), rockIcy * 0.8) * (1.0 - 0.3 * rockPits);
@@ -226,12 +227,13 @@ function rockMaterial(uniforms, atlas, detail) {
         // Dust lies thick on whatever faces the sky and gathers in the hollows; edges and fresh breaks are swept clean.
         // Where the land is bright the dust is deep and the rocks wear more of it; on dark sand the wind keeps them
         // barer, and on bare lava there is little to settle.
-        float dusty = mix(-0.08, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - max(lava, basalt * 0.5) * 0.3 + (rockTone - 0.45) * 0.3;
+        float dusty = mix(-0.03, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - max(lava, basalt * 0.5) * 0.3 + (rockTone - 0.45) * 0.3;
         // (It lies on what is nearly level, not on every slope that sees the sky: a boulder dusted all over its back is
-        // a mound of sand. And one face holds it where the next does not, which is what shows the faces.)
+        // a mound of sand. One face holds it where the next does not, which is what shows the faces; and across a
+        // big rock it lies in patches an arm or two wide, with bare stone between.)
         // (And thick only on what is large: blown sand scours a stone a hand high clean, and a stone under a full cap
         // of dust, seen from above, is a chip of the sand's own colour.)
-        float dust = mix(0.5, 0.94, smoothstep(0.1, 0.7, max(vRockS.x, vRockS.z))) * smoothstep(0.42, 0.80, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rockB.g - 0.5) * 0.34 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
+        float dust = mix(0.5, 0.94, smoothstep(0.1, 0.7, max(vRockS.x, vRockS.z))) * smoothstep(0.42, 0.80, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rockB.g - 0.5) * 0.44 + (rockStain - 0.5) * 0.5 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
         // and it is banked against the foot of the rock, in the colour of the ground there, so that rock and ground meet without a line
         float skirt = 1.0 - smoothstep(0.0, 0.05 + 0.1 * fract(vRockI.z * 7.9), rockHigh + (rg1.a - 0.5) * 0.08);
         // (what settles on a rock on bare lava is the flow's own dark grit with a little of the country's dust in it: the

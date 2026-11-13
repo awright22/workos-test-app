@@ -175,8 +175,8 @@ const DEFS = [
     uneven: [0.010, 0.006], hackle: [3.6, 0.02], lumps: [0.004, 0.3] }),
   // a block tipped over, its upper corner sheared flat and a bite out of its high side (so that it has no point)
   (r) => ({ cls: ANGULAR, ground: -0.34, join: 5,
-    parts: notch(r, notch(r, chips(r, chop(r, box(r, [0.95, 0.66, 0.62], 1.9, 0.22, 0.3, 5, 0.4), 2, 0.1, 0.24, 0.5), 2), [[[-0.6, 0.8, 0.2], 0.56], [[0.3, 0.3, 1], 0.6]]), [[[0.2, 1, -0.1], 0.72], [[1, 0.1, 0.3], 0.1]]),
-    uneven: [0.010, 0.006], hackle: [3.2, 0.022], cracks: [[[0.2, 1, 0.3], 0.1, 0.028, 0.16, 0.04], [[0.3, 0.1, 1], -0.12, 0.03, 0.24, 0.05]], lumps: [0.004, 0.3] }),
+    parts: notch(r, notch(r, flat(r, chips(r, chop(r, box(r, [0.95, 0.66, 0.62], 1.9, 0.22, 0.3, 5, 0.4), 2, 0.1, 0.24, 0.5), 2), 0.84, 0.2), [[[-0.6, 0.8, 0.2], 0.56], [[0.3, 0.3, 1], 0.6]]), [[[0.2, 1, -0.1], 0.72], [[1, 0.1, 0.3], 0.1]]),
+    uneven: [0.012, 0.008], hackle: [3.2, 0.03], cracks: [[[0.2, 1, 0.3], 0.1, 0.028, 0.16, 0.04], [[0.3, 0.1, 1], -0.12, 0.03, 0.24, 0.05]], scoops: [[[-0.8, 0.4, 0.4], 0.34, 0.07], [[0.6, 0.45, -0.6], 0.3, 0.06]], lumps: [0.004, 0.3] }),
   // a wide low block split down the middle, one half dropped, its outline broken
   (r) => ({ cls: ANGULAR, ground: -0.16, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [1.05, 0.5, 0.86], 2.9, 0.06, 2.2, 5, 0.4), 4, 0.1, 0.34, -0.5), 2, -0.5), [[[1, 0.1, 0.45], 0.16], [[0, 1, 0.1], 0.72]]),
