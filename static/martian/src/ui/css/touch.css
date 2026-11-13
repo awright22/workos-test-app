@@ -27,7 +27,7 @@
 
 .mg-tbtn { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .125rem; pointer-events: auto;
   touch-action: none; cursor: pointer; border: 1px solid rgba(245, 240, 232, .4); border-radius: 50%; background: rgba(14, 12, 11, .6);
-  color: var(--ink); font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .1em; transition: background .12s, border-color .12s, transform .12s, opacity .12s; }
+  color: var(--ink); font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .08em; transition: background .12s, border-color .12s, transform .12s, opacity .12s; }
 .mg-tbtn .ic { width: 1.25rem; height: 1.25rem; }
 .mg-tbtn:active, .mg-tbtn.down { background: rgba(245, 240, 232, .26); transform: scale(.95); }
 .mg-tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -42,7 +42,7 @@
 #mg-tE .vi, #mg-tE .vb, #mg-tE .vh { display: none; }
 #mg-tE .vi .ic { width: 1.5rem; height: 1.5rem; }
 #mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-2); }
-#mg-tE .vh { font-size: max(.6875rem, 11px); letter-spacing: .18em; color: var(--ink-3); }
+#mg-tE .vh { font-size: max(.75rem, 12px); letter-spacing: .16em; color: var(--ink-2); }
 /* (kept in the layout, so a hold that began on it still ends on it) */
 #mg-tE:not(.verb):not(.no) { visibility: hidden; pointer-events: none; }
 #mg-tE.verb .vb, #mg-tE.verb .vh { display: block; }
@@ -63,7 +63,7 @@
 #mg-tCandle { right: calc(var(--sar) + 9.5rem); bottom: calc(var(--sab) + 6.125rem); width: 3rem; height: 3rem; min-width: 44px; min-height: 44px; gap: .0625rem; letter-spacing: .02em;
   border-color: var(--cold); color: var(--cold); }
 #mg-tCandle i { font: 600 .875rem/1 var(--f-cond); font-style: normal; }
-#mg-tCandle > span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: 0; }
+#mg-tCandle > span { font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: 0; }
 #mg-tCandle b { position: absolute; right: -.25rem; top: -.25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .25rem; border-radius: .625rem; background: var(--cold); color: #06131c;
   font: 600 max(.75rem, 12px)/1.25rem var(--f-cond); letter-spacing: 0; text-align: center; }
 #mg-tExit { display: none; border-color: var(--accent); color: var(--accent); }
@@ -74,7 +74,7 @@
 #mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .25rem; pointer-events: auto; }
 #mg-trow .mg-tbtn { position: static; width: 2.75rem; height: 2.75rem; min-width: 48px; min-height: 46px; border-radius: .375rem; }
 #mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
-#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .02em; color: var(--ink); }
+#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .01em; color: var(--ink); }
 #mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
 .is-cold #mg-trow .mg-tbtn[data-t] { display: none; }
 /* each screen's button arrives when the screen first has something to show (ui/hud.js), and is lit while its card is read */

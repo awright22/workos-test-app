@@ -393,7 +393,7 @@
 .mg-compact .diff dl { margin-bottom: .4375rem; }
 .mg-compact .diff p { margin-top: 0; margin-bottom: .4375rem; flex: 0 1 auto; overflow: hidden; }
 /* (a short or a narrow phone has no room for the line of description: the three rows above it say what differs) */
-@media (max-height: 380px), (max-width: 760px) { .mg-compact .diff p { display: none; } }
+@media (max-height: 400px), (max-width: 760px) { .mg-compact .diff p { display: none; } }
 /* (and its cards are narrow: the three rows keep to a line each) */
 @media (max-width: 760px) {
   .mg-compact .newgame .diff { padding-left: .5rem; padding-right: .5rem; }
@@ -491,3 +491,41 @@
 .sleep .notes .today.later { margin-top: 0; color: var(--ink-2); }
 .sleep .notes .today.later b { color: var(--cold); }
 .sleep .delta b { color: var(--ink); }
+
+/* ================================================================ phones: capitals at 13 px
+   A label in capitals is as tall as its capitals: seven tenths of its size. At 11 px that is under 8 px of
+   letter, which the fifth review measured as "about 9 px" type, in the suit's dial, the statistics tiles, the title's
+   footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
+   under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
+   holds both. */
+.mg-compact .t-kicker, .mg-compact .dlg h2 { font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact .stat span { font-size: var(--t13); letter-spacing: .04em; color: var(--ink-2); }
+.mg-compact .title-foot { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .menu-col .tag { font-size: var(--t13); letter-spacing: .16em; }
+.mg-compact .menu-item .mi-s { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .pause-side .kv { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .pause-side h3, .mg-compact .credits section h3, .mg-compact .set-sec h3 { font-size: var(--t13); letter-spacing: .16em; }
+.mg-compact .diff .dx { font-size: var(--t13); letter-spacing: .1em; }
+.mg-compact .diff .dx em { letter-spacing: .08em; }
+.mg-compact .diff dt { font-size: var(--t13); letter-spacing: .04em; color: var(--ink-2); }
+.mg-compact .mg-seg button { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .ctl-row .keys { font-size: var(--t13); }
+.mg-compact .dlg .steps li { grid-template-columns: 3.75rem 1fr; }
+.mg-compact .dlg .steps b { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .dlg blockquote cite { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .sleep .delta > span { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .sleep .notes .today b { font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact .choice .ch-n { font-size: var(--t13); letter-spacing: .04em; }
+/* (a crop's timings are a line to read, not a label: in lower case, where it was capitals too long for its card) */
+.mg-compact .choice .ch-s { font: 500 var(--t12)/1.25 var(--f-body); letter-spacing: 0; text-transform: none; }
+.mg-compact .guide li b { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .comms-hd .live, .mg-compact .comms-ft .prog { font-size: var(--t13); }
+.mg-compact .msg .who { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .ld-row { font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact .mg-btn.small { font-size: var(--t13); }
+.mg-compact .sheet-ft .mg-btn, .mg-compact .dlg .mg-btn, .mg-compact .comms-ft .mg-btn { font-size: max(.875rem, 13px); }
+@media (max-width: 760px) {
+  .mg-compact .newgame .diff dt { letter-spacing: 0; }
+  .mg-compact .stat span { letter-spacing: 0; }
+  .mg-compact .title-foot { letter-spacing: .04em; }
+}

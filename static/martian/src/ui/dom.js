@@ -358,7 +358,10 @@ function nextToast() {
   // note (whole sentences of it), or none: it never lies over the thing his thumb is on.
   if (layout.compact && layout.touch && t.note) {
     const joy = UI.joy.getBoundingClientRect(), t3 = node.querySelector('.t3');
-    const reaches = () => joy.height > 2 && node.getBoundingClientRect().bottom > joy.top - 8;      // (8 px clear of it, as everything on the HUD is of its neighbour)
+    // (8 px clear of it, as everything on the HUD is of its neighbour. The card is measured where it will stand, not
+    //  where it is now: it arrives by sliding down, so its own box at this moment is 8 px too high, and cards that
+    //  passed this test came to rest 3 px from the stick.)
+    const reaches = () => joy.height > 2 && UI.toasts.getBoundingClientRect().top + node.offsetHeight > joy.top - 8;
     if (t3 && reaches()) {
       node.classList.add('tight');
       t3.innerHTML = chem(esc(fitSentences(t3, t.note)));

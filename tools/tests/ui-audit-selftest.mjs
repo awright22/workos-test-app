@@ -13,18 +13,23 @@ const g = await openGame({ width: 667, height: 375, touch: true, quality: 'low',
 const page = g.page, ev = g.eval;
 await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
 let failed = 0;
+let kinds = /^(over|clipped|outside)/;
 const audit = async () => {
   // (two frames first, as the walk waits before it measures: the game marks a list that scrolls on its next frame
   //  or the one after, and on a slow machine that is longer than any fixed wait)
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
-  return auditLines(await page.evaluate(auditInPage, safe)).filter((l) => /^(over|clipped|outside)/.test(l));
+  return auditLines(await page.evaluate(auditInPage, safe)).filter((l) => kinds.test(l));
 };
-const withFault = async (css) => {
-  await page.evaluate((c) => { const s = document.createElement('style'); s.id = 'fault'; s.textContent = c; document.head.appendChild(s); }, css);
+/** Measure with a fault put back: a style sheet, or a piece of markup put into the element `into` names. */
+const withFault = async (css, html, into) => {
+  await page.evaluate(([c, h, sel]) => {
+    const s = document.createElement('style'); s.id = 'fault'; s.textContent = c || ''; document.head.appendChild(s);
+    if (h) { const t = document.createElement('template'); t.innerHTML = h; const n = t.content.firstElementChild; n.id = 'fault-node'; document.querySelector(sel).appendChild(n); }
+  }, [css, html || '', into || '']);
   await sleep(300);
   const r = await audit();
-  await page.evaluate(() => document.getElementById('fault').remove());
+  await page.evaluate(() => { document.getElementById('fault').remove(); const n = document.getElementById('fault-node'); if (n) n.remove(); });
   await sleep(200);
   return r;
 };
@@ -50,6 +55,25 @@ await ev((G) => {
   S.machines = { oxygenator: 88, reclaimer: 54, rover: 31, suit: 12 };
   G.tpLocal(-3.4, 3.2); G.tick(0.05, 3);
 });
+
+// The fifth review measured four things the audit of the time had passed: slider handles 44 by 32 px and switches 56 by
+// 32 in Settings, a help mark 18 px across that was the only sign its panel could be pressed, and labels in capitals
+// at 11 px (9 px to the eye).
+kinds = /^(target|text)/;
+await page.evaluate(() => window.__UI.showSettings(() => window.__UI.hideOverlay(), false));
+await page.locator('[data-seg="settab"] [data-v="sound"]').click();
+await sleep(300);
+check('a slider handle shorter than a thumb', await audit(), await withFault('.mg-touch .mg-range::-webkit-slider-thumb { height: 2rem !important; }'), /^target: 44x3\d  the handle/);
+await page.locator('[data-seg="settab"] [data-v="interface"]').click();
+await sleep(300);
+check('a switch shorter than a thumb', await audit(), await withFault('.mg-touch .mg-switch { width: 3.5rem !important; height: 2rem !important; }'), /^target: .*the switch itself/);
+await page.locator('[data-seg="settab"] [data-v="graphics"]').click();
+await page.evaluate(() => window.__UI.hideOverlay());
+await sleep(300);
+check('a mark drawn as a button, 18 px across', await audit(),
+  await withFault('', '<span style="display:grid;place-items:center;width:17px;height:17px;border:1px solid rgba(245,240,232,.58);border-radius:50%;font:600 11px/1 sans-serif">?</span>', '#mg-vitals .suit'), /^target: 1\dx1\d  drawn as a button/);
+check('a label in capitals at 11 px', await audit(), await withFault('.mg-compact .suit .cap { font-size: 11px !important; }'), /^text: capitals at 11/);
+kinds = /^(over|clipped|outside)/;
 
 // the colony's inventory: rows that do not grow with their text
 await page.keyboard.press('c');
@@ -77,5 +101,5 @@ check('a card that cuts its own last line and button', await audit(), await with
 
 if (g.errors.length) { failed++; console.log('  console errors: ' + JSON.stringify(g.errors.slice(0, 4))); }
 await g.close();
-console.log(failed ? `\n${failed} failed` : '\nThe audit catches all three.');
+console.log(failed ? `\n${failed} failed` : '\nThe audit catches all seven.');
 process.exit(failed ? 1 : 0);

@@ -103,7 +103,7 @@ export function showNewGame(o, back) {
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies drain</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
+      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Consumption</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',

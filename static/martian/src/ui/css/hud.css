@@ -607,3 +607,34 @@
    one line; at 667 it stood 8 px into the JUMP button, so there it is narrower and centred on the gap it has */
 @media (min-width: 761px) { .mg-compact #mg-prompt, .mg-compact #mg-prompt.minor { max-width: min(24rem, calc(100vw - var(--sal) - var(--sar) - 22.5rem)); } }
 @media (max-width: 760px) { .mg-compact #mg-prompt, .mg-compact #mg-prompt.minor { max-width: 15.75rem; left: calc(50% - .8125rem); } }
+
+/* ================================================================ phones: capitals at 13 px
+   A label in capitals is as tall as its capitals: seven tenths of its size. At 11 px that is under 8 px of
+   letter, which the fifth review measured as "about 9 px" type, in the suit's dial, the statistics tiles, the title's
+   footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
+   under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
+   holds both. */
+.mg-compact .row .lb { font-size: var(--t13); letter-spacing: .03em; }
+.mg-compact { --grow: calc(.8 * var(--t14) + 1px + var(--gh)); }
+.mg-compact #mg-compass .dists span { font-size: var(--t13); letter-spacing: .02em; }
+.mg-compact #mg-region { font-size: var(--t13); letter-spacing: .12em; text-indent: .12em; }
+@keyframes mg-region-in-c { 0% { letter-spacing: .4em; text-indent: .4em; background: var(--accent-wash); } 100% { letter-spacing: .12em; text-indent: .12em; } }
+.mg-compact #mg-clock .sol .k { font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact .alert { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .mg-line { grid-template-columns: 3rem 1fr; }
+.mg-compact .mg-line .who { font-size: var(--t13); letter-spacing: .04em; }
+.mg-compact .toast .t1 { font-size: var(--t13); letter-spacing: .14em; }
+.mg-compact #mg-rover .spd span { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--t13); letter-spacing: .12em; }
+.mg-compact #mg-keys { font-size: var(--t13); letter-spacing: .1em; }
+.mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .ph-title { font-size: var(--t13); }
+@media (max-width: 760px) {
+  /* (the narrowest phones: the name of the place stands between the bars and the mission list, in what room there is) */
+  .mg-compact #mg-region { letter-spacing: 0; text-indent: 0; padding-left: .25rem; padding-right: .25rem; }
+  @keyframes mg-region-in-c { 0% { background: var(--accent-wash); } 100% { background: rgba(14, 12, 11, .6); } }
+  /* (a banner there is 127 px wide at the most: its title has the width, and the colour says it is an alarm) */
+  .mg-compact .alert { grid-template-columns: auto; letter-spacing: 0; }
+  .mg-compact .alert .ic { display: none; }
+  .mg-compact .res .row { width: 7.375rem; }
+}

@@ -64,8 +64,12 @@ export function auditInPage(safe) {
     if (size < 10.95) out.text.push(`${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
     // A label in capitals has no ascenders or descenders: what the eye measures is the capitals' height, seven tenths
     // of the type's size. At 11 px that is under 8 px of letter, and a reviewer reads it as 9 px type. Capitals are
-    // therefore held to 13 px (9 px of letter). A lone letter or figure is not a label (a key cap, a count).
-    else if (size < 12.95 && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(said)))
+    // therefore held to 13 px (9 px of letter). A lone letter or figure is not a label (a key cap, a count). The
+    // caption under the icon of a round or square touch button is half of a label, the icon being the other half,
+    // and has 46 px to stand in: it is held to 12.
+    // (An acronym at the head of a sentence, "EVA" before the rest of a line, is not a label: it is the whole of what
+    //  the element says that is in capitals, or is made so by its style.)
+    else if (size < (p.closest('.mg-tbtn') ? 11.95 : 12.95) && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(p.textContent)))
       out.text.push(`capitals at ${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
     // a figure and its unit are written apart, everywhere the same way ("28 L", not "28L")
     if (/\d(L|km|m)\b/.test(said) && !/\d(L|km|m)\b[-/]/.test(said)) out.text.push(`a figure run into its unit  ${name(p)}  “${said.slice(0, 28)}”`);

@@ -407,3 +407,31 @@
 .map-scale em { font-style: normal; color: var(--ink-3); letter-spacing: .1em; margin-right: .25rem; }
 .mg-compact .map-scale em { font-size: var(--t13); letter-spacing: .04em; color: var(--ink-2); }
 @media (max-width: 760px) { .mg-compact .map-status .rg { display: none; } }
+
+/* ================================================================ phones: capitals at 13 px
+   A label in capitals is as tall as its capitals: seven tenths of its size. At 11 px that is under 8 px of
+   letter, which the fifth review measured as "about 9 px" type, in the suit's dial, the statistics tiles, the title's
+   footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
+   under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
+   holds both. */
+.mg-compact .scr-nav button, .mg-compact .colony .tabs button, .mg-compact .journal .tabs button { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .pane-hd { font-size: var(--t13); letter-spacing: .16em; }
+.mg-compact .pane-hd span { letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .col-bar b { font-size: var(--t13); }
+.mg-compact .badge { font-size: var(--t13); letter-spacing: .06em; padding: .125rem .375rem; }
+.mg-compact .card h4 small { font-size: var(--t13); }
+.mg-compact .leads li { grid-template-columns: 2.625rem 1fr; }
+.mg-compact .leads b { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact .jlog .mg-line { grid-template-columns: 4.5rem 1fr; }
+.mg-compact .jlog .mg-line .who, .mg-compact .jlog .mg-line .who small { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .map-status, .mg-compact .map-status .t-mono { font-size: var(--t13); letter-spacing: .06em; }
+.mg-compact .map-status .t-mono { letter-spacing: -.02em; }
+.mg-compact .map-tools .cap { font-size: var(--t13); letter-spacing: .02em; }
+.mg-compact .map-legend h3, .mg-compact .map-info .ty, .mg-compact .map-info dt, .mg-compact .map-info .grp b { font-size: var(--t13); letter-spacing: .1em; }
+.mg-compact .map-info dd.t-mono { font-size: var(--t13); }
+.map-hint { font-size: max(.8125rem, 13px); }
+.mg-compact .empty b { font-size: max(.875rem, 13px); }
+@media (max-width: 760px) {
+  .mg-compact .journal .tabs button { letter-spacing: .02em; }
+  .mg-compact .scr-nav button { letter-spacing: .04em; }
+}

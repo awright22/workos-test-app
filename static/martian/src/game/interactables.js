@@ -354,7 +354,9 @@ addI({
       // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
         'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. <b>A potato bed takes one ration to plant and gives back four potatoes.</b>',
-      buttons: [{ label: 'Get to work' }],
+      // (and where it is all going, once, in his own voice, when the card and the journal's arrival have been read:
+      //  after ten minutes of play nothing had said that the rescue is a rocket a long drive away)
+      buttons: [{ label: 'Get to work', fn: () => setTimeout(() => log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the only rocket on Mars, in Schiaparelli, by Sol ${S.rescueSol}.`), 7500) }],
     });
   },
 });
