@@ -208,7 +208,7 @@ export class Vfx {
     g.instanceCount = n;
     this.sheetU = {
       uDrift: { value: this.drift }, uCam: { value: new THREE.Vector3() }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uCamH: { value: 2 },
-      uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uMap: { value: this.sprite },
+      uStorm: { value: 0 }, uLight: { value: new THREE.Color(1, 0.8, 0.6) }, uMap: { value: this.sprite }, uTime: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.sheetU, transparent: true, depthWrite: false, fog: false, blending: THREE.NormalBlending,
@@ -216,9 +216,10 @@ export class Vfx {
         attribute vec3 aSeed; attribute float aRnd;
         uniform float uStorm, uCamH;
         uniform vec3 uCam, uDrift, uUp;
-        varying float vA; varying vec2 vUv;
+        varying float vA; varying vec2 vUv; varying float vSeed;
         void main() {
           const float BOX = 70.0;
+          vSeed = aRnd;
           float pace = (8.0 + floor(aRnd * 7.0)) * 0.1;
           vec3 rel = mod(aSeed * BOX + uDrift * pace - uCam, BOX) - BOX * 0.5;
           // keep the spread sideways, but press the height into the few metres above the ground
@@ -236,10 +237,20 @@ export class Vfx {
              * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
         }`,
       fragmentShader: /* glsl */`
-        uniform sampler2D uMap; uniform vec3 uLight;
-        varying float vA; varying vec2 vUv;
+        uniform sampler2D uMap; uniform vec3 uLight; uniform float uTime;
+        varying float vA; varying vec2 vUv; varying float vSeed;
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float vn(vec2 p) {
+          vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+        }
         void main() {
-          float a = texture2D(uMap, vUv).a * vA;
+          float fall = texture2D(uMap, vUv).a;
+          // Blown sand is threads, not cloth: long along the wind, fine across it, running fast, and torn at its
+          // edges. (A plain soft shape made each veil a smooth ribbon with a clean edge, like silk in water.)
+          vec2 q = vec2(vUv.x * 4.0 - uTime * (1.1 + vSeed * 0.9), vUv.y * 17.0 + vSeed * 31.0);
+          float thread = vn(q) * 0.55 + vn(q * vec2(2.7, 3.3) + 7.1) * 0.30 + vn(q * vec2(7.0, 9.0) + 3.7) * 0.15;
+          float a = fall * vA * smoothstep(0.26, 0.70, thread + fall * 0.30) * 1.55;
           if (a < 0.003) discard;
           gl_FragColor = vec4(uLight, a);
         }`,
@@ -430,7 +441,7 @@ export class Vfx {
     st.uLight.value.copy(a.uLight.value); st.uLight.value.r *= 0.74; st.uLight.value.g *= 0.60; st.uLight.value.b *= 0.46;      // dust-coloured, never white
     const sh = this.sheetU;
     this.sheets.visible = this.air.visible && p.storm > 0.32;
-    sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm;
+    sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm; sh.uTime.value = this.time;
     sh.uCamH.value = Math.min(40, Math.max(0.5, p.camHeight === undefined ? 2 : p.camHeight));
     sh.uLight.value.copy(a.uLight.value);
     const u = this.puffU;

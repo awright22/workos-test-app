@@ -56,7 +56,8 @@ const scenes = {
   'inside-farm': async () => ev(async (G) => { G.tpLocal(1.5, -0.5, -1.3); G.look(-0.15); G.tick(0.05, 30); await G.settle(); }),
   'walk-plain': async () => ev(async (G) => { G.setLocalTime(9.5); G.tpLocal(40, 120, 0.4); G.look(-0.08); G.input.keys['w'] = true; G.tick(0.05, 26); G.input.keys['w'] = false; await G.settle(); }),
   'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 4.6); G.look(-0.16); G.tick(0.05, 40); await G.settle(); }),
-  'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); G.input.keys['w'] = false; await G.settle(); }),
+  // (on the open plain, so that it is driving when the picture is taken: among the Hab's boulders it was often stopped against one)
+  'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.roverLocal(44, 122, 0.4); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); await G.settle(); G.tick(0.05, 6); G.input.keys['w'] = false; }),
   'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.tick(0.05, 30); await G.settle(); }),
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'storm-sun': async () => ev(async (G) => { G.setLocalTime(16.6); G.faceSun(); G.look(0.2); G.tick(0.05, 40); await G.settle(); }),

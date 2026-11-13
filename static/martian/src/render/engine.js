@@ -50,11 +50,20 @@ const FINAL_FRAGMENT = /* glsl */`
       float far = vn(vec2(wq.x * 0.9 - uTime * 0.22, wq.y * 3.2 + 1.7));
       float mid = vn(vec2(wq.x * 1.6 - uTime * 0.7, wq.y * 9.0 + vn(vec2(wq.x * 2.0 - uTime * 0.5, 4.0)) * 1.4));
       float near = vn(vec2(wq.x * 2.4 - uTime * 2.1, wq.y * 26.0 + vn(vec2(wq.x * 3.0 - uTime * 1.6, 9.0)) * 2.5));
+      // Grit. The bands are sand, and sand blows in threads: fine across the wind, long along it, faster than the
+      // band they are in, and they tear its edge. (Without them each band was a smooth ribbon with a clean edge,
+      // like silk under water, and a still frame of a storm had no grain in it.)
+      float thread = vn(vec2(wq.x * 9.0 - uTime * 4.3, wq.y * 140.0)) * 0.6 + vn(vec2(wq.x * 21.0 - uTime * 7.9, wq.y * 310.0 + 5.0)) * 0.4;
+      mid += (thread - 0.5) * 0.30;
+      near += (thread - 0.5) * 0.50;
       // (the streamers nearest the eye are the ones that say "wind": sharp-edged, and whipping past twice as fast)
       near = smoothstep(0.38, 0.78, near) * (0.5 + 0.5 * smoothstep(0.85, 0.1, vUv.y));
       float sheet = far * 0.40 + mid * 0.34 + near * 0.42;
       float thick = smoothstep(0.42, 0.8, mid * 0.55 + near * 0.6);
-      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust));
+      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread));
+      // ... and grains caught by the light as they pass the visor: a flicker of specks, thickest where the dust is
+      float speck = hash12(floor(gl_FragCoord.xy * 0.5) + floor(uTime * 30.0) * 7.3);
+      col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick));
     }
     col *= uExposure;
     // scene-referred grade
@@ -244,7 +253,8 @@ export class Engine {
       // (a little under what would light the room evenly: the fittings then make pools, and the corners fall away)
       // (and now well under: the ceiling's own fittings are point lights with real pools under them, and this even
       // light from above is only what the room bounces back. At 2.5 it was the whole picture and the floor was one tone.)
-      this.sun.intensity = p.power === false ? 0.06 : 1.1;
+      // (and a little less again now that each fitting has a pool drawn under it: the floor between them falls back)
+      this.sun.intensity = p.power === false ? 0.06 : 0.95;
       this.sun.position.copy(_u);
       sh.roof = p.roof || null; sh.radius = 3.0; sh.autoUpdate = true;
     } else {

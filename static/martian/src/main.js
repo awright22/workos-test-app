@@ -345,6 +345,8 @@ function installDebug() {
       initPlayerAt(w.normalize(), yaw);
       lastFocus = tick(0.001);
     },
+    /** Park the rover at a spot in the Hab's own frame (metres), facing `yaw`. */
+    roverLocal(lx, lz, yaw = 0) { initRoverAt(siteLocalToWorld(World.hab, lx, 0, lz, new THREE.Vector3()).normalize(), yaw); },
     /** Stand `dist` metres north of a world position. */
     tpNear(pos, dist = 1.5) {
       const up = pos.clone().normalize();

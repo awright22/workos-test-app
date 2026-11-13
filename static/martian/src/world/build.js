@@ -127,6 +127,10 @@ export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'so
         const fall = Math.max(0, Math.min(1, (reach - d) / 0.34));
         const ring = Math.exp(-((d - 0.3) / 0.2) * ((d - 0.3) / 0.2));
         v = fall * (kind === 'scorch' ? 0.62 + 0.38 * Math.max(ring, Math.max(0, 1 - d / 0.3)) : 0.5 + 0.5 * ring) * (0.72 + 0.28 * hash3(i >> 1, j >> 1, 5));
+      } else if (kind === 'rim') {
+        // the foot of a round room's wall, where the ceiling's light reaches least: clear in the middle, dark at the wall
+        const t = Math.max(0, Math.min(1, (d - 0.48) / 0.52));
+        v = d > 1 ? 0 : t * t * (0.9 + 0.1 * hash3(i, j, 11));
       } else {
         const ragged = 0.80 + 0.10 * Math.sin(a * 5 + 1.3) + 0.06 * Math.sin(a * 11 + 0.4) + 0.04 * Math.sin(a * 23);
         v = Math.max(0, Math.min(1, (ragged - d) / 0.42)) * (0.75 + 0.25 * hash3(i, j, 3));
@@ -233,8 +237,8 @@ export function buildHabColony(spawn) {
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
-  groundStain(World.hab, 15, 0x24120a, 0.5, HAB_FLOOR + 0.03, 'trodden').position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
-  groundStain(World.hab, 13.5, 0x1e0f08, 0.55, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
+  groundStain(World.hab, 15, 0x24120a, 0.26, HAB_FLOOR + 0.03, 'trodden').position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
+  groundStain(World.hab, 13.5, 0x1e0f08, 0.30, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
@@ -254,7 +258,16 @@ export function buildHabColony(spawn) {
     // (a short reach: four fittings that each lit the whole room lit it evenly, like an office. Each now lights the
     // floor under it and a little more, and the walls and the far side fall away.)
     if (a) addLamp(a, { color: 0xffe4c4, power: 54, range: 7.5, decay: 2.0, level: () => powered() * (World.sealedInside ? 0.8 : 1), room: true });
+    // ... and under each, a pool on the floor, drawn as the pools outside are (see groundGlow): fittings five metres up
+    // light a floor evenly whatever their reach, and a room with no pools under its lamps is lit like a diagram.
+    if (a) {
+      World.hab.updateMatrixWorld(true);
+      const at = hab.root.worldToLocal(a.getWorldPosition(new THREE.Vector3()));
+      groundGlow(hab.root, 1.9, 0xffe2c0, 0.55, 'pool', powered, HAB_FLOOR + 0.012).position.set(at.x, HAB_FLOOR + 0.012, at.z);
+    }
   }
+  // (and the floor falls away toward the wall, as a room lit from its middle does)
+  groundStain(hab.root, HAB_R, 0x000000, 0.46, HAB_FLOOR + 0.008, 'rim');
   // the grow lights over the farm: two pink pools, one for each pair of trays
   for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 4.2, range: 5, level: powered, room: true });
   for (const [n, power, range] of [['lamp_bench', 3.5, 6], ['lamp_bunk', 2.5, 5]]) {
@@ -520,7 +533,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.5, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
