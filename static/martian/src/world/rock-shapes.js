@@ -142,7 +142,8 @@ function notch(rnd, parts, cuts) {
  * the ground is put there or higher, wherever the rock no longer overhangs its own foot); its parts (fused; `join`
  * says how sharply); and what was done to it since:
  *   uneven [slow, fine]   how far its faces are from flat, over half its width and over a hand's
- *   hackle [cells, depth] a broken surface: so many small flats to its radius, each tipped and stepped by so much
+ *   hackle [cells, depth] a broken surface: so many small flats to its radius, each tipped and stepped by so much (deep
+ *                         enough that the steps between them shade as a net of fine fractures: a face without them is clay)
  *   cracks                [direction, offset, width, depth, wander] each: a joint that has opened
  *   beds                  { n, thick, relief, tone }: layers across direction n, standing out in broad ledges (the
  *                         beds themselves, a hand or two thick, are drawn by the rock shader wherever this says the rock is bedded)
@@ -156,98 +157,98 @@ const DEFS = [
   // a low block out of square, a corner gone and a length of its top edge
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
     parts: notch(r, notch(r, chips(r, chop(r, box(r, [1.0, 0.6, 0.78], 0.4, 0.10, 1.1, 5, 0.5), 2, 0.1, 0.26, -0.5), 2, -0.5), [[[1, 0.15, 0.1], 0.6], [[0.1, 1, 0], 0.64], [[0, 0.1, 1], 0.58]]), [[[-1, 0.2, 0.3], 0.56], [[0, 1, -0.15], 0.74]]),
-    uneven: [0.010, 0.006], hackle: [3.4, 0.02], cracks: [[[0.3, 0.1, 1], 0.12, 0.03, 0.2, 0.04]], lumps: [0.004, 0.3] }),
+    uneven: [0.010, 0.006], hackle: [3.4, 0.044], cracks: [[[0.3, 0.1, 1], 0.12, 0.03, 0.2, 0.04]], lumps: [0.004, 0.3] }),
   // a taller block with a stepped top
   (r) => ({ cls: ANGULAR, ground: -0.42, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [0.8, 0.9, 0.7], 1.3, 0.16, 0.5, 5, 0.45), 2, 0.08, 0.22, 0.2), 2), [[[0.9, 0.2, 0.3], 0.5], [[0.1, 1, 0.1], 0.58]]),
-    uneven: [0.010, 0.006], hackle: [3.2, 0.02], cracks: [[[1, 0.1, -0.4], -0.1, 0.028, 0.18, 0.05]], lumps: [0.004, 0.3] }),
+    uneven: [0.010, 0.006], hackle: [3.2, 0.044], cracks: [[[1, 0.1, -0.4], -0.1, 0.028, 0.18, 0.05]], lumps: [0.004, 0.3] }),
   // a many-sided block, its top broken off flat, one great fresh face
   (r) => ({ cls: ANGULAR, ground: -0.28, join: 5,
     parts: notch(r, flat(r, chips(r, chop(r, poly(r, 12, [1.0, 0.74, 0.85], 0.2, 0.55, 5), 2, 0.22, 0.4, 0.15), 2), 0.62, 0.3), [[[0.6, 0.7, -0.4], 0.62], [[-0.3, 0.2, -1], 0.6]]),
-    uneven: [0.012, 0.006], hackle: [3.8, 0.024], scoops: [[[0.5, 0.5, 0.7], 0.4, 0.06]], lumps: [0.004, 0.3] }),
+    uneven: [0.012, 0.006], hackle: [3.8, 0.053], scoops: [[[0.5, 0.5, 0.7], 0.4, 0.06]], lumps: [0.004, 0.3] }),
   // a length of a lava column, lying over, cracked across
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
     parts: notch(r, chips(r, prism(r, 6, 0.66, 1.05, 0.7, 0.2, 2.0, 5), 2), [[[1, 0.5, 0], 0.72], [[0, 1, 0.3], 0.7]]),
-    uneven: [0.008, 0.006], hackle: [3.4, 0.018], cracks: [[[1, 0.05, 0.1], -0.2, 0.03, 0.22, 0.03]], lumps: [0.004, 0.3] }),
+    uneven: [0.008, 0.006], hackle: [3.4, 0.040], cracks: [[[1, 0.05, 0.1], -0.2, 0.03, 0.22, 0.03]], lumps: [0.004, 0.3] }),
   // two blocks, one lying against the other
   (r) => ({ cls: ANGULAR, ground: -0.26, join: 5,
     parts: [shift(chips(r, chop(r, box(r, [1.0, 0.5, 0.78], 0.2, 0.08, 0.5, 5, 0.4), 2, 0.06, 0.2), 2), [0, -0.1, 0]), shift(chips(r, chop(r, box(r, [0.56, 0.6, 0.6], 2.4, 0.38, 2.0, 5, 0.5), 2, 0.08, 0.22), 2), [0.26, 0.22, -0.12])],
-    uneven: [0.010, 0.006], hackle: [3.6, 0.02], lumps: [0.004, 0.3] }),
+    uneven: [0.010, 0.006], hackle: [3.6, 0.044], lumps: [0.004, 0.3] }),
   // a block tipped over, its upper corner sheared flat and a bite out of its high side (so that it has no point)
   (r) => ({ cls: ANGULAR, ground: -0.34, join: 5,
     parts: notch(r, notch(r, flat(r, chips(r, chop(r, box(r, [0.95, 0.66, 0.62], 1.9, 0.22, 0.3, 5, 0.4), 2, 0.1, 0.24, 0.5), 2), 0.84, 0.2), [[[-0.6, 0.8, 0.2], 0.56], [[0.3, 0.3, 1], 0.6]]), [[[0.2, 1, -0.1], 0.72], [[1, 0.1, 0.3], 0.1]]),
-    uneven: [0.012, 0.008], hackle: [3.2, 0.03], cracks: [[[0.2, 1, 0.3], 0.1, 0.028, 0.16, 0.04], [[0.3, 0.1, 1], -0.12, 0.03, 0.24, 0.05]], scoops: [[[-0.8, 0.4, 0.4], 0.34, 0.07], [[0.6, 0.45, -0.6], 0.3, 0.06]], lumps: [0.004, 0.3] }),
+    uneven: [0.012, 0.008], hackle: [3.2, 0.055], cracks: [[[0.2, 1, 0.3], 0.1, 0.028, 0.16, 0.04], [[0.3, 0.1, 1], -0.12, 0.03, 0.24, 0.05]], scoops: [[[-0.8, 0.4, 0.4], 0.34, 0.07], [[0.6, 0.45, -0.6], 0.3, 0.06]], lumps: [0.004, 0.3] }),
   // a wide low block split down the middle, one half dropped, its outline broken
   (r) => ({ cls: ANGULAR, ground: -0.16, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [1.05, 0.5, 0.86], 2.9, 0.06, 2.2, 5, 0.4), 4, 0.1, 0.34, -0.5), 2, -0.5), [[[1, 0.1, 0.45], 0.16], [[0, 1, 0.1], 0.72]]),
-    uneven: [0.012, 0.008], hackle: [3.6, 0.024], cracks: [[[1, 0.1, 0.45], 0.1, 0.04, 0.34, 0.09]], lumps: [0.004, 0.3] }),
+    uneven: [0.012, 0.008], hackle: [3.6, 0.053], cracks: [[[1, 0.1, 0.45], 0.1, 0.04, 0.34, 0.09]], lumps: [0.004, 0.3] }),
   // a shattered rock: many faces at odds, deep bites out of it, no point to it
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
     parts: notch(r, flat(r, chips(r, chop(r, poly(r, 10, [1.0, 0.8, 0.8], 0.3, 0.8, 5), 4, 0.12, 0.34, 0.0), 2), 0.6, 0.4), [[[0.7, 0.6, -0.4], 0.56], [[-0.2, 0.7, 0.7], 0.6], [[0.6, -0.1, 0.8], 0.6]]),
-    uneven: [0.012, 0.008], hackle: [4.0, 0.026], lumps: [0.004, 0.3] }),
+    uneven: [0.012, 0.008], hackle: [4.0, 0.055], lumps: [0.004, 0.3] }),
   // a great jointed block (what falls from a wall): out of square, two joints opened, a corner gone
   (r) => ({ cls: ANGULAR, ground: -0.36, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.76, 0.82], 0.9, 0.14, 2.6, 5, 0.45), 3, 0.08, 0.24, 0.2), 2), [[[1, 0.6, 0.2], 0.58], [[0.2, 1, 0.5], 0.62], [[0.1, 0.2, 1], 0.56]]),
-    uneven: [0.008, 0.006], hackle: [4.2, 0.018], cracks: [[[0.1, 1, 0.05], 0.14, 0.022, 0.16, 0.03], [[1, 0.1, -0.5], -0.22, 0.026, 0.18, 0.04]], lumps: [0.004, 0.3] }),
+    uneven: [0.008, 0.006], hackle: [4.2, 0.040], cracks: [[[0.1, 1, 0.05], 0.14, 0.022, 0.16, 0.03], [[1, 0.1, -0.5], -0.22, 0.026, 0.18, 0.04]], lumps: [0.004, 0.3] }),
   // ---- weathered rock: the same breaks, their arrises worn, pitted and scoured ----
   // a block of pitted lava, a slab off one shoulder and a flake off the other
   (r) => ({ cls: ROUNDED, ground: -0.34, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [0.96, 0.62, 0.78], 1.0, 0.16, 0.7, 5, 0.5), 3, 0.1, 0.28, 0.0), 2), [[[0.7, 0.6, 0.4], 0.62], [[-0.2, 1, 0.2], 0.7]]),
-    uneven: [0.016, 0.012], hackle: [2.8, 0.02], pits: [3.4, 0.42, 0.06, 0.65], scoops: [[[-0.7, 0.4, -0.6], 0.34, 0.06]], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [2.8, 0.044], pits: [3.4, 0.42, 0.06, 0.65], scoops: [[[-0.7, 0.4, -0.6], 0.34, 0.06]], lumps: [0.008, 0.4] }),
   // a boulder split in two, the halves a little apart
   (r) => ({ cls: ROUNDED, ground: -0.36,
     parts: [flat(r, chips(r, poly(r, 16, [1.0, 0.7, 0.88], 0.16, 0.6, 5), 2), 0.76, 0.3)],
-    uneven: [0.016, 0.012], hackle: [2.8, 0.02], cracks: [[[1, 0.1, 0.3], 0.04, 0.045, 0.5, 0.05]], pits: [4.0, 0.38, 0.045, 0.45], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [2.8, 0.044], cracks: [[[1, 0.1, 0.3], 0.04, 0.045, 0.5, 0.05]], pits: [4.0, 0.38, 0.045, 0.45], lumps: [0.008, 0.4] }),
   // a worn block, flat-topped, with a ledge where a sheet has come away
   (r) => ({ cls: ROUNDED, ground: -0.32, join: 4,
     parts: notch(r, chips(r, chop(r, box(r, [0.94, 0.64, 0.8], 0.7, 0.08, 1.4, 5, 0.45), 2, 0.08, 0.24, 0.1), 2), [[[0.8, 0.5, -0.2], 0.7], [[0, 1, 0.2], 0.72]]),
-    uneven: [0.016, 0.012], hackle: [2.8, 0.018], pits: [3.8, 0.4, 0.05, 0.5], scoops: [[[-0.5, 0.4, 0.75], 0.36, 0.06]], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [2.8, 0.040], pits: [3.8, 0.4, 0.05, 0.5], scoops: [[[-0.5, 0.4, 0.75], 0.36, 0.06]], lumps: [0.008, 0.4] }),
   // a boulder broken across: its worn back, and the flat face it broke along
   (r) => ({ cls: ROUNDED, ground: -0.34,
     parts: [flat(r, chips(r, (() => { const p = poly(r, 16, [1.0, 0.72, 0.85], 0.16, 0.6, 5); p.planes.push(face(r, unit(0.9, 0.25, 0.3), 0.42, -0.5, 1)); return p; })(), 2), 0.72, 0.35)],
-    uneven: [0.016, 0.012], hackle: [3.0, 0.02], pits: [3.8, 0.4, 0.05, 0.5], scoops: [[[-0.6, 0.5, 0.6], 0.34, 0.05]], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [3.0, 0.044], pits: [3.8, 0.4, 0.05, 0.5], scoops: [[[-0.6, 0.5, 0.6], 0.34, 0.05]], lumps: [0.008, 0.4] }),
   // three worn blocks fused, deep creases between them
   (r) => ({ cls: ROUNDED, ground: -0.26, join: 4,
     parts: [chips(r, box(r, [0.8, 0.6, 0.66], 0.3, 0.14, 0.2, 5, 0.45), 2), shift(chips(r, poly(r, 8, [0.6, 0.5, 0.56], 0.14, 0.6, 5), 2), [0.46, 0.06, 0.22]), shift(chips(r, box(r, [0.5, 0.44, 0.5], 1.7, 0.3, 1.1, 5, 0.5), 2), [-0.34, 0.02, -0.3])],
-    uneven: [0.016, 0.012], hackle: [2.8, 0.018], pits: [4.0, 0.4, 0.045, 0.45], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [2.8, 0.040], pits: [4.0, 0.4, 0.045, 0.45], lumps: [0.008, 0.4] }),
   // a rock the wind has hollowed: three scoops in a worn block
   (r) => ({ cls: ROUNDED, ground: -0.30, join: 5,
     parts: notch(r, flat(r, chips(r, chop(r, poly(r, 14, [1.0, 0.7, 0.8], 0.22, 0.7, 5), 1, 0.2, 0.36, 0.3), 2), 0.8, 0.3), [[[0.7, 0.5, 0.5], 0.66], [[0.1, 1, -0.2], 0.7]]),
-    uneven: [0.016, 0.012], hackle: [2.8, 0.018], scoops: [[[0.2, 0.9, 0.3], 0.4, 0.08], [[0.9, 0.3, -0.2], 0.36, 0.08], [[-0.5, 0.4, -0.8], 0.4, 0.07]], pits: [4.4, 0.34, 0.03, 0.35], lumps: [0.008, 0.4] }),
+    uneven: [0.016, 0.012], hackle: [2.8, 0.040], scoops: [[[0.2, 0.9, 0.3], 0.4, 0.08], [[0.9, 0.3, -0.2], 0.36, 0.08], [[-0.5, 0.4, -0.8], 0.4, 0.07]], pits: [4.4, 0.34, 0.03, 0.35], lumps: [0.008, 0.4] }),
   // ---- plates of layered rock ----
   // one thick flag, its edge broken
   (r) => ({ cls: SLAB, ground: -0.12,
     parts: [chips(r, chop(r, plate(r, 7, 0.34, 0.5, 0.85, 1.15, 0.16, 5), 2, 0.08, 0.22, 0.2), 2, 0.1)],
-    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.20, relief: 0.040, tone: 0.2 }, lumps: [0.003, 0.3] }),
+    uneven: [0.008, 0.005], hackle: [3.6, 0.022], beds: { n: Y, thick: 0.20, relief: 0.040, tone: 0.2 }, lumps: [0.003, 0.3] }),
   // a wide plate with a smaller one left standing on it
   (r) => ({ cls: SLAB, ground: -0.14, join: 5,
     parts: [chips(r, plate(r, 8, 0.16, 0.5, 0.9, 1.15, 0.1, 5), 3, 0.1), chips(r, plate(r, 6, 0.44, 0.5, 0.5, 0.74, 0.2, 5), 2, 0.1)],
-    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.20, relief: 0.036, tone: 0.2 }, lumps: [0.003, 0.3] }),
+    uneven: [0.008, 0.005], hackle: [3.6, 0.022], beds: { n: Y, thick: 0.20, relief: 0.036, tone: 0.2 }, lumps: [0.003, 0.3] }),
   // a thin flagstone, a corner off, cracked across
   (r) => ({ cls: SLAB, ground: -0.06, join: 5,
     parts: notch(r, chips(r, plate(r, 6, 0.22, 0.5, 0.88, 1.2, 0.1, 5), 3, 0.1), [[[1, 0, 0.3], 0.62], [[0.2, 1, 0], 0.55]]),
-    uneven: [0.008, 0.005], hackle: [3.8, 0.010], cracks: [[[0.5, 0, 1], 0.1, 0.03, 0.3, 0.05]], beds: { n: Y, thick: 0.20, relief: 0.028, tone: 0.2 }, lumps: [0.003, 0.3] }),
+    uneven: [0.008, 0.005], hackle: [3.8, 0.022], cracks: [[[0.5, 0, 1], 0.1, 0.03, 0.3, 0.05]], beds: { n: Y, thick: 0.20, relief: 0.028, tone: 0.2 }, lumps: [0.003, 0.3] }),
   // a block of bedded rock, its layers standing out all round
   (r) => ({ cls: SLAB, ground: -0.24, join: 5,
     parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.56, 0.8], 0.5, 0.05, 0.9, 5, 0.4), 2, 0.06, 0.2, 0.3), 2), [[[0.8, 0.6, 0.3], 0.64], [[0, 1, 0], 0.6]]),
-    uneven: [0.008, 0.005], hackle: [3.4, 0.010], beds: { n: unit(0.06, 1, 0.04), thick: 0.22, relief: 0.056, tone: 0.2 }, lumps: [0.003, 0.3] }),
+    uneven: [0.008, 0.005], hackle: [3.4, 0.022], beds: { n: unit(0.06, 1, 0.04), thick: 0.22, relief: 0.056, tone: 0.2 }, lumps: [0.003, 0.3] }),
   // a plate broken in two, the pieces lying together
   (r) => ({ cls: SLAB, ground: -0.10, join: 5,
     parts: notch(r, chips(r, chop(r, plate(r, 7, 0.26, 0.5, 0.9, 1.2, 0.14, 5), 3, 0.08, 0.26, -0.1), 2, 0.1), [[[1, 0, 0.8], 0.3], [[0.1, 1, 0], 0.66]]),
-    uneven: [0.010, 0.006], hackle: [3.6, 0.014], cracks: [[[1, 0, 0.8], 0.24, 0.045, 0.4, 0.1]], beds: { n: Y, thick: 0.20, relief: 0.032, tone: 0.2 }, lumps: [0.003, 0.3] }),
+    uneven: [0.010, 0.006], hackle: [3.6, 0.031], cracks: [[[1, 0, 0.8], 0.24, 0.045, 0.4, 0.1]], beds: { n: Y, thick: 0.20, relief: 0.032, tone: 0.2 }, lumps: [0.003, 0.3] }),
   // ---- stones: what a hand or a boot would move ----
   // a flat chip
-  (r) => ({ cls: COBBLE, ground: -0.10, parts: [chips(r, plate(r, 5, 0.3, 0.4, 0.75, 1.15, 0.5, 5), 2, 0.0)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.10, parts: [chips(r, plate(r, 5, 0.3, 0.4, 0.75, 1.15, 0.5, 5), 2, 0.0)], uneven: [0.012, 0.008], hackle: [2.4, 0.055], lumps: [0.006, 0.4] }),
   // a blocky fragment
-  (r) => ({ cls: COBBLE, ground: -0.22, parts: [flat(r, chips(r, chop(r, box(r, [0.9, 0.6, 0.7], 0.8, 0.16, 0.6, 5, 0.5), 2, 0.1, 0.3, -0.4), 2, -0.4), 0.8, 0.3)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.22, parts: [flat(r, chips(r, chop(r, box(r, [0.9, 0.6, 0.7], 0.8, 0.16, 0.6, 5, 0.5), 2, 0.1, 0.3, -0.4), 2, -0.4), 0.8, 0.3)], uneven: [0.012, 0.008], hackle: [2.4, 0.055], lumps: [0.006, 0.4] }),
   // a worn, pitted pebble (many flats: not a ball)
-  (r) => ({ cls: COBBLE, ground: -0.20, parts: [flat(r, chips(r, poly(r, 11, [1.0, 0.6, 0.8], 0.2, 0.6, 4), 2), 0.75, 0.3)], uneven: [0.014, 0.01], hackle: [2.2, 0.018], pits: [3.2, 0.4, 0.05, 0.5], lumps: [0.008, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.20, parts: [flat(r, chips(r, poly(r, 11, [1.0, 0.6, 0.8], 0.2, 0.6, 4), 2), 0.75, 0.3)], uneven: [0.014, 0.01], hackle: [2.2, 0.040], pits: [3.2, 0.4, 0.05, 0.5], lumps: [0.008, 0.4] }),
   // a wedge with its edge broken off
-  (r) => ({ cls: COBBLE, ground: -0.16, join: 5, parts: notch(r, flat(r, chips(r, poly(r, 8, [1.0, 0.56, 0.74], 0.3, 0.8, 5), 2), 0.72, 0.3), [[[0.2, 1, 0.1], 0.7], [[1, 0.3, 0], 0.66]]), uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.16, join: 5, parts: notch(r, flat(r, chips(r, poly(r, 8, [1.0, 0.56, 0.74], 0.3, 0.8, 5), 2), 0.72, 0.3), [[[0.2, 1, 0.1], 0.7], [[1, 0.3, 0], 0.66]]), uneven: [0.012, 0.008], hackle: [2.4, 0.055], lumps: [0.006, 0.4] }),
   // a long shard
-  (r) => ({ cls: COBBLE, ground: -0.14, parts: [chips(r, chop(r, prism(r, 5, 0.42, 1.0, 1.1, 0.12, 0.4, 5), 2, 0.1, 0.3, 0.0), 2)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.14, parts: [chips(r, chop(r, prism(r, 5, 0.42, 1.0, 1.1, 0.12, 0.4, 5), 2, 0.1, 0.3, 0.0), 2)], uneven: [0.012, 0.008], hackle: [2.4, 0.055], lumps: [0.006, 0.4] }),
   // a broken lump: one fresh face, its top off
-  (r) => ({ cls: COBBLE, ground: -0.22, parts: [flat(r, chips(r, chop(r, poly(r, 9, [0.9, 0.66, 0.84], 0.2, 0.6, 5), 2, 0.2, 0.4, 0.1), 2), 0.7, 0.4)], uneven: [0.012, 0.008], hackle: [2.4, 0.024], scoops: [[[-0.6, 0.6, 0.4], 0.4, 0.07]], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.22, parts: [flat(r, chips(r, chop(r, poly(r, 9, [0.9, 0.66, 0.84], 0.2, 0.6, 5), 2, 0.2, 0.4, 0.1), 2), 0.7, 0.4)], uneven: [0.012, 0.008], hackle: [2.4, 0.053], scoops: [[[-0.6, 0.6, 0.4], 0.4, 0.07]], lumps: [0.006, 0.4] }),
 ];
 const SEEDS = [11, 23, 37, 41, 59, 61, 173, 73, 89, 97, 181, 103, 127, 139, 151, 163, 191, 197, 211, 223, 227, 229, 233, 239, 241, 251];
 
@@ -548,7 +549,11 @@ function* shapeSteps(n, w, out, offset, rmaxFixed, snap, snapAt) {
   const q8 = (v) => (v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255));
   const o1 = offset, o2 = offset + NN * 4;
   for (let k = 0; k < NN; k++) {
-    out[o1 + k * 4] = q8(0.5 + 0.5 * nrm[k * 3]); out[o1 + k * 4 + 1] = q8(0.5 + 0.5 * nrm[k * 3 + 1]); out[o1 + k * 4 + 2] = q8(0.5 + 0.5 * nrm[k * 3 + 2]);
+    // (a byte holds a normal to half a degree; on a flat face those steps, smoothed from texel to texel, show as a
+    // weave across it: so each byte is rounded up or down by chance, and the steps become grain)
+    const h = hashU(k, n, 7, 131);
+    out[o1 + k * 4] = q8(0.5 + 0.5 * nrm[k * 3] + ((h & 255) / 255 - 0.5) / 255); out[o1 + k * 4 + 1] = q8(0.5 + 0.5 * nrm[k * 3 + 1] + (((h >>> 8) & 255) / 255 - 0.5) / 255);
+    out[o1 + k * 4 + 2] = q8(0.5 + 0.5 * nrm[k * 3 + 2] + (((h >>> 16) & 255) / 255 - 0.5) / 255);
     out[o1 + k * 4 + 3] = q8(rad[k] * sc / rmaxFixed);
     out[o2 + k * 4] = q8(0.5 + curv[k] * 0.035 + Math.min(0, wide[k]) * 0.12);
     out[o2 + k * 4 + 1] = q8(0.5 + 0.5 * tone[k]);
