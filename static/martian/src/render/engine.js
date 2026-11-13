@@ -270,7 +270,9 @@ export class Engine {
     // ... and it comes in gusts: the murk thickens and thins every few seconds
     const gust = 1 + dust * (0.22 * Math.sin(this.time * 0.9) + 0.14 * Math.sin(this.time * 2.3 + 1.7) + 0.08 * Math.sin(this.time * 5.1));
     // (how the dust thins with height is in the shader, see airHaze: this is the haze at the datum; from orbit it goes)
-    fog.density = (0.0012 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-Math.max(0, alt - 600) / 500) + 0.0000015;
+    // (On Mars a clear day's dust dims things by a third over thirty kilometres. At this planet's scale that is a hundred
+    // metres or so: the haze was a third of what the scale asks, and a flat plain's horizon was a ruler's edge.)
+    fog.density = (0.0019 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-Math.max(0, alt - 600) / 500) + 0.0000015;
     // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
     // light at a low angle), wider still at night, and steady indoors
     // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one

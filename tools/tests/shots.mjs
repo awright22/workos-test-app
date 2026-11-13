@@ -111,7 +111,7 @@ const scenes = {
   'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
   // the figure himself, close, from the side and from behind (he stands at the spot and the camera goes round him)
   'astronaut-side': async () => ev(async (G) => { const p = G.player.pos.clone(); G.tpAround(p, 0.01, 0); G.setLocalTime(9.5); G.tick(0.05, 40); G.photo(G.player.pos.clone(), 3.4, 90, 1.25, 0.95); await G.settle(); }),
-  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 200, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
+  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 20, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
   '-camera-back-2': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
   'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
