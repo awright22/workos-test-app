@@ -1502,7 +1502,7 @@ HAND_FINGERS = [  # name, knuckle (u, v, s), spread (degrees towards +v), radius
     ('ring', (0.0030, 0.0133, 0.6705), 3.0, 0.0129, (0.036, 0.024, 0.023), (25.0, 35.0, 20.0)),
     ('little', (0.0015, 0.0390, 0.6615), 8.5, 0.0117, (0.028, 0.019, 0.020), (30.0, 39.0, 22.0)),
 ]
-GRIP_UVS = (-0.040, 0.0, 0.662)        # where the middle of a tool's handle lies: on the palm pad, in the crook of the fingers
+GRIP_UVS = (-0.038, 0.0, 0.688)        # where the middle of a tool's handle lies, across the palm in the crook of the fingers (they close round 45 mm)
 TIP_TINT = (0.78, 0.79, 0.84)          # the moulded rubber caps of the fingertips, a shade darker and bluer than the grey webbing
 
 

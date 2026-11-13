@@ -113,16 +113,31 @@ Iterate until the sheet would not look out of place in a commercial game's art b
 A Mars surface EVA suit: hard upper torso, soft-goods arms and legs with visible joint bearings
 and convolutes, bubble helmet with a gold visor, a life-support backpack with an antenna and
 hoses to the torso, chest control unit with a display, helmet lamps (`helmet_light`), knee and
-elbow pads, treaded boots, gloves with separated thumb and mitten-style fingers. Mostly
+elbow pads, treaded boots, pressure gloves with four separate fingers and a thumb. Mostly
 `suit_white` with `suit_orange` shoulder, forearm and thigh panels and `suit_grey` joints.
 Height 1.86 m standing. Rest pose: arms about 30° out from the body, feet 0.22 m apart.
 
+The hands have one bone each and no finger bones, so the fingers are modelled in the pose they
+keep: a relaxed half-curl, a little spread, that hangs naturally, closes round the rover's yoke
+and rests on a bench or a knee. White fabric with grey rubber caps on the fingertips, a pad over
+each knuckle, a strap round the palm and a dark palm pad: at the game camera's distance it is
+those dark parts that make the glove read as a hand.
+
 The helmet comes off. Everything that leaves with it uses a material named `helmet_*`
 (`helmet_white`, `helmet_dark`, `helmet_metal`, `helmet_light`) or `visor_gold`; the head under
-it (face, communications cap, collar) uses `head_*`. The game shows one group or the other: the
-helmet outdoors, the head wherever there is air. The suit's padded collar closes the neck ring
-and is always drawn. The visor is a true spherical cap with radial normals, because the game
-makes it a mirror and any kink in it shows.
+it uses `head_*` (`head_skin`, `head_cap`, `head_hair`, `head_dark`; any name that starts
+`head_` is treated the same). The game shows one group or the other: the helmet outdoors, the
+head wherever there is air. The suit's padded collar closes the neck ring and is always drawn.
+The visor is a true spherical cap with radial normals, because the game makes it a mirror and
+any kink in it shows.
+
+The bare head is seen mostly from behind, so that is the view it is built for: a snug cloth cap
+that stops on the bulge of the skull (white centre panel, pale grey panels beside it, a slate ear
+piece in front of each ear with a small black earphone, a chin strap and a boom microphone),
+short brown hair below it from ear to ear down to a hairline on the nape, ears in skin colour
+standing off the head, and the neck going down into the collar. A cap that covers the whole
+back of the head reads as a ball at that distance; the hair, the ears and the neck are what
+make it a head.
 
 Bones (exact names; a `_L`/`_R` pair for each sided bone; no dots in names):
 `hips` → `spine` → `chest` → `neck` → `head`; `chest` → `shoulder_L` → `upper_arm_L` →
@@ -139,7 +154,7 @@ bob vertically; loops must match first and last frame):
 
 | Clip | Length | Notes |
 | --- | --- | --- |
-| `Idle` | 8.0 s loop | a relaxed stand: weight on one leg, arms hanging close, two breaths, one slow look round |
+| `Idle` | 8.0 s loop | a relaxed stand with nothing mirrored: weight on the right leg and the left knee eased, the shoulders tipped against the hips, the right arm hanging close and the left bent with its hand in front of the hip, the head a little off centre; two breaths, one slow look round |
 | `Walk` | 0.9 s loop | Mars lope: long low-gravity strides of about 2.3 m, a short float between steps, arms counter-swing, torso leans a little into it. Covers 5.1 m/s |
 | `Run` | 0.72 s loop | bounding sprint, about 3.3 m per stride, clear flight phase, strong arm drive. Covers 9.2 m/s |
 | `JumpStart` | 0.25 s | crouch and push off |
