@@ -540,6 +540,11 @@ export function openMap() {
     opened = true;
     const ll = vecToLl(_v1.copy(player.pos).normalize());
     view.lon = ll.lon; view.lat = 0; view.ppd = minPpd();
+    // (where the whole planet does not fit the height of the screen, the view starts on the band its markers are in:
+    //  on a wide phone the northernmost lander's marker was cut in half by the top edge)
+    let lo = ll.lat, hi = ll.lat;
+    for (const m of buildMarkers()) { lo = Math.min(lo, m.lat); hi = Math.max(hi, m.lat); }
+    view.lat = (lo + hi) / 2;
     clampView(view);
   }
   selected = null;
