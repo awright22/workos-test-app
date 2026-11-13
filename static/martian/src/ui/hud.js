@@ -43,8 +43,8 @@ function farmStep() {
   const soil = World.plots.find((p) => p.state === 'soil');
   if (soil) return { bed: soil, why: 'A bed is filled. Plant it: potatoes are the staple.' };
   const empty = World.plots.find((p) => p.state === 'empty');
-  if (!empty) return { why: 'Ten rations will not last until the rescue.' };
-  if ((S.inv.regolith || 0) > 0) return { bed: empty, why: 'Fill an empty bed with the regolith you are carrying.' };
+  if (!empty) return { why: 'The rations will not last until the rescue.' };
+  if ((S.inv.regolith || 0) > 0) return { bed: empty, why: 'You are carrying regolith: fill an empty bed with it.' };
   let heap = null, best = 1e9;
   for (const h of World.soilPiles) { if (h.left <= 0) continue; const d = distTo(h.group.position); if (d < best) { best = d; heap = h; } }
   return heap ? { heap, why: 'Beds need regolith. Dig it at the heap outside the airlock.' } : { why: 'The heaps are spent. Dig regolith anywhere outside, slowly.' };
@@ -54,46 +54,51 @@ function farmStep() {
  * matters (`why`, a line or a function), when it is on the list (`shown`) and when it is ticked off (`done`).
  * `urgent` things (his life) lead the list in red; `press` marks one that leads when its moment comes (night, a
  * flat battery).
+ *
+ * A title is what to do, in few enough words to stand on one line of a phone's list (tests/ui.mjs measures every
+ * one): where it is done is the `place`, which the list gives on a line of its own with the distance. (With the place
+ * in the title and the distance beside it, every title on a phone ran to two lines.) An emergency's title is the
+ * instruction: the banner at the top of the screen has already said what is wrong, and the two used to say it twice.
  */
 export const OBJECTIVES = [
   { id: 'reach', urgent: true, place: 'Hab', icon: 'hab', text: () => 'Suit breach — get to the Hab', why: 'The suit is losing air. Seal it at the airlock door.',
     pos: () => habPoint(0, 1.3, 11.7), shown: () => true, done: () => S.flags.suitSealed },
   // out of doors with a quarter of a tank left: nothing else is the mission until he is breathing something else
-  { id: 'air', urgent: true, text: () => (S.suit < suitCap() * 0.12 ? 'Suit O2 critical — get to air' : 'Suit O2 low — get to air'), why: 'An empty tank is minutes from the end.',
+  { id: 'air', urgent: true, text: () => (S.suit < suitCap() * 0.12 ? 'Run for air' : 'Get to air'), why: () => (airAtRover() ? 'The rover has air: get in and the suit refills.' : 'The airlock refills the suit. An empty tank is the end.'),
     place: () => (airAtRover() ? 'Rover' : 'Hab'), icon: () => (airAtRover() ? 'rover' : 'hab'),
     pos: () => (airAtRover() ? above(World.rover.group.position, 1.6) : habPoint(0, 1.3, 11.7)),
     shown: () => !S.flags.coldOpen && S.mode === 'walk' && !S.inside && !S.inAirlock && S.suit < suitCap() * 0.25, done: () => false },
-  { id: 'breach', urgent: true, place: 'Breach', icon: 'warning', text: () => 'Hab breach: seal it', why: 'Air is going out through the far wall, behind the comms desk.',
+  { id: 'breach', urgent: true, place: 'Breach', icon: 'warning', text: () => 'Seal the breach', why: 'It is in the far wall, behind the comms desk. Hold to patch it.',
     pos: () => habPoint(0, 1.6, -HAB_R + 0.5), shown: () => S.breach.active, done: () => !S.breach.active },
   // (nothing said it was time to sleep: at 20:16 and 89 below, the list still led with the solar panels)
-  { id: 'sleep', press: () => true, place: () => (farAfield() ? 'Rover' : 'Bunk'), text: () => (S.mode === 'rover' || farAfield() ? 'Camp in the rover until dawn' : 'Sleep until dawn in the bunk'),
+  { id: 'sleep', press: () => true, place: () => (farAfield() ? 'Rover' : 'Bunk'), text: () => (S.mode === 'rover' || farAfield() ? 'Camp in the rover until dawn' : 'Sleep until dawn'),
     why: 'The night is deadly cold. Sleep skips to dawn and mends you.',
     pos: () => (S.mode === 'rover' ? null : farAfield() ? above(World.rover.group.position, 1.6) : habPoint(-5.0, 1.1, -4.9)), shown: bedtime, done: () => false },
-  { id: 'systems', place: () => (S.checkedSystems.oxy ? 'Reclaimer' : 'Oxygenator'), text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, why: 'They make your air and your water. Know what keeps you alive.',
+  { id: 'systems', place: () => (S.checkedSystems.oxy ? 'Reclaimer' : 'Oxygenator'), text: () => `Inspect the two machines (${Object.keys(S.checkedSystems).length}/2)`, why: 'The oxygenator and the reclaimer make your air and your water.',
     pos: () => (S.checkedSystems.oxy ? habPoint(5.9, 1.4, -0.4) : habPoint(5.6, 1.4, -3.6)), shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
-  { id: 'math', place: 'Comms desk', text: () => 'Check the numbers at the comms desk', why: 'How long will the food last?',
+  { id: 'math', place: 'Comms desk', text: () => 'Check the numbers', why: 'How long will the food last?',
     pos: () => habPoint(0, 1.3, -6.6), shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
-  { id: 'water', place: 'Farm bed', text: () => 'Water the farm beds: they have stopped growing', why: 'A bed stalls at half grown until it is watered again.',
+  { id: 'water', place: 'Farm bed', text: () => 'Water the stalled beds', why: 'A bed stops at half grown until it is watered again.',
     pos: () => { const p = World.plots.find(thirsty); return p ? above(p.worldPos, 0.9) : null; }, shown: () => World.plots.some(thirsty), done: () => false },
   // "farm or starve" is the premise: the farm leads until three beds are in, whatever else has joined the list
-  { id: 'farm', place: () => (farmStep().heap ? 'Heap' : 'Farm bed'), text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, why: () => farmStep().why,
+  { id: 'farm', place: () => (farmStep().heap ? 'Heap' : 'Farm bed'), text: () => `Plant three farm beds (${Math.min(plantedPlots(), 3)}/3)`, why: () => farmStep().why,
     pos: () => { const f = farmStep(); return f.bed ? above(f.bed.worldPos, 0.9) : f.heap ? above(f.heap.group.position, 1.1) : null; },
     shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
-  { id: 'hydra', place: 'Rig', text: () => 'Make water: burn hydrazine at the rig', why: 'A burn makes 28 L for the beds, and eats a little Hab air.',
+  { id: 'hydra', place: 'Rig', text: () => 'Make water: burn hydrazine', why: 'A burn makes 28 L for the beds. The first may cost a little Hab air.',
     pos: () => habPoint(4.2, 1.3, 2.6), shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
-  { id: 'panels', place: 'Panels', press: () => S.power < 45, text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, why: 'Dust on the panels starves the Hab of power.',
+  { id: 'panels', place: 'Panels', press: () => S.power < 45, text: () => `Wipe the solar panels (${Math.min(S.stats.panels, 3)}/3)`, why: 'Dust on the panels starves the Hab of power.',
     pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? above(p.group.getWorldPosition(_wv), 1.2) : null; },
     shown: () => !!S.flags.suitSealed && (plantedPlots() > 0 || S.sol > 1 || S.power < 55), done: () => S.stats.panels >= 3 },
-  { id: 'pf', place: () => (S.pf.loaded ? 'Uplink' : 'Pathfinder'), icon: 'dish', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'), why: 'Its radio is the only way to tell Earth you are alive.',
+  { id: 'pf', place: () => (S.pf.loaded ? 'Uplink' : 'Pathfinder'), icon: 'dish', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink' : 'Recover Pathfinder, Ares Vallis'), why: 'Its radio is the only way to tell Earth you are alive.',
     pos: () => above(S.pf.loaded ? World.uplink.position : World.pathfinder.position, 2), shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
   { id: 'harvest', place: 'Farm bed', text: () => 'Bring in the first harvest',
     why: () => (World.plots.some((p) => p.state === 'ready') ? 'A bed is ripe: bring it in.' : 'Beds take about two and a half sols, and a second watering.'),
     pos: () => { const p = World.plots.find((x) => x.state === 'ready'); return p ? above(p.worldPos, 0.9) : null; },
     shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
-  { id: 'dinner', place: 'Food shelf', text: () => 'Cook a dinner at the food shelf', why: 'A cooked meal lifts morale; in good spirits work goes faster.',
+  { id: 'dinner', place: 'Food shelf', text: () => 'Cook a dinner', why: 'A cooked meal lifts morale; in good spirits work goes faster.',
     pos: () => habPoint(4.2, 1.4, 4.8), shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: 'The Hermes is coming back for you.', shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
-  { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Get to the MAV — Schiaparelli', why: 'It is the only rocket on the planet.',
+  { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Get to the MAV, Schiaparelli', why: 'It is the only rocket on the planet.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
 /** The reason an objective gives (some change with what is in hand). */
@@ -130,16 +135,28 @@ export function objectiveWhere(o) {
 }
 /** The distance an objective's line shows: the same number its marker carries. */
 export function objectiveDist(o) { const w = objectiveWhere(o); return w ? fmtDist(w.d) : ''; }
+/**
+ * What the place an objective's distance is measured to is called. From outside, a thing in the Hab is "Hab": the
+ * distance is to its door. From inside, a thing outside keeps its own name, because the distance is the whole walk to
+ * it, out through the door. (That walk used to be labelled "Airlock": 46 m to a door that stood 13 m away.)
+ */
+export function objectivePlace(o, where) {
+  const w = where || objectiveWhere(o);
+  if (!w) return '';
+  const p = typeof o.place === 'function' ? o.place() : o.place;
+  return w.via === 'in' ? 'Hab' : p || '';
+}
 export const objDone = new Set();
 let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
 const objFrom = new THREE.Vector3();
-const objNodes = new Map();          // row key -> { el, tx, ds, wy, o, q, text, dist, cls, why }
+const objNodes = new Map();          // row key -> { el, tx, at, pl, ds, wy, o, q, text, place, dist, cls, why }
 const objDoneAt = {};                // objective id -> time it was completed (shown ticked for a moment)
 function objRow(key) {
   let n = objNodes.get(key);
   if (!n) {
-    const e = el('div', null, 'obj new', UI.objectives, '<i class="mk"></i><span class="tx"></span><span class="ds t-num"></span><span class="why"></span>');
-    n = { el: e, tx: e.querySelector('.tx'), ds: e.querySelector('.ds'), wy: e.querySelector('.why'), o: null, q: null, text: null, dist: null, cls: null, why: null };
+    // (the place and the distance are one piece: beside the title on a wide list, on a line of their own under it on a phone's)
+    const e = el('div', null, 'obj new', UI.objectives, '<i class="mk"></i><span class="tx"></span><span class="at"><span class="pl"></span><span class="ds t-num"></span></span><span class="why"></span>');
+    n = { el: e, tx: e.querySelector('.tx'), at: e.querySelector('.at'), pl: e.querySelector('.pl'), ds: e.querySelector('.ds'), wy: e.querySelector('.why'), o: null, q: null, text: null, place: null, dist: null, cls: null, why: null };
     objNodes.set(key, n);
     setTimeout(() => e.classList.remove('new'), 600);
   }
@@ -161,7 +178,8 @@ onLayout(() => requestAnimationFrame(measureVitals));
 function readZones(w, h) {
   zones.length = 0;
   const add = (n, kind) => { if (!n) return; const r = n.getBoundingClientRect(); if (r.width > 2 && r.height > 2) zones.push([r.left, r.top, r.right, r.bottom, kind]); };
-  for (const n of [UI.vitals, UI.compass, UI.region, UI.alerts, UI.tr, UI.log, UI.toasts.firstElementChild, UI.keys, UI.joy, UI.tE, UI.tJump, UI.tExit, UI.tSprint, UI.tCam, UI.tCandle, UI.tRow]) add(n, 0);
+  for (const n of [UI.vitals, UI.compass, UI.region, UI.alerts, UI.tr, UI.log, UI.toasts.firstElementChild, UI.keys, UI.joy, UI.tJump, UI.tExit, UI.tSprint, UI.tCam, UI.tCandle, UI.tRow]) add(n, 0);
+  if (UI.tE.classList.contains('verb') || UI.tE.classList.contains('no')) add(UI.tE, 0);      // (with nothing in reach the action button is not shown)
   if (UI.prompt.classList.contains('on')) add(UI.prompt, 1);       // (it fades by opacity, so it always has a box)
   add(UI.rover, 1);
   // the astronaut, or the rover, in a third-person view: an arrow is never parked on him
@@ -275,6 +293,10 @@ function updateUnlocks() {
   for (const s of SCREEN_UNLOCKS) {
     if (!S.flags[s.flag] && s.when()) {
       S.flags[s.flag] = true;
+      // (the new button itself is lit while its card is read: the card stands on the other side of the screen, and
+      //  a button that had simply appeared was easy to take for one that had always been there)
+      const btn = unlocksSeeded && s.key ? UI.tRow.querySelector(`[data-t="${s.id}"]`) : null;
+      if (btn) { btn.classList.add('fresh'); setTimeout(() => btn.classList.remove('fresh'), 16000); }
       // (what a loaded game already had is not news)
       if (unlocksSeeded && !(s.quiet && s.quiet())) {
         // (the bars, on a touch screen: one line under the panel itself, pointing at it, that stays long enough to be read.
@@ -306,7 +328,7 @@ export function updateObjectivesHud() {
       if (n.o) dist = objectiveDist(n.o);
       else if (n.q) { const p = questTargetPos(n.q); dist = p ? fmtDist(distTo(p)) : ''; }
     }
-    if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; }
+    if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; n.at.style.display = dist || n.place ? '' : 'none'; }
   }
   if (now - fitAt > 1) fitObjectives(now);
 }
@@ -319,7 +341,9 @@ function rebuildObjectives(now) {
       objDone.add(id);
       // objectives already complete when a saved game loads are not news
       if (objSeeded) {
-        objDoneAt[id] = now; if (id !== 'reach') Snd.jingle();
+        // (the suit sealed is not shown ticked: that moment has the flash, the dial filling and the next thing to do,
+        //  and the struck-through line was one thing too many to read)
+        if (id !== 'reach') { objDoneAt[id] = now; Snd.jingle(); }
         const marks = S.stats.marks || (S.stats.marks = {});      // (kept with the statistics, so it is saved with them)
         if (!marks[id]) marks[id] = S.sol;
       }
@@ -339,8 +363,9 @@ function rebuildObjectives(now) {
     if (e.done) { if (e.o.id === 'mav') rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls: 'done', why: '' }); continue; }
     // the one thing to do next is marked, and carries its reason
     let cls = e.o.urgent ? 'urgent' : '', why = '';
-    if (!primary) { primary = true; cls = e.o.urgent ? 'urgent first' : 'primary'; why = objectiveWhy(e.o); }
-    rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls, why });
+    let place = '';
+    if (!primary) { primary = true; cls = e.o.urgent ? 'urgent first' : 'primary'; why = objectiveWhy(e.o); place = objectivePlace(e.o); }
+    rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls, why, place });
   }
   // night: said once as it falls, as well as listed
   const night = list.some((e) => e.o.id === 'sleep');
@@ -362,11 +387,13 @@ function rebuildObjectives(now) {
     const n = objRow(r.key);
     n.o = r.o || null; n.q = r.q || null;
     if (n.text !== r.text) { n.text = r.text; n.tx.innerHTML = chem(esc(r.text)); }
+    const place = r.place || '';
+    if (n.place !== place) { n.place = place; n.pl.textContent = place; n.at.style.display = place || n.dist ? '' : 'none'; }
     if (n.why !== r.why) { n.why = r.why; n.wy.innerHTML = chem(esc(n.why)); n.wy.style.display = n.why ? '' : 'none'; }
     if (n.cls !== r.cls) { n.el.classList.remove('done', 'urgent', 'first', 'primary', 'quest'); if (r.cls) n.el.classList.add(...r.cls.split(' ')); n.cls = r.cls; }
     if (prev.nextSibling !== n.el) UI.objectives.insertBefore(n.el, prev.nextSibling);
     prev = n.el;
-    key += `${r.key}|${r.text}|${r.why}|`;
+    key += `${r.key}|${r.text}|${r.why}|${r.place || ''}|`;
   }
   for (const [k, n] of objNodes) if (!live.has(k)) { n.el.remove(); objNodes.delete(k); }
   objHead.style.display = rows.length ? '' : 'none';
@@ -455,8 +482,9 @@ function leadPlace() {
   const at = lead ? objectiveWhere(lead.o) : null;
   if (!at) return null;
   const o = lead.o, of = (v, d) => (typeof v === 'function' ? v() : v || d);
-  // (by the door: from outside the place to make for is the Hab, from inside the airlock)
-  return { o, pos: at.pos.clone(), name: at.via === 'in' ? 'Hab' : at.via === 'out' ? 'Airlock' : of(o.place, 'Task'), icon: at.via === 'in' ? 'hab' : at.via === 'out' ? 'exit' : of(o.icon, 'target') };
+  // (by the door: from outside the place to make for is the Hab. From inside, the mark stands on the way out and wears
+  //  the way-out sign, but it is named for the thing itself, because the distance beside the name is the walk to that.)
+  return { o, pos: at.pos.clone(), name: objectivePlace(o, at) || 'Task', icon: at.via === 'in' ? 'hab' : at.via === 'out' ? 'exit' : of(o.icon, 'target') };
 }
 /**
  * Everything the compass can point at, most important first. The mission's first line leads: its mark stands where
@@ -667,7 +695,9 @@ export function updateHud() {
   // --- suit oxygen: the number that kills you ---
   const cap = suitCap(), sf = S.suit / cap;
   const suitRate = track('suit', S.suit, dt);
-  setText('suit', UI.suitNum, String(Math.round(S.suit)));
+  // (a share of the tank it has: a larger tank read "150" over the same words, with no unit, where a new suit read
+  //  100. What a larger tank gives is time, and the time is the line under the dial.)
+  setText('suit', UI.suitNum, `${Math.round(clamp(sf, 0, 1) * 100)}<small>%</small>`);
   const off = (100 - clamp(sf, 0, 1) * 100).toFixed(1);
   if (hud.text.suitArc !== off) { hud.text.suitArc = off; UI.suitArc.style.strokeDashoffset = off; }
   const filling = suitRate > 0.5;
@@ -678,7 +708,8 @@ export function updateHud() {
   if (filling) st = 'Refilling';
   else if (S.mode === 'rover') st = S.roverO2 > 0 ? 'Rover air' : 'Tank empty';
   else if (safeAir) st = 'Hab air';
-  else st = S.suit > 0 ? `${fmtLeft(suitTimeLeft())} left` : 'Empty';
+  // ("of air", not "left": beside a tank just filled at the airlock door, "5:56 left" read as a countdown to something)
+  else st = S.suit > 0 ? `${fmtLeft(suitTimeLeft())} of air` : 'Empty';
   setText('suitSt', UI.suitState, st);
 
   // --- the colony's reserves ---
@@ -686,10 +717,10 @@ export function updateHud() {
   const rows = [
     ['o2', S.o2 / 100, `${Math.round(S.o2)}<small>%</small>`, S.o2],
     ['water', S.water / BAL.waterMax, `${Math.round(S.water)}<small>L</small>`, S.water],
-    ['food', food / 16, String(food), null],
+    ['food', food / 16, `${food}<small>${food === 1 ? 'meal' : 'meals'}</small>`, null],
     ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small>%</small>`, S.power],
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small>%</small>`, S.health],
-    ['morale', S.morale / 100, String(Math.round(S.morale)), null],
+    ['morale', S.morale / 100, `${Math.round(S.morale)}<small>%</small>`, null],
   ];
   for (const [k, frac, txt, raw] of rows) {
     const b = UI.bars[k];
@@ -730,10 +761,12 @@ export function updateHud() {
 
   // --- alerts: at most two, worst first. Each says what is wrong and what to do (in fewer words where the screen is narrow) ---
   const al = [];
-  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'seal it before the air is gone', 'seal the far wall']);
+  // (the alarm and its stake. What to do about it, where and how far, is the first line of the mission list beside
+  //  it: the two used to say the same thing in the same words, "Hab breach / seal it" beside "Hab breach: seal it")
+  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out']);
   if (!filling && !safeAir && S.mode !== 'rover') {
-    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'get to air now', 'get to air now']);
-    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'head for the Hab or the rover', 'get to the Hab or rover']);
+    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty']);
+    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left']);
   }
   if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge', 'park it in the sun']);
   if (S.storm.i > 0.15) {

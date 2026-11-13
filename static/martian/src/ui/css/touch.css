@@ -43,14 +43,17 @@
 #mg-tE .vi .ic { width: 1.5rem; height: 1.5rem; }
 #mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-2); }
 #mg-tE .vh { font-size: max(.6875rem, 11px); letter-spacing: .18em; color: var(--ink-3); }
-#mg-tE:not(.verb):not(.no) { opacity: .42; }
+/* (kept in the layout, so a hold that began on it still ends on it) */
+#mg-tE:not(.verb):not(.no) { visibility: hidden; pointer-events: none; }
 #mg-tE.verb .vb, #mg-tE.verb .vh { display: block; }
 #mg-tE.ready { border-color: var(--accent); background: rgba(40, 26, 10, .62); }
 #mg-tE.ready .vb { color: var(--ink); }
 #mg-tE.ready .vh { color: var(--accent); }
 #mg-tE.no { border-style: dashed; }
 #mg-tE.no .vi { display: grid; place-items: center; color: var(--ink-2); }
-#mg-tE.no .vb { display: block; font-size: max(.6875rem, 11px); letter-spacing: .16em; }
+#mg-tE.no .vb { display: block; max-width: 4.75rem; font-size: max(.75rem, 12px); line-height: 1.1; letter-spacing: .06em; text-align: center; text-wrap: balance; }
+#mg-tE.no .vi .ic { width: 1.25rem; height: 1.25rem; }
+#mg-tE, #mg-tE.no, #mg-tE.verb { transition: background .12s, border-color .12s, transform .12s; }
 #mg-tE.holding { background: rgba(255, 180, 84, .22); }
 
 #mg-tJump, #mg-tExit { right: calc(var(--sar) + 7rem); bottom: calc(var(--sab) + 1.5rem); width: 3.625rem; height: 3.625rem; }
@@ -66,7 +69,6 @@
 #mg-tExit { display: none; border-color: var(--accent); color: var(--accent); }
 .is-rover #mg-tExit { display: flex; }
 .is-rover #mg-tJump, .is-rover #mg-tSprint { display: none; }
-.is-cold #mg-tCam { display: none; }
 
 /* pause and the three screens, top right: each with its word under it */
 #mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .25rem; pointer-events: auto; }
@@ -75,7 +77,10 @@
 #mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .02em; color: var(--ink); }
 #mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
 .is-cold #mg-trow .mg-tbtn[data-t] { display: none; }
-/* each screen's button arrives when the screen first has something to show (ui/hud.js) */
+/* each screen's button arrives when the screen first has something to show (ui/hud.js), and is lit while its card is read */
+#mg-trow .mg-tbtn.fresh { position: relative; border-color: var(--accent); background: rgba(46, 30, 10, .86); }
+#mg-trow .mg-tbtn.fresh span, #mg-trow .mg-tbtn.fresh .ic { color: var(--accent); }
+#mg-trow .mg-tbtn.fresh::after { content: ""; position: absolute; right: -.25rem; top: -.25rem; width: .625rem; height: .625rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px rgba(14, 12, 11, .8); }
 .no-map #mg-trow .mg-tbtn[data-t="map"], .no-colony #mg-trow .mg-tbtn[data-t="colony"], .no-journal #mg-trow .mg-tbtn[data-t="journal"] { display: none; }
 .no-map .scr-nav [data-screen="map"], .no-colony .scr-nav [data-screen="colony"], .no-journal .scr-nav [data-screen="journal"] { display: none; }
 /* tablets and other large touch screens: the clock and mission move below the buttons */
@@ -92,15 +97,17 @@
 .mg-touch .mg-btn.small { padding-left: 1rem; padding-right: 1rem; }
 .mg-touch .mg-iconbtn { width: max(2.75rem, 44px); height: max(2.75rem, 44px); }
 .mg-touch .map-info .x, .mg-touch .x { min-width: 44px; min-height: 44px; }
-/* a slider's handle is a thumb wide, on a track a thumb high */
-.mg-touch .mg-range { height: max(2.75rem, 44px); }
-.mg-touch .mg-range::-webkit-slider-thumb { width: max(2.75rem, 44px); height: 2rem; margin-top: calc(-1rem + 1px); border-radius: .25rem; }
-.mg-touch .mg-range::-moz-range-thumb { width: max(2.75rem, 44px); height: 2rem; border-radius: .25rem; }
-/* a switch is big enough to see which way it is; its whole row is what is pressed (ui/menus.js) */
-.mg-touch .mg-switch { width: 3.75rem; height: 2rem; }
-.mg-touch .mg-switch::after { width: 1.5rem; height: 1.5rem; margin-top: -.75rem; }
-.mg-touch .mg-switch[aria-checked="true"]::after { transform: translateX(1.75rem); }
-.mg-touch .set-row { min-height: 44px !important; }
+/* a slider's handle is a thumb each way (it was a thumb wide and 32 px high), with a grip, on a track a thumb high */
+.mg-touch .mg-range { --th: max(2.75rem, 44px); height: var(--th); }
+.mg-touch .mg-range::-webkit-slider-thumb { width: var(--th); height: var(--th); margin-top: calc(var(--th) / -2 + 1px); border-radius: .3125rem;
+  background: linear-gradient(90deg, transparent 40%, rgba(11, 10, 9, .4) 40% 44%, transparent 44% 56%, rgba(11, 10, 9, .4) 56% 60%, transparent 60%) var(--ink); }
+.mg-touch .mg-range::-moz-range-thumb { width: var(--th); height: var(--th); border-radius: .3125rem; }
+/* a switch is a thumb high too, and long enough to see which way it stands; its whole row is what is pressed (ui/menus.js) */
+.mg-touch .mg-switch { --sh: max(2.75rem, 44px); width: calc(var(--sh) * 1.75); height: var(--sh); border-radius: var(--sh); }
+.mg-touch .mg-switch::after { left: 4px; width: calc(var(--sh) - 10px); height: calc(var(--sh) - 10px); margin-top: calc(var(--sh) / -2 + 5px); }
+.mg-touch .mg-switch[aria-checked="true"]::after { transform: translateX(calc(var(--sh) * .75)); }
+/* (a row holds a control a thumb high with a little air over and under it) */
+.mg-touch .set-row { min-height: 48px !important; }
 .mg-touch .set-row.tap { cursor: pointer; }
 
 /* ---------------------------------------------------------------- nothing hovers, and nothing has the keyboard's focus
@@ -117,5 +124,5 @@
 .mg-touch .diff:active { border-color: var(--accent); }
 .mg-touch .choice:hover, .mg-touch .choice:focus-visible { background: rgba(245, 240, 232, .04); border-color: var(--line-2); border-left-color: var(--line); }
 .mg-touch .choice:active { border-color: var(--accent); }
-.mg-touch .mg-range:hover::-webkit-slider-thumb, .mg-touch .mg-range:focus-visible::-webkit-slider-thumb { background: var(--ink); }
-.mg-touch .mg-range:active::-webkit-slider-thumb { background: var(--accent); }
+.mg-touch .mg-range:hover::-webkit-slider-thumb, .mg-touch .mg-range:focus-visible::-webkit-slider-thumb { background-color: var(--ink); }
+.mg-touch .mg-range:active::-webkit-slider-thumb { background-color: var(--accent); }

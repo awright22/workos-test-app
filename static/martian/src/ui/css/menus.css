@@ -323,7 +323,8 @@
 .choice .ch-t { grid-column: 1 / -1; font-size: .875rem; line-height: 1.35; color: var(--ink-3); }
 .choice:hover, .choice:focus-visible { outline: none; background: rgba(255, 180, 84, .12); border-color: var(--accent); }
 .choice:hover .ch-n, .choice:focus-visible .ch-n { color: var(--accent); }
-.dlg.pick .btns { align-items: center; justify-content: space-between; }
+/* (Cancel at the left of the foot, where Done and Back are on every sheet; the line of advice after it) */
+.dlg.pick .btns { align-items: center; justify-content: flex-start; gap: 1rem; }
 .pick-note { font-size: .875rem; color: var(--ink-3); }
 .mg-compact .dlg.pick { width: 44rem; }
 .mg-compact .choices { grid-template-columns: 1fr 1fr; gap: .375rem; margin-top: .625rem; }
@@ -376,14 +377,15 @@
 .sleep .notes .today b { font: 600 .75rem/1 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-right: .5rem; }
 .sleep .solbig span { text-transform: uppercase; }
 
-/* ================================================================ new game: the way back and the warning in the header on a phone */
-.hd-back, .hd-note { display: none; }
+/* ================================================================ new game on a phone: the three cards between a short heading and
+   a foot with the way back and the warning (the way back was in the heading, a corner no other sheet uses for it) */
 .diff dt { white-space: nowrap; }
-.mg-compact .newgame .sheet-ft { display: none; }
-.mg-compact .newgame .hd-back { display: inline-flex; flex: none; padding: 0 .875rem 0 .625rem; }
+.mg-compact .newgame .sheet-hd { padding-top: .375rem; padding-bottom: .375rem; }
 .mg-compact .newgame .sheet-hd > div { flex: 1; min-width: 0; }
-.mg-compact .newgame .hd-note { display: block; flex: none; max-width: 40%; text-align: right; font: 500 var(--t12)/1.25 var(--f-cond); letter-spacing: .04em; color: var(--accent); }
-.mg-compact .newgame .sheet-bd { display: flex; flex-direction: column; overflow: hidden; }
+.mg-compact .newgame .sheet-ft { padding-top: .3125rem; padding-bottom: .3125rem; }
+.mg-compact .newgame .sheet-ft .note { text-align: right; }
+.mg-compact .newgame .sheet-bd { display: flex; flex-direction: column; overflow: hidden; padding-top: .4375rem; padding-bottom: .5rem; }
+.mg-compact .newgame .brief-1 { margin-bottom: .375rem; }
 .mg-compact .newgame .brief-1 { flex: none; }
 .mg-compact .newgame .diffs { flex: 1 1 auto; min-height: 0; }
 /* Begin is the foot of its card: a bar a thumb high, always inside the card and the card always inside the sheet */
@@ -418,7 +420,7 @@
 .sheet.tabbed .sheet-bd { padding-top: .25rem; padding-bottom: .25rem; }
 .sheet.tabbed .set-row { padding-top: 0; padding-bottom: 0; }
 @media (max-width: 760px) {
-  .mg-compact .sheet.tabbed .sheet-hd { gap: .5rem; padding-left: .75rem; padding-right: .75rem; }
+  .mg-compact .sheet.tabbed .sheet-hd { gap: max(1rem, 16px); padding-left: .75rem; padding-right: .75rem; }
   .mg-compact .sheet.tabbed .sheet-hd h1 { font-size: 1.1875rem; letter-spacing: .05em; }
   .sheet.tabbed .sheet-hd .mg-seg { flex: 1; }
   .sheet.tabbed .sheet-hd .mg-seg button { flex: 1; padding: 0 .25rem; letter-spacing: .05em; }
@@ -476,3 +478,16 @@
 .mg-compact .ld-row { font-size: var(--t11); }
 .mg-compact .menu-note { font-size: var(--t12); }
 .mg-compact .sheet-ft .note { font-size: var(--t12); }
+
+/* ================================================================ fifth review
+   Settings on a phone: one sheet, as tall as the screen allows, whatever tab is showing. Its tab strip and its Done
+   button therefore stand in the same place on all four tabs. (The sheet was as tall as its tab's rows and centred, so
+   the strip moved 57 px up and down under the thumb from tab to tab.) */
+.mg-compact .sheet.settings.tabbed { height: calc(100vh - var(--sat) - var(--sab) - 1rem); }
+.mg-compact .sheet.tabbed .sheet-hd { gap: max(1rem, 16px); }
+/* (a row's control is 44 px high: the figure beside a slider sits clear of its handle) */
+.mg-touch .set-row .ctl { gap: 1rem; }
+/* the night's account: what comes after today, once, on the first morning */
+.sleep .notes .today.later { margin-top: 0; color: var(--ink-2); }
+.sleep .notes .today.later b { color: var(--cold); }
+.sleep .delta b { color: var(--ink); }

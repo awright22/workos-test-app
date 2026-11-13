@@ -2,10 +2,10 @@
 // summary and the NASA uplink terminal. Pure presentation: the game passes in what to show and
 // what to do (see game/flow.js, game/sim.js, game/story.js). Death, rescue and other plain
 // dialogs go through showOverlay in ui/dom.js.
-import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast, dropPointer } from './dom.js';
+import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, log, toast, dropPointer } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
-import { missionList, suitTimeLeft } from './hud.js';
+import { OBJECTIVES, missionList, suitTimeLeft } from './hud.js';
 import { layout } from './layout.js';
 import { DIFFICULTIES } from '../game/state.js';
 import { regionName } from '../planet/features.js';
@@ -74,7 +74,7 @@ export function showTitle(o) {
     menuItem('settings', 'Settings') + menuItem('credits', 'Credits');
   const p = openOverlay('title',
     `<div class="menu-col">${WORDMARK}<p class="tag">The whole planet. All of it. Against you.</p><nav class="menu" aria-label="Main menu">${items}</nav>` +
-    (o.unreadable ? '<p class="menu-note" role="alert">A saved game was found, but it is from a version this build cannot read, so it cannot be continued.</p>' : '') +
+    (o.unreadable ? '<p class="menu-note" role="alert">Your saved game was made by an older version of Stranded II and cannot be continued. Starting a new game replaces it.</p>' : '') +
     '</div>' +
     `<div class="title-foot"><span>${layout.touch ? 'Best in landscape, with sound' : 'Arrow keys to choose · Enter to select'}</span><span>Real Mars terrain · NASA MOLA</span></div>`,
     { label: 'Stranded II, main menu' });
@@ -107,10 +107,9 @@ export function showNewGame(o, back) {
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
-    // (on a phone the way back and the warning are in the header: a footer took the height the Begin buttons needed)
-    `<div class="sheet wide newgame"><header class="sheet-hd"><button type="button" class="mg-btn hd-back" data-act="back">${icon('back')}Back</button>` +
-    '<div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div>' +
-    (o.saved ? `<span class="hd-note warn">Replaces your saved run (Sol ${o.saved.sol})</span>` : '') + '</header>' +
+    // (the way back is at the foot at every size, where Done and Cancel are on every other sheet: on a phone it was a
+    //  button in the header, and the ways out of a sheet were in four different corners)
+    '<div class="sheet wide newgame"><header class="sheet-hd"><div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div></header>' +
     '<div class="sheet-bd mg-scroll"><p class="brief-1">Stranded on the real Mars. Farm, make water, call home, drive to the rocket.</p><div class="brief">' +
     '<p>The storm hit. The crew evac\'d. Your bio-monitor said you were dead. It exaggerated. You are stranded <b>somewhere on Mars</b> — a real Mars: Olympus Mons, Valles Marineris, both ice caps, and every probe humanity ever threw at this planet, rusting exactly where history left it.</p>' +
     '<p>Grow food. Make water. Salvage the dead landers. Find Pathfinder in Ares Vallis. Call home. Then drive to Schiaparelli crater and fly out.</p></div>' +
@@ -174,8 +173,8 @@ export function showPauseMenu(o) {
     '</nav></div>' +
     '<aside class="pause-side"><div class="kv">' +
     `<span>Rescue</span><b>Sol ${o.rescueSol}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
-    `<h3>Field notes</h3><p>Survive to Sol ${o.rescueSol}. Watch the six bars.</p>` +
-    '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab. Keep the chain alive.</p>' +
+    `<h3>Field notes</h3><p>The way home: stay fed, raise Earth on a radio, and be at the Ares 4 rocket in Schiaparelli on Sol ${o.rescueSol}.</p>` +
+    '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab.</p>' +
     '<button type="button" class="mg-btn side-btn" data-act="bars">What the bars mean</button></aside>',
     { label: 'Paused', onEscape: resume });
   on(p, '[data-act]', (b) => {
@@ -407,16 +406,19 @@ export function showSleepSummary(d, onDone) {
   const box = UI.panel.querySelector('.sleep');
   if (!box) return false;
   const deltas = d.deltas.map((x) => {
-    const v = x.whole ? Math.round(x.to) - Math.round(x.from) : x.to - x.from;
-    // (the change overnight, and under it what that leaves)
-    return `<div class="delta"><b class="t-num ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : '−'}${x.whole ? Math.abs(v) : Math.abs(v).toFixed(1)}${x.unit}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${x.unit}</i></div>`;
+    // (The change overnight, and under it what that leaves: both in whole numbers, as the gauges give them, so the
+    //  change is the difference between two figures he can see. It was "+6.8%" over "now 100%". A unit that is a
+    //  word or a letter stands off from its figure, as everywhere else: "66 L", not "66L".)
+    const v = Math.round(x.to) - Math.round(x.from), u = x.unit === '%' ? '%' : x.unit ? '\u00a0' + x.unit : '';
+    return `<div class="delta"><b class="t-num ${v > 0 ? 'up' : v < 0 ? 'dn' : ''}">${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}${u}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${u}</i></div>`;
   }).join('');
   // the first thing still to do, as the mission list has it
   const todo = missionList().find((e) => !e.done);
   const today = todo ? todo.o.text() : '';
   box.querySelector('.sum').innerHTML =
     `<div class="solbig"><span>${d.turned === false ? 'Still sol' : 'Dawn · Sol'}</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
-    `<div class="notes">${d.notes.map((n) => `<div>${esc(n)}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${esc(today)}</div>` : ''}</div>` +
+    `<div class="notes">${d.notes.map((n) => `<div>${chem(esc(n))}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${chem(esc(today))}</div>` : ''}` +
+    `${d.later ? `<div class="today later"><b>Later</b> ${chem(esc(d.later))}</div>` : ''}</div>` +
     (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
   box.classList.add('done');
   const b = box.querySelector('.wake');
@@ -474,11 +476,11 @@ export function showChoice(o) {
   const rows = o.items.map((it, i) =>
     `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${esc(it.label)}</span>` +
     `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
-    `${it.note ? `<span class="ch-t">${esc(it.note)}</span>` : ''}</button>`).join('');
+    `${it.note ? `<span class="ch-t">${chem(esc(it.note))}</span>` : ''}</button>`).join('');
   const p = openOverlay('dialog',
     `<div class="dlg pick"><div class="dlg-bd mg-scroll">${o.kicker ? `<div class="t-kicker">${esc(o.kicker)}</div>` : ''}<h1 id="mg-dlg-title">${esc(o.title)}</h1>` +
     `<div class="choices n${o.items.length}">${rows}</div></div>` +
-    `<div class="btns">${o.note ? `<span class="pick-note">${esc(o.note)}</span>` : ''}<button type="button" class="mg-btn" data-act="cancel">Cancel</button></div></div>`,
+    `<div class="btns"><button type="button" class="mg-btn" data-act="cancel">Cancel</button>${o.note ? `<span class="pick-note">${chem(esc(o.note))}</span>` : ''}</div></div>`,
     { label: o.title, onEscape: cancel, guard: true });
   p.querySelectorAll('.choice').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation();
@@ -493,4 +495,4 @@ window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings
   showOverlay, hideOverlay, toast, log, settings, setSetting, resetSettings, layout,
   /** the name of the region at a latitude and longitude (so a test's made-up title screen can name the real place) */
   regionAt: (lat, lon) => regionName(llToVec(lat, lon)),
-  suitTimeLeft, missionList };
+  suitTimeLeft, missionList, objectives: OBJECTIVES };

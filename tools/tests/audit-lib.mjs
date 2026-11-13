@@ -1,6 +1,8 @@
-// What a screenshot review measures by eye, measured in the page: text set under 11 px, touch targets
-// under 44 px, controls that reach outside the safe area, text cut off by its box, text printed over other
-// text, and content cut by the edge of the box or dialog it is in, or by the screen.
+// What a screenshot review measures by eye, measured in the page: text set under 11 px (capitals under 13: a
+// line of capitals is as tall as its capitals, seven tenths of its size), a figure run into its unit, touch targets
+// under 44 px (a slider's handle and a switch included, and anything drawn as a button), controls that reach outside
+// the safe area, text cut off by its box, text printed over other text, and content cut by the edge of the box or
+// dialog it is in, or by the screen.
 // `auditInPage` runs inside the browser (pass it to page.evaluate with the safe-area insets); it must not
 // refer to anything outside itself.
 
@@ -58,23 +60,95 @@ export function auditInPage(safe) {
     if (!shown(p)) continue;
     const v = visiblePart(p);
     if (v.right - v.left < 1 || v.bottom - v.top < 1 || !onScreen(v)) continue;
-    const size = parseFloat(styleOf(p).fontSize);
-    if (size < 10.95) out.text.push(`${size.toFixed(1)}px  ${name(p)}  “${t.nodeValue.trim().slice(0, 28)}”`);
+    const cs = styleOf(p), size = parseFloat(cs.fontSize), said = t.nodeValue.trim();
+    if (size < 10.95) out.text.push(`${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
+    // A label in capitals has no ascenders or descenders: what the eye measures is the capitals' height, seven tenths
+    // of the type's size. At 11 px that is under 8 px of letter, and a reviewer reads it as 9 px type. Capitals are
+    // therefore held to 13 px (9 px of letter). A lone letter or figure is not a label (a key cap, a count).
+    else if (size < 12.95 && (said.match(/[A-Za-z]/g) || []).length >= 2 && (cs.textTransform === 'uppercase' || !/[a-z]/.test(said)))
+      out.text.push(`capitals at ${size.toFixed(1)}px  ${name(p)}  “${said.slice(0, 28)}”`);
+    // a figure and its unit are written apart, everywhere the same way ("28 L", not "28L")
+    if (/\d(L|km|m)\b/.test(said) && !/\d(L|km|m)\b[-/]/.test(said)) out.text.push(`a figure run into its unit  ${name(p)}  “${said.slice(0, 28)}”`);
   }
 
   // ---- things a thumb presses: 44 px each way (a switch is pressed by its row), and inside the safe area
-  const SEL = 'button, [role="tab"], [role="radio"], [role="switch"], input[type="range"]';
+  /**
+   * The size the style sheets give a slider's handle. It is a pseudo-element, which the page cannot measure, so the
+   * rules that style it are read instead: those whose selector, less the pseudo-element, matches the slider, the more
+   * specific and the later winning; and the value they give is resolved to pixels on a probe beside the slider.
+   */
+  const thumbSize = (input) => {
+    const found = { width: null, height: null };
+    const weigh = (sel) => (sel.match(/#/g) || []).length * 10000 + (sel.match(/\.|\[|:(?!:)/g) || []).length * 100 + (sel.match(/(^|[\s>+~])[a-z]/gi) || []).length;
+    let order = 0;
+    const visit = (rules) => {
+      for (const rule of rules) {
+        if (rule.cssRules && rule.media) { if (matchMedia(rule.media.mediaText).matches) visit(rule.cssRules); continue; }
+        if (!rule.selectorText || !/::-webkit-slider-thumb/.test(rule.selectorText)) continue;
+        for (const sel of rule.selectorText.split(',')) {
+          if (!/::-webkit-slider-thumb\s*$/.test(sel)) continue;
+          // (a state such as :hover or :active is not how it stands at rest)
+          const base = sel.replace(/::-webkit-slider-thumb\s*$/, '').trim();
+          if (/:(hover|active|focus)/.test(base)) continue;
+          let hit = false;
+          try { hit = input.matches(base || '*'); } catch (e) { hit = false; }
+          if (!hit) continue;
+          for (const prop of ['width', 'height']) {
+            const val = rule.style.getPropertyValue(prop);
+            if (!val) continue;
+            const rank = (rule.style.getPropertyPriority(prop) ? 1e9 : 0) + weigh(base) * 1000 + (++order);
+            if (!found[prop] || rank >= found[prop].rank) found[prop] = { val, rank };
+          }
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) { try { visit(sheet.cssRules); } catch (e) { /* a sheet from elsewhere */ } }
+    const probe = document.createElement('i'), ics = styleOf(input);
+    probe.style.cssText = 'position:absolute;visibility:hidden;display:block;padding:0;border:0;box-sizing:border-box';
+    for (const prop of ['width', 'height']) {
+      if (!found[prop]) continue;
+      for (const v of found[prop].val.match(/--[\w-]+/g) || []) probe.style.setProperty(v, ics.getPropertyValue(v));
+      probe.style.setProperty(prop, found[prop].val);
+    }
+    input.parentElement.appendChild(probe);
+    const r = probe.getBoundingClientRect();
+    probe.remove();
+    return found.width && found.height ? { w: r.width, h: r.height } : null;
+  };
+  const SEL = 'button, [role="button"], [role="tab"], [role="radio"], [role="switch"], input[type="range"]';
   for (const n of root.querySelectorAll(SEL)) {
-    if (n.disabled || !shown(n)) continue;
+    if (n.disabled || !shown(n) || styleOf(n).pointerEvents === 'none') continue;
     const hitNode = n.classList.contains('mg-switch') ? (n.closest('.set-row') || n) : n;
     const r = hitNode.getBoundingClientRect();
     const v = visiblePart(hitNode);
     if (!onScreen(v) || v.right - v.left < 1 || v.bottom - v.top < 1) continue;      // scrolled out of its list: reachable by scrolling
     if (r.width < 43.5 || r.height < 43.5) out.targets.push(`${Math.round(r.width)}x${Math.round(r.height)}  ${name(n)}  “${words(n)}”`);
+    // (what is pressed is the row, but what is seen is the switch: it is a thumb high as well. And a slider is worked
+    //  by its handle, which is a thumb each way: the fifth review measured handles 44 by 32 and switches 56 by 32 on
+    //  rows that passed here.)
+    if (hitNode !== n) { const own = n.getBoundingClientRect(); if (own.height < 43.5 || own.width < 43.5) out.targets.push(`${Math.round(own.width)}x${Math.round(own.height)}  the switch itself: ${name(n)}  “${words(n)}”`); }
+    if (n.matches('input[type="range"]')) { const th = thumbSize(n); if (!th || th.w < 43.5 || th.h < 43.5) out.targets.push(`${th ? Math.round(th.w) + 'x' + Math.round(th.h) : 'unmeasured'}  the handle of ${name(n)}  “${words(n)}”`); }
     // cut by the edge of a scrolling row (a tab off the side) or outside the safe area
     const cutX = v.left > r.left + 1 || v.right < r.right - 1;
     if (cutX || r.left < sl - 0.5 || r.right > W - sr + 0.5 || r.top < st - 0.5 || (r.bottom > H - sb + 0.5 && v.bottom > H - sb + 0.5))
       out.outside.push(`[${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.right)},${Math.round(r.bottom)}]  ${name(n)}  “${words(n)}”`);
+  }
+
+  // ---- anything drawn as a button is one: a ring or a frame round a single glyph, smaller than a thumb, with
+  //      nothing larger round it that is itself a button. (A "?" in an 18 px ring under the suit's dial was the only
+  //      sign that the panel it stood on could be pressed.) Key caps, a legend's swatches and a card's emblem are not.
+  for (const n of root.querySelectorAll('span, i, b, em, div')) {
+    if (n.closest('button, [role="tab"], [role="radio"], [role="switch"], .map-legend, .mg-kbd, .toast .ti, .ring, svg, #mg-boot, .sr, .badge, .chip, .diff')) continue;
+    const said = n.textContent.trim();
+    if (said.length > 2 || (!said && !n.querySelector(':scope > svg'))) continue;
+    if (n.children.length > 1 || !shown(n)) continue;
+    const cs = styleOf(n);
+    if (!['Top', 'Right', 'Bottom', 'Left'].every((e) => cs['border' + e + 'Style'] === 'solid' && parseFloat(cs['border' + e + 'Width']) >= 1 && !/, 0\)$|transparent/.test(cs['border' + e + 'Color']))) continue;
+    const r = n.getBoundingClientRect();
+    if (r.width < 12 || r.height < 12 || (r.width >= 43.5 && r.height >= 43.5)) continue;
+    if (parseFloat(cs.borderTopLeftRadius) < Math.min(r.width, r.height) * 0.2) continue;
+    if (!onScreen(visiblePart(n))) continue;
+    out.targets.push(`${Math.round(r.width)}x${Math.round(r.height)}  drawn as a button: ${name(n)}  “${said}”`);
   }
 
   // ---- a dialog's own buttons (Begin, Cancel, Done, Start the day) are on the screen without scrolling for them

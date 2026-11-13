@@ -20,6 +20,13 @@ import { showChoice } from '../ui/menus.js';
 import { R } from '../planet/constants.js';
 import { layout } from '../ui/layout.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
+//
+// When a thing cannot be done, `enabled` gives the reason as a sentence, never a bare false: the prompt shows it, and a
+// refusal with no reason is not shown at all (ui/dom.js, setPrompt). The sentence begins with what is wanting, in a few
+// words, and after a colon says what to do about it: "Needs regolith: dig it at the heap outside the airlock". The few
+// words are what the action button shows ("NEEDS REGOLITH"). A plain reading of a thing with nothing to do to it
+// ("This panel is clean") is made with statusText() and shown without the barred ring. tests/ui.mjs holds every
+// refusal here to that form.
 export function syncPlot(pl) {
   pl.soilMesh.visible = pl.state !== 'empty';
   // a bed shows the plants of the crop it holds: alive and scaled as they grow, or withered
@@ -64,9 +71,9 @@ addI({
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
       case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith: dig it at the heap outside the airlock';
-      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Not enough water (5 L): burn hydrazine at the rig') : 'Nothing left to plant';
+      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig') : 'Needs seed: no potatoes, rations or packets left';
       case 'growing':
-        if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5 L): burn hydrazine at the rig';
+        if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig';
         // (a reading, not a lock: there is nothing to do to it yet)
         return statusText(`${cropOf(pl).name}: ${Math.round(pl.growth * 100)}% grown${pl.watered < cropOf(pl).waterings ? ', water again at 50%' : ''}`);
       case 'ready': case 'dead': return true;
@@ -76,13 +83,13 @@ addI({
   label: () => {
     const pl = nearestPlot(); if (!pl) return '';
     switch (pl.state) {
-      case 'empty': return `Fill bed with regolith (1 of your ${S.inv.regolith || 0})`;
+      case 'empty': return `Fill this bed with regolith (1 of your ${S.inv.regolith || 0})`;
       case 'soil': {
         const can = plantable();
         if (can.length > 1) return 'Plant this bed…';
-        return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5L water)`;
+        return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5 L water)`;
       }
-      case 'growing': return `Water the ${cropOf(pl).name.toLowerCase()} (5L)`;
+      case 'growing': return `Water the ${cropOf(pl).name.toLowerCase()} (5 L)`;
       case 'ready': return `Harvest ${cropOf(pl).name.toLowerCase()}`;
       case 'dead': return 'Clear out the dead crop';
     }
@@ -114,7 +121,9 @@ addI({
               const potatoNote = S.potatoes > 0 && S.food > 0 ? `The staple. A bed takes one potato (you have ${S.potatoes}), then one ration (${S.food}).`
                 : `The staple. A bed takes one of your ${S.potatoes > 0 ? plural(S.potatoes, 'potato').replace('potatos', 'potatoes') : plural(S.food, 'ration')}.`;
               return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield}`,
-                note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.` : c.note,
+                // (every crop says what it would be planted from: lettuce alone, with packets and nothing in the pantry, said only that it crunched)
+                note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.`
+                  : packets ? `${plural(packets, 'seed packet')}. ${c.note}` : `${kept} from the pantry. ${c.note}`,
                 count: `Seed for ${plural(n, 'bed')}`, fn: () => plant(pl, id) };
             }),
           });
@@ -164,8 +173,11 @@ addI({
     S.shake = 1.2;
     flashScreen('rgba(139,224,164,0.22)', 220);         // (a breath of green, for air: the red it used to be read as a wound)
     Snd.play('suitSeal');
-    setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 300);
-    setTimeout(() => log(SOL_LOGS[1]), 1000);
+    // One thing at a time. The moment itself is the flash, the dial filling and the next thing to do, alone. The
+    // Hab's line comes when that has been read, and his own log entry when the Hab's has. (All of it used to land
+    // within a second, on top of the old prompt and the old task struck through.)
+    setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 2800);
+    setTimeout(() => log(SOL_LOGS[1]), 9000);
   },
 });
 export function addInspect(id, lx, lz, name, doneLine, found) {
@@ -206,7 +218,8 @@ addI({
   visible: () => !S.flags.coldOpen,
   enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : statusText('This panel is clean'),
   // (what wiping it is worth, in the prompt: nothing else on screen said whether it was)
-  label: () => `Wipe solar panel: ${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output → 100%`,
+  label: () => 'Wipe this solar panel',
+  sub: () => `Its output: ${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% → 100%`,
   use: () => {
     const p = World._activePanel;
     if (!p) return;
@@ -249,8 +262,10 @@ addI({
   r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => S.hydrazine > 0 ? true : statusText('The hydrazine tank is empty'),
-  label: () => `Burn hydrazine for water (+${BAL.hydrazineWater} L) — ${S.hydrazine} left`,
-  sub: () => (S.flags.hydrazineBoom ? '' : 'Untried indoors: it may cost some of the Hab’s air'),
+  label: () => `Burn hydrazine: +${BAL.hydrazineWater} L of water`,
+  // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
+  //  gone, nothing said whether the second would cost air again.)
+  sub: () => `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'done carefully now: no air lost' : 'untried indoors: may cost Hab air'),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
@@ -271,7 +286,7 @@ addI({
     } else {
       S.stats.booms++;
       Snd.ok();
-      log(`+${BAL.hydrazineWater}L water. Eyebrow count stable. Progress.`);
+      log(`+${BAL.hydrazineWater} L water. Eyebrow count stable. Progress.`);
       checkAchievements();
     }
   },
@@ -282,7 +297,7 @@ addI({
   r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => {
-    if (S.breach.active) return 'Seal the breach first: the far wall, behind the comms desk';
+    if (S.breach.active) return 'Breach first: seal the far wall, behind the comms desk';
     // (not yet time is a reading, not a lock: the first prompt on waking was a padlock)
     const ok = sleepTime();
     return ok === true ? true : statusText(`The bunk. ${ok}`);
@@ -338,7 +353,7 @@ addI({
       stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
-        'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. A potato bed costs one ration to plant.',
+        'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. <b>A potato bed takes one ration to plant and gives back four potatoes.</b>',
       buttons: [{ label: 'Get to work' }],
     });
   },
@@ -407,7 +422,7 @@ addI({
   pos: () => World.pathfinder.position,
   r: 5.5, hold: 2.6, mode: 'walk',
   visible: () => S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected,
-  enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Too heavy to carry — bring the rover closer',
+  enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Needs the rover: too heavy to carry, bring it closer',
   label: () => 'Dig out Pathfinder and load it up',
   use: () => {
     S.pf.loaded = true;
@@ -422,7 +437,7 @@ addI({
   pos: () => World.uplink.position,
   r: 5.0, hold: 2.6, mode: 'walk', pose: 'stand',
   visible: () => S.pf.loaded && !S.pf.connected,
-  enabled: () => groundDist(World.rover.group.position, World.uplinkRing.position) < 9 ? true : 'Park the rover on the marked ring first',
+  enabled: () => groundDist(World.rover.group.position, World.uplinkRing.position) < 9 ? true : 'Needs the rover: park it on the marked ring first',
   label: () => 'Connect Pathfinder to the uplink',
   use: () => connectPathfinder(),
 });
@@ -459,7 +474,7 @@ addI({
   },
   r: 4.5, hold: 1.6, mode: 'walk',
   visible: () => !S.flags.coldOpen,
-  enabled: () => S.upgrades.drill ? true : 'Needs the Ice Drill upgrade',
+  enabled: () => S.upgrades.drill ? true : 'Needs the Ice Drill: an upgrade, made in Colony',
   label: () => `Mine water ice (+1, ${World._activeIce ? World._activeIce.left : 0} left)`,
   use: () => {
     const site = World._activeIce;
@@ -587,7 +602,7 @@ addI({
   pos: () => World.mav.position,
   r: 8.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
-  enabled: () => S.sol >= S.rescueSol ? true : `Launch window opens Sol ${S.rescueSol} — NASA was firm about this`,
+  enabled: () => S.sol >= S.rescueSol ? true : `Not before Sol ${S.rescueSol}: the launch window opens then. NASA was firm`,
   label: () => 'Strip excess weight (nose cone, seats, dignity)',
   use: () => {
     S.flags.mavStripped = true;

@@ -135,7 +135,9 @@ export function discover(name, note, isLander) {
   S.discovered[name] = true;
   S.stats.discoveries++;
   Snd.discovery();
-  toast(isLander ? 'SITE DISCOVERED' : 'REGION DISCOVERED', name.toUpperCase(), note || '');
+  // (not while he is running for the airlock on a holed suit: the card for the region he woke up in landed on the Hab
+  //  in the middle of that, and repeated the name already at the top of the screen. The journal has it all the same.)
+  if (!S.flags.coldOpen) toast(isLander ? 'SITE DISCOVERED' : 'REGION DISCOVERED', name.toUpperCase(), note || '');
   checkAchievements();
 }
 export let discTimer = 0;

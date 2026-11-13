@@ -23,8 +23,13 @@ export function el(tag, id, cls, parent, html) {
 }
 /** Escape text for use inside HTML. */
 export function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-/** "O2", "CO2" and "H2O" with proper subscripts. */
-export function chem(s) { return String(s).replace(/\b(C?O)2\b/g, '<span class="chem">$1<sub>2</sub></span>').replace(/\bH2O\b/g, '<span class="chem">H<sub>2</sub>O</span>'); }
+/**
+ * A figure and its unit are written one way everywhere: a space between them ("28 L", "49 m", "3 km"), and one that
+ * does not break, so the unit never starts a line. (It was "+10L" on one screen and "+28 L" on the next.)
+ */
+export function units(s) { return String(s).replace(/(\d)\s?(L|km|m)\b(?!\w)/g, '$1\u00a0$2'); }
+/** "O2", "CO2" and "H2O" with proper subscripts, and figures spaced from their units. */
+export function chem(s) { return units(s).replace(/\b(C?O)2\b/g, '<span class="chem">$1<sub>2</sub></span>').replace(/\bH2O\b/g, '<span class="chem">H<sub>2</sub>O</span>'); }
 
 /** Hooks the game fills in (see game/flow.js), so this module never has to import game code. */
 export const uiHooks = { /** pause the game and show the pause menu */ pause: null };
@@ -42,14 +47,20 @@ const ring = (r, vb) => `<svg class="ring" viewBox="0 0 ${vb} ${vb}" aria-hidden
   `<circle class="arc" cx="${vb / 2}" cy="${vb / 2}" r="${r}" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>`;
 
 UI.vitals = el('div', 'mg-vitals', null, UI.hud);
+// (on a touch screen the panel is a control: pressed, it opens the guide to what it shows)
+if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'What the bars mean'); }
 UI.suit = el('div', null, 'suit', UI.vitals,
   `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
-  '<div class="st t-num"></div>');
+  // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
+  //  inside a 54 px ring the name was 9 px capitals)
+  '<div class="cap">SUIT <span class="chem">O<sub>2</sub></span></div><div class="st t-num"></div>');
 UI.suitArc = UI.suit.querySelector('.arc');
 UI.suitNum = UI.suit.querySelector('.num');
 UI.suitState = UI.suit.querySelector('.st');
-// (on a touch screen the panel opens the guide to itself: the mark under the dial says so)
-el('span', null, 'help', UI.suit, '?').setAttribute('aria-hidden', 'true');
+// On a touch screen the whole panel is one control: pressed, it opens the guide to itself. It is framed like the
+// other touch buttons and carries a chip that says so. (The chip was a bare "?" in an 18 px ring, which read as a
+// button too small to press, and nothing else said the panel could be pressed once its pointer card had gone.)
+el('span', null, 'help', UI.suit, '<i>?</i>Guide').setAttribute('aria-hidden', 'true');
 /** The resource rows beside the suit dial: [state key, icon, label]. */
 export const BARS = [
   ['o2', 'hab', 'HAB <span class="chem">O<sub>2</sub></span>'],
@@ -96,7 +107,7 @@ UI.log.setAttribute('aria-live', 'polite');
 UI.rover = el('div', 'mg-rover', null, UI.hud,
   '<div class="spd"><b class="t-num">0</b><span>KM/H</span></div>' +
   '<div class="rv">' +
-  `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">POWER</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
+  `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">BATTERY</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   `<div class="row" data-k="o2">${icon('suit')}<span class="lb"><span class="chem">O<sub>2</sub></span> TANK</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   '</div>');
 UI.roverSpeed = UI.rover.querySelector('.spd b');
@@ -104,7 +115,7 @@ UI.roverBars = {};
 UI.rover.querySelectorAll('.row').forEach((r) => { UI.roverBars[r.dataset.k] = { wrap: r, fill: r.querySelector('.fl'), val: r.querySelector('.val') }; });
 
 UI.prompt = el('div', 'mg-prompt', null, UI.hud,
-  `<div class="pk">${ring(17, 40)}<span class="kc"><span class="k">E</span>${icon('hand')}${icon('lock')}</span></div>` +
+  `<div class="pk">${ring(17, 40)}<span class="kc"><span class="k">E</span>${icon('hand')}${icon('block')}</span></div>` +
   '<div class="pt"><div class="pl"><span class="ph">HOLD</span><span class="lb"></span></div><div class="sub"></div></div>');
 UI.promptArc = UI.prompt.querySelector('.arc');
 UI.promptLabel = UI.prompt.querySelector('.lb');
@@ -129,9 +140,10 @@ UI.touch = el('div', 'mg-touch', null, root);
 UI.joyZone = el('div', 'mg-joyzone', null, UI.touch);
 UI.joy = el('div', 'mg-joy', null, UI.touch, '<i class="n"></i><i class="e"></i><i class="s"></i><i class="w"></i>');
 UI.joyKnob = el('div', 'mg-joyknob', null, UI.joy);
-// (With nothing in reach it is an empty, dim ring: "USE / HOLD", "— / HOLD" and a bare icon each read as a control
-// with no name. With something in the way it is a padlock over the word LOCKED; with something to do, the verb and HOLD.)
-UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('lock')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
+// (With nothing in reach it is not there: an empty ring under the right thumb read as a control that was broken, and
+// "USE / HOLD", "— / HOLD" and a bare icon each read as a control with no name. With something to do it carries the
+// verb and HOLD; with something in the way, a barred ring over what is wanting, in the reason's own words.)
+UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('block')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
 UI.tEArc = UI.tE.querySelector('.arc');
 UI.tEVerb = UI.tE.querySelector('.vb');
 UI.tJump = tbtn('mg-tJump', 'sec', 'Jump', `${icon('jump')}<span>JUMP</span>`);
@@ -346,7 +358,7 @@ function nextToast() {
   // note (whole sentences of it), or none: it never lies over the thing his thumb is on.
   if (layout.compact && layout.touch && t.note) {
     const joy = UI.joy.getBoundingClientRect(), t3 = node.querySelector('.t3');
-    const reaches = () => joy.height > 2 && node.getBoundingClientRect().bottom > joy.top - 4;
+    const reaches = () => joy.height > 2 && node.getBoundingClientRect().bottom > joy.top - 8;      // (8 px clear of it, as everything on the HUD is of its neighbour)
     if (t3 && reaches()) {
       node.classList.add('tight');
       t3.innerHTML = chem(esc(fitSentences(t3, t.note)));
@@ -475,11 +487,26 @@ function verbOf(label) {
   return v.toUpperCase().slice(0, 8);
 }
 /**
+ * What the action button says when something is in the way: what is wanting, which is how a reason begins
+ * ("Needs regolith: dig it at the heap…" gives NEEDS REGOLITH). A reason that does not begin that way, or begins at
+ * too great a length for the button, gives a plain NOT YET; the prompt line has the whole of it either way.
+ */
+export function refusalWord(reason) {
+  const m = /^([^:—(]{3,22}?)\s*[:—(]/.exec(reason);
+  return (m && m[1].trim().split(/\s+/).length <= 4 ? m[1].trim() : 'Not yet').toUpperCase();
+}
+/**
  * Show, update or hide (null) the interaction prompt.
  * p: { label, sub, disabled: false | reason string, hold: seconds to hold, progress: 0..1,
  *      minor: true for something always available here rather than something in reach }
+ *
+ * The rule of the prompt: a thing that cannot be done here says why, in the prompt line. `disabled` is therefore a
+ * sentence: what is wanting, and after a colon what to do about it ("Needs regolith: dig it at the heap outside the
+ * airlock"), or a reading made with statusText(). A refusal that gives no reason is not shown at all: a padlock
+ * with nothing beside it was the first thing a new player met at an empty farm bed.
  */
 export function setPrompt(p) {
+  if (p && p.disabled && (typeof p.disabled !== 'string' || !p.disabled.replace(STATUS_MARK, '').trim())) p = null;
   if (!p) {
     if (pr.on) {
       pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null;
@@ -500,7 +527,7 @@ export function setPrompt(p) {
     pr.label = label;
     UI.promptLabel.innerHTML = chem(esc(label));
   }
-  const verb = p.disabled ? (reading ? '' : 'LOCKED') : verbOf(p.label);
+  const verb = p.disabled ? (reading ? '' : refusalWord(label)) : verbOf(p.label);
   if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
   if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
   const sub = p.sub || '';

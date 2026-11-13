@@ -20,6 +20,8 @@ import { roverF } from '../game/rover.js';
 const IMG_PPD = 8;                      // the atlas is 2880 x 1440: 8 pixels per degree
 const MAX_PPD = 72;
 const KM_PER_DEG = (2 * Math.PI * R) / 360 / 1000;
+/** How many times smaller than Mars this planet is: its scale, as a map gives one ("1:282"). */
+const PLANET_SCALE = Math.round(3389500 / R);
 const R2D = 180 / Math.PI;
 const view = { lon: 180, lat: 0, ppd: 0 };      // centre and scale (CSS pixels per degree)
 let goal = null;                                 // the view being eased to, or null
@@ -123,8 +125,10 @@ function buildMarkers() {
     add({ id: 'pf', icon: 'dish', color: col.accent, pos: World.pathfinder.position, label: 'Pathfinder', pri: 1, main: true,
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
-  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink3, pos: World.mav.position, label: 'Ares 4 MAV', pri: S.flags.mavRevealed ? 1 : 5, main: !!S.flags.mavRevealed,
-    title: 'Ares 4 MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'Schiaparelli crater', note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : 'The next mission\'s ascent vehicle, pre-landed in Schiaparelli.' });
+  // (the rocket says what it is from the first sol: it stood on the map as "Ares 4 MAV" with nothing to say it was the way home)
+  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'Ares 4 MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 3, main: !!S.flags.mavRevealed,
+    title: 'Ares 4 MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'The way home · Schiaparelli crater',
+    note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
     title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
   add({ id: 'hab', icon: 'hab', color: col.accent, pos: World.hab.position, label: 'Hab', pri: 2, home: true,
@@ -143,8 +147,8 @@ function placeLabels(you, storms) {
   const r = 11 * U;
   // keep labels out from under the interface's own panels
   const wr = wrap.getBoundingClientRect();
-  for (const panel of wrap.querySelectorAll('.map-tools, .map-legend, .map-info')) {
-    if (panel.hidden) continue;
+  for (const panel of wrap.querySelectorAll('.map-tools, .map-legend, .map-info, .map-hint')) {
+    if (panel.hidden || panel.classList.contains('gone')) continue;
     const b = panel.getBoundingClientRect();
     if (b.width) boxes.push([b.left - wr.left - 6, b.top - wr.top - 6, b.width + 12, b.height + 12]);
   }
@@ -155,8 +159,9 @@ function placeLabels(you, storms) {
   for (const m of byPri) {
     if (m.under || (!m.label && m !== selected && !m.group)) continue;
     if (m.x < -40 || m.x > W + 40 || m.y < -20 || m.y > H + 20) continue;
-    // (several things in one spot: "Hab & 6 more", in words. "HAB +6" explained nothing until it was tapped.)
-    const base = (m.label || (m === selected ? m.title : '')).trim(), extra = m.group ? m.group.length - 1 : 0;
+    // (several things in one spot: "Viking 1 & 2 more", in words; "+2" explained nothing until it was tapped. Home is
+    //  simply the Hab: "Hab & 4 more" made a new player ask four more what, of the rover and the debris at its door.)
+    const base = (m.label || (m === selected ? m.title : '')).trim(), extra = m.group && !m.home ? m.group.length - 1 : 0;
     const text = (base ? base + (extra ? ` & ${extra} more` : '') : `${extra + 1} here`).toUpperCase();
     const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = 15 * U;
     // how far a marker's centre is from a label's box
@@ -173,6 +178,7 @@ function placeLabels(you, storms) {
     if (at < 0 && m.pri <= 2) at = 0;
     if (at < 0) continue;
     const [x, y] = spots[at];
+    m.named = true;
     boxes.push([x, y, w, h]); named.push([x, y, w, h]);
     out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true });
   }
@@ -304,9 +310,11 @@ function draw() {
   // Markers that fall on one another at this zoom are shown as one: the most important (or the one
   // selected), with a count of the rest. Tapping it again steps through them.
   const leads = [];
+  // (two that would touch are one: a lander's marker stood with an unknown signal's cut into its side)
+  const radius = (m) => (m.unknown ? 8 : m.small ? 6 : 10) * U;
   for (const m of markers.slice().sort((a, b) => (b === selected) - (a === selected) || a.pri - b.pri)) {
-    m.under = null; m.group = null;
-    for (const l of leads) if (Math.hypot(l.x - m.x, l.y - m.y) < 15 * U) { m.under = l; (l.group || (l.group = [l])).push(m); break; }
+    m.under = null; m.group = null; m.named = false;
+    for (const l of leads) if (Math.hypot(l.x - m.x, l.y - m.y) < Math.max(15 * U, radius(l) + radius(m) + 2 * U)) { m.under = l; (l.group || (l.group = [l])).push(m); break; }
     if (!m.under) leads.push(m);
   }
   const pll = vecToLl(_v1.copy(player.pos).normalize());
@@ -329,10 +337,21 @@ function draw() {
   if (main && main.dist > 60) route(main.pos, 'rgba(255,180,84,.75)', [6, 5]);
   if (selected && selected.pos && selected !== main && selected.dist > 60) route(selected.pos, 'rgba(245,240,232,.6)', [2, 4]);
 
+  // Names are placed before the markers are drawn, because a marker that has a name and found no room for it at this
+  // zoom is drawn as a dot, not as a picture with no name beside it (the compass does the same): zoom in, or tap it,
+  // and it says what it is. (A lander's icon stood unnamed between the Hab and the rocket on the whole-planet map.)
+  const labels = placeLabels(you, stormLabels);
   // markers
   for (const m of markers) {
     if (m.under || m.x < -20 || m.x > W + 20 || m.y < -20 || m.y > H + 20) continue;
-    const r = (m.unknown ? 8 : m.small ? 6 : 10) * U;
+    if ((m.label || m.group) && !m.named && m !== selected) {
+      c.globalAlpha = m.dim ? 0.6 : 1;
+      c.beginPath(); c.arc(m.x, m.y, 4 * U, 0, Math.PI * 2);
+      c.fillStyle = m.color; c.fill(); c.lineWidth = 1.5 * U; c.strokeStyle = 'rgba(12,10,8,.88)'; c.stroke();
+      c.globalAlpha = 1;
+      continue;
+    }
+    const r = radius(m);
     c.globalAlpha = m.dim ? 0.6 : 1;
     c.beginPath(); c.arc(m.x, m.y, r, 0, Math.PI * 2);
     c.fillStyle = 'rgba(12,10,8,.88)'; c.fill();
@@ -363,10 +382,10 @@ function draw() {
   c.fillStyle = '#fff'; c.strokeStyle = 'rgba(12,10,8,.95)'; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke(); c.fill();
   c.restore();
 
-  for (const l of placeLabels(you, stormLabels)) text(l.text, l.x, l.y, l);
+  for (const l of labels) text(l.text, l.x, l.y, l);
 
   // status bar
-  const posText = `<b>You</b> <span class="t-mono">${fmtLL(pll)}</span> · ${esc(regionName(_v1.copy(player.pos).normalize()))}`;
+  const posText = `<b>You</b> <span class="t-mono">${fmtLL(pll)}</span><span class="rg"> · ${esc(regionName(_v1.copy(player.pos).normalize()))}</span>`;
   if (statusPos.dataset.t !== posText) { statusPos.dataset.t = posText; statusPos.innerHTML = posText; }
   let km = 0.1;
   for (const k of [0.1, 0.2, 0.5, 1, 2, 5, 10, 20]) { km = k; if (k / KM_PER_DEG * ppd >= layout.rem * 4) break; }
@@ -393,11 +412,11 @@ function showInfo(s) {
     if (e) e.n++; else others.push({ name, n: 1 });
   }
   info.innerHTML = `<div class="mi-hd">${icon(s.icon || 'pin')}<div><h2>${esc(s.title)}</h2><div class="ty">${esc(s.type || '')}</div></div>` +
-    `<button type="button" class="x" aria-label="Close details">${icon('close')}</button></div>` +
+    `<button type="button" class="x mg-iconbtn" aria-label="Close details">${icon('close')}</button></div>` +
     `<dl><dt>Distance</dt><dd class="t-num">${fmtDist(dist)}</dd><dt>Bearing</dt><dd>${dist > 5 ? bearingText(absBearing(from, pos)) : '—'}</dd>` +
     `<dt>Position</dt><dd class="t-mono">${fmtLL(ll)}</dd></dl>${s.note ? `<p>${esc(s.note)}</p>` : ''}` +
     // a marker standing for several says what the others are
-    (others.length ? `<p class="grp"><b>Also here (${grp.length - 1})</b> ${others.map((o) => esc(o.n > 1 ? `${o.n} × ${o.name}` : o.name)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
+    (others.length ? `<p class="grp"><b>Also here (${grp.length - 1})</b> ${others.map((o) => esc(o.n > 1 ? `${o.n}\u00a0×\u00a0${o.name}` : o.name)).join(', ')}. ${layout.touch ? 'Tap' : 'Click'} the marker again for the next.</p>` : '');
   info.hidden = false;
   info.querySelector('.x').addEventListener('click', () => showInfo(null));
   request();
@@ -447,7 +466,9 @@ export function initMap(body) {
   info.hidden = true;
   info.setAttribute('role', 'status');
   const status = el('div', null, 'map-status', wrap,
-    '<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><i></i><span></span></span>');
+    // (the bar measures this planet, which is Mars at 1:282 and 75 km round: "10 km" under a map of the whole of Mars
+    //  read as a mistake to anyone who knows Mars, so the scale is given beside it, as a map gives one)
+    `<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><em title="This planet is Mars at 1:${PLANET_SCALE}">Scale 1:${PLANET_SCALE}</em><i></i><span></span></span>`);
   statusBar = status;
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
   // (on a touch screen the hint is a chip of the map's own, over the status bar, not a part of the bar)
