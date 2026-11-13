@@ -1,8 +1,9 @@
 /* The in-game HUD. Elements are built in ui/dom.js and updated in ui/hud.js. */
-#mg-hud { position: absolute; inset: 0; pointer-events: none; visibility: hidden; opacity: 0;
-  transition: opacity .3s, visibility 0s .3s; z-index: 5; }
-.is-playing #mg-hud { visibility: visible; opacity: 1; transition: opacity .35s; }
-.is-playing.is-modal #mg-hud { visibility: hidden; opacity: 0; transition: opacity .2s, visibility 0s .2s; }
+#mg-hud { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: 5; }
+/* It fades in once, as the game starts. Under a menu it goes at once and comes back at once: when it faded back over
+   a third of a second, a slow frame after waking was a picture of the world with no HUD in it at all. */
+.is-playing #mg-hud { visibility: visible; animation: mg-fade-in .35s; }
+.is-playing.is-modal #mg-hud { visibility: hidden; }
 /* the launch: only the log stays */
 .is-cutscene #mg-hud > :not(#mg-log):not(.hud-scrim) { opacity: 0 !important; transition: opacity .6s; }
 
@@ -86,20 +87,23 @@
 #mg-compass .mk.main { color: var(--accent); }
 #mg-compass .mk.quest { color: var(--cold); }
 #mg-compass .mk.danger { color: var(--danger); animation: mg-pulse .8s steps(2, jump-none) infinite; }
-#mg-compass .mk.small .ic { width: .875rem; height: .875rem; }
 /* behind you: pinned at the end of the strip with a mark that says which way to turn */
 #mg-compass .mk.off { opacity: .8; }
 #mg-compass .mk.off::after { content: ""; position: absolute; top: 50%; width: .3125rem; height: .3125rem; margin-top: -.1875rem; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; }
 #mg-compass .mk.off.left::after { left: -.5rem; transform: rotate(-45deg); }
 #mg-compass .mk.off.right::after { right: -.5rem; transform: rotate(135deg); }
-#mg-compass .mk.dim { opacity: .5; }
 #mg-compass .caret { position: absolute; left: 50%; top: 2.75rem; width: 0; height: 0; margin-left: -.3125rem;
   border-left: .3125rem solid transparent; border-right: .3125rem solid transparent; border-bottom: .375rem solid var(--accent);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .7)); }
 #mg-compass .dists { position: absolute; left: 0; right: 0; top: 3.125rem; height: 1.125rem; }
 #mg-compass .dists span { position: absolute; left: 0; top: 0; transform: translateX(-50%); white-space: nowrap; padding: .1875rem .375rem; border-radius: .125rem;
   background: rgba(14, 12, 11, .6); font: 600 .6875rem/1 var(--f-cond); letter-spacing: .08em; color: var(--ink-2); text-transform: uppercase; }
+#mg-compass .dists span i { font-style: normal; }
+#mg-compass .dists span b { font-weight: 600; text-transform: none; letter-spacing: .03em; color: var(--ink); }
 #mg-compass .dists span.focus { color: var(--ink); letter-spacing: .12em; }
+/* a mark with no room for its name is a dot: turn toward it and it says what it is */
+#mg-compass .mk.dot .ic { display: none; }
+#mg-compass .mk.dot::before { content: ""; width: .3125rem; height: .3125rem; border-radius: 50%; background: currentColor; opacity: .75; }
 #mg-compass .dists span.main { color: var(--accent); }
 #mg-compass .dists span.quest { color: var(--cold); }
 #mg-compass .dists span.danger { color: var(--danger); }
@@ -171,7 +175,7 @@
 .mg-line.disc .who { color: var(--ok); }
 .mg-line.fade { opacity: 0; }
 .mg-line:not(:last-child) { background: rgba(14, 12, 11, .5); }
-.mg-line:nth-last-child(n+4) { display: none; }
+#mg-log .mg-line:nth-last-child(n+4) { display: none; }
 
 /* ---------------------------------------------------------------- rover readout (bottom centre) */
 #mg-rover { position: absolute; left: 50%; bottom: calc(var(--m) + var(--sab)); transform: translateX(-50%); display: none;
@@ -258,16 +262,8 @@
 .mg-compact .ring .trk { stroke-width: 4; }
 .mg-compact .ring .arc { stroke-width: 4.5; }
 .mg-compact .res { gap: .125rem; padding-left: .5rem; }
-/* on a phone each bar keeps a short name and a number big enough to read at arm's length */
-.mg-compact .res .row { grid-template-columns: .875rem 2.5rem 2.125rem 2.5rem .375rem; column-gap: .3125rem; height: .875rem; }
-.mg-compact .res .row .lb { font-size: .6875rem; letter-spacing: .03em; }
-.mg-compact .res .row .ic { width: .8125rem; height: .8125rem; }
-.mg-compact .res .row .val { font-size: .8125rem; }
-.mg-compact .row .tr { border-left-width: .1875rem; border-right-width: .1875rem; }
-.mg-compact .row .tr.up { border-bottom-width: .25rem; }
-.mg-compact .row .tr.dn { border-top-width: .25rem; }
 
-.mg-compact #mg-compass { --cw: min(15rem, calc(100vw - var(--sal) - var(--sar) - 25.5rem)); width: var(--cw); margin-left: calc(var(--cw) / -2);
+.mg-compact #mg-compass { --cw: min(14rem, calc(100vw - var(--sal) - var(--sar) - 25.5rem)); width: var(--cw); margin-left: calc(var(--cw) / -2);
   top: calc(var(--sat) + .125rem); height: 3.25rem; }
 .mg-compact #mg-compass .strip { height: 2.375rem; }
 .mg-compact #mg-compass .cards span { font-size: .8125rem; bottom: .8125rem; }
@@ -275,17 +271,18 @@
 .mg-compact #mg-compass .marks .mk { width: 1.25rem; height: 1.25rem; margin-left: -.625rem; }
 .mg-compact #mg-compass .mk .ic { width: 1rem; height: 1rem; }
 .mg-compact #mg-compass .caret { top: 2.375rem; }
-.mg-compact #mg-compass .dists { top: 2.625rem; }
-.mg-compact #mg-compass .dists span { padding: .125rem .3125rem; }
-.mg-compact #mg-region { top: calc(var(--sat) + 3.875rem); font-size: .625rem; letter-spacing: .26em; text-indent: .26em; padding: .1875rem .5rem; }
-.mg-compact #mg-alerts { top: calc(var(--sat) + 5.125rem); }
+.mg-compact #mg-compass .dists { top: 2.8125rem; }
+/* (the region's name and a banner have the same place: while there is a banner, it is the banner's) */
+.mg-compact #mg-region { top: calc(var(--sat) + 4.625rem); font-size: .625rem; letter-spacing: .26em; text-indent: .26em; padding: .1875rem .5rem; }
+.mg-compact.has-alert #mg-region { display: none; }
+.mg-compact #mg-alerts { top: calc(var(--sat) + 4.625rem); gap: .5rem; }
 .mg-compact .alert { font-size: .75rem; padding: .25rem .625rem .25rem .5rem; }
 /* (the instruction stays on a phone: "critical" alone does not say what to do) */
 .mg-compact .alert small { font-size: .6875rem; }
 /* while his life is in the balance the log keeps quiet: the banner has the floor */
 .mg-compact.is-critical #mg-log { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */
-.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + 7.125rem); }
+.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + var(--vit) + .5rem); }
 .mg-compact.has-toast #mg-log { visibility: hidden; }
 .mg-compact .toast { min-width: 0; max-width: none; width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); padding: .4375rem .625rem .5rem; }
 .mg-compact .toast .ti { display: none; }
@@ -317,24 +314,15 @@
 /* ... and whatever it holds, the block ends above the round buttons under it (VIEW is the highest of them) */
 .mg-compact.mg-touch #mg-tr { max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 3rem - 7.375rem - max(2.75rem, 44px) - 8px); overflow: hidden; }
 
-.mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + 7.125rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
+.mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + var(--vit) + .5rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
 .mg-compact .mg-line { grid-template-columns: 2.25rem 1fr; column-gap: .375rem; padding: .25rem .5rem .3125rem .4375rem; font-size: .6875rem; line-height: 1.32; }
 .mg-compact .mg-line .who { font-size: .5625rem; letter-spacing: .12em; }
-.mg-compact .mg-line:nth-last-child(n+3) { display: none; }
 
 .mg-compact #mg-rover { bottom: calc(var(--sab) + .5rem); gap: .625rem; padding: .3125rem .625rem .3125rem .75rem; }
 .mg-compact #mg-rover .spd { min-width: 3.5rem; }
 .mg-compact #mg-rover .spd b { font-size: 1.625rem; }
 .mg-compact #mg-rover .spd span { font-size: .6875rem; }
 .mg-compact #mg-rover .rv { padding-left: .625rem; gap: .1875rem; }
-.mg-compact #mg-rover .row { grid-template-columns: .8125rem 3.25rem 2rem; height: 1rem; column-gap: .375rem; }
-/* (the rover's two bars are named, as the Hab's are: the word above, the bar a rule under it) */
-.mg-compact #mg-rover .row > * { grid-row: 1; }
-.mg-compact #mg-rover .row .lb { grid-column: 2; align-self: start; font-size: .6875rem; line-height: .75rem; letter-spacing: .03em; }
-.mg-compact #mg-rover .row .tk { grid-column: 2; align-self: end; height: .125rem; }
-.mg-compact #mg-rover .row .val { grid-column: 3; }
-.mg-compact #mg-rover .row .ic { width: .8125rem; height: .8125rem; }
-.mg-compact #mg-rover .row .val { font-size: .6875rem; }
 
 /* (one place for it on a phone, whatever kind of prompt it is: low in the middle, between the stick and the buttons) */
 .mg-compact #mg-prompt, .mg-compact #mg-prompt.minor { bottom: calc(var(--sab) + .625rem); max-width: 17rem; gap: .5rem; padding: .25rem .875rem .25rem .25rem; }
@@ -396,24 +384,8 @@
 .obj.urgent.first { font-size: .9375rem; }
 .mg-compact .obj.urgent.first { font-size: .8125rem; }
 
-/* the narrowest phones have no room for a bar beside each name and number */
-@media (max-width: 760px) {
-  /* ... so the gauge is the band the name and the number stand on: it fills from the left, behind them.
-     (It was a rule under the word, which read as an underline.) */
-  .mg-compact .res { gap: .09375rem; }
-  .mg-compact .res .row { grid-template-columns: .875rem 2.75rem 2.25rem .375rem; column-gap: .25rem; height: .9375rem; }
-  .mg-compact .res .row > * { grid-row: 1; position: relative; }
-  .mg-compact .res .row .lb { grid-column: 2; padding-left: .25rem; z-index: 1; }
-  .mg-compact .res .row:not(.warn):not(.crit) .lb { color: var(--ink); }
-  .mg-compact .res .row .val { grid-column: 3; padding-right: .25rem; z-index: 1; }
-  .mg-compact .res .row .tk { grid-column: 2 / 4; align-self: stretch; height: auto; background: rgba(245, 240, 232, .1); border-radius: .125rem; }
-  .mg-compact .res .row .fl { background: rgba(245, 240, 232, .3); }
-  .mg-compact .res .row.warn .fl { background: rgba(255, 180, 84, .34); }
-  .mg-compact .res .row.crit .fl { background: rgba(255, 106, 92, .4); }
-  .mg-compact .res .row .tr { grid-column: 4; }
-  /* (and the compass gives up the width four thumb-sized buttons need) */
-  .mg-compact #mg-compass { --cw: min(15rem, calc(100vw - var(--sal) - var(--sar) - 28.75rem)); }
-}
+/* (on the narrowest phones the compass gives up the width four thumb-sized buttons need) */
+@media (max-width: 760px) { .mg-compact #mg-compass { --cw: min(14rem, calc(100vw - var(--sal) - var(--sar) - 28.75rem)); } }
 /* the reason for the current objective, under it (on a phone too: it used to arrive there as a card that repeated the line above it) */
 .obj .why { grid-column: 2 / -1; font-size: .75rem; line-height: 1.3; color: var(--ink-2); font-weight: 400; }
 .mg-compact .obj .why { font-size: var(--t11); line-height: 1.28; margin-top: .0625rem; }
@@ -437,7 +409,9 @@
    (the journal keeps them all), and six lines of it at the most (ui/dom.js gives it whole sentences that fit) */
 .mg-compact #mg-log .mg-line:nth-last-child(n+2) { display: none; }
 .mg-compact #mg-log .mg-line { line-height: 1.3; }
-.mg-compact #mg-log .mg-line .tx { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.mg-compact #mg-log .mg-line .tx { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+/* (the first minute is one number and one task: what the log has to say waits for the journal) */
+.mg-compact.is-cold #mg-log { display: none; }
 /* driving, the rover's panel has the low middle of a phone: the prompt stands on it */
 .mg-compact.is-rover #mg-prompt, .mg-compact.is-rover #mg-prompt.minor { bottom: calc(var(--sab) + 4.5rem); }
 
@@ -457,44 +431,27 @@
 
 /* ================================================================ phones: nothing under 11 px
    (the interface's rem falls below 16 px on a small phone, so these are held in real pixels) */
-.mg-compact { --t11: max(.6875rem, 11px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); }
+.mg-compact { --t11: max(.6875rem, 11px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); }
 .mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
 .mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
 .mg-compact .suit .st { font-size: var(--t13); }
-.mg-compact .res .row .lb { font-size: var(--t12); letter-spacing: .02em; }
-.mg-compact .res .row .val { font-size: var(--t13); }
-.mg-compact .row .val small { font-size: var(--t11); }
-.mg-compact #mg-compass .dists span { font-size: var(--t11); }
+.mg-compact #mg-compass .dists span { font-size: var(--t11); letter-spacing: .04em; padding: .125rem .3125rem; }
+.mg-compact #mg-compass .dists span b { font-size: var(--t13); }
 .mg-compact #mg-region { font-size: var(--t11); letter-spacing: .2em; text-indent: .2em; }
 .mg-compact #mg-clock .sol .k { font-size: var(--t11); }
 .mg-compact .obj { font-size: var(--t12); }
 .mg-compact .obj.primary, .mg-compact .obj.urgent.first { font-size: var(--t13); }
-.mg-compact .obj .ds { font-size: var(--t11); }
+.mg-compact .obj .ds { font-size: var(--t13); line-height: 1.25; color: var(--ink); }
 .mg-compact .mg-line { grid-template-columns: 2.5rem 1fr; font-size: var(--t12); }
 .mg-compact .mg-line .who { font-size: var(--t11); letter-spacing: .06em; }
 .mg-compact .toast .t1 { font-size: var(--t11); }
 .mg-compact .toast .t3 { font-size: var(--t12); line-height: 1.3; }
-.mg-compact #mg-rover .spd span, .mg-compact #mg-rover .row .lb, .mg-compact #mg-rover .row .val { font-size: var(--t11); }
-.mg-compact #mg-rover .row { grid-template-columns: .8125rem 3.5rem 2.5rem 2.5rem; column-gap: .375rem; height: 1rem; }
-/* (the rover's two rows are laid out as the Hab's six are: a bar beside the name on a phone with the room... */
-.mg-compact #mg-rover .row .lb { grid-column: 2; align-self: center; line-height: 1; }
-.mg-compact #mg-rover .row .tk { grid-column: 3; align-self: center; height: .1875rem; }
-.mg-compact #mg-rover .row .val { grid-column: 4; }
-/* ... and, on the narrowest, the band the name and the number stand on) */
-@media (max-width: 760px) {
-  .mg-compact #mg-rover .row { grid-template-columns: .8125rem 3.75rem 2.5rem; column-gap: .25rem; }
-  .mg-compact #mg-rover .row > * { position: relative; }
-  .mg-compact #mg-rover .row .lb { padding-left: .25rem; z-index: 1; color: var(--ink); }
-  .mg-compact #mg-rover .row .val { grid-column: 3; padding-right: .25rem; z-index: 1; }
-  .mg-compact #mg-rover .row .tk { grid-column: 2 / 4; align-self: stretch; height: auto; background: rgba(245, 240, 232, .1); border-radius: .125rem; }
-  .mg-compact #mg-rover .row .fl { background: rgba(245, 240, 232, .3); }
-  .mg-compact #mg-rover .row.warn .fl { background: rgba(255, 180, 84, .34); }
-  .mg-compact #mg-rover .row.crit .fl { background: rgba(255, 106, 92, .4); }
-}
+.mg-compact #mg-rover .spd span { font-size: var(--t11); }
 .mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--t11); }
 .mg-compact #mg-prompt .pl, .mg-compact #mg-prompt.minor .pl { font-size: var(--t13); }
 .mg-compact #mg-prompt .sub { font-size: var(--t11); }
-.mg-compact #mg-way b { font-size: var(--t11); }
+.mg-compact #mg-way b { font-size: var(--t13); padding: .125rem .375rem; }
+.mg-compact #mg-way { width: 3.5rem; margin-left: -1.75rem; }
 .mg-compact .ph-hint, .mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t11); }
 
 /* ================================================================ desktops: a banner keeps between the bars and the mission panel
@@ -521,3 +478,59 @@
   .mg-compact #mg-log, .mg-compact .toast { width: min(15rem, calc(50vw - var(--sal) - 5.25rem)); }
   .mg-compact .mg-line { font-size: var(--t11); line-height: 1.3; }
 }
+
+/* ================================================================ phones: the six gauges, and the rover's two
+   One design at both phone sizes. A gauge is a band the height of its row: its name on the left, its number on the
+   right, and the band filled from the left as far as the tank is full, with a lit edge where the level stands. The
+   track is near black and the fill a mid grey, so the words keep their contrast on either side of the edge.
+   (At 844 wide a gauge was a line 34 px long and 3 px tall beside its name; at 667 a pale band whose fill ended
+   inside the word and took the contrast with it.) */
+.mg-compact { --band: max(.9375rem, 15px); --vit: calc(6 * var(--band) + 10px + .625rem + 2px); }
+.mg-compact #mg-vitals { gap: .4375rem; padding: .3125rem .4375rem .3125rem .375rem; background: rgba(14, 12, 11, .76); }
+.mg-compact .res { gap: 2px; padding-left: .4375rem; }
+.mg-compact .res .row, .mg-compact #mg-rover .row { grid-template-columns: .875rem minmax(0, 1fr) auto 9px; column-gap: .25rem; height: var(--band); width: 9.5rem; }
+.mg-compact #mg-rover .row { grid-template-columns: .875rem minmax(0, 1fr) auto; width: 8.75rem; }
+.mg-compact .res .row > *, .mg-compact #mg-rover .row > * { grid-row: 1; position: relative; }
+.mg-compact .row .ic { grid-column: 1; width: .8125rem; height: .8125rem; }
+.mg-compact .row .tk { grid-column: 2 / 4; align-self: stretch; height: auto; overflow: hidden; border-radius: 2px;
+  background: rgba(5, 4, 3, .88); box-shadow: inset 0 0 0 1px rgba(245, 240, 232, .16); }
+/* (sized by its width here, not squeezed: the colour-blind hatching keeps its pitch at every level) */
+.mg-compact .row .fl { transform: none !important; width: calc(var(--f, 1) * 100%); background: rgba(245, 240, 232, .32); transition: width .35s linear, background .3s; }
+.mg-compact .row .tk::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--f, 1) * 100% - 2px); width: 2px; background: var(--ink); transition: left .35s linear; }
+.mg-compact .row .lb { grid-column: 2; z-index: 1; padding-left: .25rem; font-size: var(--t12); letter-spacing: .02em; color: var(--ink); }
+.mg-compact .row .val { grid-column: 3; z-index: 1; padding-right: .25rem; font-size: var(--t14); color: var(--ink); }
+.mg-compact .row .val small { font-size: var(--t11); color: var(--ink); }
+/* rising or falling: an arrow big enough to see */
+.mg-compact .row .tr { grid-column: 4; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; opacity: 1; }
+.mg-compact .row .tr.up { border-bottom: 8px solid var(--ok); }
+.mg-compact .row .tr.dn { border-top: 8px solid var(--ink-2); }
+/* low, the whole row changes: the band is edged and tinted in the warning colour, its icon too; lower still, in the danger colour */
+.mg-compact .row.warn .lb, .mg-compact .row.crit .lb, .mg-compact .row.warn .val, .mg-compact .row.crit .val { color: var(--ink); }
+.mg-compact .row.warn .tk { background: rgba(46, 28, 5, .92); box-shadow: inset 0 0 0 1px var(--accent); }
+.mg-compact .row.warn .fl { background: rgba(255, 180, 84, .4); }
+.mg-compact .row.warn .tk::after { background: var(--accent); }
+.mg-compact .row.crit .tk { background: rgba(60, 12, 8, .94); box-shadow: inset 0 0 0 1.5px var(--danger); }
+.mg-compact .row.crit .fl { background: rgba(255, 106, 92, .46); }
+.mg-compact .row.crit .tk::after { background: var(--danger); }
+.mg-compact .row.crit .tr.dn { border-top-color: var(--danger); }
+/* colour-blind-safe: a low band is hatched from end to end, a critical one cross-hatched, so the two differ by pattern
+   as well as by tint (on a 3 px line the hatching was a sliver nobody could see) */
+.mg-cb.mg-compact .row.warn .fl, .mg-cb.mg-compact .row.crit .fl { background-image: none; }
+.mg-cb.mg-compact .row.warn .tk { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 216, 74, .3) 4px 6px); }
+.mg-cb.mg-compact .row.crit .tk { background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(255, 122, 51, .42) 4px 6px), repeating-linear-gradient(45deg, transparent 0 4px, rgba(255, 122, 51, .42) 4px 6px); }
+@media (max-width: 760px) {
+  .mg-compact .res .row { width: 7.75rem; }
+  .mg-compact #mg-rover .row { width: 8rem; }
+}
+/* the panel opens a guide to itself on a touch screen: the mark under the dial says so */
+.suit .help { display: none; }
+.mg-touch.mg-compact .suit .help { display: grid; place-items: center; width: 1.0625rem; height: 1.0625rem; margin-top: .125rem; border: 1px solid var(--ink-3); border-radius: 50%;
+  font: 600 var(--t11)/1 var(--f-cond); color: var(--ink-2); }
+.mg-touch.is-cold .suit .help, .mg-touch.no-bars .suit .help { display: none; }
+/* ... and the first time the bars appear, a line under the panel points at it */
+.mg-compact .toast.point { position: relative; border-top-color: var(--accent); overflow: visible; }
+.mg-compact .toast.point::before { content: ""; position: absolute; left: 1.25rem; top: -.5rem; border-left: .4375rem solid transparent; border-right: .4375rem solid transparent; border-bottom: .4375rem solid var(--accent); }
+.mg-compact .toast.point .t1 { color: var(--accent); }
+.mg-compact .toast.point .t2 { font: 500 var(--t13)/1.3 var(--f-body); letter-spacing: 0; text-transform: none; margin-top: .1875rem; }
+/* a card with a title and nothing under it (night has fallen) is a short one */
+.mg-compact .toast .t2:last-child { font-size: .9375rem; }

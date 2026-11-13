@@ -79,7 +79,7 @@ export function newGame(diffKey) {
   S.started = true;
   tryLock();
   Snd.wind(0.2);
-  log('Suit O2 at 46% and leaking. The Hab is that way. RUN.', 'sys');
+  log('Suit holed: 46 on the gauge and falling. The Hab is that way. RUN.', 'suit');
   const ll = `lat ${World.spawn.lat.toFixed(1)}°, lon ${World.spawn.lon.toFixed(1)}°E — ${regionName(World.spawn.v)}`;
   setTimeout(() => log(`Crash site logged: ${ll}. Somewhere on Mars. Emphasis on "somewhere."`), 5500);
   checkpoint();

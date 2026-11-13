@@ -108,9 +108,14 @@ addI({
             items: can.map((id) => {
               const c = CROPS[id], n = seedStock(id);
               const packets = id === 'potato' ? 0 : (S.seeds[id] || 0), kept = id === 'potato' ? 0 : (S.pantry[id] || 0);
+              // (the count is how many beds he has seed for, and says so: "13 to plant" for a bed that takes one read as a
+              // mistake, the more so beside "uses a potato" with six potatoes in the inventory)
+              const plural = (k, one) => `${k} ${one}${k === 1 ? '' : 's'}`;
+              const potatoNote = S.potatoes > 0 && S.food > 0 ? `The staple. A bed takes one potato (you have ${S.potatoes}), then one ration (${S.food}).`
+                : `The staple. A bed takes one of your ${S.potatoes > 0 ? plural(S.potatoes, 'potato').replace('potatos', 'potatoes') : plural(S.food, 'ration')}.`;
               return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield}`,
-                note: id === 'potato' ? `The staple. Planting one uses a ${S.potatoes > 0 ? 'potato' : 'ration'}.` : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.` : c.note,
-                count: `${n} to plant`, fn: () => plant(pl, id) };
+                note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.` : c.note,
+                count: `Seed for ${plural(n, 'bed')}`, fn: () => plant(pl, id) };
             }),
           });
         } else plant(pl, can[0] || 'potato');
@@ -151,31 +156,32 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, HAB_R + 1.6, _v2),
   r: 3.4, hold: 2.2, mode: 'walk',
   visible: () => S.flags.coldOpen,
-  label: () => 'Pull the antenna. Seal the suit.',
+  label: () => 'Seal the suit',
   use: () => {
     S.flags.coldOpen = false;
     S.flags.suitSealed = true;
     S.suit = suitCap();
     S.shake = 1.2;
-    flashScreen('rgba(255,60,40,0.35)', 350);
+    flashScreen('rgba(139,224,164,0.22)', 220);         // (a breath of green, for air: the red it used to be read as a wound)
     Snd.play('suitSeal');
     setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 300);
     setTimeout(() => log(SOL_LOGS[1]), 1000);
   },
 });
-export function addInspect(id, lx, lz, name, doneLine) {
+export function addInspect(id, lx, lz, name, doneLine, found) {
   addI({
     pos: () => siteLocalToWorld(World.hab, lx, 0, lz, _v2),
     r: 2.6, hold: 0.7, mode: 'walk', pose: 'stand',
     visible: () => S.started && !S.flags.coldOpen && !S.checkedSystems[id],
     label: () => `Inspect the ${name}`,
-    use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine); },
+    // (what the inspection found, on a card: the log's line alone was hidden on a phone by the card that came next)
+    use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine); toast(name.toUpperCase(), 'Working', found); },
   });
 }
 addInspect('oxy', 5.6, -3.6, 'oxygenator',
-  'Oxygenator: alive. It eats CO2 and power, makes air. My favourite roommate.');
+  'Oxygenator: alive. It eats CO2 and power, makes air. My favourite roommate.', 'It makes the Hab’s air while there is power. Its bar: HAB O2.');
 addInspect('rec', 5.9, -0.4, 'water reclaimer',
-  'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.');
+  'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.', 'It wins back most of the water you use. Its bar: WATER.');
 // NOTE: world arrays (panels, piles, landers, ice) fill AFTER world build —
 // these interactables resolve their nearest target dynamically at query time.
 export function nearestOf(list, posOf, maxD, filter) {
@@ -199,7 +205,8 @@ addI({
   r: 3.0, hold: 1.6, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : statusText('This panel is clean'),
-  label: () => `Wipe solar panel (${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output)`,
+  // (what wiping it is worth, in the prompt: nothing else on screen said whether it was)
+  label: () => `Wipe solar panel: ${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% output → 100%`,
   use: () => {
     const p = World._activePanel;
     if (!p) return;
@@ -218,7 +225,8 @@ addI({
   },
   r: 2.8, hold: 1.4, mode: 'walk',
   visible: () => !S.flags.coldOpen,
-  label: () => 'Dig regolith (+1)',
+  label: () => `Dig regolith at the heap (you carry ${S.inv.regolith || 0})`,
+  sub: () => 'One load fills one bed',
   use: () => {
     const sp = World._activePile;
     if (!sp || sp.left <= 0) return;
@@ -230,7 +238,9 @@ addI({
 addI({
   pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
   visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
-  label: () => 'Dig regolith (+1, slow going here)',
+  // (slow here: it says where it is quicker while there is a heap left near by)
+  label: () => 'Dig regolith here (slow)',
+  sub: () => (World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 200) ? 'The heaps by the airlock are quicker' : ''),
   use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); },
 });
 // hydrazine rig
@@ -239,7 +249,8 @@ addI({
   r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => S.hydrazine > 0 ? true : statusText('The hydrazine tank is empty'),
-  label: () => `Burn hydrazine for water (+${BAL.hydrazineWater}L) — ${S.hydrazine} left`,
+  label: () => `Burn hydrazine for water (+${BAL.hydrazineWater} L) — ${S.hydrazine} left`,
+  sub: () => (S.flags.hydrazineBoom ? '' : 'Untried indoors: it may cost some of the Hab’s air'),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
@@ -316,7 +327,7 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -6.6, _v2),
   r: 2.4, hold: 0.8, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside && !S.flags.didMath,
-  label: () => 'Run the numbers',
+  label: () => 'Check the numbers',
   use: () => {
     S.flags.didMath = true;
     Snd.play('terminal');
@@ -327,8 +338,7 @@ addI({
       stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
-        'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. A potato bed costs one ration to plant.\n\n' +
-        `Top left, the six bars that keep you alive: ${layout.touch ? 'tap them' : 'the pause menu has a guide'} to see what each one is. Top right, what to do next, why, and how far.`,
+        'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. A potato bed costs one ration to plant.',
       buttons: [{ label: 'Get to work' }],
     });
   },
@@ -380,15 +390,16 @@ addI({
 });
 addI({
   pos: () => World.rover.group.position, r: 1e9, hold: 0.4, mode: 'rover',
-  visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() >= 0.05,
-  label: () => 'Step out',
+  // (on a touch screen the EXIT button is the way out: a second control beside it, under another name, was one too many)
+  visible: () => !layout.touch && Math.abs(roverF.speed) < 1.5 && localSunEl() >= 0.05,
+  label: () => 'Exit the rover',
   use: () => exitRover(),
 });
 addI({
   pos: () => World.rover.group.position, r: 1e9, hold: 2.2, mode: 'rover',
   visible: () => Math.abs(roverF.speed) < 1.5 && localSunEl() < 0.05 && sleepTime() === true,
   label: () => 'Camp in the rover until dawn',
-  sub: () => 'press F to step out instead',
+  sub: () => (layout.touch ? 'or EXIT to get out' : 'or press F to get out'),
   use: () => sleepToDawn(true),
 });
 // pathfinder pickup + uplink connect

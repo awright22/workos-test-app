@@ -137,7 +137,7 @@ export function showBarsGuide(onDone) {
     ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains whenever you are outside, and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long the tank lasts at a walk: a run burns it faster, standing still slower. Empty, you start to die.`],
     ['hab', `Hab ${o2}`, 'The air in the Hab. The oxygenator keeps it up while there is power; a breach lets it out.'],
     ['water', 'Water', 'Litres in the tank. You drink some every sol and the farm drinks more. Burning hydrazine makes it.'],
-    ['food', 'Food', 'Meals left: rations, potatoes and everything in the pantry. Breakfast takes one each dawn.'],
+    ['food', 'Food', 'Everything you could eat: rations, potatoes and the pantry. Breakfast takes one each dawn, and a second when there is something to go with it.'],
     ['power', 'Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night empty it.'],
     ['vitals', 'Vitals', 'Your body. It falls when you go without air, water, food or sleep, and mends when you have them. At nothing, the run is over.'],
     ['mood', 'Morale', 'Your spirits, out of 100. Variety on the plate, a cooked dinner, music, sights and comforts lift them; every sol alone lowers them. High, work goes a fifth faster; low, a fifth slower.'],
@@ -346,12 +346,12 @@ export function showSettings(back, overTitle) {
 const kbd = (...keys) => keys.map((k) => `<kbd class="mg-kbd">${k}</kbd>`).join('');
 const KEYBOARD = [
   ['Move, drive', kbd('W', 'A', 'S', 'D')], ['Look', `${icon('mouse')}Mouse`], ['Run', kbd('Shift')], ['Jump', kbd('Space')],
-  ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Leave the rover', kbd('F')], ['Switch view', kbd('V')],
+  ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Exit the rover', kbd('F')], ['Switch view', kbd('V')],
   ['Map', kbd('M')], ['Colony and fabrication', kbd('C')], ['Journal', kbd('J')], ['Photo mode', kbd('P')], ['Pause, back', kbd('Esc')],
 ];
 const TOUCH = [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
-  ['Jump', `${icon('jump')}Jump`], ['Leave the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle, when carrying one'], ['Switch view', `${icon('camera')}View`],
+  ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle'], ['Switch view', `${icon('eye')}View`],
   ['Map', `${icon('map')}Top right`], ['Colony and fabrication', `${icon('colony')}Top right`], ['Journal', `${icon('journal')}Top right`], ['Pause, settings', `${icon('pause')}Top right`], ['Photo mode', 'In the pause menu'],
 ];
 export function showControls(back, which) {
@@ -473,8 +473,8 @@ export function showChoice(o) {
     `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
     `${it.note ? `<span class="ch-t">${esc(it.note)}</span>` : ''}</button>`).join('');
   const p = openOverlay('dialog',
-    `<div class="dlg pick">${o.kicker ? `<div class="t-kicker">${esc(o.kicker)}</div>` : ''}<h1 id="mg-dlg-title">${esc(o.title)}</h1>` +
-    `<div class="choices">${rows}</div>` +
+    `<div class="dlg pick"><div class="dlg-bd mg-scroll">${o.kicker ? `<div class="t-kicker">${esc(o.kicker)}</div>` : ''}<h1 id="mg-dlg-title">${esc(o.title)}</h1>` +
+    `<div class="choices n${o.items.length}">${rows}</div></div>` +
     `<div class="btns">${o.note ? `<span class="pick-note">${esc(o.note)}</span>` : ''}<button type="button" class="mg-btn" data-act="cancel">Cancel</button></div></div>`,
     { label: o.title, onEscape: cancel, guard: true });
   p.querySelectorAll('.choice').forEach((b) => b.addEventListener('click', (ev) => {

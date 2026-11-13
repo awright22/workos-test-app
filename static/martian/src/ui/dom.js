@@ -48,6 +48,8 @@ UI.suit = el('div', null, 'suit', UI.vitals,
 UI.suitArc = UI.suit.querySelector('.arc');
 UI.suitNum = UI.suit.querySelector('.num');
 UI.suitState = UI.suit.querySelector('.st');
+// (on a touch screen the panel opens the guide to itself: the mark under the dial says so)
+el('span', null, 'help', UI.suit, '?').setAttribute('aria-hidden', 'true');
 /** The resource rows beside the suit dial: [state key, icon, label]. */
 export const BARS = [
   ['o2', 'hab', 'HAB <span class="chem">O<sub>2</sub></span>'],
@@ -127,14 +129,16 @@ UI.touch = el('div', 'mg-touch', null, root);
 UI.joyZone = el('div', 'mg-joyzone', null, UI.touch);
 UI.joy = el('div', 'mg-joy', null, UI.touch, '<i class="n"></i><i class="e"></i><i class="s"></i><i class="w"></i>');
 UI.joyKnob = el('div', 'mg-joyknob', null, UI.joy);
-// (idle, it shows a hand and no words: "USE / HOLD" with nothing to use, and "— / HOLD" at a thing that cannot be used, both read as broken)
-UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('hand')}${icon('lock')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
+// (With nothing in reach it is an empty, dim ring: "USE / HOLD", "— / HOLD" and a bare icon each read as a control
+// with no name. With something in the way it is a padlock over the word LOCKED; with something to do, the verb and HOLD.)
+UI.tE = tbtn('mg-tE', 'act', 'Interact', `${ring(46, 100)}<span class="vi">${icon('lock')}</span><span class="vb"></span><span class="vh">HOLD</span>`);
 UI.tEArc = UI.tE.querySelector('.arc');
 UI.tEVerb = UI.tE.querySelector('.vb');
 UI.tJump = tbtn('mg-tJump', 'sec', 'Jump', `${icon('jump')}<span>JUMP</span>`);
 UI.tExit = tbtn('mg-tExit', 'sec', 'Exit the rover', `${icon('exit')}<span>EXIT</span>`);
 UI.tSprint = tbtn('mg-tSprint', 'sec', 'Run', `${icon('run')}<span>RUN</span>`);
-UI.tCam = tbtn('mg-tCam', 'mini', 'Switch view', `${icon('camera')}<span>VIEW</span>`);
+// (an eye, not a camera: the camera is photo mode's, in the menu)
+UI.tCam = tbtn('mg-tCam', 'mini', 'Switch view', `${icon('eye')}<span>VIEW</span>`);
 // (it said only "O2": what it does is under it now)
 UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle: 40 more suit oxygen', '<i>+<span class="chem">O<sub>2</sub></span></i><span>CANDLE</span><b>0</b>');
 UI.tCandle.style.display = 'none';
@@ -244,8 +248,10 @@ export function showOverlay(opts) {
   const btns = buttons.map((b, i) =>
     `<button type="button" data-i="${i}" class="mg-btn${b.ghost ? '' : ' primary'}${b.danger ? ' danger' : ''}">${b.label}</button>`).join('');
   const stats = (opts.stats || []).map(([k, v]) => `<div class="stat"><b class="t-num">${v}</b><span>${k}</span></div>`).join('');
+  // (the text is one part, which scrolls if it has to, and the buttons another, which is always on the screen: as one
+  // scrolling box, the rescue screen on a small phone cut its last line and its only button)
   const panel = openOverlay(kind,
-    '<div class="dlg">' +
+    '<div class="dlg"><div class="dlg-bd mg-scroll">' +
     (opts.kicker ? `<div class="t-kicker">${opts.kicker}</div>` : '') +
     (opts.title ? `<h1 id="mg-dlg-title">${opts.title}</h1>` : '') +
     (opts.subtitle ? `<h2>${opts.subtitle}</h2>` : '') +
@@ -253,7 +259,7 @@ export function showOverlay(opts) {
     (opts.extra || '') +
     (opts.body ? `<div class="bd">${paragraphs(opts.body)}</div>` : '') +
     (opts.quote ? `<blockquote>${opts.quote}</blockquote>` : '') +
-    (btns ? `<div class="btns">${btns}</div>` : '') +
+    '</div>' + (btns ? `<div class="btns">${btns}</div>` : '') +
     '</div>',
     { label: opts.title || 'Dialog', role: kind === 'death' || kind === 'error' ? 'alertdialog' : 'dialog', onEscape: opts.onEscape, guard: true });
   panel.querySelectorAll('.btns button').forEach((btn) => {
@@ -332,17 +338,18 @@ function nextToast() {
   }
   const t = toastQueue.shift();
   const kind = /ACHIEVEMENT/i.test(t.kicker) ? 'ach' : /DISCOVER/i.test(t.kicker) ? 'disc' : 'sys';
-  const node = el('div', null, 'toast ' + kind, UI.toasts,
+  const node = el('div', null, 'toast ' + kind + (t.point ? ' point' : ''), UI.toasts,
     `<div class="ti">${icon(kind === 'ach' ? 'trophy' : kind === 'disc' ? 'pin' : 'info')}</div>` +
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${esc(t.title)}</div>${t.note ? `<div class="t3">${esc(t.note)}</div>` : ''}</div>`);
   root.classList.add('has-toast');
-  const life = toastQueue.length ? 3400 : 6000;
+  const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0 };
   cur.timer = setTimeout(() => closeToast(cur, false), life);
 }
 /**
  * Queue a notice. `o.yields` marks a reminder (night has fallen, a new sol): it is shown like any other, but gives
- * up the screen at once if news arrives while it is up.
+ * up the screen at once if news arrives while it is up. `o.life` is the least time it stays, in milliseconds.
+ * `o.point` draws it as a pointer at the panel it stands under on a phone (the bars).
  */
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
@@ -354,7 +361,7 @@ export function toast(kicker, title, note, o) {
     const cut = note.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
     note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
   }
-  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields) });
+  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point) });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
 }
@@ -362,7 +369,7 @@ export function toast(kicker, title, note, o) {
 // ------------------------------------------------------------------------------------------
 // The log feed: three voices (the astronaut, the Hab's systems, NASA) and survey notes
 // ------------------------------------------------------------------------------------------
-const VOICES = { nasa: 'NASA', sys: 'HAB', disc: 'SURVEY', log: 'LOG' };
+export const VOICES = { nasa: 'NASA', sys: 'HAB', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
 /** What has been said, newest last: { text, voice, sol }. The journal shows it, and the last of it is kept with the saved game. */
 export const logHistory = [];
 /** The last lines of the log, for the saved game (it was this session's only: a run continued the next day had an empty log). */
@@ -378,10 +385,15 @@ function wholeSentences(text, room) {
   const cut = text.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
   return end > 40 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
 }
-export function log(full, cls) {
+/**
+ * Say something in the log. `cls` is the voice ('nasa', 'sys' for the Hab, 'suit', 'disc', or none for his own).
+ * `o.quiet` keeps it for the journal without showing it on the HUD (for what a banner is already saying).
+ */
+export function log(full, cls, o) {
   const voice = VOICES[cls] ? cls : 'log';
   logHistory.push({ text: full, voice, sol: S.sol });
   if (logHistory.length > 120) logHistory.shift();
+  if (o && o.quiet) return;
   // A phone's log has the room between the bars and the stick: six short lines. A longer entry shows as many whole
   // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
   const text = layout.compact ? wholeSentences(full, window.innerWidth <= 760 ? 150 : 170) : full;
@@ -450,7 +462,7 @@ export function setPrompt(p) {
     pr.label = label;
     UI.promptLabel.innerHTML = chem(esc(label));
   }
-  const verb = p.disabled ? '' : verbOf(p.label);
+  const verb = p.disabled ? (reading ? '' : 'LOCKED') : verbOf(p.label);
   if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
   if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
   const sub = p.sub || '';
@@ -495,11 +507,17 @@ function flag(name, on) {
   flags[name] = on;
   root.classList.toggle(name, on);
 }
-// A scrolling region fades toward any edge that hides more of it. Without that, a list cut off by
-// the bottom of a phone's screen looks like the end of the list.
+// A scrolling region with more below carries a "More" mark at its foot (and a short fade at its head when
+// there is more above). Without one, a list cut off by the bottom of a phone's screen looks like the end of
+// the list. (It used to fade its last rows instead, which read as rows that were switched off.)
 function scrollCue(n) {
   const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 4 ? 'down' : '')).trim();
   if (n.dataset.more !== more) n.dataset.more = more;
+  const last = n.lastElementChild;
+  if (more && (!last || !last.classList.contains('more-cue'))) {
+    const old = n.querySelector(':scope > .more-cue');
+    n.appendChild(old || Object.assign(document.createElement('i'), { className: 'more-cue' })).setAttribute('aria-hidden', 'true');
+  }
 }
 root.addEventListener('scroll', (ev) => { const t = ev.target; if (t && t.classList && t.classList.contains('mg-scroll')) scrollCue(t); }, true);
 let cueTick = 0;

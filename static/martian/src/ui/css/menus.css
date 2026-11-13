@@ -9,7 +9,11 @@
 /* ---------------------------------------------------------------- plain dialogs */
 .dlg, .sheet { position: relative; background: rgba(19, 17, 15, .97); border: 1px solid var(--line-2); border-top: 2px solid var(--accent);
   border-radius: .1875rem; box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .5); animation: mg-rise-in .3s var(--ease); }
-.dlg { width: 36rem; max-width: 100%; min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 1.75rem; }
+.dlg { width: 36rem; max-width: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Its text is one part, which scrolls if it must; its buttons are another, and are always on the screen. (As one
+   scrolling box, a tall dialog on a small phone cut its last line and its only button with nothing to say so.) */
+.dlg-bd { flex: 1 1 auto; min-height: 0; padding: 1.75rem 2rem .25rem; }
+.dlg-bd:last-child { padding-bottom: 1.75rem; }
 .dlg .t-kicker { margin-bottom: .625rem; }
 .dlg h1, .sheet h1 { font: 600 2.125rem/1.05 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; }
 .dlg h2 { font: 500 .875rem/1.35 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin-top: .5rem; }
@@ -24,11 +28,12 @@
 .dlg .steps .last span { color: var(--ink); }
 .dlg .steps .last b { color: var(--ok); }
 .dlg blockquote cite { display: block; margin-top: .5rem; font: 500 .75rem/1.3 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
-.dlg .btns { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+.dlg .btns { flex: none; display: flex; flex-wrap: wrap; gap: .75rem; padding: 1.25rem 2rem 1.75rem; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 1px; margin-top: 1.25rem; background: var(--line-2);
   border: 1px solid var(--line-2); }
 .stat { display: flex; flex-direction: column; gap: .3125rem; padding: .6875rem .75rem .625rem; background: #151311; }
 .stat b { font: 600 1.5rem/1 var(--f-cond); letter-spacing: .02em; }
+.stat b small { font-size: .58em; font-weight: 500; color: var(--ink-3); margin-left: .1875rem; }
 .stat span { font: 500 .6875rem/1.2 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
 
 #mg-overlay.k-death { background: radial-gradient(ellipse at center, rgba(30, 6, 4, .78), rgba(8, 2, 1, .94)); }
@@ -207,29 +212,33 @@
 
 /* ================================================================ phones in landscape */
 .mg-compact #mg-overlay { padding: calc(var(--sat) + .5rem) calc(var(--sar) + .75rem) calc(var(--sab) + .5rem) calc(var(--sal) + .75rem); }
-.mg-compact .dlg { padding: 1rem 1.25rem 1.125rem; width: 32rem; }
+.mg-compact .dlg { width: 32rem; }
+.mg-compact .dlg-bd { padding: 1rem 1.25rem .125rem; }
+.mg-compact .dlg-bd:last-child { padding-bottom: 1.125rem; }
 .mg-compact .dlg h1, .mg-compact .sheet h1 { font-size: 1.5rem; }
 .mg-compact .dlg h2 { font-size: .75rem; margin-top: .3125rem; }
 .mg-compact .dlg .bd { margin-top: .625rem; font-size: .875rem; line-height: 1.45; }
 .mg-compact .dlg .bd p + p { margin-top: .4375rem; }
 .mg-compact .dlg blockquote { margin-top: .625rem; font-size: .8125rem; line-height: 1.4; }
-.mg-compact .dlg .btns { margin-top: .875rem; }
+.mg-compact .dlg .btns { padding: .6875rem 1.25rem .875rem; }
 .mg-compact .stats { margin-top: .75rem; }
 .mg-compact .stat { padding: .4375rem .5rem; gap: .1875rem; }
 .mg-compact .stat b { font-size: 1.125rem; }
 .mg-compact .stat span { font-size: .5625rem; }
 /* the rescue screen: the record of the run on the left, the numbers and the button on the right */
-#mg-overlay.k-win .dlg { width: 58rem; display: grid; grid-template-columns: 1fr 1fr; column-gap: 2.25rem; align-content: start; }
-#mg-overlay.k-win .dlg > * { grid-column: 1; }
+#mg-overlay.k-win .dlg { width: 58rem; }
+#mg-overlay.k-win .dlg-bd { display: grid; grid-template-columns: 1fr 1fr; column-gap: 2.25rem; align-content: start; }
+#mg-overlay.k-win .dlg-bd > * { grid-column: 1; }
+#mg-overlay.k-win .dlg-bd > .more-cue { grid-column: 1 / -1; }
 #mg-overlay.k-win .dlg .t-kicker { grid-column: 1 / -1; grid-row: 1; }
 #mg-overlay.k-win .dlg h1 { grid-row: 2; }
 #mg-overlay.k-win .dlg h2 { grid-row: 3; }
 #mg-overlay.k-win .dlg .steps { grid-row: 4; }
 #mg-overlay.k-win .dlg blockquote { grid-row: 5; }
-#mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 2 / span 3; margin-top: 0; align-self: start; }
-#mg-overlay.k-win .dlg .btns { grid-column: 2; grid-row: 5; align-self: end; }
-.mg-compact #mg-overlay.k-win .dlg { width: 40rem; grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; }
-.mg-compact #mg-overlay.k-win .dlg .btns { margin-top: .625rem; }
+#mg-overlay.k-win .dlg .stats { grid-column: 2; grid-row: 2 / span 4; margin-top: 0; align-self: start; }
+#mg-overlay.k-win .dlg .btns { justify-content: flex-end; }
+.mg-compact #mg-overlay.k-win .dlg { width: 42rem; }
+.mg-compact #mg-overlay.k-win .dlg-bd { grid-template-columns: 1fr 1.05fr; column-gap: 1.25rem; }
 .mg-compact #mg-overlay.k-win .dlg h1 { font-size: 2rem; }
 .mg-compact #mg-overlay.k-win .dlg blockquote { font-size: .75rem; line-height: 1.4; }
 .mg-compact .dlg .steps { margin-top: .5rem; gap: .125rem; }
@@ -314,13 +323,12 @@
 .choice:hover .ch-n, .choice:focus-visible .ch-n { color: var(--accent); }
 .dlg.pick .btns { align-items: center; justify-content: space-between; }
 .pick-note { font-size: .875rem; color: var(--ink-3); }
-.mg-compact .dlg.pick { width: 44rem; padding-top: .875rem; padding-bottom: .875rem; }
+.mg-compact .dlg.pick { width: 44rem; }
 .mg-compact .choices { grid-template-columns: 1fr 1fr; gap: .375rem; margin-top: .625rem; }
 .mg-compact .choice { padding: .4375rem .625rem; row-gap: .125rem; }
 .mg-compact .choice .ch-l { font-size: 1rem; }
 .mg-compact .choice .ch-s { font-size: .6875rem; }
 .mg-compact .choice .ch-t { font-size: .6875rem; line-height: 1.25; }
-.mg-compact .dlg.pick .btns { margin-top: .625rem; }
 .inv-row.morale.high .ct, .inv-row.morale.high .ic { color: var(--ok); }
 .inv-row.morale.low .ct, .inv-row.morale.low .ic { color: var(--accent); }
 
@@ -407,10 +415,18 @@
 .sheet.tabbed .set-row:first-of-type { border-top: 0; }
 .sheet.tabbed .sheet-bd { padding-top: .25rem; padding-bottom: .25rem; }
 .sheet.tabbed .set-row { padding-top: 0; padding-bottom: 0; }
-@media (max-width: 760px) { .sheet.tabbed .sheet-hd h1 { display: none; } .sheet.tabbed .sheet-hd .mg-seg { margin-left: 0; flex: 1; } .sheet.tabbed .sheet-hd .mg-seg button { flex: 1; } }
+@media (max-width: 760px) {
+  .mg-compact .sheet.tabbed .sheet-hd { gap: .5rem; padding-left: .75rem; padding-right: .75rem; }
+  .mg-compact .sheet.tabbed .sheet-hd h1 { font-size: 1.1875rem; letter-spacing: .05em; }
+  .sheet.tabbed .sheet-hd .mg-seg { flex: 1; }
+  .sheet.tabbed .sheet-hd .mg-seg button { flex: 1; padding: 0 .25rem; letter-spacing: .05em; }
+}
+/* on a phone a slider has the room: a track a hand can work */
+.mg-compact .set-row .ctl .mg-range { width: 13rem; }
 
 /* ================================================================ phones: nothing under 11 px, the labels people read at 12 */
-.mg-compact .stat span { font-size: var(--t11); letter-spacing: .08em; }
+.mg-compact .stat span { font-size: var(--t11); letter-spacing: .06em; }
+@media (max-width: 760px) { .mg-compact .stat span { letter-spacing: .02em; } .mg-compact .stat { padding-left: .375rem; padding-right: .375rem; } }
 .mg-compact .title-foot { font-size: var(--t11); letter-spacing: .12em; bottom: .125rem; }
 .mg-compact .menu-item .mi-s { font-size: var(--t12); letter-spacing: .1em; }
 .mg-compact .pause-side .kv { font-size: var(--t12); }
@@ -443,9 +459,11 @@
 .mg-compact .pick-note { font-size: var(--t12); }
 /* (five crops, a line of advice and Cancel, all on a phone's screen at once: the kicker gives up its line) */
 .mg-compact .dlg.pick .t-kicker { display: none; }
-.mg-compact .dlg.pick { padding-top: .625rem; padding-bottom: .625rem; }
+.mg-compact .dlg.pick .dlg-bd { padding-top: .625rem; }
 .mg-compact .dlg.pick .choices { margin-top: .5rem; }
-.mg-compact .dlg.pick .btns { margin-top: .5rem; flex-wrap: nowrap; }
+.mg-compact .dlg.pick .btns { padding-top: .5rem; padding-bottom: .625rem; flex-wrap: nowrap; }
+/* (an odd number of things to choose from: the first, the staple, has the first row to itself, so no cell is left empty) */
+.mg-compact .choices.n3 .choice:first-child, .mg-compact .choices.n5 .choice:first-child { grid-column: 1 / -1; }
 .mg-compact .choice { padding: .3125rem .625rem; }
 .mg-compact .choice .ch-t { line-height: 1.2; }
 .mg-compact .guide li { font-size: var(--t12); }
