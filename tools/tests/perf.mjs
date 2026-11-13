@@ -5,7 +5,7 @@
 import { openGame, sleep } from './lib.mjs';
 const budgets = { low: { calls: 180, main: 340000, shadow: 230000 }, medium: { calls: 240, main: 480000, shadow: 300000 }, high: { calls: 290, main: 600000, shadow: 400000 } };
 let failed = false;
-for (const quality of (process.env.Q || 'low,high').split(',')) {
+for (const quality of (process.env.Q || 'low,medium,high').split(',')) {
   const g = await openGame({ quality });
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); });
   const rows = [];
