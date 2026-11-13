@@ -6,30 +6,38 @@ import { decodeHeightFile, Planet } from './height.js';
 export const BASE = new URL('.', import.meta.url);
 export const asset = (path) => new URL(path, BASE).href;
 
+/**
+ * Download a file as bytes, reporting progress.
+ *
+ * The length a server states is the length on the wire. A host that compresses the file (GitHub Pages does) states
+ * the compressed length, and the bytes that arrive here, uncompressed, are more than that. So the stated length is
+ * used for the progress bar and for nothing else: the pieces are kept as they come and joined at the end.
+ * (An earlier version filled a buffer of the stated length, and when the file overran it tried to read the rest of
+ * a download it had already begun reading. Safari refuses that outright, "Input body is disturbed", and the game
+ * could not start on an iPhone from the published site, though it ran everywhere it was tested.)
+ */
 async function fetchBytes(url, onProgress) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not load ${url} (${res.status})`);
   const total = Number(res.headers.get('content-length')) || 0;
-  if (!res.body || !total) { const b = await res.arrayBuffer(); if (onProgress) onProgress(1); return b; }
+  if (!res.body || typeof res.body.getReader !== 'function') { const b = await res.arrayBuffer(); if (onProgress) onProgress(1); return b; }
   const reader = res.body.getReader();
-  const out = new Uint8Array(total);
+  const parts = [];
   let got = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (got + value.length > out.length) {             // server lied about the length: fall back
-      const grown = new Uint8Array(got + value.length);
-      grown.set(out.subarray(0, got)); grown.set(value, got);
-      const rest = new Uint8Array(await new Response(reader.stream ? reader.stream : res.body).arrayBuffer().catch(() => new ArrayBuffer(0)));
-      const all = new Uint8Array(grown.length + rest.length);
-      all.set(grown); all.set(rest, grown.length);
-      return all.buffer;
-    }
-    out.set(value, got);
+    if (!value || !value.length) continue;
+    parts.push(value);
     got += value.length;
-    if (onProgress) onProgress(got / total);
+    // (never "done" before it is: a compressed file passes its stated length well before its end)
+    if (onProgress && total) onProgress(Math.min(0.98, got / total));
   }
-  return out.buffer.slice(0, got);
+  const out = new Uint8Array(got);
+  let at = 0;
+  for (const part of parts) { out.set(part, at); at += part.length; }
+  if (onProgress) onProgress(1);
+  return out.buffer;
 }
 
 function loadImage(url) {

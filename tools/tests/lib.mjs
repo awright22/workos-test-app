@@ -38,7 +38,11 @@ export async function openGame(o = {}) {
   const t0 = Date.now();
   // (quality 'auto': no preset in the address, so the game chooses as it would for a player; and then nothing is fixed)
   await page.goto(o.quality === 'auto' ? `http://127.0.0.1:${port}/${o.query ? '?' + o.query : ''}` : `http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
+  // (ready, or the game's own "could not start" screen: that fails at once and says why, where a wait for "ready"
+  // alone ran out its four minutes and said nothing)
+  await page.waitForFunction(() => (window.__MG && window.__MG.ready) || window.__MG_FAILED, null, { timeout: 240000 });
+  const failed = await page.evaluate(() => window.__MG_FAILED || null);
+  if (failed) { await browser.close(); server.close(); throw new Error(`The game could not start: ${failed}`); }
   const loadMs = Date.now() - t0;
   // A page that stops answering must fail the test, not hang it: one whole run stood for half an hour on a single
   // step with the browser drawing something it never finished, and there was nothing to say where the game was.
