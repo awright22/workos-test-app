@@ -121,7 +121,7 @@ export class Terrain {
       this.queue.sort((a, b) => a.priority - b.priority);
       for (let n = 0; n < 2 && this.queue.length; n++) {
         const node = this.queue.shift();
-        this.ready.push([node, buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level))]);
+        this.ready.push([node, buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level), this.maxLevel)]);
       }
       return;
     }
@@ -134,7 +134,7 @@ export class Terrain {
       const id = this.nextId++;
       node._worker = w;
       this.pending.set(id, node);
-      w.postMessage({ type: 'build', id, face: node.face, level: node.level, ix: node.ix, iy: node.iy, G: this.G, rocks: this._rockKind(node.level) });
+      w.postMessage({ type: 'build', id, face: node.face, level: node.level, ix: node.ix, iy: node.iy, G: this.G, rocks: this._rockKind(node.level), fine: this.maxLevel });
     }
     // drop stale requests so the queue cannot grow without bound while moving fast
     if (this.queue.length > 64) {
@@ -317,7 +317,7 @@ export class Terrain {
   }
 
   _rebuild(node) {
-    const c = buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level));
+    const c = buildChunk(this.planet, node.face, node.level, node.ix, node.iy, this.G, this._rockKind(node.level), this.maxLevel);
     const old = node.mesh;
     if (this.onDispose) this.onDispose(node);
     this.parent.remove(old);

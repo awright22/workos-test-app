@@ -13,7 +13,7 @@ self.onmessage = (e) => {
   } else if (m.type === 'pads') {
     planet.pads = m.pads;
   } else if (m.type === 'build') {
-    const c = buildChunk(planet, m.face, m.level, m.ix, m.iy, m.G, m.rocks);
+    const c = buildChunk(planet, m.face, m.level, m.ix, m.iy, m.G, m.rocks, m.fine);
     c.type = 'chunk';
     c.id = m.id;
     const transfer = [c.pos.buffer, c.nor.buffer, c.tex.buffer, c.uv.buffer, c.geo.buffer, c.idx.buffer];

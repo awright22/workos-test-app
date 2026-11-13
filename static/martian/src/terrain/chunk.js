@@ -24,7 +24,11 @@ export function chunkSpacing(level, G) { return (2 / (1 << level)) * R * PI_4 / 
 /** Arc length of a chunk's side at a face centre (world metres). */
 export function chunkSize(level) { return (2 / (1 << level)) * R * PI_4; }
 
-export function buildChunk(planet, face, level, ix, iy, G, rocks) {
+/**
+ * @param {'big'|'small'|null} rocks  which rocks this chunk carries, if any
+ * @param {number} [fineLevel]  the deepest level this quality draws: rocks rest on the mesh of that level
+ */
+export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = level) {
   const spacing = chunkSpacing(level, G);
   const minW = Math.max(planet.finest, spacing * 1.25);
   const W = G + 3;                                   // one extra ring for normals
@@ -127,7 +131,14 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks) {
     }
   }
   const out = { pos, nor, tex, uv, geo, idx, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
-  if (rocks) out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz);
+  if (rocks) {
+    // stones lie on this very mesh; boulders (carried by a coarser chunk, to be seen from afar) on the finest one, which
+    // is what is drawn wherever anyone is near enough to see how a boulder sits
+    const grid = level === fineLevel
+      ? { T, unit, at(gi, gj, C, o) { const k = (gj - gy0) * W + (gi - gx0); C[o] = px[k]; C[o + 1] = py[k]; C[o + 2] = pz[k]; C[o + 3] = rad[k]; C[o + 4] = geoIn[k * 4] / 127.5; C[o + 5] = geoIn[k * 4 + 2] / 255; } }
+      : planetGrid(planet, face, G, fineLevel);
+    out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz, grid);
+  }
   return out;
 }
 
@@ -161,14 +172,83 @@ export function chunkIndices(G) {
   return out;
 }
 
+/** Numbers per rock in a chunk's list (see scatterRocks). */
+export const ROCK_STRIDE = 9;
+/** What a rock is: the scatter chooses by region, the rock field (world/rocks.js) picks a shape of that kind. */
+export const ROCK_ANGULAR = 0, ROCK_ROUNDED = 1, ROCK_SLAB = 2, ROCK_COBBLE = 3;
+
+/**
+ * The vertices of the terrain mesh at `level`, worked out on demand: what a rock stands on when the
+ * chunk that carries it is not the one that is drawn under it. `at(gi, gj, C, o)` writes a vertex's
+ * position, its radius, the land's own slope there and how near a lava flow's edge it lies.
+ */
+export function planetGrid(planet, face, G, level) {
+  const T = G << level, unit = 2 / T, minW = Math.max(planet.finest, chunkSpacing(level, G) * 1.25);
+  const cache = new Map();
+  return { T, unit, cache, at(gi, gj, C, o) {
+    const key = gj * (T + 1) + gi;
+    let c = cache.get(key);
+    if (!c) {
+      const s = gi <= 0 ? -1 : gi >= T ? 1 : -1 + gi * unit, t = gj <= 0 ? -1 : gj >= T ? 1 : -1 + gj * unit;
+      faceToDir(face, s, t, d2);
+      const edge = gi <= 0 || gi >= T || gj <= 0 || gj >= T;
+      const r = edge ? planet.radius(d2[0], d2[1], d2[2], minW) : planet.radiusFace(face, s, t, d2[0], d2[1], d2[2], minW);
+      c = [d2[0] * r, d2[1] * r, d2[2] * r, r, planet.baseSlope(), planet.flowEdge()];
+      cache.set(key, c);
+    }
+    C[o] = c[0]; C[o + 1] = c[1]; C[o + 2] = c[2]; C[o + 3] = c[3]; C[o + 4] = c[4]; C[o + 5] = c[5];
+  } };
+}
+
+const _C = new Float64Array(24);
+/**
+ * The point of a terrain mesh above face coordinates (s, t): on the very triangle that is drawn
+ * there (each square is cut along the diagonal buildChunk chooses). Writes the point (3) and the
+ * triangle's outward normal (3) into `out`, then the land's own slope and the nearness of a lava
+ * flow's edge.
+ *
+ * A rock placed by the height function itself stands on ground the mesh may not show. The mesh
+ * joins its samples with flat triangles, and across a dune's crest or a crater's rim that cuts the
+ * corner by up to half a metre: the rock was left in the air above its own shadow.
+ */
+export function meshPoint(grid, s, t, out) {
+  const T = grid.T;
+  let gi = Math.floor((s + 1) / grid.unit), gj = Math.floor((t + 1) / grid.unit);
+  if (gi < 0) gi = 0; else if (gi > T - 1) gi = T - 1;
+  if (gj < 0) gj = 0; else if (gj > T - 1) gj = T - 1;
+  let fu = (s + 1) / grid.unit - gi, fv = (t + 1) / grid.unit - gj;
+  fu = fu < 0 ? 0 : fu > 1 ? 1 : fu; fv = fv < 0 ? 0 : fv > 1 ? 1 : fv;
+  const C = _C;
+  grid.at(gi, gj, C, 0); grid.at(gi + 1, gj, C, 6); grid.at(gi, gj + 1, C, 12); grid.at(gi + 1, gj + 1, C, 18);      // a, b, c, e
+  // the triangle the point is in: P = P0 + w1 (P1 - P0) + w2 (P2 - P1), as offsets into C
+  let p0, p1, p2, w1, w2;
+  if (Math.abs(C[3] - C[21]) < Math.abs(C[9] - C[15])) {                 // this square is cut a-e
+    if (fv >= fu) { p0 = 0; p1 = 12; p2 = 18; w1 = fv; w2 = fu; } else { p0 = 0; p1 = 6; p2 = 18; w1 = fu; w2 = fv; }
+  } else if (fu + fv <= 1) { p0 = 6; p1 = 0; p2 = 12; w1 = 1 - fu; w2 = fv; } else { p0 = 12; p1 = 18; p2 = 6; w1 = fu; w2 = 1 - fv; }
+  const ax = C[p1] - C[p0], ay = C[p1 + 1] - C[p0 + 1], az = C[p1 + 2] - C[p0 + 2];
+  const bx = C[p2] - C[p1], by = C[p2 + 1] - C[p1 + 1], bz = C[p2 + 2] - C[p1 + 2];
+  const x = C[p0] + ax * w1 + bx * w2, y = C[p0 + 1] + ay * w1 + by * w2, z = C[p0 + 2] + az * w1 + bz * w2;
+  const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+  let l = Math.hypot(nx, ny, nz) || 1;
+  if (nx * x + ny * y + nz * z < 0) l = -l;
+  out[0] = x; out[1] = y; out[2] = z; out[3] = nx / l; out[4] = ny / l; out[5] = nz / l;
+  out[6] = C[4]; out[7] = C[5];
+  return out;
+}
+
+const _m = new Float64Array(8), _q = new Float64Array(8), _rim = new Float64Array(12);
 /**
  * Rocks for one chunk, placed by a hash of the chunk's address so the same rock is always in
  * the same place. Boulder fields are patchy and denser on rough, old terrain; small stones are
- * everywhere. Returns 8 numbers per rock: position relative to the chunk origin (3), the
- * surface direction (3), size in metres, and a random 0..1 for shape and colour.
+ * everywhere; none lies on a cliff, a ledge's riser or a crater's wall. Returns ROCK_STRIDE
+ * numbers per rock: where it meets the ground, relative to the chunk origin (3); the ground's
+ * normal there (3); its radius at the ground in metres; what kind it is (the whole part: angular,
+ * rounded, slab, cobble) plus a random 0..1 for shape and colour; and how far to sink it so that
+ * uneven ground leaves no gap under it.
  * @param {'big'|'small'} kind
+ * @param {{T:number, unit:number, at:Function}} grid  the mesh it rests on (see meshPoint)
  */
-export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
+export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid) {
   const span = 2 / (1 << level);
   const s0 = -1 + ix * span, t0 = -1 + iy * span;
   const side = chunkSize(level);
@@ -177,51 +257,99 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz) {
   const field = gnoise3(d[0] * R / 260 + 7.7, d[1] * R / 260, d[2] * R / 260 - 3.1);       // patchy boulder fields
   const patch = Math.min(1, Math.max(0, (field + 0.15) * 1.8));
   const lat = Math.abs(d[1]);
-  let density = kind === 'big' ? (0.0010 + 0.0085 * rough * rough) * (0.15 + 0.85 * patch) : (0.05 + 0.16 * rough) * (0.35 + 0.65 * patch);
-  // the ice caps are nearly bare, and stones thin out toward them
+  const big = kind === 'big';
+  let density = big ? (0.0010 + 0.0085 * rough * rough) * (0.15 + 0.85 * patch) : (0.05 + 0.16 * rough) * (0.35 + 0.65 * patch);
+  // stones thin out toward the poles (and nothing lies on the ice itself: the rock field sees to that, having the colour map)
   if (lat > 0.93) density *= lat > 0.985 ? 0.03 : lat > 0.97 ? 0.12 : 1 - 0.88 * (lat - 0.93) / 0.04;
   const lava = planet.lava(d[0], d[1], d[2]);
-  density *= 1 + (kind === 'big' ? 3.4 : 1.6) * lava;                                        // a lava field is strewn with its own rubble
+  density *= 1 + (big ? 3.4 : 1.6) * lava;                                                   // a lava field is strewn with its own rubble
   // the first landing sites were rock gardens, and look it in every picture sent home
   for (const g of ROCK_GARDENS) {
     const away = Math.acos(Math.min(1, d[0] * g[0] + d[1] * g[1] + d[2] * g[2])) * R;
     if (away < g[3]) density *= 1 + g[4] * (1 - away / g[3]);
   }
-  const n = Math.min(kind === 'big' ? 160 : 300, Math.floor(side * side * density));
-  const out = new Float32Array(n * 8);
-  let seed = hashU(ix, iy, face, level * 7 + (kind === 'big' ? 1 : 2));
+  const n = Math.min(big ? 160 : 300, Math.floor(side * side * density));
+  const out = new Float32Array(n * ROCK_STRIDE);
+  let seed = hashU(ix, iy, face, level * 7 + (big ? 1 : 2));
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   let k = 0;
   const pads = planet.pads;
+  // What the rocks of a region are: a lava field breaks into angular blocks, old rough ground is mostly
+  // broken rock, and on the smooth plains more of what lies about has been rounded by the wind.
+  const pAng = lava > 0.3 ? 0.92 : rough > 0.5 ? 0.78 : 0.66;
+  // (how steep the ground a rock will lie on: loose stones roll off at about thirty degrees; a flow's broken edge holds its
+  // interlocked blocks steeper than that, and that edge is where a lava field's rubble belongs)
+  const tiltMost = lava > 0.3 ? 0.84 : 0.62, tiltEasy = lava > 0.3 ? 0.5 : 0.36;
   for (let i = 0; i < n; i++) {
-    const s = s0 + rnd() * span, t = t0 + rnd() * span, u = rnd(), v = rnd();
+    const s = s0 + rnd() * span, t = t0 + rnd() * span, u = rnd(), v = rnd(), pick = rnd(), keep = rnd(), keep2 = rnd();
     faceToDir(face, s, t, d);
     let clear = true;
     for (let p = 0; p < pads.length; p++) {
       const pd = pads[p];
-      const keepOut = kind === 'big' ? pd.r + pd.blend * 0.35 : Math.min(pd.r, 15);      // boulders stay off a whole site; stones only off its middle
+      const keepOut = big ? pd.r + pd.blend * 0.35 : Math.min(pd.r, 15);      // boulders stay off a whole site; stones only off its middle
       if (d[0] * pd.x + d[1] * pd.y + d[2] * pd.z > Math.cos(keepOut / R)) { clear = false; break; }
     }
     if (!clear) continue;
-    const size = kind === 'big' ? Math.min(4.2, 0.48 * Math.pow(1 - u * 0.985, -0.6)) : 0.09 + 0.36 * u * u;
-    let r = planet.radiusFace(face, s, t, d[0], d[1], d[2], planet.finest);
-    // nothing lies on a cliff: a stone there has rolled to the foot of it
-    const steep = planet.baseSlope();
-    if (steep > 0.8 || (steep > 0.5 && rnd() < (steep - 0.5) / 0.3)) continue;
+    // (its radius where it meets the ground: most boulders are knee-high, a few stand taller than a man; a stone is
+    // nothing he cannot step over, since only boulders are in his way)
+    const size = big ? Math.min(3.4, 0.38 * Math.pow(1 - u * 0.985, -0.6)) : 0.07 + 0.25 * u * u;
+    meshPoint(grid, s, t, _m);
+    const px = _m[0], py = _m[1], pz = _m[2];
+    let nx = _m[3], ny = _m[4], nz = _m[5], drop;
+    // Nothing lies on a cliff: a stone there has rolled to the foot of it. The land's own slope says where the
+    // cliffs are; the mesh's says where a ledge's riser or a crater's wall is, which the land's slope cannot.
+    const steep = _m[6];
+    if (steep > 0.8 || (steep > 0.5 && keep < (steep - 0.5) / 0.3)) continue;
+    let c = nx * d[0] + ny * d[1] + nz * d[2];
+    let tilt = Math.sqrt(Math.max(0, 1 - c * c)) / Math.max(c, 0.05);
+    if (tilt > tiltMost || (tilt > tiltEasy && keep2 < (tilt - tiltEasy) / (tiltMost - tiltEasy))) continue;
     // (most of it along the edges of the flows, where the crust broke up as the flow crept)
-    if (lava > 0 && rnd() > 1 - lava * 0.68 * (1 - Math.min(1, planet.flowEdge() * 1.6))) continue;
-    // sit it in the ground: a little always, and on a slope by enough that its downhill side is not left in the air
-    let sink = size * (0.10 + 0.16 * v);
-    if (size > 0.5) {
-      const e = size * 0.6 / FACE_M;
-      faceToDir(face, s + e, t, d2); const ra = planet.radiusFace(face, s + e, t, d2[0], d2[1], d2[2], planet.finest);
-      faceToDir(face, s, t + e, d2); const rb = planet.radiusFace(face, s, t + e, d2[0], d2[1], d2[2], planet.finest);
-      sink += Math.min(size * 0.45, Math.hypot(ra - r, rb - r) * 0.8);
+    if (lava > 0 && keep > 1 - lava * 0.68 * (1 - Math.min(1, _m[7] * 1.6))) continue;
+    if (size > 0.8) {
+      // a boulder covers several triangles: it lies on their average, sunk until the lowest ground under its edge is covered
+      const e = size * 0.8 / FACE_M;
+      let ax = 0, ay = 0, az = 0, bx = 0, by = 0, bz = 0, hangs = false;
+      for (let q = 0; q < 4; q++) {
+        const sg = q & 1 ? 1 : -1;
+        meshPoint(grid, q < 2 ? s + sg * e : s, q < 2 ? t : t + sg * e, _q);
+        if (q < 2) { ax += sg * _q[0]; ay += sg * _q[1]; az += sg * _q[2]; } else { bx += sg * _q[0]; by += sg * _q[1]; bz += sg * _q[2]; }
+        if (_q[3] * d[0] + _q[4] * d[1] + _q[5] * d[2] < 0.8) hangs = true;         // one side of it would overhang a riser
+        _rim[q * 3] = _q[0]; _rim[q * 3 + 1] = _q[1]; _rim[q * 3 + 2] = _q[2];
+      }
+      if (hangs) continue;
+      nx = by * az - bz * ay; ny = bz * ax - bx * az; nz = bx * ay - by * ax;
+      let l = Math.hypot(nx, ny, nz) || 1;
+      if (nx * d[0] + ny * d[1] + nz * d[2] < 0) l = -l;
+      nx /= l; ny /= l; nz /= l;
+      c = nx * d[0] + ny * d[1] + nz * d[2];
+      tilt = Math.sqrt(Math.max(0, 1 - c * c)) / Math.max(c, 0.05);
+      if (tilt > tiltMost) continue;
+      let worst = 0;
+      for (let q = 0; q < 4; q++) {
+        const below = (px - _rim[q * 3]) * nx + (py - _rim[q * 3 + 1]) * ny + (pz - _rim[q * 3 + 2]) * nz;
+        if (below > worst) worst = below;
+      }
+      drop = Math.min(size * 0.5, worst);
+    } else {
+      // (a stone has settled a little toward level: less tilted than the one triangle it lies on)
+      nx = nx * 0.8 + d[0] * 0.2; ny = ny * 0.8 + d[1] * 0.2; nz = nz * 0.8 + d[2] * 0.2;
+      const l = 1 / Math.hypot(nx, ny, nz);
+      nx *= l; ny *= l; nz *= l;
+      drop = size * 0.12 * Math.min(1, tilt);
     }
-    r -= sink;
-    out[k++] = d[0] * r - ox; out[k++] = d[1] * r - oy; out[k++] = d[2] * r - oz;
-    out[k++] = d[0]; out[k++] = d[1]; out[k++] = d[2];
-    out[k++] = size; out[k++] = v;
+    // What kind it is. Kinds come in patches: an outcrop of layered rock sheds plates, a broken flow sheds blocks.
+    const vein = gnoise3(d[0] * R / 85 + 1.3, d[1] * R / 85 - 6.1, d[2] * R / 85 + 2.9);
+    const pSlab = Math.max(0.03, 0.1 + vein * 0.36);
+    let cls;
+    if (pick < pSlab) cls = ROCK_SLAB;
+    else {
+      const p = (pick - pSlab) / (1 - pSlab);
+      if (big) cls = p < pAng ? ROCK_ANGULAR : ROCK_ROUNDED;
+      else cls = p < 0.5 ? ROCK_COBBLE : (p - 0.5) * 2 < pAng ? ROCK_ANGULAR : ROCK_ROUNDED;
+    }
+    out[k++] = px - ox; out[k++] = py - oy; out[k++] = pz - oz;
+    out[k++] = nx; out[k++] = ny; out[k++] = nz;
+    out[k++] = size; out[k++] = cls + Math.min(0.999, v); out[k++] = drop;
   }
   return k === out.length ? out : out.slice(0, k);
 }

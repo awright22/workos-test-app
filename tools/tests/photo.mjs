@@ -64,7 +64,9 @@ await page.keyboard.press('Escape');
 await sleep(600);
 t = await ev((G) => { const u = G.ctx.engine.final.uniforms; return { on: G.photoMode.photo.on, flag: G.S.photo, mono: u.uMono.value, sat: u.uSaturation.value, paused: G.S.uiOpen, cls: /is-photo/.test(document.getElementById('mg-root').className), hud: getComputedStyle(document.getElementById('mg-hud')).visibility }; });
 check('Escape leaves photo mode, restores the picture, and does not open the pause menu', t.on === false && t.flag === false && t.mono === 0 && Math.abs(t.sat - 1.06) < 1e-6 && t.paused === false && t.cls === false && t.hud === 'visible', t);
-await sleep(1200);
+// (wait for frames, not for time: the clock only moves when a frame is drawn, and under load that can take seconds)
+await ev(async (G) => { const e = G.ctx.engine; for (let n = 0, last = e.frameStats; n < 3;) { await new Promise((r) => setTimeout(r, 60)); if (e.frameStats !== last) { last = e.frameStats; n++; } } });
+await sleep(300);
 t = await ev((G) => { let astro = null; G.ctx.world.traverse((o) => { if (o.name === 'astronaut' && astro === null) astro = o.visible; }); return { tod: G.S.tod, astro, fov: G.ctx.engine.camera.fov }; });
 check('the game carries on: time moves, the astronaut is back, the lens is the game\'s', t.tod > inPhoto.tod && t.astro === true && t.fov > 40, t);
 
