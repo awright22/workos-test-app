@@ -147,7 +147,9 @@ smoothly across each joint so elbows, knees, shoulders and hips bend without col
 tearing. Assign weights by code from the geometry (distance along the limb), not bone heat.
 
 Anchors parented to bones: `lamp_L`, `lamp_R` (helmet lamps, pointing forward),
-`hand_grip_R` (palm of the right hand), `eye` (inside the visor, looking forward).
+`hand_grip_R` (in the crook of the right hand's fingers, where the middle of a tool's handle
+lies: the fingers close round about 45 mm there, and the handle runs across the palm, which is
+the anchor's local Z), `eye` (inside the visor, looking forward).
 
 Animation clips (glTF animations, exact names, in place — no forward translation; hips may
 bob vertically; loops must match first and last frame):
@@ -164,7 +166,7 @@ bob vertically; loops must match first and last frame):
 | `KneelDown` | 0.45 s, once | from Idle's pose at time 0 down to WorkKneel's at time 0: the right foot steps back and the knee comes down. The game plays it before `WorkKneel` (a cross-fade from standing to kneeling puts the feet through the floor) |
 | `KneelUp` | 0.45 s, once | `KneelDown` backwards, ending in Idle's pose at time 0 |
 | `WorkStand` | 2.0 s loop | standing, hands working at chest height in front (consoles, wiping a panel, patching a wall) |
-| `Drive` | 3.0 s loop | seated, hands on a yoke, small steering motion |
+| `Drive` | 3.0 s loop | seated, a hand on each horn of the rover's yoke (its place is quoted from `vehicles.py` as `YOKE_C`, `YOKE_N` in `astronaut.py`: if the cab is rebuilt, the clip must follow), small steering motion |
 | `Stagger` | 1.4 s loop | hurt or out of air: hunched, uneven, one hand to the chest unit |
 | `Collapse` | 2.2 s once | falls to the knees and then forward; ends lying still |
 | `Wave` | 2.0 s once | one arm raised in a big slow wave |

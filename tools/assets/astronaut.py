@@ -988,7 +988,7 @@ HAIR_TH = [82, 86, 95, 106, 119, 134, 150, 165, 180]      # the hair on the back
 HAIRLINE = Curve([(82, 1.6470), (86, 1.6460), (95, 1.6430), (106, 1.6365), (119, 1.6270), (134, 1.6170), (150, 1.6095), (165, 1.6050), (180, 1.6035)])
 HAIR_T = 0.0036                          # how far short hair stands off the skull (the cap lies over it)
 SLATE = (0.235, 0.25, 0.285)             # the cap's ear pieces and chin strap: head_cap's cloth dyed slate grey
-CAP_GREY = (0.70, 0.71, 0.73)            # the panels between the white centre panel and the ear pieces
+CAP_GREY = (0.56, 0.57, 0.60)            # the panels between the white centre panel and the ear pieces
 HAIR_TINT = (0.80, 0.80, 0.80)           # brows and the hair at the forehead, a shade darker than the back of the head
 FLAP_TINT = (0.52, 0.52, 0.56)           # black plastic: earphones and microphone
 EAR_Y, EAR_Z = 0.0190, 1.6670            # middle of the left ear (its front edge is 17 mm ahead of this, at the jaw joint)
@@ -2571,7 +2571,21 @@ def clip_kneel_up(t):
     return kneel_move(smooth01(1.0 - t / KNEEL_T))
 
 
+# The rover's yoke as the seated driver has it (rover.glb, vehicles.py: the yoke is on a column in
+# front of the left seat, and the game puts this model's origin 0.52 m under the seat anchor).
+# It is a U with a bar across the top, 0.15 m from the hub to each horn, on a column that leans
+# back towards the driver. If the rover's cab is rebuilt these three have to follow.
+YOKE_C = Vector((0.0, -0.565, 0.713))                   # the hub
+YOKE_N = Vector((0.0, 0.85, 0.527)).normalized()        # along the column, towards the driver
+YOKE_UP = Vector((0.0, -0.527, 0.85)).normalized()      # up the face of the yoke
+YOKE_R = 0.15
+DRIVE_HOLD = 4.0                                        # where on the rim the hands hold it, degrees above the bar
+
+
 def clip_drive(t):
+    """Seated at the rover's yoke with a hand on each horn: the horn lies in the crook of the fingers
+    (where hand_grip_R is), thumbs up, the arms reaching forward and down to it, and the hands go
+    round with the small steering motion."""
     w = TAU / 3.0
     steer = 13 * math.sin(w * t) + 5 * math.sin(2 * w * t + 1.0)
     p = Pose()
@@ -2583,11 +2597,12 @@ def clip_drive(t):
     p.q['head'] = Q(x=-1 + 1.0 * math.sin(2 * w * t), z=0.45 * steer)
     for side, sx in SIDES:
         p.plant(side, sx * 0.15, -0.50 + 0.012 * sx * math.sin(w * t + 1), pitch=-8, yaw=sx * 8, pole=(sx * 0.25, -0.3, 1))
-        p.shrug(side, fwd=7)
-        a = rad(steer)
-        grip = Vector((sx * 0.17 * math.cos(a), -0.43, 0.955 + sx * 0.17 * math.sin(a)))
-        hd = Quaternion(Y_AX, -a) @ Vector((0, -0.75, 0.66))
-        p.arm(side, grip - hd.normalized() * 0.085 + Vector((sx * 0.03, 0, 0)), pole=(sx * 0.75, 0.25, -0.6), hand=hand_q(side, hd, (-sx, 0, 0)))
+        p.shrug(side, fwd=9)
+        a = rad(DRIVE_HOLD + sx * steer)
+        out = X_AX * (sx * math.cos(a)) + YOKE_UP * math.sin(a)          # from the hub to this hand's horn
+        grip = YOKE_C + out * YOKE_R
+        wrist = grip + out * -GRIP_UVS[0] + YOKE_N * (GRIP_UVS[2] - L_UPPER - L_FORE)
+        p.arm(side, wrist, pole=(sx * 0.75, 0.25, -0.6), hand=hand_q(side, -YOKE_N, -out))
     return p
 
 
@@ -2809,11 +2824,15 @@ def clip_test(t):
 #     the clip matches the ground when the body is moved at that speed and the clip plays at 1x.
 #   * Drive is seated with the feet on the model's ground plane: the hips bone sits 0.52 m above
 #     the model origin (and straight above it). Put the origin 0.52 m below the seat anchor.
+#     The hands hold the rover's own yoke, whose place the clip quotes from vehicles.py (YOKE_C).
 #   * Collapse is not in place: he drops onto his knees about 0.5 m ahead of where he stood and
 #     falls forward from there, so the body ends between 0 and 1.85 m in front of the origin.
 #   * JumpStart ends on the toes at take-off; Land starts at touch-down and ends in the Idle stance.
 #   * Anchors (lamp_L, lamp_R, eye on the head; hand_grip_R on the right hand): in the rest pose
 #     their axes equal the model's axes, so an anchor's local +Z is the astronaut's forward.
+#     hand_grip_R is in the crook of the fingers, which close round about 45 mm there: put the
+#     middle of a tool's handle on it with the handle along the anchor's Z (across the palm).
+#   * The hands have no finger bones: the fingers keep one relaxed half-curl in every clip.
 CLIPS = [  # name, seconds, samples, loop, function
     ('Idle', IDLE_T, 96, True, clip_idle),
     ('Walk', 0.9, 54, True, clip_walk),
