@@ -179,7 +179,8 @@ export class Sky {
           col += (moon(v, uPhobos, 0.0075, 1.0) * 0.42 + moon(v, uDeimos, 0.0030, 0.5) * 0.8) * moonVis;
           // the Earth: the brightest star in the evening sky, and blue-white. It shows as soon as the sun is down.
           float earthVis = (1.0 - uDust) * max(1.0 - smoothstep(-0.12, -0.02, sunE), airless) * smoothstep(0.0, 0.10, dot(v, uUp) + airless);
-          col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.999975, 0.999996, dot(v, uEarth)) * 3.2 * earthVis);
+          // (a star, not a disc: drawn four tenths of a degree across it was a white ball with a halo high in the dusk)
+          col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.9999930, 0.9999992, dot(v, uEarth)) * 3.4 * earthVis);
           // the sun: a small hard disc (0.35 degrees across on Mars) with a tight halo
           float cosT = dot(v, uSun);
           float ang = acos(clamp(cosT, -1.0, 1.0));

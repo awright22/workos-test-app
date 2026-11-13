@@ -149,6 +149,54 @@ export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'so
   return m;
 }
 
+/*
+ * Light that a lit building spills on the ground round it after dark. It is drawn, not cast. The fittings are point
+ * lights with no shadows: bright enough to reach the ground outside, they burn out the white wall or the dome's own
+ * floor a pace from them, and at any strength the dome's frame throws no shadow. So the pool on the ground is a
+ * patch added to it: a soft pool under a porch lamp, a ring round the greenhouse cut by the shadows of its frame.
+ */
+const glows = [], glowTextures = {};
+export function groundGlow(parent, radius, color, strength, kind = 'pool', level = () => World.dark || 0, y = 0.035) {
+  if (!glowTextures[kind]) {
+    const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+    const g = c.getContext('2d'), img = g.createImageData(N, N);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const dx = (i - (N - 1) / 2) / (N / 2), dy = (j - (N - 1) / 2) / (N / 2), d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      let v;
+      if (kind === 'dome') {
+        // nothing under the dome (its floor has the real lamps); brightest at the foot of the wall, gone by the edge
+        const wall = 0.58, out = Math.max(0, (d - wall) / (1 - wall));      // (the dome's base ring, as a share of the patch's radius)
+        const fall = d < wall - 0.03 ? 0 : Math.min(1, (d - wall + 0.03) / 0.05) * Math.pow(Math.max(0, 1 - out), 1.7);
+        // the frame's uprights stand between the lamps and the ground: fifteen dark spokes that widen as they run out
+        const turn = ((a / (Math.PI * 2)) * 15 + 0.5) % 1, off = Math.abs((turn < 0 ? turn + 1 : turn) - 0.5) * 2;      // 0 on a spoke, 1 between
+        const width = 0.16 + 0.34 * out;
+        const spoke = Math.max(0, 1 - off / width);
+        v = fall * (1 - 0.7 * spoke * spoke * (3 - 2 * spoke)) * (0.86 + 0.14 * hash3(i >> 1, j >> 1, 9));
+      } else {
+        v = Math.pow(Math.max(0, 1 - d), 1.8) * (0.9 + 0.1 * hash3(i >> 1, j >> 1, 7));
+      }
+      const o = (j * N + i) * 4;
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.round(Math.max(0, Math.min(1, v)) * 255); img.data[o + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    glowTextures[kind] = new THREE.CanvasTexture(c);
+    glowTextures[kind].colorSpace = THREE.NoColorSpace;
+  }
+  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color, alphaMap: glowTextures[kind], transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.y = y; m.renderOrder = 2; m.visible = false;
+  glows.push({ mesh: m, mat, strength, level });
+  parent.add(m);
+  return m;
+}
+/** Bring each pool of spilt light up or down with its lamps (call each frame). */
+export function setGlowLight() {
+  for (const gl of glows) { const k = gl.strength * Math.max(0, Math.min(1, gl.level())); gl.mat.opacity = k; gl.mesh.visible = k > 0.004; }
+}
+
 export function buildHabColony(spawn) {
   World.hab = placeAt(spawn.lat, spawn.lon, 0);
   World.hab.position.addScaledVector(World.hab.userData.up, -HAB_FLOOR);     // the model's floor sits HAB_FLOOR above its origin
@@ -227,6 +275,9 @@ export function buildHabColony(spawn) {
       // sand under it, so the light has to be nearer the ground than the wall for a pool to show)
       lp.x += (lp.x / out) * 2.4; lp.z += (lp.z / out) * 2.4; lp.y = HAB_FLOOR + 1.0;
       addLamp(hab.root, { offset: lp, color: 0xffe2bd, power: power * 1.5, range, level: outside });
+      // ... and its pool on the ground, drawn (see groundGlow): the two door lamps share one
+      if (n !== 'lamp_door_R') groundGlow(World.hab, n === 'lamp_tanks' ? 4.2 : 5.6, 0xffc890, n === 'lamp_tanks' ? 0.16 : 0.2, 'pool', outside, HAB_FLOOR + 0.04)
+        .position.set(n === 'lamp_tanks' ? lp.x : 0, HAB_FLOOR + 0.04, lp.z + (n === 'lamp_tanks' ? 0 : 0.6));
     }
   }
   // the fittings themselves glow: outside only in the dark, inside whenever there is power
@@ -573,6 +624,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     //  before the ground outside is lit)
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 20, decay: 1.25, level: lit });
     addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 6, range: 12, decay: 1.3, level: lit });
+    // what the dome spills on the ground round it after dark, cut by the shadows of its frame (drawn: see groundGlow)
+    // (no wider than the ground levelled for the dome: beyond it the land rises and falls through the patch, and cuts it in straight lines)
+    groundGlow(g, 7.4, 0xffb8a8, 0.28, 'dome', () => World.dark || 0, GREENHOUSE.floor + 0.04);
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
     // the door swings outward on its left jamb as someone walks up to it, from either side
     b.door = { node: gm.part('door_leaf'), k: 0, cols: [siteCollider(g, 0, GREENHOUSE.portalEnd, 0.7)] };

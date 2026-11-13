@@ -203,7 +203,17 @@ function setUpPlain(plain, ground) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x * (0.86 + 0.28 * surfGrain), 0.05, 1.0), 0.96, dustAmount);')
       // soil has no sheen (the terrain's own material has none): with one, an apron pales at a low angle and shows
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n if (vPbr.z > 1.5) { material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16; }')
-      .replace('#include <lights_fragment_maps>', 'irradiance *= uFill;\n#include <lights_fragment_maps>\niblIrradiance *= uFill; radiance *= uFill;')
+      // (... and less of it on what faces away from the sun: the Martian sky is brightest round the sun, and a surface
+      // turned from it sees the dimmer half. With the sun ahead, a white back lit evenly by the whole sky measured as
+      // bright as the sunlit sand.)
+      .replace('#include <lights_fragment_maps>', `
+        float skyFill = uFill;
+        #if NUM_DIR_LIGHTS > 0
+        skyFill *= 1.0 - 0.45 * uRim * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
+        #endif
+        irradiance *= skyFill;
+        #include <lights_fragment_maps>
+        iblIrradiance *= skyFill; radiance *= skyFill;`)
       // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
@@ -212,12 +222,13 @@ function setUpPlain(plain, ground) {
           vec3 rimV = normalize(vViewPosition);
           float rimBack = max(0.0, -dot(directionalLights[0].direction, rimV));
           float rimEdge = pow(1.0 - clamp(dot(normal, rimV), 0.0, 1.0), 3.0) * smoothstep(-0.2, 0.25, dot(normal, directionalLights[0].direction));
-          reflectedLight.directDiffuse += directionalLights[0].color * diffuseColor.rgb * (uRim * rimBack * rimBack * rimEdge * 0.55);
+          // (stronger and not squared: at a tenth of the sun's light on an edge, under a high sun, no rim could be seen)
+          reflectedLight.directDiffuse += directionalLights[0].color * diffuseColor.rgb * (uRim * rimBack * rimEdge * 1.5);
         }
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust8' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust9' + (ground ? 'G' : '');
   return plain;
 }
 

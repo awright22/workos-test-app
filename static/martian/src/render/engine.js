@@ -307,7 +307,9 @@ export class Engine {
     // pasted on. Least under a low sun, when a man seen against the light should be a dark figure with a bright edge.)
     // (Under a low sun the lit sand is itself mostly sky-lit, and white cloth in full shade measured as bright as the
     // sand it stood on: so the fill falls to a third there. The rim light is the other half of the same picture.)
-    this.modelAmbient = lerp(lerp(0.22, lerp(0.32, 0.8, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
+    // (At night a sixth: at a fifth the whole dome stood evenly pale with nothing to light it. And at midday under
+    // two thirds, not four fifths: with the sun ahead, his shaded back measured as bright as the lit sand.)
+    this.modelAmbient = lerp(lerp(0.17, lerp(0.32, 0.62, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
     this.modelRim = (1 - io) * sky.day;
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
@@ -398,7 +400,9 @@ function airHaze() {
     float fogAir = 0.5 * (exp(-clamp(fogHigh, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
     float fogThick = fogNear * fogAir * vFogDepth;
     float fogFactor = 1.0 - exp(-fogThick * fogThick);
-    float fogBand = (1.0 - smoothstep(0.012, 0.05, abs(vFogEl - fogFar))) * smoothstep(110.0, 240.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
+    // (from sixty metres: on a plain that swells a little the skyline is a crest a hundred metres off, nearer than
+    // the true horizon, and it stayed a ruler's edge with stones standing on it)
+    float fogBand = (1.0 - smoothstep(0.012, 0.05, abs(vFogEl - fogFar))) * smoothstep(60.0, 170.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - (1.0 - fogFactor) * (1.0 - fogBand));
   #endif`;
 }

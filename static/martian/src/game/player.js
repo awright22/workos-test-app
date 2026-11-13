@@ -170,7 +170,7 @@ export function buildAstronaut() {
   // (and a beam, not a glow: a wide lamp that fell off fast lit a pool at his own feet, which from behind him was a
   // pale cloud round his waist. Narrower, aimed further out and falling off more slowly, it lays a long oval on the
   // ground from four paces ahead to a dozen.)
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 26, 0.40, 0.8, 1.35);
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 17, 0.40, 0.8, 1.35);      // (a reach of seventeen metres: at twenty-six, stones well beyond the pool caught it face-on and glowed like embers on dark ground)
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
   tgt.position.set(0, -0.8, 8);
