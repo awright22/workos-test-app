@@ -226,11 +226,31 @@ export class Engine {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Lower or raise the render resolution to hold the frame rate (called with smoothed frame ms). */
+  /**
+   * Lower or raise the render resolution to hold the frame rate (called about once a second with that second's
+   * average frame time).
+   *
+   * Down is easy to see: frames are late. Up is not: a screen that refreshes sixty times a second never shows a
+   * frame time under 16.7 ms however much the GPU has in hand, so "faster than the target" cannot be the test.
+   * (It was. The first busy second after loading took the resolution down and nothing could bring it back: the
+   * owner's iPhone sat at sixty frames a second, drawing 1192 pixels across on a 2796-pixel screen.) So after a run
+   * of seconds with nothing late, a step up is tried. If it holds, the next try comes as soon; if it brings late
+   * frames, it is undone and the wait before the next try doubles, up to about a minute.
+   */
   adaptResolution(frameMs, targetMs) {
     let s = this.dynScale;
-    if (frameMs > targetMs * 1.18) s = Math.max(0.55, s - 0.05);
-    else if (frameMs < targetMs * 0.82) s = Math.min(1, s + 0.03);
+    const a = this._adapt || (this._adapt = { calm: 0, wait: 4, trial: 0 });
+    if (frameMs > targetMs * 1.18) {
+      s = Math.max(0.55, s - 0.05);
+      if (a.trial > 0) a.wait = Math.min(64, a.wait * 2);
+      a.calm = 0; a.trial = 0;
+    } else if (frameMs < targetMs * 0.82) {
+      s = Math.min(1, s + 0.03);                  // (a faster screen, or no vertical sync: there is room, plainly)
+      a.calm = 0;
+    } else if (frameMs <= targetMs * 1.08) {
+      if (a.trial > 0 && --a.trial === 0) a.wait = 4;
+      if (++a.calm >= a.wait && s < 1) { s = Math.min(1, s + 0.05); a.calm = 0; a.trial = 3; }
+    } else a.calm = 0;
     if (Math.abs(s - this.dynScale) > 0.001) { this.dynScale = s; this.resize(); }
   }
 
