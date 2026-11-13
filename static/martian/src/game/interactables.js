@@ -494,7 +494,7 @@ addI({
   r: 5.5, hold: 2.6, mode: 'walk',
   visible: () => S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected,
   enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Needs the rover: bring it within 20 m',
-  label: () => 'Load Pathfinder onto the rover',
+  label: () => 'Load Pathfinder aboard',
   use: () => {
     S.pf.loaded = true;
     S.pf.found = true;
@@ -522,7 +522,8 @@ addI({
   },
   r: 5.0, hold: 2.4, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
-  label: () => World._activeLander ? `Salvage ${World._activeLander.data.name} (${World._activeLander.data.year})` : '',
+  label: () => World._activeLander ? `Salvage ${World._activeLander.data.name}` : '',
+  sub: () => World._activeLander ? `Landed in ${World._activeLander.data.year}` : '',
   use: () => {
     const rec = World._activeLander;
     if (!rec || S.salvaged[rec.data.name]) return;
@@ -570,7 +571,9 @@ addI({
   },
   r: 4.5, hold: 1.6, mode: 'walk',
   visible: () => !S.flags.coldOpen,
-  label: () => World._activePod ? World._activePod.label : '',
+  // (a reward pod is named for its task on the line under: 'Open "Oppy's Last Message" reward pod' ran to two lines)
+  label: () => World._activePod ? World._activePod.label.replace(/^Open ["“].*["”] reward pod$/, 'Open the reward pod') : '',
+  sub: () => { const m = World._activePod && /^Open ["“](.*)["”] reward pod$/.exec(World._activePod.label); return m ? `For “${m[1]}”` : ''; },
   use: () => {
     const p = World._activePod;
     if (!p || p.taken) return;
@@ -632,8 +635,8 @@ addI({
   r: 3.5, hold: 1.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   enabled: () => S.suit < suitCap() - 5 ? true : statusText('An O2 cache. The suit is full'),
-  label: () => 'Top up the suit from the cache',
-  sub: () => `+${airTime(40)} of air · ${World._activeCache ? World._activeCache.charges : 0} left in it`,
+  label: () => 'Top up the suit here',
+  sub: () => `+${airTime(40)} of air · ${World._activeCache ? World._activeCache.charges : 0} left in the cache`,
   use: () => {
     const c = World._activeCache;
     if (!c || c.charges <= 0) return;
@@ -654,7 +657,8 @@ export function startDeploy(kind) {
 addI({
   pos: () => player.pos, r: 99, hold: 1.6, mode: 'walk', priority: 2,
   visible: () => !!deployKind && !S.inside,
-  label: () => `Place the ${ITEM_NAMES['kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1)] || deployKind} here`,
+  label: () => 'Set the kit down here',
+  sub: () => ITEM_NAMES['kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1)] || deployKind,
   use: () => {
     const kitKey = 'kit' + deployKind.charAt(0).toUpperCase() + deployKind.slice(1);
     if ((S.inv[kitKey] || 0) <= 0) { deployKind = null; return; }
@@ -680,7 +684,7 @@ addI({
   r: 8.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
   enabled: () => S.sol >= S.rescueSol ? true : `Not before Sol ${S.rescueSol}: the launch window opens then`,
-  label: () => 'Strip the MAV’s excess weight',
+  label: () => 'Lighten the MAV',
   sub: () => 'Nose cone, seats, dignity',
   use: () => {
     S.flags.mavStripped = true;

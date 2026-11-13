@@ -736,3 +736,8 @@
 
 /* the first minute's two hints, on the small phone: between the stick and JUMP, with a margin (at 14 px they reached 6 px into JUMP) */
 @media (max-width: 760px) { .mg-touch.is-cold #mg-keys { left: calc(50% - 1.5rem); letter-spacing: .03em; gap: .25rem; } .mg-touch.is-cold #mg-keys span { padding: .3125rem .5rem; } }
+
+/* Closed, the card is the one thing to do and where: the lines under it go with its reason, and come back with it.
+   (On the small phone the room the reason gave up was taken by the next line, and the card was no shorter.) A
+   second line that is itself a red one stays. */
+.mg-compact #mg-objectives.shut .obj:not(.primary):not(.urgent):not(.done) { display: none; }

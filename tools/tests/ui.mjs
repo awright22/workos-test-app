@@ -333,7 +333,7 @@ if (!onlySize || onlySize === 'play') {
   {
     const READING = '\u200b';
     // (five refusals live in game files this test's author could not edit; they give their reason, in another form)
-    const elsewhere = /analyser|Sample case|Already sampled|Servicing the|has failed|in good order/;
+    const elsewhere = /analyser|Sample case|Already sampled|in good order/;
     const formed = (r) => r.startsWith(READING) ? r.length > 4 : /^[A-Z][^:—(]{2,21}?\s*[:—(]\s*\S/.test(r) && r.split(/[:—(]/)[0].trim().split(/\s+/).length <= 4;
     const bare = refusals.filter((x) => !x.isString || !x.r.replace(READING, '').trim());
     const unformed = refusals.filter((x) => x.isString && !elsewhere.test(x.r) && !formed(x.r));
