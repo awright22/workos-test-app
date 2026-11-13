@@ -11,7 +11,7 @@ import { surfaceAt } from '../planet/surface.js';
 import { Y_AXIS } from '../core/scratch.js';
 
 const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _q = new THREE.Quaternion(), _d = new THREE.Vector3();
-let trackDist = 0, plumeT = 0, launchT = 0;
+let trackDist = 0, plumeT = 0;
 
 function onGround(pos) { return pos.normalize().multiplyScalar(surfaceAt(pos)); }
 const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tn = new THREE.Vector3();
@@ -72,15 +72,6 @@ export function updateEffects(dt) {
         _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -2.2 * Math.sign(roverF.speed));
         ctx.vfx.puff(onGround(_p), { count: 1, speed: 0.6 + v * 0.04, up: 0.5 + v * 0.03, spread: 0.3, size: 0.6 + v * 0.03, life: 2.2 + v * 0.03, dir: _d.copy(_f).multiplyScalar(-v * 0.18 * Math.sign(roverF.speed)) });
       }
-    }
-  }
-  if (S.mode === 'cutscene' && World.mavFlame && World.mavFlame.visible && World.mavRocket) {
-    // the ascent engine scours the pad for the first seconds of the climb
-    const alt = World.mavRocket.position.y - (World.mavRocketY || 0);
-    launchT += dt;
-    if (alt < 60 && launchT > 0.03) {
-      launchT = 0;
-      ctx.vfx.puff(World.mav.position, { count: 6, speed: 9 + Math.random() * 6, up: 1.5, spread: 2.5, size: 2.6, life: 4.5, tone: 0.5 });
     }
   }
 }

@@ -41,7 +41,8 @@ import { roverF, updateRover, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
-import { updateDiscoveries, checkAchievements, startLaunch } from './game/story.js';
+import { updateDiscoveries, checkAchievements } from './game/story.js';
+import { startLaunch } from './game/launch.js';
 import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
@@ -174,6 +175,7 @@ function draw(dt, focus) {
     const tu = ctx.terrainUniforms, high = e.camera.position.length() - R;
     tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;
     tu.uSpace.value = smoothstep(1500, 9000, high);
+    tu.uSunW.value.copy(e.sunDir); tu.uSkyLit.value.setRGB(0.47, 0.29, 0.145).multiplyScalar(1 - tu.uDust.value); tu.uCamSpace.value = e.sky.space || 0;
     tu.uRelief.value = 1 - 0.68 * smoothstep(2500, 12000, high);
 
   }
@@ -198,7 +200,7 @@ function tick(dt) {
     if (World.launchAnim) World.launchAnim(dt);
     updateEffects(dt);
     updateSunDir();
-    return World.mav.position;
+    return (World.launch && World.launch.focus) || World.mav.position;
   }
   if (!S.sleeping) {
     advanceTime(dt);

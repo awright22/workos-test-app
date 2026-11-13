@@ -322,9 +322,10 @@ export class Engine {
     const e = this.env, sky = this.sky;
     e.age += dt;
     const up = sky.uniforms.uUp.value;
-    const moved = Math.abs(sky.sunE - e.sunE) > 0.012 || Math.abs(dust - e.dust) > 0.04 || up.distanceToSquared(e.up) > 0.0004;
+    // (and when the camera has climbed: the sky it stands under thins with height, and from orbit is black)
+    const moved = Math.abs(sky.sunE - e.sunE) > 0.012 || Math.abs(dust - e.dust) > 0.04 || up.distanceToSquared(e.up) > 0.0004 || Math.abs((sky.space || 0) - (e.space || 0)) > 0.06;
     if (e.target && !(this.snapLight > 0 && moved) && (!moved || e.age < 1.2)) return;
-    e.sunE = sky.sunE; e.dust = dust; e.up.copy(up); e.age = 0;
+    e.sunE = sky.sunE; e.dust = dust; e.up.copy(up); e.age = 0; e.space = sky.space || 0;
     // the ground as the sky sees it: sunlit regolith plus the sky's own light bounced back
     const lit = (sky.sunIntensity * Math.max(sky.sunE, 0)) / Math.PI;
     this.envGround.material.color.setRGB(

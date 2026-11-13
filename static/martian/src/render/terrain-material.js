@@ -73,6 +73,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     uField: { value: flat.field },
     uDust: { value: 0 },                       // storm dusting 0..1 (brightens and flattens)
     uDay: { value: 1 },                        // 0 at night .. 1 by day (what glows by daylight must not glow in the dark)
+    uSunW: { value: new THREE.Vector3(1, 0, 0) },   // toward the sun (world)
+    uSkyLit: { value: new THREE.Color(0, 0, 0) },   // the sky's light on the ground by day
+    uCamSpace: { value: 0 },                        // how far out of the air the camera is, 0..1 (the ground then needs that light given back: see below)
     uSpace: { value: 0 },                      // 0 on the ground .. 1 from orbit: the air seen edge-on hazes the planet's rim
     uRelief: { value: 1 },                     // how much of the (exaggerated) relief is drawn: all of it on the ground, a third from orbit
   };
@@ -116,6 +119,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform sampler2D uField;
         uniform float uDust;
         uniform float uDay;
+        uniform vec3 uSunW, uSkyLit;
+        uniform float uCamSpace;
         uniform float uSpace;
         varying float vChute;
         varying vec3 vTex;
@@ -327,7 +332,15 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec2 terrainFlat = flatSlope * (1.0 - ice * 0.35);`)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor = clamp(terrainRough, 0.05, 1.0);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += vec3(0.012, 0.034, 0.075) * iceGlow * uDay;`)
+        totalEmissiveRadiance += vec3(0.012, 0.034, 0.075) * iceGlow * uDay;
+        // Half the light on Mars's ground by day is its sky's. The renderer takes sky light from the sky where the
+        // camera is, and above the dust that sky is black: seen from a climbing rocket, and from orbit, the day side
+        // went dim and flat. So ground that lies deeper in the air than the camera is given back the sky light the
+        // camera's height took from it: by day, under its own sun. (On a mountain top the two are at one height, and
+        // nothing is added: the thin sky up there is the sky that lights it.)
+        { float sunHere = dot(pDir, uSunW);
+          float skyGone = max(0.0, uCamSpace - (1.0 - exp(-max(length(vPlanetPos) - ${F(R)}, 0.0) / 420.0)));
+          totalEmissiveRadiance += diffuseColor.rgb * uSkyLit * (skyGone * smoothstep(-0.16, 0.10, sunHere) * mix(0.5, 1.0, smoothstep(0.0, 0.45, sunHere))); }`)
       // regolith scatters light back toward the sun; it has no sheen at grazing angles. Ice keeps its glint.
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
         { float sheen = mix(0.16, 1.0, ice); material.specularColor *= sheen; material.specularColorBlended *= sheen; material.specularF90 *= sheen; }`)
@@ -349,6 +362,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain32' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain34' + (o.fine !== false ? 'F' : '');
   return mat;
 }

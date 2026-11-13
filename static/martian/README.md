@@ -131,7 +131,7 @@ static/martian/
     terrain/   quadtree level-of-detail chunks built in web workers
     render/    renderer, sky, ground material, 3D detail textures, shadows, effects
     world/     models, the Hab and everything placed on the planet, rocks
-    game/      state, player, rover, simulation, story, interactions, saves
+    game/      state, player, rover, simulation, story, interactions, saves, the launch (launch.js)
     ui/, audio/
   QUALITY.md   the bar the game is held to, what has been measured, what is open
   CREDITS.md   data and software credits
@@ -139,7 +139,8 @@ tools/
   build.mjs          bundle src/ (esbuild) and write the service worker
   serve.mjs          static server for development
   lint.mjs           undefined names and bad imports
-  tests/             smoke, interface, story arc, saves, science, machines, farm, audio, scene cost, screenshots
+  tests/             smoke, interface, story arc, saves, science, machines, farm, audio, scene cost, screenshots,
+                     and film.mjs: the launch photographed shot by shot
   publish.mjs        build, check and publish to gh-pages
   build_mars_data.py NASA data -> assets/mars/
   assets/            the models, authored in Blender from Python (see assets/SPEC.md)

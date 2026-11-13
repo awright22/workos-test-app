@@ -103,9 +103,9 @@ export function updateAudio(dt) {
     } else if (!rover) { prevH = 0; rough = 0; }
     P.rough = rough;
     // the launch
-    if (S.mode === 'cutscene' && World.mavRocket) {
-      launch.burning = !!(World.mavFlame && World.mavFlame.visible);
-      launch.alt = Math.max(0, World.mavRocket.position.y);
+    if (S.mode === 'cutscene' && World.launch) {
+      launch.burning = !!World.launch.burning;
+      launch.alt = Math.max(0, World.launch.alt || 0);
       P.launch = launch;
     } else P.launch = null;
 

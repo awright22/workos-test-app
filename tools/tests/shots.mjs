@@ -128,10 +128,12 @@ const scenes = {
   'dusk': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(17.95); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
   'twilight': async () => ev(async (G) => { G.setLocalTime(18.75); G.faceSun(); G.look(0.08); G.tick(0.05, 40); await G.settle(); }),
   'night-plain': async () => ev(async (G) => { G.setLocalTime(23); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
-  // the last act, and so the last pictures (the game is won at the end of it): lift-off, the climb, and the planet from the Hermes' height
-  'launch': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 128); await G.settle(); }),
-  'launch-climb': async () => ev(async (G) => { G.tick(0.05, 174); await G.settle(); }),
-  'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 420); await G.settle(); }),
+  // the last act, and so the last pictures (the game is won at the end of it): the pad as the engine lights, the column
+  // from far off, the climb into a black sky, and the Hermes over the day-night line (tests/film.mjs takes the whole strip)
+  'launch': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 130); await G.settle(); }),
+  'launch-wide': async () => ev(async (G) => { G.tick(0.05, 50); await G.settle(); }),
+  'launch-climb': async () => ev(async (G) => { G.tick(0.05, 120); await G.settle(); }),
+  'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 250); await G.settle(); }),
 };
 for (const [name, setup] of Object.entries(scenes)) {
   // scenes that only set something up (their name starts with '-', or is one of the old three) run always and take no picture

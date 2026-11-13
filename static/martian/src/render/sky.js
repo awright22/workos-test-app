@@ -79,8 +79,13 @@ const GLSL_SKY = /* glsl */`
     float above = max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.16).toFixed(1)};
     float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-above);
     vec3 fromSpace = mix(vec3(0.70, 0.48, 0.33), vec3(0.36, 0.46, 0.66), smoothstep(0.3, 2.2, above)) * limb * limbLit * 0.75;
-    // lower down, the day sky thins toward the zenith before it gives way to black
-    fromSpace = max(fromSpace, col * exp(-max(uAlt, 0.0) / ${(ATMO_H * 2.0).toFixed(1)}) * h);
+    // On the way up the day sky is the dust still left along each line of sight: overhead it thins with the camera's
+    // own height, and below the level it thins with the height at which that line passes the planet. So the sky
+    // goes dark from the top down, and what is left at the end is a bright band lying on the limb.
+    // (It was thinned by the camera's height alone, and from 1,400 m the whole sky below the level was one brown,
+    // with the stars showing through it.)
+    float passes = mu >= 0.0 ? max(uAlt, 0.0) : max(b - ${R.toFixed(1)}, 0.0);
+    fromSpace = max(fromSpace, col * exp(-passes / ${(ATMO_H * 0.55).toFixed(1)}) * h * mix(1.0, limbLit, step(mu, 0.0)));
     col = mix(col, fromSpace, space);
     return col;
   }
@@ -166,7 +171,8 @@ export class Sky {
           // ... and they drown in the dust toward the horizon and in the glow of the set sun
           float starVis = max(night, airless) * (1.0 - uDust) * smoothstep(0.0, 0.38, dot(v, uUp) + airless)
             * (1.0 - 0.8 * smoothstep(-0.34, -0.04, sunE) * (1.0 - airless) * pow(max(dot(v, uSun) * 0.5 + 0.5, 0.0), 2.0));
-          col += stars(v, starVis) * 0.9;
+          // (and in whatever sky is still bright: the dust band on the limb, seen from the climb)
+          col += stars(v, starVis * (1.0 - smoothstep(0.03, 0.16, dot(col, vec3(0.3, 0.5, 0.2))))) * 0.9;
           // Phobos and Deimos. Truly they are a fifth of a degree and a twentieth across, which on a screen is a
           // star and less than a star: they are drawn four times that, so that one is a moon and the other a moonlet.
           // Both can be seen by day, palely.

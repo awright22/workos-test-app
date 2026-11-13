@@ -546,13 +546,7 @@ export function buildStorySites() {
   World.mavRocketY = World.mavRocket.position.y;
   World.mavNose = mm.part('nose');
   World.mavStrobeMats = ownMaterials(mm.part('strobe'));
-  const flameAt = mm.part('flame');
-  const flame = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.2, 7, 14, 1, true),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 4.2, 1.2), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-  flame.position.y = -3.5;
-  (flameAt || World.mavRocket).add(flame);
-  flame.visible = false;
-  World.mavFlame = flame;
+  World.mavFlameAt = mm.part('flame');             // the nozzle: the launch hangs its flame here (game/launch.js)
   groundStain(mav, 13, 0x0c0706, 0.72, 0.03, 'scorch');   // what four descent engines left: burnt ground, years old and still black
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
