@@ -305,6 +305,51 @@ the interiors' light, the storm's grit, the stains.
 | Q12 | The driving rover looks parked: no tracks, no wheel dust, no cue of motion (`rover-drive`) | done, not yet seen by a reviewer: both rear wheels throw a tail of dust and the two ruts run back from it (`rover-drive` now drives on the open plain: among the Hab's boulders it was often photographed stopped against one) |
 | Q13 | Small: the title's moon sits against the end of the subtitle; two orange ghost dots at the bottom of `walk-plain`; a pale speck over the ground at Pathfinder; a pale cube on the caldera's skyline and a pale blob boulder on a far dune (`debris-b`); a few single-triangle shards at Schiaparelli; Viking 1 one cream colour; `dusk` near black in its lower half; `astronaut-back` still shows his front | part done: the moons are left out of the title screen; `astronaut-back` is taken from behind him; facing a setting sun the camera stops down less, so `dusk` keeps its ground. Not done: the rest |
 
+### Round 8 (iPhone size, "medium"; 69 stills and a 14-frame strip of the launch, all seen)
+
+| Area | Verdict |
+| --- | --- |
+| Day | MET |
+| Dawn and dusk | NEARLY (was MET: `dawn-light`'s two-colour line, `hab-dusk`'s white sky with no glow, no rim light on him) |
+| Night | NEARLY |
+| Dust storm | NEARLY |
+| Poles | NEARLY for the caps, NOT MET for the `ice` outcrop |
+| Orbit | NEARLY (was MET: the title globe's outline kinks where its glow ring starts, Olympus a flat grey disc, a thick limb glow in the climb) |
+| The launch (new bar) | NEARLY: lift-off has spectacle and the ship looks like a ship; the climb between and the catch at the end are weak |
+| Valles Marineris | NEARLY from inside, NOT MET from the rim and at the wall |
+| Olympus Mons | NEARLY for the caldera, NOT MET for the flows |
+| Terrain | NEARLY |
+| Models | NEARLY |
+| Astronaut | NEARLY |
+| Interiors | NEARLY |
+| Overall | NEARLY: "base, lander and deployable frames would pass for a good mobile release. The canyon rim, ice, Olympus flanks, night driving and mid-launch frames would not" |
+
+A different reviewer from round 7's, and a harder one on the two landmarks (round 7 had both NEARLY). Best: `rover-park`,
+`lander-curiosity`, the launch strip's `22.6`, `dawn`, `pod-open`. Worst: `ice`, the strip's `12.5` and `20.6`, `canyon-rim`,
+`olympus-flows`. Found gone from round 7's list: the lift-off's emptiness (Q1, in part), stars through a brown sky, buildings
+that lit nothing at night (Q3, but for the starburst), the parked-looking rover (Q12), the title's moon, the blank monitor,
+bare trays, the smudges at `yard`, `pile` and `hab-noon`, orange rocks on lava, `astronaut-back`. The full report is kept at
+`scratchpad/rep_pic8.txt` in the session it was written in; the findings are these.
+
+| # | Finding | State |
+| --- | --- | --- |
+| S1 | The launch sags after lift-off and ends flat: the column on a blotchy field with no horizon (`08.4`, `10.6`, `launch-wide`); a pill over a featureless brown ball (`12.5`); a clean orange triangle with a dark disc behind the nozzle (`19.6`); a dot on a starfield (`20.6`); in the catch (`28.0`, `30.2`) two identical figures in one dangling pose, boots on helmet; the planet fully lit there but with a night side in `22.6`–`26.4`; the crewman and tether 8 px in the wide shot | open |
+| S2 | Smoke and vented air are cotton balls: distinct, uniformly white, unshaded; grey out-of-focus balls at the frame edge in `24.4`; dense smoke still behind the rocket above the air (`15.5`) | open |
+| S3 | Valles Marineris from the rim is still a pit and the walls painted stripes: countable boulders on the far rim, a washed left wall (`canyon-rim`); banded rounded hills with dune-like tops (`canyon-wall`); soft bulging folds (`canyon-foot`); boulders on the skyline (`canyon`). The wall behind Curiosity and `canyon-floor`'s left wall are named as what to match: a hard cap-rock edge, stepped ledges, talus cones with boulders | open |
+| S4 | The astronaut is lit the same from every direction: his back the brightest thing in the frame with the sun ahead (`day-sun`, `canyon-floor`, `hab-dusk`, `walk-plain`, `greenhouse-door`, `olympus`); no rim light at dawn and dusk; flat-lit in orbit | open |
+| S5 | He rocks back on his heels in every profile, five to six degrees off plumb (`o2-cache` and the lander pictures) | open |
+| S6 | Vehicle and helmet lights do not light the way: no pool ahead of the rover on a slope (`rover-night`), nothing landing from the parked rover's bars (`hab-night`), the helmet's pool a smear at his hip (`twilight`, `night-plain`, `south-pole`), a four-point starburst in the dome and its ground pool ending in a clean oval (`greenhouse-night`) | open |
+| S7 | Ice is a snowfield and the outcrop a toy: faceted blocks with pinstripes, a tan shadow on white, a warm-to-blue edge across `ice`; the caps matte with no glint or wind sculpting, cracks as blurred marker lines; a smeared band in `pole-90` | open (a helper is rebuilding the outcrop) |
+| S8 | The world breaks from red to cream along one crisp line at the first ridge (`walk-plain`, `debris-b`, `hab-noon`, `hab-morning`, `deployables`, `solar-kit`, `dawn-light`), and dark sharp boulders stand unhazed on ruler horizons at the lander sites | open |
+| S9 | Storm dust is flat scalloped ribbons that cross his legs like stripes; the airlock's frame and the shovel are razor-crisp | open |
+| S10 | Olympus's flanks are still smooth brown lobes (`olympus-flows`); camouflage mottling and a red smear on the caldera's slope | open |
+| S11 | The Schiaparelli wreck is flat-shaded panels with loose tetrahedra, a pure black airbrushed scorch, murky maroon ground (there and at Perseverance) | open (a helper has the shards) |
+| S12 | Interiors: no contact shadow under him, legs cut at the shin (and the thigh in the dome), panes with no tint from inside, a blown funnel, props cleaner and more cartoon-like than outdoors | open (a helper has the dome's whites) |
+| S13 | Stains, veins and red regions: crack nets as thick blurred welts (Mars 3, Phoenix, the caldera); Mars 3's stretched scarp; saturated dark-red regions (`debris-a`, `astronaut-side`, `pile`); broad dark bands with no caster (`hab-morning`, `beacon`, `deployables`) | open |
+| S14 | The title globe's outline kinks where the glow ring begins; Olympus is a flat dark grey disc on it | open |
+| S15 | Rocks, better but not done: pebbles one colour and one size, evenly sprinkled; rocks crowding his boots; a smooth cracked bun in `canyon-foot`; a regular dot grid on a slab's top (`astronaut-front`) | open |
+| S16 | Smaller: Viking 1 one cream colour; a flat visor and clean legs; the dirt mound's flat facets (`hab-noon`); far dome struts sparkling; no flame light on the dust at lift-off and the flame a straight-sided bar; a small upright shape left of the pad at `04.9`; the rover's dust a dark smudge | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -504,10 +549,11 @@ button (J7), new-player hesitations (J17).
 | 31 | **The owner's iPhone.** First report from the real phone: the preview failed at startup with "Something broke / Input body is disturbed". Cause: the elevation file's loader filled a buffer of the length the server stated; GitHub Pages sends the file compressed and states the compressed length, so more bytes arrived than the buffer held, and the loader's fallback then re-read a download it was already reading, which Safari refuses. No test saw it because the test server stated no length and compressed nothing. | **confirmed on the phone:** the preview starts, with no errors, and runs at 60 fps (see the frame-rate row in the bar). The loader fix was the cause. The test server serves as the published site does (the old loader fails the smoke test against it); the failure screen's Reload clears the game's offline cache first. Still unproven on WebKit beyond "it starts and plays": nobody has yet looked at the phone's picture or its layout with the bar in hand, and the phone was on a build four publishes old when it reported (an installed copy picks up a new build on its next open or the one after) |
 | 21 | Act on the fifth picture review (X1–X15 above) | acted on and reviewed again: see round 6 |
 | 29 | Act on the sixth picture review (P1–P18 above) | acted on and reviewed again: see round 7 |
-| 32 | Act on the seventh picture review (Q1–Q13 above): the launch, the canyon from its rim, the night's lights and the rocks first | in progress |
+| 32 | Act on the seventh picture review (Q1–Q13 above): the launch, the canyon from its rim, the night's lights and the rocks first | acted on and reviewed again: see round 8 |
 | 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
 | 28 | Act on the fourth interface review (Z1–Z22 above) | acted on (seventeen fixed, five part fixed) and reviewed again: see the fifth review |
 | 30 | Act on the fifth interface review (J1–J17 above); walk the small phone's HUD, map, new-game screen and journal, which the reviewer could not open | acted on (thirteen fixed, four part fixed; the audit now holds 128 phone states under stricter rules, and `ui.mjs` 176 checks). The small phone's unseen screens were walked and fixed (prompt over JUMP, cards cut mid-sentence, a card on the stick, map lettering, the new-game sheet, the night's account and rescue screen overflowing). Next: a sixth review on these pictures. Known weak: the 44 px slider handles are heavy blocks; morale is a percentage on the HUD and points in the account; the small phone is tight with capitals at 13 px |
+| 34 | Act on the eighth picture review (S1–S16 above) | in progress |
 | 33 | Act on the sixth interface review (K1–K20 above) | open: a helper next |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
