@@ -247,7 +247,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec4 band = texture(uGrain, vec3(alt * 0.13 + hFar * 0.3 + wob * 0.55, 0.37, 0.71));
         float beds = texture(uGrain, vec3(alt * 0.029 + hFar * 0.15 + wob * 0.2, 0.83, 0.21)).a;
         float bedTone = mix(0.5, smoothstep(0.30, 0.70, beds * 0.68 + band.a * 0.32), 1.0 - smoothstep(260.0, 1200.0, viewDist));
-        vec3 rockCol = alb * mix(vec3(0.44, 0.40, 0.41), vec3(0.88, 0.79, 0.72), bedTone);
+        // (the beds a little closer in tone to one another: the wall's shape is its spurs and gullies, not its stripes)
+        vec3 rockCol = alb * mix(vec3(0.48, 0.435, 0.44), vec3(0.82, 0.735, 0.675), bedTone);
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
         // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
         rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.060, 0.058), 0.75) * mix(1.0, 0.72 + 0.56 * bedTone, smoothstep(0.22, 0.45, slope)), lava * 0.9);
@@ -269,7 +270,18 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float craggy = max(rock, basalt * (1.0 - pond)) * fCrag;
         grad += (nCrag.rgb - 0.5) * (1.25 * craggy);
         float cragTone = (nCrag.a - 0.5) * craggy;
-        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7), rock * 0.9);
+        // Flutes. A wall's spurs and chutes are in the mesh only near to: from a hundred metres its triangles are
+        // too coarse to carry anything finer than the great buttresses, and a wall seen face-on in a high sun was a
+        // smooth banded sheet. The grain volume once more, stretched eight times up and down (columns of it stand
+        // on end, and a steep wall cuts them into streaks that run down the fall line), as relief and tone on steep
+        // bare rock from twenty metres out.
+        float fFlute = smoothstep(18.0, 60.0, viewDist) * (1.0 - smoothstep(900.0, 2200.0, viewDist)) * rock * smoothstep(0.10, 0.28, landSlope) * (1.0 - lava);
+        vec4 nFlute = texture(uGrain, pDir * (${F(R)} / 20.0 + (length(vPlanetPos) - ${F(R)}) / 160.0));
+        vec3 gFlute = nFlute.rgb - 0.5;
+        gFlute -= pDir * (dot(gFlute, pDir) * 0.875);
+        grad += gFlute * (2.2 * fFlute);
+        float fluteTone = (nFlute.a - 0.5) * fFlute;
+        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7 + fluteTone * 0.6), rock * 0.9);
         // Spur and gully. The beds show on the spurs, which are bare rock. A chute between two spurs is floored with
         // what fell from them: scree with no beds in it, running down the wall in a pale tongue. (Without it a wall
         // was banded from end to end like a layer cake, and its spurs could only be seen by their shading.)
@@ -343,6 +355,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain26' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain29' + (o.fine !== false ? 'F' : '');
   return mat;
 }

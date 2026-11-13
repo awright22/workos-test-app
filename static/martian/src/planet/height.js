@@ -107,7 +107,9 @@ const FACE_C = [[0, -1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, -
  * out from the wall, in metres (its height is that times the slope: on a cliff a spur a few metres
  * high is a ripple, and on a hillside one twenty metres high is a mountain).
  */
-const GULLIES = [[150, 13], [56, 5], [21, 1.8]];
+// (the two smaller sizes stand out nearly twice as far as they did: at five metres and under two a wall seen face-on
+// in a high sun was a smooth banded sheet, its spurs too shallow to shade)
+const GULLIES = [[150, 13], [56, 8.5], [21, 3.1]];
 const CHUTE_SHARE = [0.5, 0.33, 0.17];
 /** Headings of the patches of spur and gully last asked about: a small direct-mapped table (see _gully). */
 const GULLY_SLOTS = 4093;

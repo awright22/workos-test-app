@@ -78,7 +78,8 @@ function rockMaterial(uniforms, rmax, detail) {
         varying vec3 vRockS;
         varying vec4 vRockI;
         varying vec4 vRockLies;
-        varying mat3 vRockRot;`)
+        varying mat3 vRockRot;
+        varying vec3 vRockGround;`)
       .replace('#include <begin_vertex>', `
         vec3 transformed = rockSurface(position);
         #ifdef USE_INSTANCING
@@ -92,6 +93,10 @@ function rockMaterial(uniforms, rmax, detail) {
         vRockS = rockS;
         vRockI = aRock;
         vRockRot = mat3(viewMatrix) * mat3(rockM[0] / rockS.x, rockM[1] / rockS.y, rockM[2] / rockS.z);
+        // The ground's own normal where the rock lies. A rock is laid on the ground and then tipped a little about a
+        // level axis (see RockField._prepare, whose numbers these are): untipped, its "up" is the ground's.
+        float rockTip = (fract(aRock.z * 3.3) - 0.5) * (aRock.w < 0.0 ? 0.5 : 0.22);
+        vRockGround = vRockRot * vec3(cos(aRock.z * 40.0) * sin(rockTip), cos(rockTip), -sin(aRock.z * 40.0) * sin(rockTip));
         // where on the planet it lies (the same for every vertex of a rock), and how much of that ground is lava
         vec3 rockDir = normalize(rockT[3].xyz);
         float rockLava = 0.0;
@@ -108,6 +113,7 @@ function rockMaterial(uniforms, rmax, detail) {
         varying vec4 vRockI;
         varying vec4 vRockLies;
         varying mat3 vRockRot;
+        varying vec3 vRockGround;
         ${GLSL_SHAPE_UV}
         ${GLSL_GROUND_GRADE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -148,7 +154,7 @@ function rockMaterial(uniforms, rmax, detail) {
         float gl = dot(ground, vec3(0.3, 0.55, 0.15));
         // Bare stone is dark basalt (grey, warmed by what the sky and the ground throw on it) under a film of the local
         // dust: the thinner the film, the darker and greyer the rock. Each face has its own, a fresh break has least, and it comes and goes in stains.
-        float film = mix(0.26, 0.64, vRockI.w) * (1.0 + (rockB.g - 0.5) * 0.5) * (1.0 - 0.3 * lava) - rockB.b * 0.1 + (rockStain - 0.5) * 0.2;
+        float film = mix(0.26, 0.64, abs(vRockI.w)) * (1.0 + (rockB.g - 0.5) * 0.5) * (1.0 - 0.3 * lava) - rockB.b * 0.1 + (rockStain - 0.5) * 0.2;
         vec3 stone = mix(mix(vec3(gl), ground, 0.3) * 0.7, ground * 0.96, clamp(film, 0.1, 0.9));
         stone = mix(stone, vec3(0.20, 0.19, 0.20), icy * 0.8) * (1.0 - 0.3 * rockPits);
         // Dust lies thick on whatever faces the sky and gathers in the hollows; edges and fresh breaks are swept clean.
@@ -167,20 +173,26 @@ function rockMaterial(uniforms, rmax, detail) {
         material.specularColor *= 0.25; material.specularColorBlended *= 0.25; material.specularF90 *= 0.25;`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         normal = normalize(vRockRot * rockN);`)
-      // The horizon. Level ground seen at a grazing angle, well out, melts into the haze (see the terrain's material),
-      // and a boulder standing on it must melt with it: left crisp, it sat on the sky's edge like a thing on a table.
-      // A rock knows where on the planet it lies, which is the level ground's normal; one on a hillside (its own
-      // "up" well off the planet's) is left alone, as the hillside is.
+      // The horizon. Ground seen at a grazing angle, well out, melts into the haze (see the terrain's material), and
+      // a boulder standing on it must melt with it: left crisp, it sat on the sky's edge like a thing on a table.
+      // The measure is the terrain's own, taken with the normal of the ground under the rock: a rock on a rise that
+      // faces the eye is left as clear as the rise is. (Measured by where on the planet the rock lay, rocks on such a
+      // rise went pale against clear ground, like ghosts of themselves.)
       .replace('#include <fog_fragment>', `#include <fog_fragment>
         {
+          vec3 rockGroundV = normalize(vRockGround);
+          float rockGraze = abs(dot(normalize(vViewPosition), rockGroundV));
+          // (and only on ground that is nearly level, which is what a horizon is: a block on a wall's bench, its
+          // ground seen edge-on from below, went to a pale disc on the wall)
           vec3 rockUpV = normalize(mat3(viewMatrix) * vRockLies.xyz);
-          float rockGraze = abs(dot(normalize(vViewPosition), rockUpV));
-          float rockLevel = smoothstep(0.93, 0.98, dot(vRockRot[1], rockUpV));
+          // (... and that lies about level with the eye, as a horizon does: a block on a bench high on a wall, seen
+          // from the canyon's floor, has the wall behind it and not the sky)
+          float rockLevel = smoothstep(0.93, 0.98, dot(rockGroundV, rockUpV)) * (1.0 - smoothstep(0.03, 0.09, abs(dot(normalize(vViewPosition), rockUpV))));
           float rockRim = (1.0 - smoothstep(0.004, 0.05, rockGraze)) * smoothstep(110.0, 240.0, length(vViewPosition)) * 0.72 * rockLevel;
           gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, rockRim);
         }`);
   };
-  mat.customProgramCacheKey = () => 'rock8-' + detail;
+  mat.customProgramCacheKey = () => 'rock11-' + detail;
   return mat;
 }
 /** The rocks in the shadow maps: the shadow pass must push the vertices out the same way. */
@@ -489,7 +501,9 @@ export class RockField {
       // the bare stone's tone, dark basalt to weathered brown: most wear a film of the local dust; the wind has swept
       // some bare, broken basalt more often than the rest
       const bare = fr(rnd * 11.3) < (cls === ROCK_ANGULAR ? 0.3 : cls === ROCK_SLAB ? 0.1 : 0.18);
-      inst[j + 12] = shape * 2; inst[j + 13] = ground; inst[j + 14] = rnd; inst[j + 15] = bare ? 0.04 + 0.3 * fr(rnd * 3.7) : 0.4 + 0.6 * fr(rnd * 3.7);
+      // (a slab's tone is stored below zero: the shader works out how each rock was tipped, to know the ground's own
+      // normal under it, and a slab is tipped more than the rest)
+      inst[j + 12] = shape * 2; inst[j + 13] = ground; inst[j + 14] = rnd; inst[j + 15] = (cls === ROCK_SLAB ? -1 : 1) * (bare ? 0.04 + 0.3 * fr(rnd * 3.7) : 0.4 + 0.6 * fr(rnd * 3.7));
       const radius = (_s.x + _s.z) * 0.5, stands = sh.top * sy - ground;
       aux[a] = radius; aux[a + 1] = stands; aux[a + 2] = shape;
       // whatever stands knee-high or more is in the way
