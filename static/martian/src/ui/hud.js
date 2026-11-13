@@ -149,7 +149,7 @@ export function objectivePlace(o, where) {
 export const objDone = new Set();
 let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
 const objFrom = new THREE.Vector3();
-const objNodes = new Map();          // row key -> { el, tx, at, pl, ds, wy, o, q, text, place, dist, cls, why }
+const objNodes = new Map();          // row key -> { el, tx, at, pl, ds, wy, o, q, text, lead, place, dist, cls, why }
 const objDoneAt = {};                // objective id -> time it was completed (shown ticked for a moment)
 function objRow(key) {
   let n = objNodes.get(key);
@@ -324,12 +324,17 @@ export function updateObjectivesHud() {
   //  list rebuilt by the clock alone was left showing "get to air" beside a full tank in the pictures taken that way)
   if (now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   for (const n of objNodes.values()) {
-    let dist = '';
+    let dist = '', place = n.place || '';
     if (n.cls !== 'done') {
-      if (n.o) dist = objectiveDist(n.o);
+      // (the first line's place is named in the same frame as its distance is measured: the name belongs to the number.
+      //  Named only when the list was next rebuilt, the line read "FARM BED 34 m" for a moment with the heap's distance.)
+      if (n.o) { const w = objectiveWhere(n.o); dist = w ? fmtDist(w.d) : ''; if (n.lead) place = objectivePlace(n.o, w); }
       else if (n.q) { const p = questTargetPos(n.q); dist = p ? fmtDist(distTo(p)) : ''; }
     }
-    if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; n.at.style.display = dist || n.place ? '' : 'none'; }
+    if (n.place !== place) { n.place = place; n.pl.textContent = place; }
+    if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; }
+    const show = dist || place ? '' : 'none';
+    if (n.at.style.display !== show) n.at.style.display = show;
   }
   if (now - fitAt > 1) fitObjectives(now);
 }
@@ -364,9 +369,9 @@ function rebuildObjectives(now) {
     if (e.done) { if (e.o.id === 'mav') rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls: 'done', why: '' }); continue; }
     // the one thing to do next is marked, and carries its reason
     let cls = e.o.urgent ? 'urgent' : '', why = '';
-    let place = '';
-    if (!primary) { primary = true; cls = e.o.urgent ? 'urgent first' : 'primary'; why = objectiveWhy(e.o); place = objectivePlace(e.o); }
-    rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls, why, place });
+    let lead = false;
+    if (!primary) { primary = lead = true; cls = e.o.urgent ? 'urgent first' : 'primary'; why = objectiveWhy(e.o); }
+    rows.push({ key: e.o.id, o: e.o, text: e.o.text(), cls, why, lead });
   }
   // night: said once as it falls, as well as listed
   // (not when he is already standing at the bunk: there the task, the prompt and the button say it, and the card was a fourth)
@@ -389,13 +394,16 @@ function rebuildObjectives(now) {
     const n = objRow(r.key);
     n.o = r.o || null; n.q = r.q || null;
     if (n.text !== r.text) { n.text = r.text; n.tx.innerHTML = chem(esc(r.text)); }
-    const place = r.place || '';
+    // (the line that leads carries the name of its place: set here, so the block is fitted at its real height, and
+    //  kept in step with the distance by the frame's own pass, above)
+    n.lead = !!r.lead;
+    const place = n.lead && n.o ? objectivePlace(n.o) : '';
     if (n.place !== place) { n.place = place; n.pl.textContent = place; n.at.style.display = place || n.dist ? '' : 'none'; }
     if (n.why !== r.why) { n.why = r.why; n.wy.innerHTML = chem(esc(n.why)); n.wy.style.display = n.why ? '' : 'none'; }
     if (n.cls !== r.cls) { n.el.classList.remove('done', 'urgent', 'first', 'primary', 'quest'); if (r.cls) n.el.classList.add(...r.cls.split(' ')); n.cls = r.cls; }
     if (prev.nextSibling !== n.el) UI.objectives.insertBefore(n.el, prev.nextSibling);
     prev = n.el;
-    key += `${r.key}|${r.text}|${r.why}|${r.place || ''}|`;
+    key += `${r.key}|${r.text}|${r.why}|${r.lead ? 1 : 0}|`;
   }
   for (const [k, n] of objNodes) if (!live.has(k)) { n.el.remove(); objNodes.delete(k); }
   objHead.style.display = rows.length ? '' : 'none';
