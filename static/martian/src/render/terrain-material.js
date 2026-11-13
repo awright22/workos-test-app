@@ -177,7 +177,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           // (and the land's own colour says what it is made of: the dark regions are basalt sand, which the wind works into
           // strong ripples and leaves strewn with gravel; the bright ones are deep dust, which lies smooth)
           float sandy = 1.0 - smoothstep(0.11, 0.26, albLum);
-          float ripples = (1.0 - ice * 0.5) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
+          float ripples = (1.0 - ice * 0.78) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
           flatSlope += (fld.rg - 0.5) * (4.0 * fField * ripples);
           tone += (fld.b - 0.56) * 1.5 * fField * (1.0 - ice * 0.6) * (0.35 + 0.65 * ripples);
           gravelHere = min(1.0, fld.a * (1.0 - ice) * mix(0.7, 1.25, sandy) + lava * 0.3 + basalt * (1.0 - pond) * 0.55);      // clinker lies all over a flow
@@ -188,8 +188,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           vec4 cr = texture2D(uCrust, uv / 12.8);                 // every span divides the 64 m the coordinates wrap at
           // (on ice the polygons are fine blue lines in a hard surface the wind has cut into ridges, not embossed plates:
           // embossed, a cap looked like cracked plaster; and on soil the troughs are a hand deep, not a mud flat's cracks)
-          flatSlope += (cr.rg - 0.5) * (2.6 * fField * frosty * (1.0 - ice * 0.6));
-          tone += (cr.b - 0.56) * 0.95 * fField * frosty * (1.0 - ice * 0.6);
+          // (and on ice no relief at all: a crack in ice is a thin dark line, and any bevel made the cap a plaster cast)
+          flatSlope += (cr.rg - 0.5) * (2.6 * fField * frosty * (1.0 - ice));
+          tone += (cr.b - 0.56) * 0.95 * fField * frosty * (1.0 - ice * 0.85);
           crack = cr.a * fField * frosty * (1.0 - 0.35 * pond);
           #ifdef TERRAIN_FINE
             // (pebbles do not survive being stretched down a steep face: there the field layer and the rock carry it)
@@ -267,10 +268,11 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (bluer than the sky's light is warm, or it reads as cream; frost whitens the polygon troughs and the hollows)
         // old ice is blue where it is clean and deep, tan where a season's dust was laid into it, white only where frost lies
         float dusty = smoothstep(0.50, 0.70, iceBand + hFar * 0.5) * 0.6;
-        vec3 iceCol = mix(vec3(0.25, 0.43, 0.72), vec3(0.50, 0.43, 0.36), dusty) * (1.0 + tone * 0.30 + coarse * 0.08);
+        // (kept well under white: lit by a low sun at an exposure set for red ground, pale ice burnt out and lost its blue)
+        vec3 iceCol = mix(vec3(0.19, 0.34, 0.60), vec3(0.42, 0.36, 0.30), dusty) * (1.0 + tone * 0.30 + coarse * 0.08);
         // (a crack shows the ice's depth: darker and bluer than its face, not a pale scar)
         iceCol = mix(iceCol, vec3(0.09, 0.22, 0.48), clamp(crack * 0.9, 0.0, 1.0) * (1.0 - dusty));
-        iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.10, 0.34, hMid * fMid + hFar * 0.5) * 0.5 * (1.0 - crack));
+        iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.12, 0.36, hMid * fMid + hFar * 0.5) * 0.3 * (1.0 - crack));
         col = mix(col, iceCol, ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
@@ -309,6 +311,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain19' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain20' + (o.fine !== false ? 'F' : '');
   return mat;
 }
