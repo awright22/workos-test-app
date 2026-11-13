@@ -146,6 +146,12 @@ export class Engine {
     // the sky is the first thing drawn in the main pass: whatever was drawn before it was shadow maps
     this.sky.mesh.onBeforeRender = () => { const i = this.renderer.info.render; if (!this._shadowMark) this._shadowMark = { calls: i.calls, triangles: i.triangles }; };
     this.scene.fog = new THREE.FogExp2(0xc98a5b, 0.0012);
+    // The fog shader wants one number more than a density: where the horizon line is (see airHaze). The renderer
+    // hands every fogged material the fog's `near` and `far` if the fog says it is of the linear kind, so this one
+    // says it is both kinds: `near` carries the density and `far` the horizon's dip, and nothing is linear.
+    this.scene.fog.isFog = true;
+    Object.defineProperty(this.scene.fog, 'near', { get() { return this.density; } });
+    this.scene.fog.far = 0;
     airHaze();
 
     this.sunDir = new THREE.Vector3(1, 0, 0);
@@ -362,33 +368,37 @@ function airHaze() {
   if (hazed) return;
   hazed = true;
   const C = THREE.ShaderChunk;
+  // The horizon. On a planet twelve kilometres across it is two hundred metres off, too near for any honest haze to
+  // have softened it: a plain ended in a ruler's edge with boulders standing on it. So there is a layer of haze at eye
+  // level in the distance. Whatever is seen within a degree or so of the horizon line, well out, fades toward the
+  // sky: the last of a plain melts away, a far hill stands in haze to its knees, and the rocks and buildings out
+  // there fade with the ground they stand on, because the rule knows only where a point is seen, not what it is.
+  // (fogNear is the density and fogFar the horizon's dip below level, in radians: see where the fog is made.)
   C.fog_pars_vertex = `#ifdef USE_FOG
     varying float vFogDepth;
     varying float vFogAlt;
+    varying float vFogEl;
   #endif`;
   C.fog_vertex = `#ifdef USE_FOG
     vFogDepth = - mvPosition.z;
-    vFogAlt = length(cameraPosition + mvPosition.xyz * mat3(viewMatrix)) - 12000.0;
+    vec3 fogTo = mvPosition.xyz * mat3(viewMatrix);
+    vFogAlt = length(cameraPosition + fogTo) - 12000.0;
+    vFogEl = dot(normalize(fogTo), normalize(cameraPosition));
   #endif`;
   C.fog_pars_fragment = `#ifdef USE_FOG
     uniform vec3 fogColor;
     varying float vFogDepth;
     varying float vFogAlt;
-    #ifdef FOG_EXP2
-      uniform float fogDensity;
-    #else
-      uniform float fogNear;
-      uniform float fogFar;
-    #endif
+    varying float vFogEl;
+    uniform float fogNear;
+    uniform float fogFar;
   #endif`;
   C.fog_fragment = `#ifdef USE_FOG
-    #ifdef FOG_EXP2
-      float fogAir = 0.5 * (exp(-clamp(length(cameraPosition) - 12000.0, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
-      float fogThick = fogDensity * fogAir * vFogDepth;
-      float fogFactor = 1.0 - exp(-fogThick * fogThick);
-    #else
-      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-    #endif
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
+    float fogHigh = length(cameraPosition) - 12000.0;
+    float fogAir = 0.5 * (exp(-clamp(fogHigh, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
+    float fogThick = fogNear * fogAir * vFogDepth;
+    float fogFactor = 1.0 - exp(-fogThick * fogThick);
+    float fogBand = (1.0 - smoothstep(0.012, 0.05, abs(vFogEl - fogFar))) * smoothstep(110.0, 240.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - (1.0 - fogFactor) * (1.0 - fogBand));
   #endif`;
 }

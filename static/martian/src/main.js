@@ -166,7 +166,11 @@ function draw(dt, focus) {
     tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;
     tu.uSpace.value = smoothstep(1500, 9000, high);
     tu.uRelief.value = 1 - 0.68 * smoothstep(2500, 12000, high);
+
   }
+  // the horizon line as this camera sees it: how far below level it lies, from the camera's height over the ground
+  // under it (the haze that lies along it is in the fog shader: see airHaze in the engine)
+  e.scene.fog.far = -Math.sqrt(2 * clamp(e.camera.position.length() - surfaceAt(e.camera.position), 0.5, 400) / e.camera.position.length());
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;

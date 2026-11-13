@@ -326,16 +326,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec3 terrainGrad = grad * (1.0 - ice * 0.5);
         vec2 terrainFlat = flatSlope * (1.0 - ice * 0.35);`)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor = clamp(terrainRough, 0.05, 1.0);`)
-      // The horizon. On a planet twelve kilometres across it is two hundred metres off, too near for the haze to have
-      // softened it, and a plain ended in a ruler's edge with boulders standing on it. Ground seen at a grazing angle
-      // of under three degrees, well out, takes more of the haze: the last of a plain melts into the sky, and a far
-      // hill's outline is soft. (A wall seen face-on is not grazed, and keeps what the distance alone gives it.)
-      .replace('#include <fog_fragment>', `#include <fog_fragment>
-        {
-          float graze = abs(dot(normalize(cameraPosition - vPlanetPos), geoN));
-          float rimHaze = (1.0 - smoothstep(0.004, 0.05, graze)) * smoothstep(110.0, 240.0, viewDist) * 0.72 * (1.0 - uSpace);
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, rimHaze);
-        }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         totalEmissiveRadiance += vec3(0.012, 0.034, 0.075) * iceGlow * uDay;`)
       // regolith scatters light back toward the sun; it has no sheen at grazing angles. Ice keeps its glint.
@@ -359,6 +349,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain30' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain32' + (o.fine !== false ? 'F' : '');
   return mat;
 }
