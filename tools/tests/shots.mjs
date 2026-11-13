@@ -48,6 +48,9 @@ const scenes = {
   'hab-noon': async () => ev(async (G) => { G.tpLocal(-9, 26, 0.35); G.setLocalTime(12.3); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
   'hab-dusk': async () => ev(async (G) => { G.tpLocal(10, 26, -0.4); G.setLocalTime(17.6); G.look(-0.02); G.tick(0.05, 40); await G.settle(); }),
   'hab-night': async () => ev(async (G) => { G.tpLocal(6, 22, 0); G.setLocalTime(22); G.look(-0.05); G.tick(0.05, 30); await G.settle(); }),
+  // (a played game has crops in its beds: the interior pictures show the farm as it is for most of a run)
+  '-farm-planted': async () => ev((G) => { const crops = ['potato', 'potato', 'radish', 'lettuce', 'soy', 'tomato'], grown = [0.9, 0.6, 0.75, 0.95, 0.45, 0.7];
+    G.World.plots.forEach((pl, i) => { pl.state = 'growing'; pl.crop = crops[i % 6]; pl.growth = grown[i % 6]; pl.watered = 2; }); G.syncAllVisuals(); }),
   'inside-game-cam': async () => ev(async (G) => { G.setLocalTime(10); G.tpLocal(0, 4.5, 0); G.look(-0.2); G.tick(0.05, 30); await G.settle(); }),
   'inside-machines': async () => ev(async (G) => { G.tpLocal(-1.5, 0.5, 1.9); G.look(-0.25); G.tick(0.05, 30); await G.settle(); }),
   'inside-farm': async () => ev(async (G) => { G.tpLocal(1.5, -0.5, -1.3); G.look(-0.15); G.tick(0.05, 30); await G.settle(); }),
@@ -119,7 +122,7 @@ const scenes = {
   // the last act, and so the last pictures (the game is won at the end of it): lift-off, the climb, and the planet from the Hermes' height
   'launch': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 128); await G.settle(); }),
   'launch-climb': async () => ev(async (G) => { G.tick(0.05, 174); await G.settle(); }),
-  'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 330); await G.settle(); }),
+  'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 420); await G.settle(); }),
 };
 for (const [name, setup] of Object.entries(scenes)) {
   // scenes that only set something up (their name starts with '-', or is one of the old three) run always and take no picture

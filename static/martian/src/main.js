@@ -158,6 +158,7 @@ function draw(dt, focus) {
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
+  dustUniforms.uRim.value = e.modelRim || 0;
   if (ctx.terrainUniforms) {
     const tu = ctx.terrainUniforms, high = e.camera.position.length() - R;
     tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;

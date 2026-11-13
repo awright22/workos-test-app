@@ -79,7 +79,8 @@ function trodden(base) {
   c.width = c.height = N;
   const g = c.getContext('2d');
   g.imageSmoothingQuality = 'high';
-  g.drawImage(base, 0, 0, N, N);
+  // (the packed patch itself faint: at full strength the yard read as a dark smudge with nothing to cast it)
+  g.globalAlpha = 0.5; g.drawImage(base, 0, 0, N, N); g.globalAlpha = 1;
   g.globalCompositeOperation = 'lighter';
   let seed = 7;
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -214,7 +215,17 @@ export function buildHabColony(spawn) {
   const outside = () => dark() * (S.power > 0.5 ? 1 : 0);
   for (const [n, power, range] of [['lamp_door_L', 5, 20], ['lamp_door_R', 5, 20], ['lamp_tanks', 5, 16]]) {
     const a = hab.part(n);
-    if (a) addLamp(a, { color: 0xffe2bd, power, range, level: outside });
+    if (a) {
+      // The light itself hangs a pace out from the wall under its fitting. At the wall's own face it burnt the
+      // panel white from top to bottom and left the ground at its foot dark: a lamp that lit nothing.
+      a.updateWorldMatrix(true, false);
+      const lp = hab.root.worldToLocal(a.getWorldPosition(new THREE.Vector3()));
+      const out = Math.hypot(lp.x, lp.z) || 1;
+      // (a pace and a half out and at waist height: a white wall a hand's breadth from a lamp is five times as bright as
+      // sand under it, so the light has to be nearer the ground than the wall for a pool to show)
+      lp.x += (lp.x / out) * 2.4; lp.z += (lp.z / out) * 2.4; lp.y = HAB_FLOOR + 1.0;
+      addLamp(hab.root, { offset: lp, color: 0xffe2bd, power: power * 1.5, range, level: outside });
+    }
   }
   // the fittings themselves glow: outside only in the dark, inside whenever there is power
   World.habLampMats = []; World.habRoomLampMats = [];
@@ -501,7 +512,7 @@ export function buildStorySites() {
     // those that came down on engines left their blast in the dust; those that bounced in on airbags, a scuffed patch
     // (the rovers drove away from where they were set down, and the airbag landers rolled to where they lie)
     const engines = /Viking|Mars 3|Mars 6|Phoenix|InSight/.test(L.name);
-    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 5.2 : 3.4, blast: engines, stainOpacity: engines ? 0.3 : 0.34 });
+    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 5.2 : 3.4, blast: engines, stainOpacity: engines ? 0.3 : 0.2 });
     if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }
@@ -555,7 +566,7 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     const gm = addSiteModel(g, 'greenhouse', { stain: 6.8, stainOpacity: 0.5 });
     // its lights: white from the apex, pink from the grow strips; they carry the dome at night
     // (hardly brighter by night than by day: the eye is wide open then, and what lit the dome at noon floods it)
-    const lit = () => 0.3 + 0.12 * (World.dark || 0);
+    const lit = () => 0.3 + 0.4 * (World.dark || 0);      // (the dome's own light reaches the ground round it after dark)
     // (kept modest: the dome's own floor and trays are white and a metre or two from these, and blow out long
     //  before the ground outside is lit)
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 20, decay: 1.25, level: lit });

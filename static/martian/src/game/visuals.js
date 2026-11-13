@@ -47,7 +47,7 @@ export function syncAllVisuals() {
   if (World.breachPatch) World.breachPatch.visible = S.breach.done && !S.breach.active;
   const powered = S.power > 0.5;
   // (with power and no uplink the monitor idles dim, it is not a dead black slab)
-  setGlow(World.commsMats, S.pf.connected && powered ? 1 : powered ? 0.22 : 0.03);
+  setGlow(World.commsMats, S.pf.connected && powered ? 1 : powered ? 0.5 : 0.03);
   setGlow(World.oxyMats, powered ? 1 : 0.05);
   setGlow(World.habRoomLampMats || [], powered ? 0.55 : 0.03);
   for (const [id, node] of Object.entries(World.comfortParts || {})) {

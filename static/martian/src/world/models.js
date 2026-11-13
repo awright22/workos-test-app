@@ -22,8 +22,8 @@ function screenTexture() {
   if (_screenTex) return _screenTex;
   const S = 256, c = document.createElement('canvas');
   c.width = c.height = S * 2;
-  const g = c.getContext('2d'), ink = '#7fd6e8', dim = '#2c6f82', rule = '#12313d', warm = '#f0a44a';
-  const panel = (i, draw) => { g.save(); g.translate((i % 2) * S, (i >> 1) * S); g.beginPath(); g.rect(0, 0, S, S); g.clip(); g.fillStyle = '#06131c'; g.fillRect(0, 0, S, S); draw(); g.restore(); };
+  const g = c.getContext('2d'), ink = '#a8ecfa', dim = '#4fa3ba', rule = '#1a4a5e', warm = '#ffb45a';
+  const panel = (i, draw) => { g.save(); g.translate((i % 2) * S, (i >> 1) * S); g.beginPath(); g.rect(0, 0, S, S); g.clip(); g.fillStyle = '#0d3247'; g.fillRect(0, 0, S, S); draw(); g.restore(); };
   panel(0, () => {
     g.fillStyle = ink; g.fillRect(18, 16, 96, 12); g.fillStyle = dim; g.fillRect(180, 18, 56, 8);
     [0.82, 0.64, 0.91, 0.38, 0.72, 0.55, 0.87].forEach((w, k) => {
@@ -129,7 +129,7 @@ const GROUND = /^ground_dust/;
 /** Parts that are indoors, whatever their model's dust. */
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
-export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 } };
+export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 } };
 
 let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
@@ -158,6 +158,7 @@ function setUpPlain(plain, ground) {
         uniform samplerCube uDustAlbedo;
         uniform vec3 uDustHere;
         uniform float uFill;
+        uniform float uRim;
         #ifndef USE_NORMALMAP_OBJECTSPACE
         uniform mat3 normalMatrix;
         #endif
@@ -201,9 +202,20 @@ function setUpPlain(plain, ground) {
       // soil has no sheen (the terrain's own material has none): with one, an apron pales at a low angle and shows
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n if (vPbr.z > 1.5) { material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16; }')
       .replace('#include <lights_fragment_maps>', 'irradiance *= uFill;\n#include <lights_fragment_maps>\niblIrradiance *= uFill; radiance *= uFill;')
+      // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
+      // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        #if NUM_DIR_LIGHTS > 0
+        {
+          vec3 rimV = normalize(vViewPosition);
+          float rimBack = max(0.0, -dot(directionalLights[0].direction, rimV));
+          float rimEdge = pow(1.0 - clamp(dot(normal, rimV), 0.0, 1.0), 3.0) * smoothstep(-0.2, 0.25, dot(normal, directionalLights[0].direction));
+          reflectedLight.directDiffuse += directionalLights[0].color * diffuseColor.rgb * (uRim * rimBack * rimBack * rimEdge * 0.55);
+        }
+        #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust7' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust8' + (ground ? 'G' : '');
   return plain;
 }
 

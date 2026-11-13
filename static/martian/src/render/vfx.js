@@ -407,7 +407,8 @@ export class Vfx {
     _v.crossVectors(up, _e);
     const veer = Math.sin(this.time * 0.013) * 0.6;
     const px = (p.pixelHeight || 720) / (2 * Math.tan((camera.fov * Math.PI) / 360));
-    const lit = Math.min(1.6, 0.25 + p.sunIntensity * 0.32);
+    // (dust is lit by what lights the ground: with a floor of a quarter it glowed at night, brighter than the sand it rose from)
+    const lit = Math.min(1.6, 0.025 + p.sunIntensity * 0.32);
     const a = this.airU;
     // carry the dust along: the wind's speed rises with the storm. The totals wrap at a length
     // every mote's pace divides, so they stay small and exact however long the game runs.

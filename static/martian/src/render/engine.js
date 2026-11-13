@@ -294,7 +294,10 @@ export class Engine {
      *  fabric under starlight was as bright as a lit porch). Indoors it is the room's own bounce and is left alone. */
     // (And by day less than all of it: white fabric in the shade stood out as bright as the lit sand beside it, as if
     // pasted on. Least under a low sun, when a man seen against the light should be a dark figure with a bright edge.)
-    this.modelAmbient = lerp(lerp(0.22, lerp(0.56, 0.84, smoothstep(0.08, 0.7, sky.sunE)), sky.day), 1, io);
+    // (Under a low sun the lit sand is itself mostly sky-lit, and white cloth in full shade measured as bright as the
+    // sand it stood on: so the fill falls to a third there. The rim light is the other half of the same picture.)
+    this.modelAmbient = lerp(lerp(0.22, lerp(0.32, 0.8, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
+    this.modelRim = (1 - io) * sky.day;
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
     const near = alt > 400 ? 2 : 0.12;

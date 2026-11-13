@@ -239,18 +239,26 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec3 rockCol = alb * mix(vec3(0.50, 0.45, 0.46), vec3(0.98, 0.88, 0.80), bedTone);
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
         // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
-        rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.105, 0.082, 0.076), 0.6) * mix(0.9 + 0.2 * bedTone, 0.72 + 0.56 * bedTone, smoothstep(0.10, 0.34, slope)), lava * 0.9);
+        rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.060, 0.058), 0.75) * mix(1.0, 0.72 + 0.56 * bedTone, smoothstep(0.22, 0.45, slope)), lava * 0.9);
         float nearLump = 1.0 - smoothstep(24.0, 110.0, viewDist);
-        vec3 basaltCol = mix(alb * vec3(0.46, 0.43, 0.47), vec3(0.092, 0.074, 0.070), 0.62) * (0.86 + 0.5 * hMid * fMid + 0.55 * hLump * nearLump + 0.3 * clamp(tone, -0.5, 0.5));
+        vec3 basaltCol = mix(alb * vec3(0.46, 0.43, 0.47), vec3(0.050, 0.043, 0.044), 0.86) * (0.86 + 0.6 * hMid * fMid + 0.55 * hLump * nearLump + 0.3 * clamp(tone, -0.5, 0.5));
         // (a frozen lava lake is not swept clean: dust lies on it in broad drifts)
         float drift = pond * smoothstep(0.02, 0.26, hFar * 0.8 + hMid * 0.5 * fMid) * 0.7;
         // (the joints of a frozen lava lake are dark, where frost in an ice field's cracks is pale)
         basaltCol *= 1.0 - 0.45 * crack * pond;
         col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift));
-        grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level);
+        grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
         col = mix(col, col * vec3(0.80, 0.78, 0.78) * (1.0 + clamp(tone, -0.4, 0.4) * 0.35), worn * 0.75);
-        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5), rock * 0.9);
+        // Crags. Past a hundred metres a wall had only the broadest relief to shade it and hung like drapery; a lava
+        // field from the air was a smooth hump. The grain volume again at twelve metres a period, strong, on bare rock
+        // and on the tops of flows, from sixty metres out to a kilometre and a half (nearer, the lumps take over).
+        vec4 nCrag = texture(uGrain, vTex / 12.0 + vec3(0.37, 0.11, 0.59));
+        float fCrag = smoothstep(40.0, 140.0, viewDist) * (1.0 - smoothstep(700.0, 1500.0, viewDist));
+        float craggy = max(rock, basalt * (1.0 - pond)) * fCrag;
+        grad += (nCrag.rgb - 0.5) * (1.25 * craggy);
+        float cragTone = (nCrag.a - 0.5) * craggy;
+        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7), rock * 0.9);
         grad += pDir * ((band.r - 0.5) * 2.4 * rock) * (1.0 - smoothstep(300.0, 1500.0, viewDist));
         // stones are basalt, not dust: darker and greyer than the sand they lie in
         col = mix(col, col * vec3(0.74, 0.78, 0.84), stone * 0.75);
@@ -301,6 +309,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain17' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain19' + (o.fine !== false ? 'F' : '');
   return mat;
 }

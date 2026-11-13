@@ -196,7 +196,7 @@ export function startLaunch() {
   S.uiOpen = false;
   setPrompt(null);
   closeScreens();
-  const mavUp = _v1.copy(World.mav.position).normalize().clone();
+  const mavUp = _v1.copy(World.mav.position).normalize().clone(), _lp = mavUp.clone();
   tangentBasis(mavUp, _pe, _pn);
   const camGround = World.mav.position.clone().addScaledVector(_pe, 26).addScaledVector(_pn, -20);
   camGround.normalize().multiplyScalar(surfaceAt(camGround) + 2.2);
@@ -229,16 +229,27 @@ export function startLaunch() {
     World.mavRocket.position.y = World.mavRocketY + alt;
     World.mavFlame.scale.y = 1 + Math.random() * 0.4;
     const rocketWorld = _v2.copy(World.mav.position).addScaledVector(mavUp, alt + 8);
+    // the exhaust: a column of pale smoke left hanging down the sky behind the climb
+    if (ctx.vfx && alt < 5000) {
+      ctx.vfx.puff(_lp.copy(rocketWorld).addScaledVector(mavUp, -11), { count: 2, speed: 2.5 + alt * 0.002, up: -4 - Math.min(14, lt * 2.5), spread: 1.2 + Math.min(6, alt * 0.004),
+        size: 4.5 + Math.min(18, alt * 0.02), life: 6.5, tone: 0.75 });
+    }
     if (alt < 2200) {
-      // chase from below-side
-      ctx.engine.camera.position.copy(camGround).addScaledVector(mavUp, alt * 0.55);
+      // The first seconds from the ground, the rocket climbing out of its own dust. Then alongside and a little
+      // above it, close enough that it stays large, so that the ground falls away under it and the horizon curves.
+      // (It was watched from below the whole way: a rocket, then a dot, in an empty sky.)
+      const a = smoothstep(30, 220, alt);
+      ctx.engine.camera.position.copy(camGround).addScaledVector(mavUp, alt * (0.22 + 0.80 * a) + 26 * a)
+        .addScaledVector(_pe, a * (14 + alt * 0.03)).addScaledVector(_pn, -a * alt * 0.012);
       S.shake = clamp(1.0 - lt * 0.06, 0, 1);
       ctx.engine.camera.position.addScaledVector(_v3.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.5);
-      camLookAt(rocketWorld, mavUp);
+      camLookAt(_v3.copy(World.mav.position).addScaledVector(mavUp, 8 + alt * (0.72 + 0.28 * a) - 5 * a), mavUp);
     } else {
       // pull out to orbit: watch the whole planet you survived
       const k = smoothstep(2200, 14000, alt);
-      _v3.copy(mavUp).multiplyScalar(R * (1.15 + k * 1.3)).addScaledVector(_pe, -R * 0.55 * k);
+      // (ending half as far from the Hermes as before, above and beside her and looking back down past her, so that
+      // she is a ship and not a speck and the planet's limb curves through the frame behind her)
+      _v3.copy(mavUp).multiplyScalar(R * (1.15 + k * 1.0)).addScaledVector(_pe, -R * 0.3 * k);
       ctx.engine.camera.position.lerp(_v3, 1 - Math.pow(0.02, dt));
       camLookAt(k > 0.6 ? hermes.position : rocketWorld, mavUp);
       Snd.rumble(clamp(1 - k, 0.1, 0.85));
