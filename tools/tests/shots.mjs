@@ -1,5 +1,5 @@
 // Screenshot matrix: the scenes the quality bar is judged on (see static/martian/QUALITY.md).
-//   node tools/tests/shots.mjs [--quality medium] [--only name,name] [--size 1280x720] [--touch] [--phone]
+//   node tools/tests/shots.mjs [--quality medium] [--only name,name] [--from name] [--size 1280x720] [--touch] [--phone]
 // Images go to tools/tests/.cache/shots/. Rendering is software WebGL: slow, and not a
 // measure of frame rate.
 import { openGame, sleep, outDir } from './lib.mjs';
@@ -20,7 +20,10 @@ await mkdir(dir, { recursive: true });
 const g = await openGame({ quality, width: W, height: H, touch, dsf: phone ? 2 : 1, query: phone ? 'safe=0,47,21,47' : '' });
 const ev = (fn, a) => g.eval(fn, a);
 const snap = async (name) => { await sleep(900); await g.page.screenshot({ path: path.join(dir, `${name}.png`), timeout: 180000 }); console.log('  shot', name); };
-const want = (n) => !only.length || only.includes(n);
+// --from name: take up a run that was cut short, at the named scene (set-up scenes before it still run)
+const from = arg('--from', '');
+let begun = !from;
+const want = (n) => { if (n === from) begun = true; return begun && (!only.length || only.includes(n)); };
 // pictures of the world: everything of the interface is hidden (the interface has its own screenshot set, tests/ui-shots.mjs)
 const hud = (on) => g.page.addStyleTag({ content: `#mg-root > *:not(canvas) { opacity: ${on ? 1 : 0} !important; }` });
 
