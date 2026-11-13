@@ -29,7 +29,9 @@ export function initEffects() {
     _tn.subVectors(_ta, _tb).normalize();
     _tn.crossVectors(_r, _tn).normalize();
     ctx.vfx.mark('boot', _p, _f, _tn);
-    ctx.vfx.puff(_p, { count: e.run ? 4 : 2, speed: e.run ? 0.9 : 0.5, up: 0.35, spread: 0.12, size: e.run ? 0.34 : 0.24, life: 1.3, dir: _d.copy(_f).multiplyScalar(-0.5) });
+    // (several small wisps that are gone in under a second: two larger ones that hung for longer were soft orange discs
+    // at his heels in any still picture)
+    ctx.vfx.puff(_p, { count: e.run ? 5 : 3, speed: e.run ? 1.0 : 0.6, up: 0.4, spread: 0.16, size: e.run ? 0.2 : 0.14, life: 0.85, dir: _d.copy(_f).multiplyScalar(-0.5) });
   });
   on('land', (e) => {
     if (S.inside || S.inAirlock) return;

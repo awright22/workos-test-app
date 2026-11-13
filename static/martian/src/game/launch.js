@@ -1,7 +1,8 @@
 // The launch: the last act of the story. Ignition and lift-off seen from the ground, the climb out of the dust into
-// a black sky, and the Hermes over the day-night line with the ascent stage closing on her.
+// a black sky, and the rescue as the book has it: the ascent vehicle falls short, the Hermes blows her forward
+// airlock to brake, and Beck crosses on a tether to fetch him. Nobody flies anything: he is cargo.
 //
-// It is five shots, cut like film, and three effects that exist only here:
+// It is six shots, cut like film, and three effects that exist only here:
 //   the flame   three nested cones of light (a white core, the flame, a wide faint plume that spreads as the air thins)
 //   the smoke   lit puffs: a skirt of dust rolling out along the ground, and the column the engine leaves up the sky
 //   the glow    the engine's light on the pad and on the smoke round it
@@ -28,6 +29,7 @@ const CUT_CHASE = 5.6;       // ... to the camera that climbs beside the rocket
 const CUT_LEAVE = 13.0;      // ... the rocket pulls away from it
 const CUT_ORBIT = 16.4;      // ... the Hermes
 const WIN = 25.5;            // the rescue is called
+const CLOSE_AT = 5.0;        // seconds into the last scene: cut from the whole ship to the vehicle's nose
 const ORBIT_R = R * 1.45;    // where the Hermes waits, from the planet's centre
 const climb = (lt) => 14 * lt * lt;        // height of the ascent stage above the pad (m), lt seconds after lift-off
 
@@ -280,6 +282,25 @@ export function startLaunch() {
     ctx.world.add(hermes);
   }
   hermes.visible = false;
+  if (!World.launchCrew) {
+    // two more astronauts for the last scene: suited, helmets on, in the pose of a man with nothing under his feet
+    const figure = () => {
+      const a = model('astronaut');
+      a.root.traverse((o) => { const n = o.material && !Array.isArray(o.material) ? o.material.name : ''; if (o.name === 'head' || /^head_/.test(n)) o.visible = false; });
+      const mixer = new THREE.AnimationMixer(a.inner), clip = a.clips.find((c) => c.name === 'Air');
+      if (clip) mixer.clipAction(clip).play();
+      // (he is placed by his middle, not his boots: the model stands on its origin, so it hangs in a holder a little
+      // above it. Moving the model itself did nothing: the clip writes its place every frame.)
+      const holder = new THREE.Group();
+      a.root.position.y = -0.95;
+      holder.add(a.root);
+      holder.visible = false;
+      ctx.world.add(holder);
+      return { root: holder, mixer };
+    };
+    World.launchCrew = { beck: figure(), mark: figure() };
+  }
+  World.launchCrew.beck.root.visible = World.launchCrew.mark.root.visible = false;
   const F = effects(), smoke = F.smoke, parts = F.flame.userData;
   smoke.points.position.copy(pad);
   smoke.u.uUp.value.copy(up);
@@ -374,27 +395,79 @@ export function startLaunch() {
       cam.position.copy(pad).addScaledVector(nearDir, dist).addScaledVector(side, -dist * 0.35).addScaledVector(up, camAlt + 31 + Math.min(alt, 2400) * 0.008);
       camLookAt(rocketAt.addScaledVector(up, -6 - Math.min(lag * 3, 4)), up);
     } else {
-      // 5. The Hermes, over the line between day and night, and the ascent stage coming up to her.
-      setShot('orbit', 30);
+      // 5. The Hermes, over the line between day and night. The ascent vehicle has fallen short of her and hangs
+      //    off her bow. Her forward airlock blows, to brake her; a man comes out of it on a tether.
+      // 6. Close on the vehicle's open nose as he reaches it.
       if (!orbit) orbit = enterOrbit(up, F);
-      const ot = lt - CUT_ORBIT;
+      const ot = lt - CUT_ORBIT, O = orbit;
       hermes.visible = true;
       if (World.hermesRing) World.hermesRing.rotation.z = ot * 0.22;
-      // the camera drifts round her, slowly
-      const swing = orbit.swing + ot * 0.012;
-      _a.copy(orbit.h).multiplyScalar(Math.cos(swing)).addScaledVector(orbit.s, Math.sin(swing));
-      cam.position.copy(orbit.centre).addScaledVector(_a, Math.cos(orbit.pitch) * orbit.dist).addScaledVector(up, Math.sin(orbit.pitch) * orbit.dist);
-      _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(orbit.centre).normalize(), orbit.roll);
-      camLookAt(_c.copy(orbit.centre).addScaledVector(orbit.f, 20), _b);
-      // the ascent stage closes on the forward port, nose first, braking
-      const gap = 11 + 42 * Math.pow(1 - clamp(ot / 14, 0, 1), 2.0);
-      _a.copy(orbit.dock).addScaledVector(orbit.f, gap).addScaledVector(up, -2.5 + Math.min(ot, 12) * 0.2).addScaledVector(orbit.x, 3 - Math.min(ot, 12) * 0.22);
-      rocket.parent.worldToLocal(_a);
-      rocket.position.copy(_a);
-      rocket.quaternion.copy(orbit.rocketQ);
-      const brake = 1 - smoothstep(0.6, 2.4, ot);
-      F.flame.scale.setScalar(Math.max(0.001, 0.5 * brake));
+      // the ascent stage, spent, turning slowly end over end a little
+      const mavAt = O.mavAt.copy(O.dock).addScaledVector(O.f, 46 - Math.min(ot, 14) * 0.5).addScaledVector(O.x, -10).addScaledVector(up, -3);
+      _q.setFromAxisAngle(O.x, 0.22 * Math.sin(ot * 0.21) - 0.1).multiply(O.rocketWorldQ);
+      const noseDir = O.noseDir.set(0, 1, 0).applyQuaternion(_q);
+      rocket.position.copy(rocket.parent.worldToLocal(_a.copy(mavAt)));
+      rocket.quaternion.copy(O.parentInvQ).multiply(_q);
+      F.flame.scale.setScalar(0.001);
       World.launch.burning = false;
+      const nose = O.nose.copy(mavAt).addScaledVector(noseDir, O.stageLength);
+      // (what is said over the radio, once each)
+      if (ot > 0.5 && !O.said) { O.said = 1; log('HERMES: He is short of us, and fast. Blowing the forward airlock to brake. Beck, you are on the tether.', 'nasa'); }
+      if (ot > 7.6 && O.said < 2) { O.said = 2; log('BECK: I have him.', 'nasa'); }
+      // the airlock blows: a jet of the ship's own air out of her bow, gone in two seconds
+      if (ot > 0.7 && ot < 1.7) {
+        // (a dense cone of vapour, thick at the hatch and thinning as it spreads: seventy small puffs were a string of beads)
+        O.blastDue += dt * 240 * (1 - smoothstep(1.2, 1.7, ot));
+        while (O.blastDue >= 1) {
+          O.blastDue -= 1;
+          const a1 = rnd() * Math.PI * 2, wide = Math.sqrt(rnd()) * 11;
+          _b.copy(O.f).multiplyScalar(10 + rnd() * 30).addScaledVector(O.x, Math.cos(a1) * wide).addScaledVector(up, Math.sin(a1) * wide);
+          smoke.emit(_a.copy(O.dock).addScaledVector(O.f, 0.8 + rnd() * 1.5), _b, 1.5 + rnd() * 1.2, 9 + rnd() * 7, 1.5 + rnd() * 1.3, 0.94, 0.5);
+        }
+      }
+      // Beck: out of the airlock at two seconds, across the gap, hand on the nose at seven and a half; then back, with him
+      const out = smoothstep(1.9, 7.5, ot), back = smoothstep(8.3, 19, ot);
+      const from = O.from.copy(O.dock).addScaledVector(O.f, 1.6), to = O.to.copy(nose).addScaledVector(noseDir, 1.5);
+      const beckAt = O.beckAt.copy(from).lerp(to, out).lerp(from, back);
+      const crew = World.launchCrew;
+      crew.beck.root.visible = ot > 1.9;
+      crew.beck.root.position.copy(beckAt);
+      // (he flies head first toward where he is going, belly to the planet)
+      const ahead = O.ahead.copy(back > 0 ? from : to).sub(back > 0 ? to : from).normalize();
+      crew.beck.root.quaternion.setFromRotationMatrix(_m.makeBasis(_d.crossVectors(up, ahead).normalize(), ahead, _a.crossVectors(_d, ahead)));
+      crew.beck.mixer.setTime(0.4 + 0.25 * Math.sin(ot * 0.9));
+      // ... and Watney, in the open nose until he is fetched, then a little behind Beck on the way home
+      const carried = smoothstep(8.0, 9.2, ot), markUp = carried > 0.5 ? ahead : noseDir;
+      crew.mark.root.visible = true;
+      crew.mark.root.position.copy(nose).addScaledVector(noseDir, 0.15).lerp(_b.copy(beckAt).addScaledVector(ahead, -2.0), carried);
+      crew.mark.root.quaternion.setFromRotationMatrix(_m.makeBasis(_d.crossVectors(up, markUp).normalize(), markUp, _a.crossVectors(_d, markUp)));
+      crew.mark.mixer.setTime(0.2 + 0.2 * Math.sin(ot * 0.7 + 1));
+      // the tether, slack as it pays out and drawn straight as he nears the end of it
+      {
+        const pts = O.tether.geometry.attributes.position, n = pts.count, slack = 2.6 * (1 - 0.85 * Math.max(out - back, 0));
+        for (let i = 0; i < n; i++) {
+          const k = i / (n - 1), sag = Math.sin(k * Math.PI) * slack;
+          _a.copy(O.dock).lerp(beckAt, k).addScaledVector(up, -sag).addScaledVector(O.x, Math.sin(k * 7 + ot * 0.8) * 0.25 * slack);
+          pts.setXYZ(i, _a.x - O.centre.x, _a.y - O.centre.y, _a.z - O.centre.z);
+        }
+        pts.needsUpdate = true;
+        O.tether.visible = ot > 1.9;
+      }
+      if (ot < CLOSE_AT) {
+        setShot('orbit', 30);
+        // the camera drifts round her, slowly
+        const swing = O.swing + ot * 0.012;
+        _a.copy(O.h).multiplyScalar(Math.cos(swing)).addScaledVector(O.s, Math.sin(swing));
+        cam.position.copy(O.centre).addScaledVector(_a, Math.cos(O.pitch) * O.dist).addScaledVector(up, Math.sin(O.pitch) * O.dist);
+        _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(O.centre).normalize(), O.roll);
+        camLookAt(_c.copy(O.centre).addScaledVector(O.f, 27), _b);
+      } else {
+        // from above and a little beyond the vehicle, looking back down the tether: the two of them over the planet
+        setShot('reach', 40);
+        const ct = ot - CLOSE_AT;
+        cam.position.copy(nose).addScaledVector(up, 11.5 - ct * 0.1).addScaledVector(O.x, -4 + ct * 0.15).addScaledVector(O.f, 3 - ct * 0.15);
+        camLookAt(_c.copy(nose).addScaledVector(O.f, -2.8), _b.copy(O.f).negate());
+      }
     }
     if (S.shake > 0) cam.position.addScaledVector(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.35);
     // a short dip to black over the one cut that crosses half a planet
@@ -431,13 +504,28 @@ function enterOrbit(up, F) {
   hermes.position.copy(centre).addScaledVector(up, -12);
   hermes.updateMatrixWorld(true);
   const dock = centre.clone().addScaledVector(f, 30);
-  // the ascent stage flies nose toward the port: its own "up" is the way it points
+  // the ascent stage lies nose toward the ship: its own "up" is the way it points
   const rocketWorldQ = new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(x, f.clone().negate(), up));
-  World.mavRocket.parent.updateWorldMatrix(true, false);
-  World.mavRocket.parent.getWorldQuaternion(_q);
-  const rocketQ = _q.invert().multiply(rocketWorldQ).clone();
+  const rocket = World.mavRocket;
+  rocket.parent.updateWorldMatrix(true, false);
+  const parentInvQ = rocket.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+  // how long the stage is, from the point it is placed by to its open nose (measured as it stands, before it is turned)
+  const padUp = World.mav.position.clone().normalize(), box = new THREE.Box3().setFromObject(rocket);
+  const basePt = rocket.getWorldPosition(new THREE.Vector3());
+  let top = 0;
+  for (let i = 0; i < 8; i++) top = Math.max(top, _a.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).sub(basePt).dot(padUp));
+  const stageLength = clamp(top * 0.82, 3, 14);
+  // the tether: a line from the airlock to the man on the end of it
+  const tg = new THREE.BufferGeometry();
+  tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(20 * 3), 3));
+  const tether = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xf4f0e8, fog: false }));
+  tether.frustumCulled = false; tether.position.copy(centre); tether.visible = false;
+  ctx.world.add(tether);
   World.launch.focus = centre;
   e.snapLight = 3;                 // (the light is metered and the sky's light taken afresh at once, under the cut, not a second into the shot)
   F.glow = 0; F.smoke.u.uGlow.value = 0;
-  return { centre, dock, f, x, s, h, rocketQ, dist: 106, pitch: 50 * deg, swing: 25 * deg, roll: -0.14 };
+  const V = () => new THREE.Vector3();
+  return { centre, dock, f, x, s, h, rocketWorldQ, parentInvQ, stageLength, tether, blastDue: 0, said: 0,
+    mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), from: V(), to: V(), ahead: V(),
+    dist: 106, pitch: 50 * deg, swing: 25 * deg, roll: -0.14 };
 }
