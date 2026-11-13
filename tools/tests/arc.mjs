@@ -173,8 +173,16 @@ s = await ev((G) => {
 });
 check('stripping the MAV opens the launch prompt', s.stripped && s.ui, s);
 await click('PUNCH IT');
-s = await ev((G) => { const m = G.S.mode; G.tick(0.05, 900); return { mode: m, won: G.S.won, ui: G.S.uiOpen }; });
+s = await ev((G) => {
+  const m = G.S.mode;
+  G.tick(0.05, 140);
+  const mid = { burning: !!(G.World.launch && G.World.launch.burning), alt: Math.round((G.World.launch && G.World.launch.alt) || 0) };
+  G.tick(0.05, 760);
+  const gap = Math.round(G.World.mavRocket.getWorldPosition(G.World.mav.position.clone()).distanceTo(G.World.launch.focus));
+  return { mode: m, won: G.S.won, ui: G.S.uiOpen, mid, gap, fade: G.ctx.engine.final.uniforms.uFade.value };
+});
 check('launching reaches orbit and wins', s.mode === 'cutscene' && s.won && s.ui, s);
+check('the engine burns on the climb, and the last shot has the ascent stage beside the Hermes with the picture faded back in', s.mid.burning && s.mid.alt > 100 && s.gap < 80 && s.fade === 0, s);
 await g.shot('arc-win');
 
 const failed = results.filter((r) => !r.ok);

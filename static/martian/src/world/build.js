@@ -634,6 +634,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     // what the dome spills on the ground round it after dark, cut by the shadows of its frame (drawn: see groundGlow)
     // (no wider than the ground levelled for the dome: beyond it the land rises and falls through the patch, and cuts it in straight lines)
     groundGlow(g, 7.4, 0xffb8a8, 0.28, 'dome', () => World.dark || 0, GREENHOUSE.floor + 0.04);
+    // (its strip lights are lamps too: full at night, a glimmer by day, when the sun through the panes does the work.
+    // Burning white at noon they were the brightest thing in the dome.)
+    b.glow = ownMaterials(gm.root, /^light_/);
     for (const [px, pz] of [[-1.1, -1.2], [1.1, -1.2], [-1.1, 1.2], [1.1, 1.2]]) addFarmPlot(g, px, pz, true);
     // the door swings outward on its left jamb as someone walks up to it, from either side
     b.door = { node: gm.part('door_leaf'), k: 0, cols: [siteCollider(g, 0, GREENHOUSE.portalEnd, 0.7)] };

@@ -191,6 +191,7 @@ function draw(dt, focus) {
 /** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
 function tick(dt) {
   updateAudio(dt);
+  ctx.engine.sky.showMoons = S.started;
   if (!S.started) { titleCamera(dt); return null; }
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
   if (S.over && S.mode !== 'cutscene') return focus;
@@ -227,6 +228,7 @@ function tick(dt) {
   const strobe = Math.sin(blinkT * 6) > 0.7 ? 1 : 0;
   for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }
   for (const b of World.builtMeshes) {
+    if (b.glow && b.group.visible) setGlow(b.glow, 0.16 + 0.44 * (World.dark || 0));      // (not full even at night: at full the apex fitting burnt a star through the glass)
     if (!b.lamp) continue;
     b.pulse = Math.max(0, Math.sin(blinkT * 2.2)) ** 6;
     if (b.group.visible) setGlow(b.lamp, 0.25 + 1.5 * b.pulse);

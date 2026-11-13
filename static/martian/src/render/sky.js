@@ -234,7 +234,8 @@ export class Sky {
       const p = this.moons[i], m = (i ? u.uDeimos : u.uPhobos).value;
       _m.copy(p).multiplyScalar(R).sub(camPos).normalize();
       const along = p.dot(sunDir), off = Math.sqrt(Math.max(0, p.lengthSq() - along * along));
-      m.set(_m.x, _m.y, _m.z, along < 0 ? smoothstep(0.93, 1.07, off) : 1);       // behind the planet, in its shadow
+      // (on the title screen they are left out: one drifted across the menu and came to rest against a line of it)
+      m.set(_m.x, _m.y, _m.z, this.showMoons === false ? 0 : along < 0 ? smoothstep(0.93, 1.07, off) : 1);       // behind the planet, in its shadow
     }
     // --- values the rest of the renderer needs, consistent with the shader above ----------
     const sunE = sunDir.dot(u.uUp.value);

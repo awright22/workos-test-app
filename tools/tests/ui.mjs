@@ -632,8 +632,14 @@ if (!onlySize || onlySize === 'portrait') {
   await sleep(400);
   const land = await g.page.evaluate(() => ({ rot: getComputedStyle(document.getElementById('mg-rotate')).display, ui: window.__MG.S.uiOpen }));
   await g.page.setViewportSize({ width: 390, height: 844 });
-  await sleep(600);
-  const up = await g.page.evaluate(() => ({ rot: getComputedStyle(document.getElementById('mg-rotate')).display, ui: window.__MG.S.uiOpen, kind: document.getElementById('mg-overlay').className }));
+  // (the pause follows the turn by a frame or two; on a loaded machine a frame can take a second, and a fixed wait
+  // of 0.6 s read the state before the game had seen the turn)
+  let up = null;
+  for (let i = 0; i < 40; i++) {
+    await sleep(250);
+    up = await g.page.evaluate(() => ({ rot: getComputedStyle(document.getElementById('mg-rotate')).display, ui: window.__MG.S.uiOpen, kind: document.getElementById('mg-overlay').className }));
+    if (up.ui && /k-pause/.test(up.kind)) break;
+  }
   check('portrait phone: turning upright mid-game pauses it', land.rot === 'none' && !land.ui && up.rot !== 'none' && up.ui && /k-pause/.test(up.kind), { land, up });
   errors += g.errors.length;
   await g.close();

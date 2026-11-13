@@ -403,8 +403,24 @@ function prepare(gltf, name) {
         m.color.setRGB(0.035, 0.045, 0.055);
         m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
         // (and its glint from a lamp is a glint: the helmet lamp three metres off still burnt a white star into a pane)
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= 0.07;'); };
-        m.customProgramCacheKey = () => 'glass1';
+        // A pane is seen by what it does to the light: looked through squarely it is almost not there, and looked along
+        // it mirrors the sky. And glass on Mars carries a film of dust. (At one faint tint from every angle a dome of
+        // it read as an open frame with nothing in it.)
+        m.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader
+            .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.07, vec3(0.5));')      // (and never bright enough to bloom: the dome's own lamp still starred a pane at night)
+            .replace('#include <opaque_fragment>', `{ vec3 paneN = normalize(vNormal);
+                float glance = pow(1.0 - abs(dot(paneN, normalize(vViewPosition))), 3.0);
+                // the film of dust on it scatters the light that falls on either face: seen from inside a dome, the sun is behind the pane
+                vec3 filmLit = reflectedLight.indirectDiffuse * 20.0;
+                #if NUM_DIR_LIGHTS > 0
+                  filmLit += directionalLights[0].color * (abs(dot(paneN, directionalLights[0].direction)) * 0.32);
+                #endif
+                outgoingLight += vec3(0.34, 0.24, 0.16) * filmLit * (0.35 + 0.65 * glance);
+                diffuseColor.a = mix(diffuseColor.a + 0.10, 0.82, glance * 0.85); }
+              #include <opaque_fragment>`);
+        };
+        m.customProgramCacheKey = () => 'glass4';
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;

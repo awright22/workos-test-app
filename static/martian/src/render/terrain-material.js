@@ -52,6 +52,12 @@ const GLSL_LAVA = /* glsl */`
     // (one less the share of the reach squared: 0 at the field's edge, 0.36 a fifth of the way in)
     for (int i = 0; i < ${LAVA_FIELDS.length}; i++) m = max(m, 1.0 - (1.0 - dot(dir, LAVA_FIELD[i].xyz)) * LAVA_FIELD[i].w);
     return smoothstep(0.0, 0.36, m);
+  }
+  /** The summit of the lava field a place lies in (of the nearest, where it lies in none). */
+  vec3 lavaSummit(vec3 dir) {
+    float m = -1e9; vec3 c = vec3(0.0, 1.0, 0.0);
+    for (int i = 0; i < ${LAVA_FIELDS.length}; i++) { float k = 1.0 - (1.0 - dot(dir, LAVA_FIELD[i].xyz)) * LAVA_FIELD[i].w; if (k > m) { m = k; c = LAVA_FIELD[i].xyz; } }
+    return c;
   }`;
 /** GLSL mat3 whose product with a texture-space vector gives the world-space vector. */
 export const GLSL_DETAIL_T = `mat3(${DETAIL_FRAME.map(F).join(', ')})`;
@@ -285,6 +291,25 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float drift = pond * smoothstep(0.02, 0.26, hFar * 0.8 + hMid * 0.5 * fMid) * 0.7;
         // (the joints of a frozen lava lake are dark, where frost in an ice field's cracks is pale)
         basaltCol *= 1.0 - 0.45 * crack * pond;
+        // Ropes. A flow that was still moving under its cooling skin wrinkled it: ridges across the flow, a pace or
+        // a few apart, bowed downstream in the middle where the lava ran fastest and swept back along its edges. It
+        // is what says "this ran" from a hill or from the air. They are drawn about the summit the lava came from
+        // (so they always lie across the fall line), bent back where a tongue's top gives way to its edge, and broken
+        // by the same lumps as the rest of the flow. (Without them a flow field from above was smooth dark lobes, like
+        // melted chocolate.)
+        float fRope = smoothstep(8.0, 30.0, viewDist) * (1.0 - smoothstep(500.0, 1100.0, viewDist));
+        float ropy = basalt * (1.0 - pond) * smoothstep(0.25, 0.7, flowTop) * fRope;
+        if (ropy > 0.003) {
+          vec3 summit = lavaSummit(pDir);
+          float down = length(pDir - summit) * ${F(R)};
+          vec3 fall = normalize(pDir * dot(pDir, summit) - summit);
+          float bend = (1.0 - flowTop) * 2.2 + hMid * 2.0 * fMid + hFar * 3.0;
+          float w1 = 6.2832 * (down / 3.6 - bend), w2 = 6.2832 * (down / 11.0 - bend * 0.6 + 0.3);
+          float broken = clamp(0.55 + 1.6 * (nCrag.a - 0.5), 0.0, 1.0);
+          float fine = 1.0 - smoothstep(120.0, 320.0, viewDist);          // (the close-set ridges only as far as they can be told apart)
+          grad += (fall * DETAIL_T) * ((cos(w1) * 0.8 * fine + cos(w2) * 0.9) * ropy * broken);
+          basaltCol *= 1.0 + (sin(w1) * 0.14 * fine + sin(w2) * 0.16) * ropy * broken;
+        }
         col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift));
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
@@ -394,6 +419,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain35' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain36' + (o.fine !== false ? 'F' : '');
   return mat;
 }

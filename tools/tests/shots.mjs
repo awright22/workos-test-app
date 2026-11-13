@@ -96,6 +96,9 @@ const scenes = {
     }
     return G.World.builtMeshes[0].group.position;
   }, 16, 55, 10, { stand: [7.5, 10], height: 2.6, aim: 1.6 }),
+  // (a dome in use has crops in its trays, as the Hab's beds have in their pictures)
+  '-dome-planted': async () => ev((G) => { const crops = ['lettuce', 'tomato', 'soy', 'radish'], grown = [0.9, 0.7, 0.55, 0.8]; let k = 0;
+    G.World.plots.forEach((pl) => { if (pl.state === 'growing') return; pl.state = 'growing'; pl.crop = crops[k % 4]; pl.growth = grown[k % 4]; pl.watered = 2; k++; }); G.syncAllVisuals(); }),
   'greenhouse-inside': async () => ev(async (G) => { G.photo(null); G.tpAround(G.World.builtMeshes[0].group.position, 1.2, 210); G.setLocalTime(10); G.look(-0.2); G.tick(0.05, 40); await G.settle(); }),
   // the dome's floor from above, through the glazing: the frame's shadows should lie across it
   'greenhouse-above': async () => ev(async (G) => { const p = G.World.builtMeshes[0].group.position.clone(); G.photo(p, 2.2, 30, 7.5, 0.2); G.tick(0.05, 2); await G.settle(); }),
@@ -121,7 +124,8 @@ const scenes = {
   'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
   // the figure himself, close, from the side and from behind (he stands at the spot and the camera goes round him)
   'astronaut-side': async () => ev(async (G) => { const p = G.player.pos.clone(); G.tpAround(p, 0.01, 0); G.setLocalTime(9.5); G.tick(0.05, 40); G.photo(G.player.pos.clone(), 3.4, 90, 1.25, 0.95); await G.settle(); }),
-  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 200, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
+  // (he faces south as he is stood here: his back is seen from the north. From bearing 200 this picture was a second front view.)
+  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 20, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
   '-camera-back-2': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
   'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
