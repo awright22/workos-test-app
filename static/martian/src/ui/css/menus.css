@@ -543,13 +543,12 @@
   .mg-compact .title-foot { letter-spacing: .04em; }
 }
 
-/* The rescue screen on the smallest phone: with its labels at a size that can be read it was 34 px taller than the
-   screen, and its last entry was under the fold. The entry's source runs on after it, and the card's own margins are
-   a little closer. (A run with every step dated is taller still, and scrolls: the body says so.) */
-@media (max-width: 760px) {
-  .mg-compact #mg-overlay.k-win .dlg-bd { padding-top: .625rem; }
-  .mg-compact #mg-overlay.k-win .dlg .btns { padding-top: .5rem; padding-bottom: .625rem; }
-  .mg-compact #mg-overlay.k-win .dlg .steps { margin-top: .375rem; }
-  .mg-compact #mg-overlay.k-win .dlg blockquote { margin-top: .375rem; }
-  .mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 0 0 .5em; white-space: nowrap; }
-}
+/* The rescue screen on a phone: with its labels at a size that can be read it was taller than the screen (by 34 px
+   at 667 wide, by a line at 844), and its last entry was under the fold. The entry's source runs on after it, and
+   the card's own margins are a little closer. (A run with every step dated is taller still, and scrolls: the body
+   says so.) */
+.mg-compact #mg-overlay.k-win .dlg-bd { padding-top: .625rem; }
+.mg-compact #mg-overlay.k-win .dlg .btns { padding-top: .5rem; padding-bottom: .625rem; }
+.mg-compact #mg-overlay.k-win .dlg .steps { margin-top: .375rem; }
+.mg-compact #mg-overlay.k-win .dlg blockquote { margin-top: .375rem; }
+.mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 0 0 .5em; white-space: nowrap; }
