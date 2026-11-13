@@ -27,6 +27,8 @@ What follows from it:
    resource and build a whole base from them. Not started. Keep story-mode systems (crafting,
    deployables, pads, saves) general enough that a second mode can reuse them.
 
+The owner has since agreed to this being added to the repository's `CLAUDE.md`, and it is there.
+
 ## How to check
 
 ```
@@ -57,6 +59,11 @@ hold 4 GB. Three or four at once (a test run, a helper's pictures, another helpe
 run) have filled the limit and had browsers killed. Run one browser at a time, two at most,
 and tell helpers the same.
 
+The local server (`tools/serve.mjs`, which every test uses) serves as the published site does:
+every reply states its length, and what compresses goes out gzipped with the compressed length
+stated. It did neither until the owner's iPhone showed what that hid (see "The owner's iPhone"
+under Open items): keep it that way.
+
 One whole run also stood for half an hour on a single step of the interface suite (the first
 key press after a new game started from the title), with the browser's four drawing threads
 busy throughout and its page not answering. The cause was not found: twenty random starts
@@ -70,7 +77,7 @@ return in fifteen minutes now fails its test and prints the site and what was be
 | --- | --- | --- |
 | Frame rate | 30 fps or better on the owner's iPhone, in landscape, on the preset a phone starts on ("medium"); 60 fps on a mid-range laptop at "high" is a bonus | **Not measured on a real GPU.** Software rendering gives 0.4–12 fps, which says nothing. A phone starts on "medium"; dynamic resolution (55 fps target) trades pixels for frames, and a phone that stays under 27 fps for ten seconds at the lowest resolution is noted and opens on "low" from its next launch. Needs a number from the owner's iPhone: the diagnostics panel (four taps top-left) reports it with a COPY button |
 | Scene cost | Per frame (`tests/perf.mjs`). "low": 180 draw calls, 340k triangles in the picture, 230k in the shadow passes. "high": 290 / 600k / 400k. These budgets are estimates, not derived from hardware: they exist to catch regressions until a real frame rate is known | Measured (counts, valid on any machine). low: 69–180 calls, 130–251k picture, 47–222k shadow. high: 83–229, 130–389k, 84–266k. "low" outside the Hab sits exactly on its call budget (180): 75 of those calls are shadow passes for the Hab, rover, array and astronaut. "medium", which a phone now starts on, lies between the two and is not measured separately |
-| Load | Title screen interactive in under 5 s on a 20 Mbit connection; total download under 14 MB; works offline after first load | 13.54 MB precached (53 files). Headless load to title: 1.2–5.5 s from localhost. Not measured on a phone network |
+| Load | Title screen interactive in under 5 s on a 20 Mbit connection; total download under 14 MB; works offline after first load | 13.54 MB precached (53 files). Headless load to title: 1.2–5.5 s from localhost. Not measured on a phone network. **On the owner's iPhone the published preview did not start at all** until the loader was fixed (it trusted the stated length of a compressed file); whether it now loads there, and how fast, is the owner's to report |
 | Console | Zero errors or warnings in a full playthrough | Zero errors in every test and screenshot run |
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
@@ -413,6 +420,7 @@ suit seal (Z8), the ring's "150" and the shortfall that grows by one (Z10), the 
 
 | # | Item | State |
 | --- | --- | --- |
+| 31 | **The owner's iPhone.** First report from the real phone: the preview failed at startup with "Something broke / Input body is disturbed". Cause: the elevation file's loader filled a buffer of the length the server stated; GitHub Pages sends the file compressed and states the compressed length, so more bytes arrived than the buffer held, and the loader's fallback then re-read a download it was already reading, which Safari refuses. No test saw it because the test server stated no length and compressed nothing. | fixed in the loader; the test server now serves as the published site does (the old loader fails the smoke test against it); the failure screen's Reload clears the game's offline cache first. **Not yet confirmed on the phone.** Everything Safari-specific is still unproven here (only Chromium is installed): the next report from the phone decides what comes next |
 | 21 | Act on the fifth picture review (X1–X15 above) | acted on and reviewed again: see round 6 |
 | 29 | Act on the sixth picture review (P1–P18 above), the caldera's faults and the floating astronaut first, then the launch and the landmarks | in progress |
 | 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
