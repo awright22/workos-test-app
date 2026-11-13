@@ -198,8 +198,10 @@ export function renderColony() {
   let ready = 0;
   let craft = '';
   for (const r of RECIPES) {
+    // (a tab's figure is what he has the materials for, at the Hab or away from it: out of range the figures used to
+    //  go from the tabs, as if what he carried had gone with them. The cards say "Only at the Hab".)
     const can = hasCost(r.cost), ok = atHome && can;
-    if (ok) ready++;
+    if (can) ready++;
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
     craft += `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
       tags((ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '')) + '</div>' +
@@ -211,7 +213,7 @@ export function renderColony() {
   }
   // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
   //  where its materials come from instead)
-  craft = `<div class="pane-hd">Fabricator <span>${!atHome ? 'Out of range' : ready ? `${ready} ready to build` : 'Needs materials'}</span></div>` +
+  craft = `<div class="pane-hd">Fabricator <span>${!ready ? (atHome ? 'Needs materials' : 'Out of range') : atHome ? `${ready} ready to build` : `${ready} ready · only at the Hab`}</span></div>` +
     (atHome && !ready ? '<p class="pane-note">Nothing to build yet. The fabricator works in scrap metal and circuit boards: salvage the debris lying around the Hab, and the old landers further out.</p>' : '') + craft;
 
   // --- upgrades: what can still be installed first; what is in, under its own heading (among the others an installed
@@ -224,7 +226,7 @@ export function renderColony() {
       continue;
     }
     const gate = upgradeGate(u), can = hasCost(u.cost), ok = atHome && !gate && can;
-    if (ok) upReady++;
+    if (!gate && can) upReady++;
     // (a locked card: the one reason it is locked, what it will take, and no button to press in vain)
     up += `<article class="rcp ${ok ? 'ready' : gate ? 'locked' : ''}" data-card="${u.id}"><div class="rcp-hd"><h4>${chem(esc(u.name))}</h4>` +
       tags(ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
@@ -244,7 +246,7 @@ export function renderColony() {
   for (const c of COMFORTS) {
     const made = !!comforts()[c.id], block = made ? null : comfortBlock(c.id, World), locked = !made && !!(c.needs && !c.needs(World));
     const ok = !made && !block && atHome;
-    if (ok) homeReady++;
+    if (!made && !block) homeReady++;
     const costHtml = Object.keys(c.cost).length ? costChips(c.cost, locked) : '<span class="chip ok">Nothing but time</span>';
     const card = `<article class="rcp ${made ? 'done' : ok ? 'ready' : locked ? 'locked' : ''}" data-card="${c.id}"><div class="rcp-hd"><h4>${esc(c.name)}</h4>` +
       tags((made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') +

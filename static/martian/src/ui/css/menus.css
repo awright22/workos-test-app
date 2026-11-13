@@ -618,7 +618,6 @@
    a run with every step dated was a line too tall for the screen with both) */
 .mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 .625em 0 0; white-space: normal; }
 .mg-compact #mg-overlay.k-win .dlg h2 { display: none; }
-.mg-compact #mg-overlay.k-win .dlg .steps { grid-row: 3 / span 2; }
 #mg-overlay.k-win .stats { grid-auto-rows: 1fr; }
 @media (min-width: 761px) {
   .mg-compact #mg-overlay.k-win .dlg-bd { grid-template-columns: minmax(0, 1fr) auto; }

@@ -420,7 +420,7 @@ addI({
       stats: [['Meals left', S.food], ['Rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: `${S.food} ration packs, one meal a sol: they run out long before anyone can reach Mars.\n\n` +
-        'The Hab has six farm beds. Fill them with regolith from the heaps outside the airlock, plant, and water. <b>A potato bed takes one ration and gives back four potatoes.</b>',
+        'The Hab has six farm beds. Fill them with regolith, the soil of Mars, from the heaps outside the airlock; plant; and water. <b>A potato bed takes one ration and gives back four potatoes.</b>',
       // (And where it is all going, on the card itself, as the morning's account has it: it used to arrive ten seconds
       //  later as a line of the log, in the slot that carries his jokes, while he stood at a bed with PLANT up.)
       later: `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}.`,
@@ -463,7 +463,8 @@ addI({
   r: 2.4, hold: 0.5, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen && S.inside,
   label: () => (layout.touch ? 'Use the fabricator' : 'Use the fabricator [C]'),      // (a key's name is no use on a phone)
-  use: () => toggleScreen('colony'),
+  // (he has met the Colony screen by opening it here: its button is his from now on, without a card to say so)
+  use: () => { S.flags.uiColony = true; toggleScreen('colony'); },
 });
 // rover enter + exit + camp
 addI({

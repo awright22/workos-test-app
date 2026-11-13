@@ -121,7 +121,23 @@ export function showNewGame(o, back) {
     { label: 'New game: choose a difficulty', onEscape: back });
   UI.overlay.classList.add('over-title');
   on(p, '[data-act="back"]', back);
-  on(p, '[data-diff]', (b) => { hideOverlay(); o.onNewGame(b.dataset.diff); });
+  on(p, '[data-diff]', (b) => {
+    const go = () => { hideOverlay(); o.onNewGame(b.dataset.diff); };
+    if (!o.saved) return go();
+    // (A run in hand is not replaced by one press: Restart in the pause menu asks first, and Begin, which does the
+    //  same thing, had only a line of small print beside Back.)
+    const again = () => showNewGame(o, back);
+    showOverlay({
+      kind: 'error', kicker: 'New game', title: 'Replace your saved run?',
+      body: `Starting a new game replaces your saved run: Sol ${o.saved.sol}${o.saved.region ? ', ' + esc(o.saved.region) : ''}, and everything you have built.`,
+      onEscape: again,
+      buttons: [
+        { label: 'Keep my run', ghost: true, keep: true, fn: again },
+        { label: 'Start a new game', danger: true, ghost: true, keep: true, fn: go },
+      ],
+    });
+    UI.overlay.classList.add('over-title');
+  });
 }
 
 // ------------------------------------------------------------------------------------------

@@ -719,12 +719,14 @@ for (const size of SIZES) {
         const out = { open: why(), h0: Math.round(o.getBoundingClientRect().height) };
         G.tick(0.05, 220);
         out.shut = !why(); out.mark = o.classList.contains('shut'); out.h1 = Math.round(o.getBoundingClientRect().height);
+        // (closed, its title is still one line: the mark that it opens once took a rem of the title's own line)
+        { const r = document.createRange(); r.selectNodeContents(o.querySelector('.obj.primary .tx, .obj.first .tx')); out.titleLines = new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size; }
         out.lead = !!o.querySelector('.obj.primary .tx, .obj.first .tx') && !!o.querySelector('.obj .pl').textContent;
         o.click(); G.tick(0.05, 2);
         out.again = why();
         return out;
       });
-      check(`${size.name}: the task card closes to its title and its place once its reason has been read, and a press opens it again`, card.shut && card.mark && card.lead && card.h1 < card.h0 && card.h1 >= 44 && card.again, card);
+      check(`${size.name}: the task card closes to its title and its place once its reason has been read, and a press opens it again`, card.shut && card.mark && card.lead && card.titleLines === 1 && card.h1 < card.h0 && card.h1 >= 44 && card.again, card);
     }
     // the action button carries the verb for what is in reach, and holding it works the interaction
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });

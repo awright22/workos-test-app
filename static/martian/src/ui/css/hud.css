@@ -707,8 +707,9 @@
 .mg-compact #mg-objectives .obj .nx b { font: 600 var(--t13)/1.25 var(--f-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
 .mg-touch #mg-objectives { pointer-events: auto; cursor: pointer; }
 .mg-touch.mg-compact #mg-objectives { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
-.mg-compact #mg-objectives.shut .obj.primary .tx, .mg-compact #mg-objectives.shut .obj.urgent.first .tx { padding-right: 1rem; position: relative; }
-.mg-compact #mg-objectives.shut .obj.primary .tx::after, .mg-compact #mg-objectives.shut .obj.urgent.first .tx::after { content: ""; position: absolute; right: .125rem; top: .4em; width: .375rem; height: .375rem;
+/* (the mark stands at the end of the line that names the place: beside the title it took a rem of the title's own
+   line, and a title that stood on one line open ran to two closed) */
+.mg-compact #mg-objectives.shut .obj.primary .at::after, .mg-compact #mg-objectives.shut .obj.urgent.first .at::after { content: ""; margin: 0 .1875rem .1875rem auto; align-self: center; width: .375rem; height: .375rem;
   border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(45deg); }
 
 /* the compass: the mission's own mark is named and no more (its distance is on the first line of the list) */

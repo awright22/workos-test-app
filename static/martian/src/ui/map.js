@@ -133,8 +133,8 @@ function buildMarkers() {
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
   // (the rocket says what it is from the first sol: it stood on the map as "Ares 4 MAV" with nothing to say it was the way home)
-  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'Ares 4 MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 3, main: !!S.flags.mavRevealed,
-    title: 'Ares 4 MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'The way home · Schiaparelli crater',
+  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 3, main: !!S.flags.mavRevealed,
+    title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'The way home · Schiaparelli crater',
     note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
     title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
@@ -329,7 +329,13 @@ function draw() {
   }
 
   markers = buildMarkers();
-  for (const m of markers) { m.x = sx(m.lon); m.y = sy(m.lat); }
+  for (const m of markers) {
+    m.x = sx(m.lon); m.y = sy(m.lat);
+    // (a marker that the head or the foot of the map would cut through is drawn whole, against that edge: at most its
+    //  own radius out of place. A survey target's ring was cut in half by the top of the whole-planet map.)
+    const q = ((m.unknown ? 8 : m.small ? 6 : 10) + (m.main ? 6 : 2)) * U;
+    if (m.y > -q && m.y < q) m.y = q; else if (m.y > H - q && m.y < H + q) m.y = H - q;
+  }
   // Markers that fall on one another at this zoom are shown as one: the most important (or the one
   // selected), with a count of the rest. Tapping it again steps through them.
   const leads = [];
