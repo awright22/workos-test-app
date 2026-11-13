@@ -62,13 +62,13 @@ the local time and the weather, step the simulation without drawing, and place a
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
-| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 5: **MET**, narrowly. Reads as Mars at a glance; `hab-noon` is dull and the frame still washes out toward the sun (X11) |
-| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 5: **MET** |
-| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 5: NEARLY. Open-plain night, the rover's lamps and twilight are right; the Hab's dome is evenly pale and the greenhouse has a white glare (X10) |
-| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 5: NEARLY. Visibility collapses and the sun is a disc; the dust has no mass and nothing streams (X9) |
-| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 5: NEARLY in the north (no artefacts), NOT MET at the outcrop and the south pole. The ice reads as cracked plaster (X5) |
-| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 5: NEARLY. A convincing globe with a thin rim; on the title screen itself it is nearly black (X4); no launch picture |
-| Models | Every object is a purpose-built model; nothing reads as a primitive | 37 models. Lander and prop pass after the review: Perseverance has its own model, solar cells are consistent, the wreck, airbags, parachute, soil heap, ice and uplink dish are rebuilt, the greenhouse has a door. Second review owed |
+| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 6 (iPhone size): **MET** |
+| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 6: **MET** |
+| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 6: NEARLY. Stars, silhouette and lamp pool are right on the plain; at the base the lights do not light the ground (P9) |
+| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 6: NEARLY. Visibility collapses, the Hab is a ghost and the lamps have haloes; little blows past the camera (P13) |
+| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 6: NEARLY. No artefacts and both caps have ice; the ice still reads as plaster (P8) and the astronaut floats in one picture (P5) |
+| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 6: NEARLY. The title's globe is MET; the launch has no spectacle (P2) |
+| Models | Every object is a purpose-built model; nothing reads as a primitive | Round 6: **MET**. Weak ones: Beagle 2, the loose shards at Schiaparelli, Curiosity's power unit (P16) |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Twelve clips blended. Idle rebuilt as a relaxed stand (8 s); he takes his helmet off where there is air. Not yet reviewed in motion; feet dip up to 4 cm in cross-fades |
 | First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fourth independent review: NEARLY. There is always a named task with a reason and a distance, the buttons arrive one at a time and night is announced; a new player still hesitates at the points in Z22, the bars are explained only in prose (Z9), and the screen flashes red as the suit is saved (Z8) |
 | Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fourth independent review (phone only): 844 wide NEARLY (nothing clipped, nothing overlapping, every target 44 px, no text under 11 px; short on finish: gauges that are 3 px lines, numbers that contradict each other in an emergency), 667 wide NOT MET (three broken screens: Z1–Z3). The interface suite is 157 checks with long text forced into the log and the mission list at every size, and an audit (`tests/ui-audit.mjs`) measures text size, target size and clipping in the page at both phone sizes; it did not catch Z1–Z3, so it must learn to measure rows printing over each other and cards cut by the screen |
@@ -205,6 +205,38 @@ What round 5 added or sharpened (X-numbers), most damaging first:
 | X14 | Interiors are flat: even light, no pools under the fittings, blank monitors and tablet, empty trays, more toy-like than outdoors (`inside-*`) | part done: monitors show something (four panels drawn in code: levels, a trace, the planet with a fix on it, a log; each screen in a model is laid on one), and the comms monitor idles dim until there is an uplink. Light pools and planted trays in the pictures still open |
 | X15 | Smaller: the astronaut leans as a rigid plank in `debris-a`; Mars 3's petals are see-through; the Schiaparelli wreck is cardboard shards in soil browns; ruler-straight horizons at four landers; unexplained dark patches (`lander-perseverance`, `pile`, `hab-noon`); a white dot in the day sky (`olympus-flows`); pale patches in a night track (`rover-night`); `astronaut-back` shows his front | part done: Mars 3's petals are drawn from both sides; a wall's beds are unevenly thick (the layers repeated every 7.7 and 34.5 m of height, which showed as pinstripes); the white dot by day was Phobos; the Schiaparelli wreck is rebuilt as what is left of a disc lander (a third of the drum standing under torn gold blanket, a tank burst at its weld, the rest thrown across burnt ground, every sheet with thickness and a torn edge). The astronaut's lean in `debris-a` is the camera's perspective at the frame's edge, not the figure. Ruler-straight horizons on flat plains still open |
 
+**Round 6** (65 pictures at iPhone size, 844x390 at twice the pixels, on the preset a phone starts
+on; after the work on X1–X15): **day, dawn and dusk, and models MET**; night, storm, poles, orbit,
+terrain, astronaut and interiors NEARLY; **landmarks NOT MET; overall NEARLY** (it was NOT MET).
+"The base, the plains, the props and landers, dawn/dusk and the title now look like a polished
+stylised release. The landmarks, the launch sequence, the ice and a handful of bugs do not. Roughly
+two frames in three would pass for a good commercial stylised mobile game." Found fixed: the title
+globe, the palm-tree blast stamp, the row of smudges, the floating rock, the lit strip under the
+tank, Mars 3's petals, most of the storm and of the wash toward the sun. Best: `pod-open`, `dawn`,
+`rtg`, `hab-morning`, `night-plain`. Worst: `launch-climb`, `olympus-caldera`, `olympus-flows`,
+`pole-90`, `canyon-rim`.
+
+| # | Finding (pictures) | State |
+| --- | --- | --- |
+| P1 | The new caldera has terrain faults: a row of pyramid teeth on the far rim, a flat-faced pyramid, a thin fin, a vertical seam where pale strata stop dead, pale shards against the dark wall, a saw-toothed edge to a sand patch (`olympus-caldera`) | fixed: the teeth were canyon-sized spurs standing up over the brim (a caldera's wall now takes a seventh of them, and every spur's crest is a little rounded); the seam and the shards were the skirt between a fine mesh and a coarser one whose cliffs stood metres apart (the meshes near enough to matter now draw the same cliff, and the same ledges); the floor's edge is broken up by noise. To re-review |
+| P2 | The launch has no spectacle: `launch-climb` is an empty brown frame with a dot; `launch` a rocket in a featureless sky with a clean cone for a flame, no smoke, dust or ground; in `launch-orbit` the ship is small over a blurred sliver of planet | open |
+| P3 | Valles Marineris is banded hills, not a great canyon: pinstripes (`canyon`), a far side close enough to count its rocks and a wall smeared to watercolour (`canyon-rim`), a smooth slope with no ledges, talus or fallen blocks (`canyon-wall`), walls like drapery (`canyon-floor`, still the best) | open |
+| P4 | Olympus's flanks do not say volcano: one lobe on a smooth brown hump with blurred orange patches and faint bands (`olympus`, `olympus-flows`) | open |
+| P5 | The astronaut floats at the pole: his shadow starts 25 px below and 60 px left of his boots (`pole-90`) | fixed: he stood on the height function, 19 cm above the triangles the medium mesh draws there. Feet, wheels, the camera and everything placed in the world now stand on the drawn triangle itself (measured: 0.00 m at the pole and on the plain) |
+| P6 | Rover tracks are rectangles by day and, with the dust puffs, glow at night as square orbs (`rover-drive`, `rover-night`) | part done since the pictures were taken: marks are half as long and twice as many, so a track is unbroken, and puffs are no longer cut by the ground. Their brightness at night still open |
+| P7 | The astronaut ignores the sun's direction: with the sun ahead his back measures as bright as lit sand, with no rim light (`day-sun`, `dawn`, `dusk`, `canyon-floor`, `walk-plain`) | open |
+| P8 | Ice reads as plaster: matte white with wide embossed grooves, no glint; the same crack net on red ground at Mars 3 and Phoenix; raked stripes in `pole-90`; the outcrop better but toy-like; a tan shadow in `ice`; the lamp pool a white cloud at his waist in `south-pole` | open |
+| P9 | Night lights do not light the ground: the airlock face evenly near-white with dark ground at its foot; no glow or strut shadows outside the greenhouse; a white disc with a halo in `twilight` | part done since: the moons are half as bright. The rest open |
+| P10 | Rocks still repeat in places: dark dust-free buns (`walk-plain`, `rover-drive`), one wedge shape (`canyon-floor`, `lander-curiosity`), flat tan chips (`debris-b`, `astronaut-front`) | open (these pictures have the new rocks) |
+| P11 | Ruler-straight, haze-free horizons at the flat lander sites, with boulders perched on them like a table's edge | open |
+| P12 | Interiors evenly lit: no pools under the lamps, weak shadows, blank monitors, empty trays; in the greenhouse no strut shadows and the astronaut cut at the thighs; from behind with the helmet off his head is a white ball with black ear cups | open |
+| P13 | The storm lacks near dust: a straight band edge, few streaks, nothing blowing past the camera; the sun's disc is out of frame in `storm-sun` | open |
+| P14 | Stains and smears: a dark smudge with nothing to cast it (`hab-noon`, `lander-beagle-2`); a pale grey-green smear at the foot of far dunes (`astronaut-back`, `beacon`, `debris-b`); a dark red blotch (`debris-a`); soft foregrounds | open |
+| P15 | The astronaut's finish: a symmetrical arms-out pose, mitten hands, no dust on boots or legs, a flat visor | open |
+| P16 | Weak models: flat shards round the Schiaparelli wreck, Beagle 2 as three mats and a dish, Curiosity's power unit a blank box | open |
+| P17 | Framing: the astronaut hides the rocket's base (`mav`); no sky (`debris-a`); the rover small under a big sky; `astronaut-back` shows his front | open |
+| P18 | Small: a faint pale dot in the day sky (a moon); a stretched scarp at Mars 3; the glass greenhouse casts a solid shadow; a moon behind the word GAME on the title | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -334,7 +366,8 @@ duplicate names, statistics under three names, and most of the first-ten hesitat
 
 | # | Item | State |
 | --- | --- | --- |
-| 21 | Act on the fifth picture review (X1–X15 above) | in progress: landmarks, lighting, storm, ice, blast marks and the camera are acted on and wait for a sixth review; the rocks pass (X6) and the outcrop and wreck models are in hand; interior light pools, paths worn into the ground and region-specific landmarks are open |
+| 21 | Act on the fifth picture review (X1–X15 above) | acted on and reviewed again: see round 6 |
+| 29 | Act on the sixth picture review (P1–P18 above), the caldera's faults and the floating astronaut first, then the launch and the landmarks | in progress |
 | 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
 | 28 | Act on the fourth interface review (Z1–Z22 above), the three broken small-phone screens and the emergency contradictions first | in hand |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
@@ -411,6 +444,10 @@ duplicate names, statistics under three names, and most of the first-ten hesitat
   and gravel rest on the triangle the terrain mesh draws under them (`meshPoint` in `terrain/chunk.js`), not on
   the height function the mesh only samples. `rocks.js` copies the ground shader's tests for ice and lava: if
   `groundIce` or the lava fields change, its thresholds must follow.
+- **The ground is what is drawn.** `surfaceAt` (planet/surface.js) returns the height of the very triangle the finest
+  terrain mesh draws under a place (the same `meshPoint` the rocks use), not the height function the mesh
+  samples. Physics, the camera, wheels and every placed object use it, so nothing hovers over or sinks into
+  the picture, whatever the quality preset's mesh spacing.
 - **Two shadow cascades.** three.js's `SunLight` with a split set by hand (10–18 m): a tight map
   around the camera so the astronaut's shadow is a figure, a wide one for the base. Sealed in
   the Hab, the same maps are used for the ceiling lights.

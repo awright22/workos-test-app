@@ -140,8 +140,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float landRise = vGeo.x * 2.0;
         float landSlope = 1.0 - inversesqrt(1.0 + landRise * landRise);
         float flowTop = vGeo.y, worn = vGeo.w;
-        // lava that ponded and froze level: a caldera floor
-        float pond = lava * (1.0 - smoothstep(0.004, 0.022, landSlope));
 
         // ---- how much of this fragment is level ground (2D layers) and how much slope (3D) ----
         // (laid from above, a 2D texture stretches down a slope: on scree that passes, on a cliff it is corduroy,
@@ -159,6 +157,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float hFar = nFar.a - 0.5, hMid = nMid.a - 0.5, hLump = nLump.a - 0.5;
         vec3 grad = (nFar.rgb - 0.5) * (0.40 * fFar) + (nMid.rgb - 0.5) * (0.36 * fMid * (0.35 + 0.65 * steep)) + (nLump.rgb - 0.5) * (0.80 * fLump);
         float tone = hFar * 0.22 + hMid * 0.34 * fMid + hLump * 0.75 * fLump;
+        // lava that ponded and froze level: a caldera floor (its edge broken up by the noise: drawn from the mesh's own
+        // vertices alone it followed their triangles in a saw-tooth)
+        float pond = lava * (1.0 - smoothstep(0.004, 0.05, landSlope + (hMid * 0.03 + hLump * 0.015) * fMid));
         // The top of a flow is bare basalt with dust only in its hollows; between flows the dust lies deep.
         // (This is what makes a volcano's flank read as lava from any distance: dark tongues on red ground.)
         float basalt = lava * max(smoothstep(0.30, 0.62, flowTop + hMid * 0.26 * fMid + hFar * 0.18), pond);
@@ -300,6 +301,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain16' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain17' + (o.fine !== false ? 'F' : '');
   return mat;
 }

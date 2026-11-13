@@ -256,7 +256,7 @@ export class Engine {
     const io = this.indoor;
     this.hemi.color.setRGB(lerp(nr, 0.50 * pw, io), lerp(ng, 0.46 * pw, io), lerp(nb, 0.40 * pw, io));
     this.hemi.groundColor.setRGB(lerp(0.02, 0.26 * pw, io), lerp(0.02, 0.24 * pw, io), lerp(0.03, 0.21 * pw, io));
-    this.hemi.intensity = lerp(dusk * 1.6, p.sealed ? 0.44 : 1, io);
+    this.hemi.intensity = lerp(dusk * 1.6, p.sealed ? 0.3 : 1, io);      // (little fill when sealed in: the lamps make the room, and what they do not reach is dim)
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
     this._updateEnvironment(p.dt || 0.016, p.dust || 0);

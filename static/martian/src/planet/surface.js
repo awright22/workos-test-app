@@ -2,12 +2,34 @@
 import { ctx } from '../game/ctx.js';
 import { R } from './constants.js';
 import { tangentBasis } from './geo.js';
+import { dirToFace } from './height.js';
+import { planetGrid, meshPoint } from '../terrain/chunk.js';
 import { _fe, _fn, _pv } from '../core/scratch.js';
 
-/** Distance from the planet's centre to the ground below (or above) a world position. */
+let _grids = null, _gridPads = -1, _gridOf = null;
+const _ft = [0, 0, 0], _mp = new Float64Array(8);
+/**
+ * Distance from the planet's centre to the ground below (or above) a world position: the ground as it
+ * is DRAWN. The finest terrain mesh samples the height function every metre or three and joins the
+ * samples with flat triangles; across a crest or a hollow the two differ by up to a few decimetres, and
+ * a man standing on the function hovered over the picture (19 cm at the pole on the medium preset).
+ * So feet, wheels, the camera and everything placed in the world stand on the very triangle the mesh
+ * draws there (the same one rocks rest on: terrain/chunk.js, meshPoint).
+ */
 export function surfaceAt(v) {
-  const l = 1 / Math.hypot(v.x, v.y, v.z);
-  return ctx.planet.radius(v.x * l, v.y * l, v.z * l);
+  const P = ctx.planet;
+  const l = 1 / Math.hypot(v.x, v.y, v.z), x = v.x * l, y = v.y * l, z = v.z * l;
+  const mg = P.meshGrid;
+  if (!mg) return P.radius(x, y, z);
+  // (one table of mesh vertices per cube face, emptied when a site is levelled or it grows large)
+  if (!_grids || _gridOf !== P || _gridPads !== P.pads.length) { _grids = [null, null, null, null, null, null]; _gridOf = P; _gridPads = P.pads.length; }
+  dirToFace(x, y, z, _ft);
+  const g = _grids[_ft[0]] || (_grids[_ft[0]] = planetGrid(P, _ft[0], mg.G, mg.level));
+  if (g.cache.size > 20000) g.cache.clear();
+  meshPoint(g, _ft[1], _ft[2], _mp);
+  // where the ray from the centre through the place meets that triangle's plane
+  const dn = x * _mp[3] + y * _mp[4] + z * _mp[5];
+  return dn > 1e-6 ? (_mp[0] * _mp[3] + _mp[1] * _mp[4] + _mp[2] * _mp[5]) / dn : P.radius(x, y, z);
 }
 /** Real elevation in kilometres above the Mars datum for a unit direction. */
 export function elevationKm3(ux, uy, uz) { return ctx.planet.elevationMetres(ux, uy, uz) / 1000; }

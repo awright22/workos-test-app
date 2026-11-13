@@ -84,6 +84,7 @@ async function boot() {
   engine.scene.add(ctx.outdoor);
   ctx.terrainUniforms = material.userData.uniforms;        // (the storm's dusting of the ground was never switched on: nothing set it)
   data.planet.finest = Math.max(FINEST, chunkSpacing(engine.q.maxLevel, engine.q.grid) * 1.25);
+  data.planet.meshGrid = { G: engine.q.grid, level: engine.q.maxLevel };      // the finest mesh drawn: what the ground "is" to feet and wheels (planet/surface.js)
   ctx.terrain = new Terrain({
     planet: data.planet, heightData: data.heightData, parent: ctx.outdoor, material,
     workerUrl: asset('terrain-worker.js'), grid: engine.q.grid, maxLevel: engine.q.maxLevel, split: engine.q.split, workers: engine.q.workers,

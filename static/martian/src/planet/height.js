@@ -93,8 +93,9 @@ let _f = 0, _s = 0, _t = 0, _sc = 0, _tc = 0;
 // slope (rise over run, exaggerated like the heights) of the elevation data at the last sample,
 // and its two parts along the face's texels (for the direction of the fall line)
 let _slope = 0, _du = 0, _dv = 0;
-/** How far the place last asked about lies out on a caldera's level floor, 0..1 (set by _caldera). */
-let _floor = 0;
+/** How far the place last asked about lies out on a caldera's level floor, 0..1, and how far inside a caldera's
+ *  reach it is at all, 0..1 (set by _caldera). */
+let _floor = 0, _zone = 0;
 // The gnomonic face coordinates as vectors: a face's directions are A + sc·B + tc·C (see faceToDir).
 const FACE_B = [[0, 0, -1], [0, 0, 1], [1, 0, 0], [1, 0, 0], [1, 0, 0], [-1, 0, 0]];
 const FACE_C = [[0, -1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, -1, 0]];
@@ -236,7 +237,9 @@ export class Planet {
     // The land as the elevation data has it; calderas cut level; spurs and gullies worn into what is steep;
     // then the rock's own layers, which crop out as ledges along the contours of that worn slope.
     let base = this._caldera(this._mola(), x, y, z, minW);
-    if (_slope > 0.22 && _floor < 1) base += this._gully(x, y, z, minW) * (1 - _floor);
+    // (a caldera's wall is a collapse scar, fluted a little, not a canyon wall worn into buttresses: full-size spurs
+    // there stood up over the brim as a row of teeth)
+    if (_slope > 0.22 && _floor < 1) base += this._gully(x, y, z, minW) * (1 - _floor) * (1 - 0.85 * _zone);
     base = this._ledges(base, x, y, z, minW);
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
@@ -353,7 +356,7 @@ export class Planet {
    * pit keeps its true outline. Leaves in _floor how far out on the floor the place is.
    */
   _caldera(base, x, y, z, minW) {
-    _floor = 0;
+    _floor = 0; _zone = 0;
     for (let i = 0; i < CALDERAS.length; i++) {
       const c = CALDERAS[i];
       const dot = x * c.x + y * c.y + z * c.z;
@@ -363,8 +366,12 @@ export class Planet {
       const d = Math.sqrt(Math.max(0, 2 - 2 * dot)) * R;
       let zone = d <= c.reach * 0.86 ? 1 : (c.reach - d) / (c.reach * 0.14);
       zone = zone * zone * (3 - 2 * zone);
-      // the cliff takes the upper share of the bowl's side, and (as with ledges) no less than three cells of the mesh asking
-      const share = Math.min(1, Math.max(0.42, 2.4 * _slope * minW / c.depth));
+      // The cliff takes the upper three fifths of the bowl's side. A far mesh, whose cells are too coarse to draw
+      // that, is given a wider one (as with ledges, three cells of the mesh asking); but the meshes near enough
+      // to matter all draw the same cliff, or the wall stands metres apart where a fine mesh meets a coarser one
+      // and the skirt between them shows as a pale seam.
+      const wide = Math.min(1, 2.4 * _slope * minW / c.depth), far = minW <= 6 ? 0 : minW >= 12 ? 1 : (minW - 6) / 6;
+      const share = wide > 0.6 ? 0.6 + (wide - 0.6) * far * far * (3 - 2 * far) : 0.6;
       let v = (u - (1 - share)) / share, g = 0, dg = 0;
       if (v > 0) {
         // a scree foot, then the wall: the lower third of the rise is a ramp, the rest stands steep
@@ -372,7 +379,7 @@ export class Planet {
         dg = (v < 0.4 ? 0.6 * v / 0.16 : 0.7 * 6 * ((v - 0.4) / 0.6) * (1 - (v - 0.4) / 0.6) / 0.6) / share;
       }
       const flat = v <= 0 ? 1 : v >= 0.25 ? 0 : 1 - v * 4;
-      _floor = zone * flat;
+      _floor = zone * flat; _zone = zone;
       _slope *= 1 + zone * (dg - 1);
       return base + (c.floor + c.depth * g - base) * zone;
     }
@@ -429,8 +436,9 @@ export class Planet {
       }
       if (wsum < 1e-6) continue;
       const wave = sum / wsum;
-      // sharp crests (the spurs), round hollows (the chutes, floored with what fell down them); 0.52 is the mean
-      h += (1 - Math.abs(wave) - 0.52) * amp * w;
+      // crests (the spurs) a little rounded, hollows (the chutes) round and floored with what fell down them. (A
+      // knife-edged crest shows on a skyline as a tooth.) 0.45 is the mean.
+      h += (1 - Math.sqrt(wave * wave + 0.06) - 0.45) * amp * w;
       steeper += amp * w * 2 / lam;
     }
     _slope += steeper * m * 0.8;
@@ -454,9 +462,12 @@ export class Planet {
     // sharper, and a grid of triangles cannot follow its edge, so the wall breaks into rows of
     // teeth. So with distance each riser widens and its bench shortens, until the ledge has
     // melted into the slope.
+    // (the finest mesh and the next one out draw the same ledges: where they differed, the skirt between the two
+    // showed as a smear down the wall forty metres from the eye)
+    const mw = minW <= this.finest * 2.05 ? this.finest : minW;
     for (let i = 0; i < 2; i++) {
       const H = i ? 7 : 20;
-      const riser = Math.max(0.42, 2.4 * _slope * minW / H);        // the riser's share of each step (cells are minW / 1.25)
+      const riser = Math.max(0.42, 2.4 * _slope * mw / H);        // the riser's share of each step (cells are minW / 1.25)
       if (riser >= 0.96) continue;
       const q = (base + tilt * H) / H + i * 0.37;
       const f = q - Math.floor(q);
