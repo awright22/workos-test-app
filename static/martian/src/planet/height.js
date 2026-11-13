@@ -478,7 +478,7 @@ export class Planet {
       // (0.297 * bench is what the step takes off the slope on average: put back, a mesh that draws the
       // ledges and a coarser neighbour that has melted them stand at the same mean height, and no wall
       // shows where the two meet)
-      out += (step - f + 0.297 * bench) * H * (i ? 0.9 : 0.5) * w;
+      out += (step - f + 0.297 * bench) * H * (i ? 0.9 : 0.85) * w;      // (the broad terraces at nearly their full height: at half, a canyon wall was a smooth bank from across the floor)
     }
     return out;
   }
