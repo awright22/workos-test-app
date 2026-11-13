@@ -27,7 +27,7 @@
 
 .mg-tbtn { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .125rem; pointer-events: auto;
   touch-action: none; cursor: pointer; border: 1px solid rgba(245, 240, 232, .4); border-radius: 50%; background: rgba(14, 12, 11, .6);
-  color: var(--ink); font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .08em; transition: background .12s, border-color .12s, transform .12s, opacity .12s; }
+  color: var(--ink); font: 600 max(.8125rem, 13px)/1 var(--f-cond); letter-spacing: .06em; transition: background .12s, border-color .12s, transform .12s, opacity .12s; }
 .mg-tbtn .ic { width: 1.25rem; height: 1.25rem; }
 .mg-tbtn:active, .mg-tbtn.down { background: rgba(245, 240, 232, .26); transform: scale(.95); }
 .mg-tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -42,7 +42,7 @@
 #mg-tE .vi, #mg-tE .vb, #mg-tE .vh { display: none; }
 #mg-tE .vi .ic { width: 1.5rem; height: 1.5rem; }
 #mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-2); }
-#mg-tE .vh { font-size: max(.75rem, 12px); letter-spacing: .16em; color: var(--ink-2); }
+#mg-tE .vh { font-size: max(.8125rem, 13px); letter-spacing: .14em; color: var(--ink-2); }
 /* (kept in the layout, so a hold that began on it still ends on it) */
 #mg-tE:not(.verb):not(.no) { visibility: hidden; pointer-events: none; }
 #mg-tE.verb .vb, #mg-tE.verb .vh { display: block; }
@@ -51,20 +51,22 @@
 #mg-tE.ready .vh { color: var(--accent); }
 #mg-tE.no { border-style: dashed; }
 #mg-tE.no .vi { display: grid; place-items: center; color: var(--ink-2); }
-#mg-tE.no .vb { display: block; max-width: 4.75rem; font-size: max(.75rem, 12px); line-height: 1.1; letter-spacing: .06em; text-align: center; text-wrap: balance; }
+#mg-tE.no .vb { display: block; max-width: 4.875rem; font-size: max(.8125rem, 13px); line-height: 1.05; letter-spacing: .03em; text-align: center; text-wrap: balance; }
 #mg-tE.no .vi .ic { width: 1.25rem; height: 1.25rem; }
 #mg-tE, #mg-tE.no, #mg-tE.verb { transition: background .12s, border-color .12s, transform .12s; }
 #mg-tE.holding { background: rgba(255, 180, 84, .22); }
 
-#mg-tJump, #mg-tExit { right: calc(var(--sar) + 7rem); bottom: calc(var(--sab) + 1.5rem); width: 3.625rem; height: 3.625rem; }
-#mg-tSprint { right: calc(var(--sar) + 5.5rem); bottom: calc(var(--sab) + 5.75rem); width: 3.625rem; height: 3.625rem; }
+/* (The round buttons stand 12 px apart at the least, measured between their rims: tests/audit-lib.mjs holds it. JUMP
+   was 9 px from the action button, and the candle, which spends something, 6 px from RUN with its count 3 px off.) */
+#mg-tJump, #mg-tExit { right: calc(var(--sar) + 7.375rem); bottom: calc(var(--sab) + 1.375rem); width: 3.625rem; height: 3.625rem; }
+#mg-tSprint { right: calc(var(--sar) + 5.875rem); bottom: calc(var(--sab) + 6.125rem); width: 3.625rem; height: 3.625rem; }
 #mg-tCam { right: calc(var(--sar) + 1.75rem); bottom: calc(var(--sab) + 7.375rem); width: 2.75rem; height: 2.75rem; min-width: 44px; min-height: 44px; }
 /* the candle stands left of RUN (above it, it took the room the mission list needs for its reason) */
-#mg-tCandle { right: calc(var(--sar) + 9.5rem); bottom: calc(var(--sab) + 6.125rem); width: 3rem; height: 3rem; min-width: 44px; min-height: 44px; gap: .0625rem; letter-spacing: .02em;
+#mg-tCandle { right: calc(var(--sar) + 10.5rem); bottom: calc(var(--sab) + 6.5rem); width: 3rem; height: 3rem; min-width: 44px; min-height: 44px; gap: .0625rem; letter-spacing: .02em;
   border-color: var(--cold); color: var(--cold); }
 #mg-tCandle i { font: 600 .875rem/1 var(--f-cond); font-style: normal; }
-#mg-tCandle > span { font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: 0; }
-#mg-tCandle b { position: absolute; right: -.25rem; top: -.25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .25rem; border-radius: .625rem; background: var(--cold); color: #06131c;
+#mg-tCandle > span { font: 600 max(.8125rem, 13px)/1 var(--f-cond); letter-spacing: 0; }
+#mg-tCandle b { position: absolute; left: -.25rem; top: -.25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .25rem; border-radius: .625rem; background: var(--cold); color: #06131c;
   font: 600 max(.75rem, 12px)/1.25rem var(--f-cond); letter-spacing: 0; text-align: center; }
 #mg-tExit { display: none; border-color: var(--accent); color: var(--accent); }
 .is-rover #mg-tExit { display: flex; }
@@ -72,16 +74,18 @@
 
 /* pause and the three screens, top right: each with its word under it */
 #mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .25rem; pointer-events: auto; }
-#mg-trow .mg-tbtn { position: static; width: 2.75rem; height: 2.75rem; min-width: 48px; min-height: 46px; border-radius: .375rem; }
+#mg-trow .mg-tbtn { position: static; width: 3.125rem; height: 2.875rem; min-width: 50px; min-height: 46px; border-radius: .375rem; }
 #mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
-#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .01em; color: var(--ink); }
+/* (a caption is a label in capitals like any other: 13 px. At 12 it measured as 10 px type beside the 13 px labels.) */
+#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.8125rem, 13px)/1 var(--f-cond); letter-spacing: 0; color: var(--ink); }
 #mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
-.is-cold #mg-trow .mg-tbtn[data-t] { display: none; }
+.is-cold #mg-trow .mg-tbtn[data-t] { visibility: hidden; }
 /* each screen's button arrives when the screen first has something to show (ui/hud.js), and is lit while its card is read */
 #mg-trow .mg-tbtn.fresh { position: relative; border-color: var(--accent); background: rgba(46, 30, 10, .86); }
 #mg-trow .mg-tbtn.fresh span, #mg-trow .mg-tbtn.fresh .ic { color: var(--accent); }
 #mg-trow .mg-tbtn.fresh::after { content: ""; position: absolute; right: -.25rem; top: -.25rem; width: .625rem; height: .625rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px rgba(14, 12, 11, .8); }
-.no-map #mg-trow .mg-tbtn[data-t="map"], .no-colony #mg-trow .mg-tbtn[data-t="colony"], .no-journal #mg-trow .mg-tbtn[data-t="journal"] { display: none; }
+/* (one that has not arrived keeps its place, unseen: the row is laid out once, and nothing in it ever moves) */
+.no-map #mg-trow .mg-tbtn[data-t="map"], .no-colony #mg-trow .mg-tbtn[data-t="colony"], .no-journal #mg-trow .mg-tbtn[data-t="journal"] { visibility: hidden; }
 .no-map .scr-nav [data-screen="map"], .no-colony .scr-nav [data-screen="colony"], .no-journal .scr-nav [data-screen="journal"] { display: none; }
 /* tablets and other large touch screens: the clock and mission move below the buttons */
 .mg-touch:not(.mg-compact) #mg-tr { top: calc(var(--m) + var(--sat) + 3.5rem); }

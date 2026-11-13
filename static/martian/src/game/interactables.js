@@ -2,8 +2,8 @@ import { HAB_R, World, buildDeployable, plotPlants, setSiteShown, siteLocalToWor
 import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
-import { BAL, S, roverPowerCap, suitCap } from './state.js';
-import { after, clearLog, flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
+import { BAL, S, airTime, roverPowerCap, suitCap } from './state.js';
+import { UI, after, clearLog, flashScreen, log, playTime, showOverlay, statusText, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent } from './story.js';
 import { startLaunch } from './launch.js';
@@ -14,7 +14,10 @@ import { clamp } from '../core/math.js';
 import { localSunEl, sleepTime, sleepToDawn } from './sim.js';
 import { closeScreens, toggleScreen } from '../ui/screens.js';
 import { enterRover, exitRover, roverF } from './rover.js';
-import { ITEM_NAMES, gainLoot } from './inventory.js';
+import { ITEM_NAMES, RECIPES, gainLoot } from './inventory.js';
+import { COMFORTS, comforts } from './comforts.js';
+import { canSample, scienceSummary } from './science.js';
+import { fmtDist } from '../planet/geo.js';
 import { bagSoilHere } from './fieldwork.js';
 import { CROPS, MORALE_WORD, cookDinner, dinnerPlan, foodTotal, harvest, moraleBand, plantable, seedStock, snack, takeSeed } from './farm.js';
 import { showChoice } from '../ui/menus.js';
@@ -28,6 +31,12 @@ import { layout } from '../ui/layout.js';
 // words are what the action button shows ("NEEDS REGOLITH"). A plain reading of a thing with nothing to do to it
 // ("This panel is clean") is made with statusText() and shown without the barred ring. tests/ui.mjs holds every
 // refusal here to that form.
+//
+// A prompt is a line and at most one line under it, each short enough to stand on one line of a small phone:
+// `label` is what holding does, in a few words, and `sub` what it costs or gives. (Costs and counts in brackets in
+// the label made three-line prompts: "Dig regolith at the / heap (you carry 0) / One load fills one bed".)
+// tests/ui.mjs measures every one.
+const loads = (n) => `${n} load${n === 1 ? '' : 's'}`;
 export function syncPlot(pl) {
   pl.soilMesh.visible = pl.state !== 'empty';
   // a bed shows the plants of the crop it holds: alive and scaled as they grow, or withered
@@ -72,7 +81,7 @@ addI({
     const pl = nearestPlot(); if (!pl) return false;
     switch (pl.state) {
       case 'empty': return S.inv.regolith > 0 ? true : 'Needs regolith: dig it at the heap outside the airlock';
-      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig') : 'Needs seed: no potatoes, rations or packets left';
+      case 'soil': return plantable().length ? (S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig') : 'Needs seed: nothing left to plant from';
       case 'growing':
         if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig';
         // (a reading, not a lock: there is nothing to do to it yet)
@@ -84,18 +93,26 @@ addI({
   label: () => {
     const pl = nearestPlot(); if (!pl) return '';
     switch (pl.state) {
-      case 'empty': return `Fill this bed with regolith (1 of your ${S.inv.regolith || 0})`;
-      case 'soil': {
-        const can = plantable();
-        if (can.length > 1) return 'Plant this bed…';
-        return `Plant seed potato (1 ${S.potatoes > 0 ? 'potato' : 'ration'}, 5 L water)`;
-      }
-      case 'growing': return `Water the ${cropOf(pl).name.toLowerCase()} (5 L)`;
-      case 'ready': return `Harvest ${cropOf(pl).name.toLowerCase()}`;
+      case 'empty': return 'Fill this bed with regolith';
+      case 'soil': return plantable().length > 1 ? 'Plant this bed…' : 'Plant potatoes in this bed';
+      case 'growing': return `Water the ${cropOf(pl).name.toLowerCase()}`;
+      case 'ready': return `Harvest the ${cropOf(pl).name.toLowerCase()}`;
       case 'dead': return 'Clear out the dead crop';
     }
     return '';
   },
+  sub: () => {
+    const pl = nearestPlot(); if (!pl) return '';
+    switch (pl.state) {
+      case 'empty': return `Uses 1 of the ${loads(S.inv.regolith || 0)} you carry`;
+      case 'soil': return plantable().length > 1 ? 'Choose what to grow' : `Uses 1 ${S.potatoes > 0 ? 'potato' : 'ration'} and 5 L of water`;
+      case 'growing': return 'Uses 5 L of water';
+      case 'ready': return `Brings in ${cropOf(pl).yield}`;
+    }
+    return '';
+  },
+  // (the task this belongs to: standing at a bed, that is the task the HUD leads with)
+  task: () => { const pl = nearestPlot(); return !pl ? '' : pl.state === 'growing' ? 'water' : pl.state === 'ready' ? 'harvest' : 'farm'; },
   use: () => {
     const pl = nearestPlot(); if (!pl) return;
     switch (pl.state) {
@@ -182,20 +199,22 @@ addI({
     after(9, () => log(SOL_LOGS[1]));
   },
 });
-export function addInspect(id, lx, lz, name, doneLine, found) {
+export function addInspect(id, lx, lz, name, doneLine, found, bar) {
   addI({
     pos: () => siteLocalToWorld(World.hab, lx, 0, lz, _v2),
-    r: 2.6, hold: 0.7, mode: 'walk', pose: 'stand',
+    r: 2.6, hold: 0.7, mode: 'walk', pose: 'stand', task: 'systems',
     visible: () => S.started && !S.flags.coldOpen && !S.checkedSystems[id],
     label: () => `Inspect the ${name}`,
-    // (what the inspection found, on a card: the log's line alone was hidden on a phone by the card that came next)
-    use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine); toast(name.toUpperCase(), 'Working', found); },
+    // (What the inspection found, on a card: the log's line alone was hidden on a phone by the card that came next.
+    //  The machine's bar arrives on the HUD with it (ui/hud.js) and is lit while the card that names it is up. His
+    //  own remark goes to the journal: on the HUD it was a second card about the same machine.)
+    use: () => { S.checkedSystems[id] = true; Snd.ok(); log(doneLine, null, { quiet: true }); toast(name.toUpperCase(), 'Working', found, { lit: UI.bars[bar].wrap, life: 7000 }); },
   });
 }
 addInspect('oxy', 5.6, -3.6, 'oxygenator',
-  'Oxygenator: alive. It eats CO2 and power, makes air. My favourite roommate.', 'It makes the Hab’s air while there is power. Its bar: HAB O2.');
+  'Oxygenator: alive. It eats CO2 and power, makes air. My favourite roommate.', 'It makes the Hab’s air while there is power. Its bar: HAB O2.', 'o2');
 addInspect('rec', 5.9, -0.4, 'water reclaimer',
-  'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.', 'It wins back most of the water you use. Its bar: WATER.');
+  'Water reclaimer: functional. Yes, it recycles what you think it recycles. No, we don\'t discuss it.', 'It wins back most of the water you use. Its bar: WATER.', 'water');
 // NOTE: world arrays (panels, piles, landers, ice) fill AFTER world build —
 // these interactables resolve their nearest target dynamically at query time.
 export function nearestOf(list, posOf, maxD, filter) {
@@ -216,7 +235,7 @@ addI({
     const p = nearestOf(World.panels, panelPos, 3.0);
     return p ? panelPos(World._activePanel = p) : null;
   },
-  r: 3.0, hold: 1.6, mode: 'walk', pose: 'stand',
+  r: 3.0, hold: 1.6, mode: 'walk', pose: 'stand', task: 'panels',
   visible: () => !S.flags.coldOpen,
   enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : statusText('This panel is clean'),
   // (what wiping it is worth, in the prompt: nothing else on screen said whether it was)
@@ -238,10 +257,10 @@ addI({
     const sp = nearestOf(World.soilPiles, s => s.group.position, 2.8, s => s.left > 0);
     return sp ? (World._activePile = sp).group.position : null;
   },
-  r: 2.8, hold: 1.4, mode: 'walk',
+  r: 2.8, hold: 1.4, mode: 'walk', task: 'farm',
   visible: () => !S.flags.coldOpen,
-  label: () => `Dig regolith at the heap (you carry ${S.inv.regolith || 0})`,
-  sub: () => 'One load fills one bed',
+  label: () => 'Dig a load of regolith',
+  sub: () => `You carry ${loads(S.inv.regolith || 0)} · one fills a bed`,
   use: () => {
     const sp = World._activePile;
     if (!sp || sp.left <= 0) return;
@@ -250,24 +269,63 @@ addI({
     Snd.play('dig');
   },
 });
+/**
+ * Why the open ground is worth digging where he stands now: { label, sub }, or null when nothing wants it.
+ *
+ * Digging can be done anywhere out of doors, so it is the one "ambient" interaction, and the rule for those is that
+ * they are offered with a reason or not at all (game/interact.js). Offered always, "Dig regolith here (slow)" and a
+ * DIG button stood on the screen every second he was outside, and the prompt no longer meant that something was
+ * there. The reasons are two:
+ *  - something is waiting on a load of regolith (an empty bed, an O2 candle or the window garden he has everything
+ *    else for) and there is no heap left within a walk: the heaps are quicker, and the farm's task sends him to them;
+ *  - this is new ground and there is room in the sample case: a scoop of it is a sample (and a load besides).
+ */
+let digMemo = null, digMemoAt = -1;
+export function digOffer() {
+  if (digMemoAt === playTime()) return digMemo;
+  digMemoAt = playTime();
+  return (digMemo = digReason());
+}
+function digReason() {
+  if (!S.flags.didMath) return null;
+  const carried = S.inv.regolith || 0;
+  if (!World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 400)) {
+    const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · slow going, with no heap near` });
+    if (World.plots.filter((p) => p.state === 'empty').length > carried) return why('an empty farm bed');
+    if (!carried) {
+      // (a thing he has everything for but the regolith)
+      const short = (cost) => cost.regolith > 0 && Object.keys(cost).every((k) => k === 'regolith' || (S.inv[k] || 0) >= cost[k]);
+      const r = RECIPES.find((x) => short(x.cost));
+      if (r) return why(/^[aeiou]/i.test(r.name) ? `an ${r.name}` : `a ${r.name}`);
+      const c = COMFORTS.find((x) => !comforts()[x.id] && short(x.cost) && (!x.needs || x.needs(World)));
+      if (c) return why(`the ${c.name.toLowerCase()}`);
+    }
+  }
+  // (soil is sampled once he has a sample case going, or is well away from home: on the Hab's own doorstep on the
+  //  first sol it would be one more thing offered before he has heard of samples)
+  const sc = scienceSummary();
+  if (canSample(player.pos, 'soil') === true && (sc.kinds + sc.bagged > 0 || groundDist(player.pos, World.hab.position) > 300))
+    return { label: 'Bag a soil sample here', sub: `New ground · bag ${sc.bagged + 1} of ${sc.limit}` };
+  return null;
+}
 addI({
   pos: () => player.pos, r: 99, hold: 2.6, mode: 'walk', priority: 9,
-  visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
-  // (slow here: it says where it is quicker while there is a heap left near by)
-  label: () => 'Dig regolith here (slow)',
-  sub: () => (World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 200) ? 'The heaps by the airlock are quicker' : ''),
-  use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); },
+  visible: () => !S.flags.coldOpen && !S.inside && !!digOffer(),
+  label: () => (digOffer() || { label: 'Dig here' }).label,
+  sub: () => (digOffer() || { sub: '' }).sub,
+  use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); digMemoAt = -1; },
 });
 // hydrazine rig
 addI({
   pos: () => siteLocalToWorld(World.hab, 5.5, 0, 2.6, _v2),
-  r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand',
+  r: 2.4, hold: 2.0, mode: 'walk', pose: 'stand', task: () => (S.water < 12 ? 'lowwater' : 'hydra'),
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => S.hydrazine > 0 ? true : statusText('The hydrazine tank is empty'),
   label: () => `Burn hydrazine: +${BAL.hydrazineWater} L of water`,
   // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
-  //  gone, nothing said whether the second would cost air again.)
-  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'done carefully now: no air lost' : 'untried indoors: may cost Hab air') : ''),
+  //  gone, nothing said whether the second would cost air again. "Untried indoors" was the warning's old wording:
+  //  untried by whom, and risking what?)
+  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
@@ -296,10 +354,13 @@ addI({
 // bunk
 addI({
   pos: () => siteLocalToWorld(World.hab, -5.0, 0, -4.9, _v2),
-  r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand',
+  r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand', task: 'sleep',
   visible: () => !S.flags.coldOpen && S.inside,
   enabled: () => {
-    if (S.breach.active) return 'Breach first: seal the far wall, behind the comms desk';
+    // (it names what is refused, and leaves where the breach is to the task that leads the list: "Breach first: seal
+    //  the far wall, behind the comms desk" was the sixth time the screen said breach, and its button, BREACH FIRST,
+    //  did not say what it would not do)
+    if (S.breach.active) return 'No sleep yet: seal the breach first';
     // (not yet time is a reading, not a lock: the first prompt on waking was a padlock)
     const ok = sleepTime();
     return ok === true ? true : statusText(`The bunk. ${ok}`);
@@ -326,7 +387,7 @@ addI({
 });
 addI({
   pos: () => siteLocalToWorld(World.hab, 4.2, 0, 4.8, _v2),
-  r: 2.2, hold: 2.4, mode: 'walk', pose: 'stand', priority: -1,
+  r: 2.2, hold: 2.4, mode: 'walk', pose: 'stand', priority: -1, task: 'dinner',
   visible: () => !S.flags.coldOpen && S.inside && dinnerPlan().ok,
   label: () => { const p = dinnerPlan(); return `Cook dinner: ${p.staple === 'soy' ? 'soybeans' : 'potato'}, ${p.sides.map((id) => CROPS[id].name.toLowerCase()).join(' and ')}`; },
   sub: () => '+25 vitals, lifts morale',
@@ -342,23 +403,28 @@ addI({
 // comms desk: the math, NASA chatter, disco
 addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -6.6, _v2),
-  r: 2.4, hold: 0.8, mode: 'walk', pose: 'stand',
+  r: 2.4, hold: 0.8, mode: 'walk', pose: 'stand', task: 'math',
   visible: () => !S.flags.coldOpen && S.inside && !S.flags.didMath,
   label: () => 'Check the numbers',
   use: () => {
     S.flags.didMath = true;
     Snd.play('terminal');
-    log(`${S.food} rations. Rescue window: Sol ${S.rescueSol}. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`);
+    // (his own entries go to the journal: the card says all of it, and on the HUD they were two more cards to read)
+    log(`${S.food} rations. Rescue: Sol ${S.rescueSol}. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`, null, { quiet: true });
+    log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the MAV, the only rocket on Mars, in Schiaparelli: it can launch on Sol ${S.rescueSol}.`, null, { quiet: true });
     // the premise of the whole game: a card he reads and puts down, not a line that scrolls away
     showOverlay({
       kicker: 'The numbers', title: 'Farm or starve',
-      stats: [['Rations left', S.food], ['Earliest rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
+      // (food is counted in meals, here as on the FOOD bar: a ration is one; and the date is the rescue, in the same
+      //  two words wherever it is given)
+      stats: [['Meals left', S.food], ['Rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
-      body: 'One ration a sol. They run out long before anyone can reach Mars.\n\n' +
+      body: `${S.food} ration packs, one meal a sol: they run out long before anyone can reach Mars.\n\n` +
         'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. <b>A potato bed takes one ration to plant and gives back four potatoes.</b>',
-      // (and where it is all going, once, in his own voice, when the card and the journal's arrival have been read:
-      //  after ten minutes of play nothing had said that the rescue is a rocket a long drive away)
-      buttons: [{ label: 'Get to work', fn: () => after(7.5, () => log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the only rocket on Mars, in Schiaparelli, by Sol ${S.rescueSol}.`)) }],
+      // (And where it is all going, on the card itself, as the morning's account has it: it used to arrive ten seconds
+      //  later as a line of the log, in the slot that carries his jokes, while he stood at a bed with PLANT up.)
+      later: `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}.`,
+      buttons: [{ label: 'Get to work', fn: () => {} }],
     });
   },
 });
@@ -533,7 +599,7 @@ addI({
   pos: () => siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1.2, _v2),
   // an emergency outranks the desk in front of it (the comms prompts used to win on distance,
   // which left the breach impossible to seal once Pathfinder was connected)
-  r: 3.6, hold: 3.0, mode: 'walk', pose: 'stand', priority: -1,
+  r: 3.6, hold: 3.0, mode: 'walk', pose: 'stand', priority: -1, task: 'breach',
   visible: () => S.breach.active && S.inside,
   label: () => 'Seal the breach (canvas, tape, prayer)',
   use: () => {
@@ -562,7 +628,8 @@ addI({
   r: 3.5, hold: 1.0, mode: 'walk', pose: 'stand',
   visible: () => !S.flags.coldOpen,
   enabled: () => S.suit < suitCap() - 5 ? true : statusText('An O2 cache. The suit is full'),
-  label: () => `Refill suit O2 (${World._activeCache ? World._activeCache.charges : 0} charges left)`,
+  label: () => 'Top up the suit from the cache',
+  sub: () => `+${airTime(40)} of air · ${World._activeCache ? World._activeCache.charges : 0} left in it`,
   use: () => {
     const c = World._activeCache;
     if (!c || c.charges <= 0) return;
@@ -576,7 +643,9 @@ export let deployKind = null;
 export function startDeploy(kind) {
   deployKind = kind;
   closeScreens();
-  log('Pick a spot outside and place it.', 'sys');
+  // (how to do it is said on a card and not kept: in the log it stood under the Hab's name, in red, for the rest of
+  //  the run, an instruction with no subject)
+  toast('DEPLOY', ITEM_NAMES['kit' + kind.charAt(0).toUpperCase() + kind.slice(1)] || kind, 'Pick a spot outside, then hold to place it.');
 }
 addI({
   pos: () => player.pos, r: 99, hold: 1.6, mode: 'walk', priority: 2,

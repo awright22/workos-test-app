@@ -60,5 +60,13 @@ export function machineEff(id) {
   return c >= 20 ? 0.55 + 0.45 * (c - 20) / 40 : 0.55 * c / 20;
 }
 export function suitCap() { return S.upgrades.tank2 ? 200 : S.upgrades.tank1 ? 150 : BAL.suitCap; }
+/**
+ * How long an amount of suit oxygen lasts at a walk, as minutes and seconds. Suit oxygen has one unit wherever it is
+ * not a share of the tank: time, as under the dial ("5:56 of air"). (A candle gave "+40 suit O2" and a tank went
+ * "150 → 200", beside a dial that read 100%.)
+ */
+export function airTime(units) { const s = Math.floor(units / BAL.suitWalk); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+/** The same in whole minutes, for a tank's size. */
+export function airMinutes(units) { return Math.round(units / BAL.suitWalk / 60); }
 export function roverTopSpeed() { return (S.upgrades.drive2 ? 55 : S.upgrades.drive1 ? 45 : 35) * (0.62 + 0.38 * machineEff('rover')); }
 export function roverPowerCap() { return S.upgrades.roverBattery ? 160 : BAL.roverPowerCap; }
