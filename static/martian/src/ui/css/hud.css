@@ -651,7 +651,7 @@
    The prompt means "something is here". A reading, and on a touch screen an offer that is always there, are put
    away after a few seconds (ui/dom.js); the pill is as wide as its longest line (its width is measured there). */
 #mg-prompt.rest { visibility: hidden; opacity: 0; }
-#mg-prompt .pt { flex: none; max-width: 100%; }
+#mg-prompt .pt { flex: 0 1 auto; min-width: 0; }
 /* a refusal is two lines, as every prompt is: what is wanting, and under it what to do about it */
 #mg-prompt.no .lb { color: var(--ink); font-weight: 500; }
 #mg-prompt.no .sub { color: var(--ink-2); }

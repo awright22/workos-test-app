@@ -493,7 +493,7 @@ addI({
   pos: () => World.pathfinder.position,
   r: 5.5, hold: 2.6, mode: 'walk',
   visible: () => S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected,
-  enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Needs the rover: too heavy to carry, bring it closer',
+  enabled: () => groundDist(World.rover.group.position, World.pathfinder.position) < 20 ? true : 'Needs the rover: bring it within 20 m',
   label: () => 'Load Pathfinder onto the rover',
   use: () => {
     S.pf.loaded = true;
@@ -679,7 +679,7 @@ addI({
   pos: () => World.mav.position,
   r: 8.0, hold: 3.0, mode: 'walk', pose: 'stand',
   visible: () => S.flags.mavRevealed && !S.flags.mavStripped,
-  enabled: () => S.sol >= S.rescueSol ? true : `Not before Sol ${S.rescueSol}: the launch window opens then. NASA was firm`,
+  enabled: () => S.sol >= S.rescueSol ? true : `Not before Sol ${S.rescueSol}: the launch window opens then`,
   label: () => 'Strip the MAV’s excess weight',
   sub: () => 'Nose cone, seats, dignity',
   use: () => {
