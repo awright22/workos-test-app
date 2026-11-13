@@ -50,8 +50,9 @@ const FINAL_FRAGMENT = /* glsl */`
       float far = vn(vec2(wq.x * 0.9 - uTime * 0.22, wq.y * 3.2 + 1.7));
       float mid = vn(vec2(wq.x * 1.6 - uTime * 0.7, wq.y * 9.0 + vn(vec2(wq.x * 2.0 - uTime * 0.5, 4.0)) * 1.4));
       float near = vn(vec2(wq.x * 2.4 - uTime * 2.1, wq.y * 26.0 + vn(vec2(wq.x * 3.0 - uTime * 1.6, 9.0)) * 2.5));
-      near *= 0.45 + 0.55 * smoothstep(0.8, 0.15, vUv.y);
-      float sheet = far * 0.42 + mid * 0.36 + near * 0.3;
+      // (the streamers nearest the eye are the ones that say "wind": sharp-edged, and whipping past twice as fast)
+      near = smoothstep(0.38, 0.78, near) * (0.5 + 0.5 * smoothstep(0.85, 0.1, vUv.y));
+      float sheet = far * 0.40 + mid * 0.34 + near * 0.42;
       float thick = smoothstep(0.42, 0.8, mid * 0.55 + near * 0.6);
       col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust));
     }

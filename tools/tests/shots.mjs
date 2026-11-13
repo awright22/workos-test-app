@@ -59,7 +59,7 @@ const scenes = {
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); G.input.keys['w'] = false; await G.settle(); }),
   'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.tick(0.05, 30); await G.settle(); }),
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
-  'storm-sun': async () => ev(async (G) => { G.setLocalTime(15.5); G.faceSun(); G.look(0.28); G.tick(0.05, 40); await G.settle(); }),
+  'storm-sun': async () => ev(async (G) => { G.setLocalTime(16.6); G.faceSun(); G.look(0.2); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
   'mav': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 14); G.setLocalTime(9); G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
   'canyon': async () => ev(async (G) => { await G.tp(-11.5, 293, 3.14); G.setLocalTime(15.5); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),

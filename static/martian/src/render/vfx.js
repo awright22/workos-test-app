@@ -118,7 +118,7 @@ export class Vfx {
           float size = mix(0.035, 0.06, uStorm) * (0.5 + aRnd);
           gl_PointSize = clamp(size * uPx / max(-mv.z, 0.3), 1.0, 90.0);
           float show = step(aRnd, mix(0.42, 1.0, uStorm) * uAmount);
-          vA = show * smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(BOX * 0.32, BOX * 0.5, d)) * mix(0.16, 0.26, uStorm);
+          vA = show * smoothstep(0.6, 2.5, d) * (1.0 - smoothstep(BOX * 0.32, BOX * 0.5, d)) * mix(0.16, 0.4, uStorm);
         }`,
       fragmentShader: /* glsl */`
         uniform sampler2D uMap; uniform vec3 uLight;
