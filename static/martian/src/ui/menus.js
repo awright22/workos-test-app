@@ -2,7 +2,7 @@
 // summary and the NASA uplink terminal. Pure presentation: the game passes in what to show and
 // what to do (see game/flow.js, game/sim.js, game/story.js). Death, rescue and other plain
 // dialogs go through showOverlay in ui/dom.js.
-import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, log, logHistory, toast, dropPointer, setPrompt } from './dom.js';
+import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, holdCards, log, logHistory, toast, dropPointer, setPrompt } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { OBJECTIVES, missionList, suitTimeLeft } from './hud.js';
@@ -528,7 +528,7 @@ export function showChoice(o) {
 
 // test and debug handle (tools/tests/ui-shots.mjs drives every view through this)
 window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings, showControls, showCredits, showSleep, showSleepSummary, showComms, showChoice,
-  showOverlay, hideOverlay, toast, log, logHistory, setPrompt, showBarsGuide, settings, setSetting, resetSettings, layout,
+  showOverlay, hideOverlay, toast, holdCards, log, logHistory, setPrompt, showBarsGuide, settings, setSetting, resetSettings, layout,
   /** what the map lettered on its canvas at its last drawing (the audit holds it to the sizes of the page's own text) */
   get mapLettering() { return UI.mapLettering || []; },
   /** the name of the region at a latitude and longitude (so a test's made-up title screen can name the real place) */

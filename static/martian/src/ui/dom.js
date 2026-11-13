@@ -396,7 +396,21 @@ function nextToast() {
   //  time its own card came)
   if (t.lit) t.lit.classList.add('fresh');
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now(), lit: t.lit || null };
-  cur.timer = setTimeout(() => closeToast(cur, false), life);
+  cur.life = life;
+  cur.timer = cardsHeld ? 0 : setTimeout(() => closeToast(cur, false), life);
+}
+let cardsHeld = false;
+/**
+ * For pictures and tests: while held, a card that is up stays up, and when it is let go it has its life again. (A card
+ * lives by the wall's clock. A machine that draws a frame a second can take longer over one picture than a card lives:
+ * the picture of a bar arriving was of the bar alone, its card come and gone.) Nothing in the game calls this.
+ */
+export function holdCards(on) {
+  cardsHeld = !!on;
+  const cur = toastNow;
+  if (!cur) return;
+  clearTimeout(cur.timer);
+  cur.timer = cardsHeld ? 0 : setTimeout(() => closeToast(cur, false), cur.life || 6000);
 }
 /** True when no card is up and none is waiting: a hint that can wait its turn asks this first. */
 export function toastsIdle() { return !toastBusy && !toastQueue.length; }

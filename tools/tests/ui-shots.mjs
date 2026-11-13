@@ -3,6 +3,8 @@
 //   node tools/tests/ui-shots.mjs                         every size, every state
 //   node tools/tests/ui-shots.mjs --size=1280x720         one size (comma-separated list; matches by substring)
 //   node tools/tests/ui-shots.mjs --only=hud,map          only states whose name contains one of these
+//   node tools/tests/ui-shots.mjs --only=the-numbers --stop   take that one picture again and end the walk there
+//   node tools/tests/ui-shots.mjs --still                 with the game's reduced-motion setting on, as the audit walks
 //
 // Images land in tools/tests/.cache/ui/<size>/NN-<state>.png. The script drives the real game
 // through its debug hooks (window.__MG for the game, window.__UI for menus) in headless
@@ -28,6 +30,7 @@ export const SIZES = [
   { name: 'portrait-390x844', w: 390, h: 844, touch: true, safe: '47,0,34,0', portrait: true },
 ];
 const arg = (k) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split('=')[1].split(',') : null; };
+const STOP = 'every state asked for has been taken';
 const errors = [];
 let total = 0;
 
@@ -51,7 +54,7 @@ export async function walk(size, o = {}) {
   }
   const page = g.page;
   if (o.reducedMotion) await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
-  let n = 0;
+  let n = 0, taken = 0;
   /** `sub` (a letter) files the picture beside the previous one, as 05b-..., without taking a number: the numbers stay the same at every size. */
   const shot = async (name, wait = 500, sub = '') => {
     if (!sub) n++;
@@ -64,6 +67,8 @@ export async function walk(size, o = {}) {
     const label = `${String(n).padStart(2, '0')}${sub}-${name}`;
     if (shoot) { await page.screenshot({ path: path.join(dir, label + '.png'), timeout: 120000 }); total++; }
     if (o.onState) await o.onState(label, page);
+    // (--stop: the walk ends once each state asked for with --only has been taken, for taking one picture again)
+    if (only && o.stop && ++taken >= only.length) { await g.close(); throw new Error(STOP); }
   };
   /** Wait until no toast is showing or queued, so the next one fired is the one photographed. */
   const toastsDone = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});
@@ -121,8 +126,11 @@ export async function walk(size, o = {}) {
   await ev((G) => { G.hold(2.6); G.tick(0.05, 24); });
   await shot('hud-suit-sealed', 300, 'c');
   // (the first bar arrives with the machine it measures, lit while the card that names it is up)
+  // (its card is held up for the picture: this machine can take longer over one picture than a card lives)
+  await ui((U) => U.holdCards(true));
   await ev((G) => { G.tpLocal(4.0, -3.0); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
-  await shot('hud-bars-arrive', 200, 'd');                         // (while its card is up: on a slow machine 900 ms more was the card's whole life)
+  await shot('hud-bars-arrive', 200, 'd');
+  await ui((U) => U.holdCards(false));
   await toastsDone();
   await ev((G) => { G.tpLocal(4.3, -0.4); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 4); });
   await toastsDone();
@@ -134,7 +142,9 @@ export async function walk(size, o = {}) {
   // (a new button, lit while its card is up: the Journal, which comes with the numbers after the FOOD bar's card)
   await ev((G) => { G.tick(0.05, 4); });
   await page.waitForFunction(() => /journal/i.test((document.querySelector('#mg-toast .toast') || { textContent: '' }).textContent), null, { timeout: 40000 }).catch(() => {});
+  await ui((U) => U.holdCards(true));
   await shot('hud-new-button', 300, 'g');
+  await ui((U) => U.holdCards(false));
   await toastsDone();
 
   // ---------------------------------------------------------------- on foot by day
@@ -391,10 +401,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const size of SIZES) {
     if (wantSizes && !wantSizes.some((s) => size.name.includes(s))) continue;
     try {
-      const r = await walk(size, { only });
+      const r = await walk(size, { only, stop: process.argv.includes('--stop'), reducedMotion: process.argv.includes('--still') });
       console.log(`  ${size.name}: ${r.states} states in ${r.seconds} s; console errors: ${r.errors.length}`);
       for (const e of r.errors) errors.push(`${size.name}: ${e}`);
-    } catch (e) { errors.push(`${size.name}: ${e.message}`); console.error(`  ${size.name} FAILED: ${e.message}`); }
+    } catch (e) { if (e.message === STOP) { console.log(`  ${size.name}: taken`); continue; } errors.push(`${size.name}: ${e.message}`); console.error(`  ${size.name} FAILED: ${e.message}`); }
   }
   console.log(`${total} screenshots in ${path.join(outDir, 'ui')}`);
   if (errors.length) { console.log('ERRORS:\n' + errors.slice(0, 20).join('\n')); process.exit(1); }
