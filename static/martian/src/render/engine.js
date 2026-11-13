@@ -300,7 +300,8 @@ export class Engine {
     const intoSun = smoothstep(0.35, 0.95, facing) * smoothstep(-0.12, 0.05, sky.sunE);
     // (a high sun flattens everything: close down further toward noon, or the ground washes out to peach)
     // (and a camera with the sun in the frame stops down whatever the hour: the ground under it kept its exposure and bleached)
-    const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.9 * intoSun)) * (1 - 0.2 * smoothstep(0.62, 0.98, facing));
+    // (stopped down less than it was when facing a setting sun: on a phone the whole lower half of `dusk` was near black)
+    const dayExposure = lerp(1.0, 0.76, smoothstep(0.45, 0.95, sky.sunE)) * (1 + 0.5 * lowSun * (1 - 0.55 * intoSun)) * (1 - 0.2 * smoothstep(0.62, 0.98, facing) * (1 - 0.5 * lowSun));
     const target = (p.inside ? 0.95 : lerp(1.95 * (1 - 0.45 * intoSun), dayExposure, sky.day)) * (p.exposureBias || 1);
     this.exposure = this.snapLight > 0 ? target : lerp(this.exposure, target, damp(0.9, p.dt));
     if (this.snapLight > 0) this.snapLight--;

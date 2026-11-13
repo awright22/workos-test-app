@@ -292,7 +292,8 @@ export function startLaunch() {
   const nozzle = new THREE.Vector3(), lastNozzle = new THREE.Vector3();
   let t = 0, shot = '', skirtDue = 0, trailAt = 0, orbit = null;
   const setShot = (name, fov) => { shot = name; if (cam.fov !== fov) { cam.fov = fov; cam.updateProjectionMatrix(); } };
-  const pixelHeight = () => e.renderer.getDrawingBufferSize(_sz).y * (e.q ? e.q.scale || 1 : 1);
+  // (the canvas is already at the render scale. The 0.8 is the size the smoke was drawn and judged at: the same on every preset.)
+  const pixelHeight = () => e.renderer.domElement.height * 0.8;
 
   World.launchAnim = (dt) => {
     t += dt;
@@ -410,7 +411,6 @@ export function startLaunch() {
     if (lt > WIN && !S.won) winGame();
   };
 }
-const _sz = new THREE.Vector2();
 
 /** Set the last scene: the hour, the Hermes, and where the camera and the ascent stage are about her. */
 function enterOrbit(up, F) {

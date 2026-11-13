@@ -195,6 +195,8 @@ function tick(dt) {
   if (!S.started) { titleCamera(dt); return null; }
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
   if (S.over && S.mode !== 'cutscene') return focus;
+  // (the last shot of the launch goes on turning behind the rescue screen: it is not a still)
+  if (S.won && S.mode === 'cutscene' && World.launchAnim) { World.launchAnim(dt); return (World.launch && World.launch.focus) || focus; }
   if ((S.uiOpen || screenOpen()) && !S.sleeping) return focus;
   if (photo.on) { updatePhoto(dt); return focus; }             // photo mode: the clock is stopped, only the camera moves
   if (S.mode === 'cutscene') {

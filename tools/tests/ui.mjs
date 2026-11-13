@@ -205,7 +205,9 @@ if (!onlySize || onlySize === 'play') {
   });
   check('compass: in a breach indoors its one label is the breach, with the mission line\'s distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0] === `breach ${br.line}`, br);
   // inside, a thing outside is marked at the door with the whole walk; the marker's number is still the line's
-  await g.eval((G) => { G.S.inv.regolith = 0; G.tpLocal(0, 0, 0); G.tick(0.05, 2); });
+  // (forty frames, as for the breach above: the compass looks again at what there is to do every dozen or so, and after
+  // two it could still be naming the last place)
+  await g.eval((G) => { G.S.inv.regolith = 0; G.tpLocal(0, 0, 0); G.tick(0.05, 40); });
   const d3 = await where();
   check('distances: indoors the marker and the mission line still agree', d3.shown && d3.tag === d3.line, d3);
   // ... and the distance is the distance to the thing named: the whole walk to the heap is the heap's, on the line

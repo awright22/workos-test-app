@@ -82,25 +82,39 @@ function screenUVs(o) {
   for (let i = 0; i < n; i++) { const r = find(i); let list = groups.get(r); if (!list) groups.set(r, list = []); list.push(i); }
   const uv = new Float32Array(n * 2);
   let gi = 0;
-  for (const list of groups.values()) {
-    let nx = 0, ny = 0, nz = 0;
-    for (const i of list) { _sn.fromBufferAttribute(nor, i).applyMatrix3(_sm); nx += _sn.x; ny += _sn.y; nz += _sn.z; }
-    const nl = Math.hypot(nx, ny, nz) || 1;
-    nx /= nl; ny /= nl; nz /= nl;
-    // to the right of someone facing it (up × normal), and up the screen (normal × right)
-    let ux = 1, uz = 0;
-    if (Math.abs(ny) < 0.9) { const l = Math.hypot(nz, nx); ux = nz / l; uz = -nx / l; }
-    const vx = ny * uz, vy = nz * ux - nx * uz, vz = -ny * ux;
-    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-    for (const i of list) {
-      const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
-      if (a < u0) u0 = a; if (a > u1) u1 = a; if (b < v0) v0 = b; if (b > v1) v1 = b;
+  for (const whole of groups.values()) {
+    // A screen is drawn as a thin slab, and a slab has six faces: each face is laid out by its own normal. (They were
+    // laid out by the normal of the whole slab, which is the sum of six that cancel: whatever rounding error was
+    // left chose the axes, and a monitor showed a sliver of its panel stretched across it, or nothing.)
+    const faces = new Map();
+    for (const i of whole) {
+      _sn.fromBufferAttribute(nor, i).applyMatrix3(_sm).normalize();
+      const key = Math.round(_sn.x * 3) + ',' + Math.round(_sn.y * 3) + ',' + Math.round(_sn.z * 3);
+      let f = faces.get(key);
+      if (!f) faces.set(key, f = []);
+      f.push(i);
     }
-    const tile = gi++ % 4, du = u1 - u0 || 1, dv = v1 - v0 || 1;
-    for (const i of list) {
-      const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
-      uv[i * 2] = ((tile & 1) + 0.03 + 0.94 * (a - u0) / du) / 2;
-      uv[i * 2 + 1] = (1 - (tile >> 1) + 0.03 + 0.94 * (b - v0) / dv) / 2;
+    const tile = gi++ % 4;
+    for (const list of faces.values()) {
+      let nx = 0, ny = 0, nz = 0;
+      for (const i of list) { _sn.fromBufferAttribute(nor, i).applyMatrix3(_sm); nx += _sn.x; ny += _sn.y; nz += _sn.z; }
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      // to the right of someone facing it (up × normal), and up the screen (normal × right)
+      let ux = 1, uz = 0;
+      if (Math.abs(ny) < 0.9) { const l = Math.hypot(nz, nx) || 1; ux = nz / l; uz = -nx / l; }
+      const vx = ny * uz, vy = nz * ux - nx * uz, vz = -ny * ux;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (const i of list) {
+        const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
+        if (a < u0) u0 = a; if (a > u1) u1 = a; if (b < v0) v0 = b; if (b > v1) v1 = b;
+      }
+      const du = u1 - u0 || 1, dv = v1 - v0 || 1;
+      for (const i of list) {
+        const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
+        uv[i * 2] = ((tile & 1) + 0.03 + 0.94 * (a - u0) / du) / 2;
+        uv[i * 2 + 1] = (1 - (tile >> 1) + 0.03 + 0.94 * (b - v0) / dv) / 2;
+      }
     }
   }
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
