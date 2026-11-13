@@ -112,6 +112,12 @@ function radiusOf(part, d) {
   }
   return Math.pow(f, -1 / (1 << part.e));
 }
+/** Break a part's top off flat (no rock here comes to a point): a plane across it at that share of its height, leaning by up to `lean`. */
+function flat(rnd, part, share, lean = 0.2) {
+  const n = unit((rnd() - 0.5) * lean, 1, (rnd() - 0.5) * lean);
+  part.planes.push(face(rnd, n, radiusOf(part, n) * share, rnd() * 0.8));
+  return part;
+}
 /** Knock chips off a part's edges and corners: n small fresh breaks, which is what makes a broken rock look broken. */
 const chips = (rnd, part, n, yMin = -0.35) => chop(rnd, part, n, 0.03, 0.11, yMin);
 /**
@@ -146,101 +152,101 @@ function notch(rnd, parts, cuts) {
 const Y = [0, 1, 0];
 const DEFS = [
   // ---- broken basalt: blocks bounded by joints, corners and edges fallen away ----
-  // a low block, a corner gone and a length of its top edge
+  // a low block out of square, a corner gone and a length of its top edge
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
-    parts: notch(r, notch(r, chips(r, box(r, [1.0, 0.62, 0.8], 0.4, 0.10, 1.1, 5, 0.22), 3), [[[1, 0.15, 0.1], 0.62], [[0.1, 1, 0], 0.66], [[0, 0.1, 1], 0.6]]), [[[-1, 0.2, 0], 0.6], [[0, 1, -0.15], 0.74]]),
+    parts: notch(r, notch(r, chips(r, chop(r, box(r, [1.0, 0.6, 0.78], 0.4, 0.10, 1.1, 5, 0.5), 2, 0.1, 0.26, -0.5), 2, -0.5), [[[1, 0.15, 0.1], 0.6], [[0.1, 1, 0], 0.64], [[0, 0.1, 1], 0.58]]), [[[-1, 0.2, 0.3], 0.56], [[0, 1, -0.15], 0.74]]),
     uneven: [0.010, 0.006], hackle: [3.4, 0.02], cracks: [[[0.3, 0.1, 1], 0.12, 0.03, 0.2, 0.04]], lumps: [0.004, 0.3] }),
   // a taller block with a stepped top
   (r) => ({ cls: ANGULAR, ground: -0.42, join: 5,
-    parts: notch(r, chips(r, chop(r, box(r, [0.8, 0.92, 0.72], 1.3, 0.16, 0.5, 5, 0.3), 2, 0.08, 0.2, 0.2), 3), [[[0.9, 0.2, 0.3], 0.5], [[0.1, 1, 0.1], 0.58]]),
+    parts: notch(r, chips(r, chop(r, box(r, [0.8, 0.9, 0.7], 1.3, 0.16, 0.5, 5, 0.45), 2, 0.08, 0.22, 0.2), 2), [[[0.9, 0.2, 0.3], 0.5], [[0.1, 1, 0.1], 0.58]]),
     uneven: [0.010, 0.006], hackle: [3.2, 0.02], cracks: [[[1, 0.1, -0.4], -0.1, 0.028, 0.18, 0.05]], lumps: [0.004, 0.3] }),
-  // a many-sided block with one great fresh face
-  (r) => ({ cls: ANGULAR, ground: -0.28,
-    parts: [chips(r, chop(r, poly(r, 12, [1.0, 0.7, 0.85], 0.2, 0.55, 5), 2, 0.22, 0.4, 0.15), 3)],
-    uneven: [0.012, 0.006], hackle: [3.8, 0.024], scoops: [[[0.5, 0.5, -0.7], 0.42, 0.07]], lumps: [0.004, 0.3] }),
+  // a many-sided block, its top broken off flat, one great fresh face
+  (r) => ({ cls: ANGULAR, ground: -0.28, join: 5,
+    parts: notch(r, flat(r, chips(r, chop(r, poly(r, 12, [1.0, 0.74, 0.85], 0.2, 0.55, 5), 2, 0.22, 0.4, 0.15), 2), 0.62, 0.3), [[[0.6, 0.7, -0.4], 0.62], [[-0.3, 0.2, -1], 0.6]]),
+    uneven: [0.012, 0.006], hackle: [3.8, 0.024], scoops: [[[0.5, 0.5, 0.7], 0.4, 0.06]], lumps: [0.004, 0.3] }),
   // a length of a lava column, lying over, cracked across
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
-    parts: notch(r, chips(r, prism(r, 6, 0.66, 1.05, 0.7, 0.2, 2.0, 5), 3), [[[1, 0.5, 0], 0.72], [[0, 1, 0.3], 0.7]]),
+    parts: notch(r, chips(r, prism(r, 6, 0.66, 1.05, 0.7, 0.2, 2.0, 5), 2), [[[1, 0.5, 0], 0.72], [[0, 1, 0.3], 0.7]]),
     uneven: [0.008, 0.006], hackle: [3.4, 0.018], cracks: [[[1, 0.05, 0.1], -0.2, 0.03, 0.22, 0.03]], lumps: [0.004, 0.3] }),
   // two blocks, one lying against the other
   (r) => ({ cls: ANGULAR, ground: -0.26, join: 5,
-    parts: [shift(chips(r, chop(r, box(r, [1.0, 0.5, 0.78], 0.2, 0.08, 0.5, 5, 0.24), 2, 0.06, 0.18), 2), [0, -0.1, 0]), shift(chips(r, chop(r, box(r, [0.56, 0.6, 0.6], 2.4, 0.38, 2.0, 5, 0.4), 2, 0.08, 0.22), 2), [0.26, 0.22, -0.12])],
+    parts: [shift(chips(r, chop(r, box(r, [1.0, 0.5, 0.78], 0.2, 0.08, 0.5, 5, 0.4), 2, 0.06, 0.2), 2), [0, -0.1, 0]), shift(chips(r, chop(r, box(r, [0.56, 0.6, 0.6], 2.4, 0.38, 2.0, 5, 0.5), 2, 0.08, 0.22), 2), [0.26, 0.22, -0.12])],
     uneven: [0.010, 0.006], hackle: [3.6, 0.02], lumps: [0.004, 0.3] }),
-  // a block tipped on its side, its upper corner sheared flat (so that it has no point)
+  // a block tipped over, its upper corner sheared flat and a bite out of its high side (so that it has no point)
   (r) => ({ cls: ANGULAR, ground: -0.34, join: 5,
-    parts: notch(r, chips(r, chop(r, box(r, [0.95, 0.66, 0.6], 1.9, 0.5, 0.3, 5, 0.3), 2, 0.1, 0.24, 0.5), 3), [[[-0.6, 0.8, 0.2], 0.6], [[0.3, 0.3, 1], 0.62]]),
+    parts: notch(r, notch(r, chips(r, chop(r, box(r, [0.95, 0.66, 0.62], 1.9, 0.34, 0.3, 5, 0.4), 2, 0.1, 0.24, 0.5), 2), [[[-0.6, 0.8, 0.2], 0.56], [[0.3, 0.3, 1], 0.6]]), [[[0.5, 0.8, -0.3], 0.66], [[1, 0, 0.2], 0.5]]),
     uneven: [0.010, 0.006], hackle: [3.2, 0.022], cracks: [[[0.2, 1, 0.3], 0.1, 0.028, 0.16, 0.04]], lumps: [0.004, 0.3] }),
-  // a wide low block split down the middle, one half dropped
+  // a wide low block split down the middle, one half dropped, its outline broken
   (r) => ({ cls: ANGULAR, ground: -0.16, join: 5,
-    parts: notch(r, chips(r, box(r, [1.05, 0.5, 0.86], 2.9, 0.06, 2.2, 5, 0.2), 3), [[[1, 0.1, 0.25], 0.06], [[0, 1, 0], 0.72]]),
+    parts: notch(r, chips(r, chop(r, box(r, [1.05, 0.5, 0.86], 2.9, 0.06, 2.2, 5, 0.45), 3, 0.1, 0.3, -0.1), 2), [[[1, 0.1, 0.25], 0.06], [[0, 1, 0], 0.7]]),
     uneven: [0.010, 0.006], hackle: [3.6, 0.02], cracks: [[[1, 0.1, 0.25], 0.03, 0.04, 0.34, 0.05]], lumps: [0.004, 0.3] }),
-  // a shattered rock: many faces at odds, deep bites out of it
+  // a shattered rock: many faces at odds, deep bites out of it, no point to it
   (r) => ({ cls: ANGULAR, ground: -0.30, join: 5,
-    parts: notch(r, chips(r, chop(r, poly(r, 10, [1.0, 0.8, 0.8], 0.3, 0.8, 5), 4, 0.12, 0.34, 0.0), 3), [[[0.7, 0.6, -0.4], 0.56], [[-0.2, 0.7, 0.7], 0.6], [[0.6, -0.1, 0.8], 0.6]]),
+    parts: notch(r, flat(r, chips(r, chop(r, poly(r, 10, [1.0, 0.8, 0.8], 0.3, 0.8, 5), 4, 0.12, 0.34, 0.0), 2), 0.6, 0.4), [[[0.7, 0.6, -0.4], 0.56], [[-0.2, 0.7, 0.7], 0.6], [[0.6, -0.1, 0.8], 0.6]]),
     uneven: [0.012, 0.008], hackle: [4.0, 0.026], lumps: [0.004, 0.3] }),
-  // a great jointed block (what falls from a wall): two joints opened, a corner gone
+  // a great jointed block (what falls from a wall): out of square, two joints opened, a corner gone
   (r) => ({ cls: ANGULAR, ground: -0.36, join: 5,
-    parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.8, 0.84], 0.9, 0.12, 2.6, 5, 0.18), 2, 0.05, 0.14, 0.3), 3), [[[1, 0.6, 0.2], 0.6], [[0.2, 1, 0.5], 0.64], [[0.1, 0.2, 1], 0.58]]),
+    parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.76, 0.82], 0.9, 0.14, 2.6, 5, 0.45), 3, 0.08, 0.24, 0.2), 2), [[[1, 0.6, 0.2], 0.58], [[0.2, 1, 0.5], 0.62], [[0.1, 0.2, 1], 0.56]]),
     uneven: [0.008, 0.006], hackle: [4.2, 0.018], cracks: [[[0.1, 1, 0.05], 0.14, 0.022, 0.16, 0.03], [[1, 0.1, -0.5], -0.22, 0.026, 0.18, 0.04]], lumps: [0.004, 0.3] }),
   // ---- weathered rock: the same breaks, their arrises worn, pitted and scoured ----
-  // pitted lava, a flake off one shoulder
+  // pitted lava: many worn flats, a flake off one shoulder
   (r) => ({ cls: ROUNDED, ground: -0.34,
-    parts: [chips(r, poly(r, 11, [1.0, 0.72, 0.86], 0.2, 0.6, 4), 3)],
-    uneven: [0.016, 0.008], hackle: [2.6, 0.014], pits: [7.5, 0.34, 0.03, 0.5], scoops: [[[0.6, 0.6, 0.5], 0.4, 0.07], [[-0.7, 0.3, -0.6], 0.3, 0.05]], lumps: [0.008, 0.4] }),
+    parts: [flat(r, chips(r, poly(r, 18, [1.0, 0.7, 0.86], 0.16, 0.6, 5), 2), 0.74, 0.25)],
+    uneven: [0.016, 0.012], hackle: [2.8, 0.03], pits: [3.4, 0.42, 0.06, 0.65], scoops: [[[0.6, 0.6, 0.5], 0.4, 0.07], [[-0.7, 0.3, -0.6], 0.3, 0.05]], lumps: [0.008, 0.4] }),
   // a boulder split in two, the halves a little apart
-  (r) => ({ cls: ROUNDED, ground: -0.38,
-    parts: [chips(r, poly(r, 10, [1.0, 0.84, 0.84], 0.18, 0.6, 4), 3)],
-    uneven: [0.016, 0.008], hackle: [2.8, 0.016], cracks: [[[1, 0.12, 0.35], 0.05, 0.05, 0.5, 0.06]], pits: [8.0, 0.3, 0.02, 0.3], lumps: [0.008, 0.4] }),
+  (r) => ({ cls: ROUNDED, ground: -0.36,
+    parts: [flat(r, chips(r, poly(r, 16, [1.0, 0.7, 0.88], 0.16, 0.6, 5), 2), 0.76, 0.3)],
+    uneven: [0.016, 0.012], hackle: [2.8, 0.028], cracks: [[[1, 0.1, 0.3], 0.04, 0.045, 0.5, 0.05]], pits: [4.0, 0.38, 0.045, 0.45], lumps: [0.008, 0.4] }),
   // a worn block, flat-topped, with a ledge where a sheet has come away
   (r) => ({ cls: ROUNDED, ground: -0.32, join: 4,
-    parts: notch(r, chips(r, box(r, [0.94, 0.66, 0.8], 0.7, 0.08, 1.4, 4, 0.3), 3), [[[0.8, 0.5, -0.2], 0.7], [[0, 1, 0.2], 0.72]]),
-    uneven: [0.016, 0.008], hackle: [2.6, 0.012], pits: [7.0, 0.32, 0.026, 0.4], scoops: [[[-0.5, 0.4, 0.75], 0.36, 0.06]], lumps: [0.008, 0.4] }),
+    parts: notch(r, chips(r, chop(r, box(r, [0.94, 0.64, 0.8], 0.7, 0.08, 1.4, 4, 0.45), 2, 0.08, 0.24, 0.1), 2), [[[0.8, 0.5, -0.2], 0.7], [[0, 1, 0.2], 0.72]]),
+    uneven: [0.014, 0.008], hackle: [2.6, 0.012], pits: [3.8, 0.38, 0.04, 0.45], scoops: [[[-0.5, 0.4, 0.75], 0.36, 0.06]], lumps: [0.008, 0.4] }),
   // a boulder broken across: its worn back, and the flat face it broke along
-  (r) => ({ cls: ROUNDED, ground: -0.36,
-    parts: [chips(r, (() => { const p = poly(r, 10, [1.0, 0.9, 0.85], 0.16, 0.6, 4); p.planes.push(face(r, unit(0.9, 0.3, 0.3), 0.3, -0.5, 1)); return p; })(), 3)],
-    uneven: [0.016, 0.008], hackle: [3.0, 0.018], pits: [7.5, 0.3, 0.024, 0.35], scoops: [[[-0.6, 0.5, 0.6], 0.34, 0.05]], lumps: [0.008, 0.4] }),
+  (r) => ({ cls: ROUNDED, ground: -0.34,
+    parts: [flat(r, chips(r, (() => { const p = poly(r, 16, [1.0, 0.72, 0.85], 0.16, 0.6, 5); p.planes.push(face(r, unit(0.9, 0.25, 0.3), 0.42, -0.5, 1)); return p; })(), 2), 0.72, 0.35)],
+    uneven: [0.016, 0.012], hackle: [3.0, 0.028], pits: [3.8, 0.4, 0.05, 0.5], scoops: [[[-0.6, 0.5, 0.6], 0.34, 0.05]], lumps: [0.008, 0.4] }),
   // three worn blocks fused, deep creases between them
   (r) => ({ cls: ROUNDED, ground: -0.26, join: 4,
-    parts: [chips(r, box(r, [0.8, 0.6, 0.66], 0.3, 0.14, 0.2, 4, 0.36), 2), shift(chips(r, poly(r, 8, [0.6, 0.5, 0.56], 0.14, 0.6, 4), 2), [0.46, 0.06, 0.22]), shift(chips(r, box(r, [0.5, 0.44, 0.5], 1.7, 0.3, 1.1, 4, 0.4), 2), [-0.34, 0.02, -0.3])],
-    uneven: [0.016, 0.008], hackle: [2.8, 0.014], pits: [8.0, 0.3, 0.02, 0.3], lumps: [0.008, 0.4] }),
+    parts: [chips(r, box(r, [0.8, 0.6, 0.66], 0.3, 0.14, 0.2, 4, 0.45), 2), shift(chips(r, poly(r, 8, [0.6, 0.5, 0.56], 0.14, 0.6, 4), 2), [0.46, 0.06, 0.22]), shift(chips(r, box(r, [0.5, 0.44, 0.5], 1.7, 0.3, 1.1, 4, 0.5), 2), [-0.34, 0.02, -0.3])],
+    uneven: [0.014, 0.008], hackle: [2.8, 0.014], pits: [4.0, 0.36, 0.035, 0.35], lumps: [0.008, 0.4] }),
   // a rock the wind has hollowed: three scoops in a worn block
   (r) => ({ cls: ROUNDED, ground: -0.30,
-    parts: [chips(r, chop(r, poly(r, 9, [1.0, 0.7, 0.8], 0.22, 0.7, 4), 1, 0.2, 0.36, 0.3), 3)],
-    uneven: [0.016, 0.008], hackle: [2.6, 0.012], scoops: [[[0.2, 0.9, 0.3], 0.4, 0.08], [[0.9, 0.3, -0.2], 0.36, 0.08], [[-0.5, 0.4, -0.8], 0.4, 0.07]], pits: [9.0, 0.28, 0.016, 0.3], lumps: [0.008, 0.4] }),
+    parts: [flat(r, chips(r, chop(r, poly(r, 10, [1.0, 0.7, 0.8], 0.22, 0.7, 4), 1, 0.2, 0.36, 0.3), 2), 0.8, 0.3)],
+    uneven: [0.016, 0.012], hackle: [2.8, 0.026], scoops: [[[0.2, 0.9, 0.3], 0.4, 0.08], [[0.9, 0.3, -0.2], 0.36, 0.08], [[-0.5, 0.4, -0.8], 0.4, 0.07]], pits: [4.4, 0.34, 0.03, 0.35], lumps: [0.008, 0.4] }),
   // ---- plates of layered rock ----
   // one thick flag, its edge broken
   (r) => ({ cls: SLAB, ground: -0.12,
-    parts: [chips(r, chop(r, plate(r, 7, 0.3, 0.5, 0.85, 1.15, 0.16, 5), 1, 0.05, 0.15, 0.5), 3, 0.1)],
-    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.11, relief: 0.022, tone: 0.5 }, lumps: [0.003, 0.3] }),
+    parts: [chips(r, chop(r, plate(r, 7, 0.34, 0.5, 0.85, 1.15, 0.16, 5), 2, 0.08, 0.22, 0.2), 2, 0.1)],
+    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.12, relief: 0.05, tone: 0.7 }, lumps: [0.003, 0.3] }),
   // a wide plate with a smaller one left standing on it
   (r) => ({ cls: SLAB, ground: -0.14, join: 5,
     parts: [chips(r, plate(r, 8, 0.16, 0.5, 0.9, 1.15, 0.1, 5), 3, 0.1), chips(r, plate(r, 6, 0.44, 0.5, 0.5, 0.74, 0.2, 5), 2, 0.1)],
-    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.1, relief: 0.03, tone: 0.6 }, lumps: [0.003, 0.3] }),
+    uneven: [0.008, 0.005], hackle: [3.6, 0.010], beds: { n: Y, thick: 0.1, relief: 0.045, tone: 0.7 }, lumps: [0.003, 0.3] }),
   // a thin flagstone, a corner off, cracked across
   (r) => ({ cls: SLAB, ground: -0.06, join: 5,
-    parts: notch(r, chips(r, plate(r, 6, 0.2, 0.5, 0.88, 1.2, 0.1, 5), 3, 0.1), [[[1, 0, 0.3], 0.62], [[0.2, 0, -1], 0.6]]),
-    uneven: [0.008, 0.005], hackle: [3.8, 0.010], cracks: [[[0.5, 0, 1], 0.1, 0.03, 0.3, 0.05]], beds: { n: Y, thick: 0.08, relief: 0.016, tone: 0.5 }, lumps: [0.003, 0.3] }),
+    parts: notch(r, chips(r, plate(r, 6, 0.22, 0.5, 0.88, 1.2, 0.1, 5), 3, 0.1), [[[1, 0, 0.3], 0.62], [[0.2, 1, 0], 0.55]]),
+    uneven: [0.008, 0.005], hackle: [3.8, 0.010], cracks: [[[0.5, 0, 1], 0.1, 0.03, 0.3, 0.05]], beds: { n: Y, thick: 0.08, relief: 0.035, tone: 0.6 }, lumps: [0.003, 0.3] }),
   // a block of bedded rock, its layers standing out all round
   (r) => ({ cls: SLAB, ground: -0.24, join: 5,
-    parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.56, 0.8], 0.5, 0.05, 0.9, 5, 0.26), 2, 0.06, 0.2, 0.3), 2), [[[0.8, 0.6, 0.3], 0.64], [[0, 1, 0], 0.6]]),
-    uneven: [0.008, 0.005], hackle: [3.4, 0.010], beds: { n: unit(0.06, 1, 0.04), thick: 0.14, relief: 0.045, tone: 0.7 }, lumps: [0.003, 0.3] }),
+    parts: notch(r, chips(r, chop(r, box(r, [1.0, 0.56, 0.8], 0.5, 0.05, 0.9, 5, 0.4), 2, 0.06, 0.2, 0.3), 2), [[[0.8, 0.6, 0.3], 0.64], [[0, 1, 0], 0.6]]),
+    uneven: [0.008, 0.005], hackle: [3.4, 0.010], beds: { n: unit(0.06, 1, 0.04), thick: 0.13, relief: 0.07, tone: 0.8 }, lumps: [0.003, 0.3] }),
   // a plate broken in two, the pieces lying together
   (r) => ({ cls: SLAB, ground: -0.10, join: 5,
-    parts: notch(r, chips(r, plate(r, 7, 0.26, 0.5, 0.9, 1.2, 0.14, 5), 3, 0.1), [[[1, 0, 0.4], 0.05], [[0, 1, 0], 0.7]]),
-    uneven: [0.008, 0.005], hackle: [3.6, 0.010], cracks: [[[1, 0, 0.4], 0.02, 0.045, 0.4, 0.06]], beds: { n: Y, thick: 0.09, relief: 0.02, tone: 0.5 }, lumps: [0.003, 0.3] }),
+    parts: notch(r, chips(r, chop(r, plate(r, 7, 0.26, 0.5, 0.9, 1.2, 0.14, 5), 2, 0.08, 0.2, 0.0), 2, 0.1), [[[1, 0, 0.4], 0.05], [[0, 1, 0], 0.7]]),
+    uneven: [0.008, 0.005], hackle: [3.6, 0.010], cracks: [[[1, 0, 0.4], 0.02, 0.045, 0.4, 0.06]], beds: { n: Y, thick: 0.09, relief: 0.04, tone: 0.6 }, lumps: [0.003, 0.3] }),
   // ---- stones: what a hand or a boot would move ----
   // a flat chip
   (r) => ({ cls: COBBLE, ground: -0.10, parts: [chips(r, plate(r, 5, 0.3, 0.4, 0.75, 1.15, 0.5, 5), 2, 0.0)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
   // a blocky fragment
-  (r) => ({ cls: COBBLE, ground: -0.22, parts: [chips(r, chop(r, box(r, [0.9, 0.62, 0.7], 0.8, 0.3, 0.6, 5, 0.4), 2, 0.1, 0.3, 0.0), 2)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.22, parts: [chips(r, chop(r, box(r, [0.9, 0.6, 0.7], 0.8, 0.3, 0.6, 5, 0.5), 2, 0.1, 0.3, 0.0), 2)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
   // a worn, pitted pebble (many flats: not a ball)
-  (r) => ({ cls: COBBLE, ground: -0.20, parts: [chips(r, poly(r, 9, [1.0, 0.6, 0.8], 0.22, 0.6, 4), 2)], uneven: [0.016, 0.01], hackle: [2.2, 0.018], pits: [5.5, 0.36, 0.04, 0.5], lumps: [0.008, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.20, parts: [flat(r, chips(r, poly(r, 11, [1.0, 0.6, 0.8], 0.2, 0.6, 4), 2), 0.75, 0.3)], uneven: [0.014, 0.01], hackle: [2.2, 0.018], pits: [3.2, 0.4, 0.05, 0.5], lumps: [0.008, 0.4] }),
   // a wedge with its edge broken off
-  (r) => ({ cls: COBBLE, ground: -0.16, join: 5, parts: notch(r, chips(r, poly(r, 7, [1.0, 0.56, 0.74], 0.3, 0.8, 5), 2), [[[0.2, 1, 0.1], 0.66], [[1, 0.3, 0], 0.7]]), uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
+  (r) => ({ cls: COBBLE, ground: -0.16, join: 5, parts: notch(r, chips(r, poly(r, 7, [1.0, 0.56, 0.74], 0.3, 0.8, 5), 2), [[[0.2, 1, 0.1], 0.6], [[1, 0.3, 0], 0.66]]), uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
   // a long shard
   (r) => ({ cls: COBBLE, ground: -0.14, parts: [chips(r, chop(r, prism(r, 5, 0.42, 1.0, 1.1, 0.12, 0.4, 5), 2, 0.1, 0.3, 0.0), 2)], uneven: [0.012, 0.008], hackle: [2.4, 0.026], lumps: [0.006, 0.4] }),
-  // a lump with one fresh face
-  (r) => ({ cls: COBBLE, ground: -0.22, parts: [chips(r, chop(r, poly(r, 8, [0.9, 0.7, 0.84], 0.2, 0.6, 4), 1, 0.25, 0.4, 0.2), 2)], uneven: [0.014, 0.01], hackle: [2.4, 0.022], scoops: [[[-0.6, 0.6, 0.4], 0.4, 0.07]], lumps: [0.008, 0.4] }),
+  // a broken lump: one fresh face, its top off
+  (r) => ({ cls: COBBLE, ground: -0.22, parts: [flat(r, chips(r, chop(r, poly(r, 9, [0.9, 0.66, 0.84], 0.2, 0.6, 5), 2, 0.2, 0.4, 0.1), 2), 0.7, 0.4)], uneven: [0.012, 0.008], hackle: [2.4, 0.024], scoops: [[[-0.6, 0.6, 0.4], 0.4, 0.07]], lumps: [0.006, 0.4] }),
 ];
 const SEEDS = [11, 23, 37, 41, 59, 61, 173, 73, 89, 97, 181, 103, 127, 139, 151, 163, 191, 197, 211, 223, 227, 229, 233, 239, 241, 251];
 
@@ -310,21 +316,21 @@ function partsRadius(def, d) {
   return Math.pow(acc, 1 / (1 << je));
 }
 
-/**
- * Work out one shape and write its two layers.
- * @returns {{cls:number, ground:number, top:number, big:number}} in units where its radius at the ground is 1
- */
-function buildShape(n, w, out, offset, rmaxFixed, snap, snapAt) {
-  const { N, NN, dx, dy, dz, inside, rad, tone, fresh, bed, nrm, curv, wide } = w;
-  const rnd = rng(SEEDS[n] * 7919 + 13);
-  const def = DEFS[n](rnd);
-  const parts = def.parts, je = def.join || 4, sd = SEEDS[n] * 3.71, isd = SEEDS[n] * 131 + 7;
-  const un = def.uneven || [0.012, 0.008], L = def.lumps || [0, 1], hk = def.hackle, pits = def.pits, beds = def.beds;
-  const cracks = def.cracks || [];
+/** What is asked of a shape, set out once for its texels: its definition, its seeds, and where its scoops are. */
+function shapeJob(n) {
+  const def = DEFS[n](rng(SEEDS[n] * 7919 + 13));
   // (a scoop is a dish cut into the surface about a point of it: where that point is, is worked out once)
   const scoops = (def.scoops || []).map(([v, r, depth]) => { const d = unit(v[0], v[1], v[2]), at = partsRadius(def, d); return [d[0] * at, d[1] * at, d[2] * at, r, depth]; });
-  const crackN = cracks.map((c) => unit(c[0][0], c[0][1], c[0][2]));
-  for (let k = 0; k < NN; k++) {
+  const cracks = def.cracks || [];
+  return { def, parts: def.parts, je: def.join || 4, sd: SEEDS[n] * 3.71, isd: SEEDS[n] * 131 + 7, un: def.uneven || [0.012, 0.008], L: def.lumps || [0, 1], hk: def.hackle, pits: def.pits, beds: def.beds,
+    cracks, crackN: cracks.map((c) => unit(c[0][0], c[0][1], c[0][2])), scoops };
+}
+
+/** The surface along the directions of texels k0 to k1: its distance, and the tone, freshness and bedding of the spot. */
+function texels(w, job, k0, k1) {
+  const { dx, dy, dz, rad, rad0, tone, fresh, bed } = w;
+  const { parts, je, sd, isd, un, L, hk, pits, beds, cracks, crackN, scoops } = job;
+  for (let k = k0; k < k1; k++) {
     const x = dx[k], y = dy[k], z = dz[k];
     // slow fields: each face is a little out of flat by its own mix of them, so no edge runs dead straight
     const w0 = gnoise3(x * 1.3 + sd, y * 1.3, z * 1.3 - sd), w1 = gnoise3(x * 1.3 - 7.1, y * 1.3 + sd, z * 1.3), w2 = gnoise3(x * 1.3, y * 1.3 - sd, z * 1.3 + 4.4);
@@ -348,7 +354,7 @@ function buildShape(n, w, out, offset, rmaxFixed, snap, snapAt) {
     }
     let r = acc > 0 ? Math.pow(acc, 1 / (1 << je)) : 1;
     if (acc > 0) { tn /= acc; fr /= acc; }
-    w.rad0[k] = r;
+    rad0[k] = r;
     // Everything from here is laid out across the surface itself (by position, not by direction: a face near the
     // centre takes up a great deal of direction, and a pattern drawn by direction puckers in the middle of it).
     let px = x * r, py = y * r, pz = z * r;
@@ -397,9 +403,16 @@ function buildShape(n, w, out, offset, rmaxFixed, snap, snapAt) {
     if (L[0]) r *= 1 + L[0] * 2 * gnoise3(px / L[1] + sd, py / L[1] - sd * 0.7, pz / L[1] + 3.3);
     rad[k] = r; tone[k] = tn < -1 ? -1 : tn > 1 ? 1 : tn; fresh[k] = fr; bed[k] = bedded;
   }
-  // Measure it. Where the ground stands on it: as low as the rock allows without overhanging its own foot (a rock
-  // that narrows toward the ground is a rock set down on a table). For each bearing and each height, how far out
-  // the surface reaches; the ground goes to the lowest height at which what is above it overhangs by little.
+}
+
+/**
+ * Measure a shape. Where the ground stands on it: as low as the rock allows without overhanging its own foot (a
+ * rock that narrows toward the ground is a rock set down on a table). For each bearing and each height, how far out
+ * the surface reaches; the ground goes to the lowest height at which what is above it overhangs by little.
+ * @returns {{ground:number, top:number, big:number, foot:number}} in the shape's own units
+ */
+function measure(w, def) {
+  const { NN, dx, dy, dz, inside, rad } = w;
   const BEAR = 24, BANDS = 60, lo = -1.2, bandH = 2.4 / BANDS;
   const reach = new Float32Array(BEAR * BANDS);
   let top = 0, big = 0;
@@ -426,63 +439,74 @@ function buildShape(n, w, out, offset, rmaxFixed, snap, snapAt) {
     if (foot > 0 && over / BEAR / foot <= (def.overhang === undefined ? 0.035 : def.overhang)) break;
     if (ground > top * 0.3) break;                                                    // (never buried past two thirds)
   }
-  const foot = footAt(Math.max(0, Math.min(BANDS - 2, Math.floor((ground - lo) / bandH)))) || 1;
-  const sc = 1 / foot;                  // every rock is brought to the same radius at the ground, so "size" means the same for each
-  const info = { cls: def.cls, ground: ground * sc, top: top * sc, big: big * sc };
-  if (!out) return info;
+  return { ground, top, big, foot: footAt(Math.max(0, Math.min(BANDS - 2, Math.floor((ground - lo) / bandH)))) || 1 };
+}
+
+/** The normal of a surface (its distance along each texel's direction), from its own neighbours in the map, into w.nrm. */
+function normals(w, rad) {
+  const { N, dx, dy, dz, inside, nrm } = w;
   const at = (i, j) => (j < 0 ? 0 : j >= N ? N - 1 : j) * N + (i < 0 ? 0 : i >= N ? N - 1 : i);
-  // the normal of a surface, from its own neighbours in the map
-  const normals = (rad) => {
-    for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
-      const a0 = at(i - 1, j), a1 = at(i + 1, j), b0 = at(i, j - 1), b1 = at(i, j + 1);
-      const ux = rad[a1] * dx[a1] - rad[a0] * dx[a0], uy = rad[a1] * dy[a1] - rad[a0] * dy[a0], uz = rad[a1] * dz[a1] - rad[a0] * dz[a0];
-      const vx = rad[b1] * dx[b1] - rad[b0] * dx[b0], vy = rad[b1] * dy[b1] - rad[b0] * dy[b0], vz = rad[b1] * dz[b1] - rad[b0] * dz[b0];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      let l = Math.hypot(nx, ny, nz);
-      if (nx * dx[k] + ny * dy[k] + nz * dz[k] < 0) l = -l;
-      // (round the rim of the map the directions close on the underside: there the rock is its own direction)
-      if (Math.abs(l) < 1e-9 || dy[k] < -0.96 || !inside[a0] || !inside[a1] || !inside[b0] || !inside[b1]) { nx = dx[k]; ny = dy[k]; nz = dz[k]; l = 1; }
-      nrm[k * 3] = nx / l; nrm[k * 3 + 1] = ny / l; nrm[k * 3 + 2] = nz / l;
-    }
-  };
-  // Where the block's arrises are. A ball's vertices fall where they fall, and a rock drawn with a few hundred of
-  // them has every edge planed off to the width of a triangle: a block comes out a loaf. So each texel is told the
-  // way to the nearest arris of the block (of the block as it broke, before it weathered: its joints and breaks, not
-  // every pit), and the rock shader moves a vertex that lies near one onto it (see snapUv). The triangles then meet
-  // along the rock's edges and corners, and what lies between is flat, as the faces are.
-  if (snap) {
-    const edge = w.edge, rad0 = w.rad0, R = SNAP_REACH;
-    normals(rad0);
-    for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
-      let e = 0;
-      if (inside[k] && dy[k] > -0.93) {
-        for (const q of [at(i - 1, j), at(i + 1, j), at(i, j - 1), at(i, j + 1)]) { const c = 1 - (nrm[q * 3] * nrm[k * 3] + nrm[q * 3 + 1] * nrm[k * 3 + 1] + nrm[q * 3 + 2] * nrm[k * 3 + 2]); if (c > e) e = c; }
-      }
-      edge[k] = e > 0.035 ? e : 0;                       // (neighbours a fifteen-degree turn apart or more: an arris)
-    }
-    for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
-      let best = (R + 0.5) * (R + 0.5), bi = 0, bj = 0, found = false;
-      for (let b = Math.max(0, j - R); b <= Math.min(N - 1, j + R); b++) for (let a = Math.max(0, i - R); a <= Math.min(N - 1, i + R); a++) {
-        if (!edge[b * N + a]) continue;
-        const d2 = (a - i) * (a - i) + (b - j) * (b - j);
-        if (d2 < best) { best = d2; bi = a; bj = b; found = true; }
-      }
-      let ou = 0, ov = 0;
-      if (found) {
-        // (the middle of the arris there: an edge is two or three texels wide)
-        let su = 0, sv = 0, sw = 0;
-        for (let b = bj - 1; b <= bj + 1; b++) for (let a = bi - 1; a <= bi + 1; a++) { const e = edge[at(a, b)], wt = e * e; su += wt * a; sv += wt * b; sw += wt; }
-        ou = su / sw - i; ov = sv / sw - j;
-      }
-      snap[snapAt + k * 2] = Math.max(0, Math.min(255, Math.round(127.5 + ou * 127 / R))); snap[snapAt + k * 2 + 1] = Math.max(0, Math.min(255, Math.round(127.5 + ov * 127 / R)));
-    }
+  for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
+    const a0 = at(i - 1, j), a1 = at(i + 1, j), b0 = at(i, j - 1), b1 = at(i, j + 1);
+    const ux = rad[a1] * dx[a1] - rad[a0] * dx[a0], uy = rad[a1] * dy[a1] - rad[a0] * dy[a0], uz = rad[a1] * dz[a1] - rad[a0] * dz[a0];
+    const vx = rad[b1] * dx[b1] - rad[b0] * dx[b0], vy = rad[b1] * dy[b1] - rad[b0] * dy[b0], vz = rad[b1] * dz[b1] - rad[b0] * dz[b0];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    let l = Math.hypot(nx, ny, nz);
+    if (nx * dx[k] + ny * dy[k] + nz * dz[k] < 0) l = -l;
+    // (round the rim of the map the directions close on the underside: there the rock is its own direction)
+    if (Math.abs(l) < 1e-9 || dy[k] < -0.96 || !inside[a0] || !inside[a1] || !inside[b0] || !inside[b1]) { nx = dx[k]; ny = dy[k]; nz = dz[k]; l = 1; }
+    nrm[k * 3] = nx / l; nrm[k * 3 + 1] = ny / l; nrm[k * 3 + 2] = nz / l;
   }
-  normals(rad);
-  // how the surface bends: normals that lean apart are an edge (proud), normals that lean together a crease (hollow)
+}
+
+/** Which texels lie on an arris of the surface whose normals are in w.nrm: how far the normal turns to a neighbour, into w.edge. */
+function arrises(w) {
+  const { N, dy, inside, nrm, edge } = w;
+  const at = (i, j) => (j < 0 ? 0 : j >= N ? N - 1 : j) * N + (i < 0 ? 0 : i >= N ? N - 1 : i);
+  for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
+    let e = 0;
+    if (inside[k] && dy[k] > -0.93) {
+      for (let q = 0; q < 4; q++) {
+        const o = q === 0 ? at(i - 1, j) : q === 1 ? at(i + 1, j) : q === 2 ? at(i, j - 1) : at(i, j + 1);
+        const c = 1 - (nrm[o * 3] * nrm[k * 3] + nrm[o * 3 + 1] * nrm[k * 3 + 1] + nrm[o * 3 + 2] * nrm[k * 3 + 2]);
+        if (c > e) e = c;
+      }
+    }
+    edge[k] = e > 0.035 ? e : 0;                         // (neighbours a fifteen-degree turn apart or more: an arris)
+  }
+}
+
+/** For rows j0 to j1 of the map: the way from each texel to the nearest arris within SNAP_REACH texels, into `snap`. */
+function snapRows(w, snap, snapAt, j0, j1) {
+  const { N, edge } = w, R = SNAP_REACH;
+  for (let j = j0; j < j1; j++) for (let i = 0; i < N; i++) {
+    let best = (R + 0.5) * (R + 0.5), bi = 0, bj = 0, found = false;
+    for (let b = Math.max(0, j - R); b <= Math.min(N - 1, j + R); b++) for (let a = Math.max(0, i - R); a <= Math.min(N - 1, i + R); a++) {
+      if (!edge[b * N + a]) continue;
+      const d2 = (a - i) * (a - i) + (b - j) * (b - j);
+      if (d2 < best) { best = d2; bi = a; bj = b; found = true; }
+    }
+    let ou = 0, ov = 0;
+    if (found) {
+      // (the middle of the arris there: an edge is two or three texels wide)
+      let su = 0, sv = 0, sw = 0;
+      for (let b = Math.max(0, bj - 1); b <= Math.min(N - 1, bj + 1); b++) for (let a = Math.max(0, bi - 1); a <= Math.min(N - 1, bi + 1); a++) { const e = edge[b * N + a], wt = e * e; su += wt * a; sv += wt * b; sw += wt; }
+      ou = su / sw - i; ov = sv / sw - j;
+    }
+    const k = j * N + i;
+    snap[snapAt + k * 2] = Math.max(0, Math.min(255, Math.round(127.5 + ou * 127 / R))); snap[snapAt + k * 2 + 1] = Math.max(0, Math.min(255, Math.round(127.5 + ov * 127 / R)));
+  }
+}
+
+/** How the surface bends: normals that lean apart are an edge (proud), normals that lean together a crease (hollow). Into w.curv. */
+function bends(w, foot) {
+  const { N, dx, dy, dz, inside, rad, nrm, curv } = w;
+  const at = (i, j) => (j < 0 ? 0 : j >= N ? N - 1 : j) * N + (i < 0 ? 0 : i >= N ? N - 1 : i);
   for (let j = 0, k = 0; j < N; j++) for (let i = 0; i < N; i++, k++) {
     let c = 0;
     if (inside[k] && dy[k] > -0.9) {
-      for (const q of [at(i - 1, j), at(i + 1, j), at(i, j - 1), at(i, j + 1)]) {
+      for (let n = 0; n < 4; n++) {
+        const q = n === 0 ? at(i - 1, j) : n === 1 ? at(i + 1, j) : n === 2 ? at(i, j - 1) : at(i, j + 1);
         const px = rad[q] * dx[q] - rad[k] * dx[k], py = rad[q] * dy[q] - rad[k] * dy[k], pz = rad[q] * dz[q] - rad[k] * dz[k];
         const d2 = px * px + py * py + pz * pz;
         if (d2 > 1e-12) c += ((nrm[q * 3] - nrm[k * 3]) * px + (nrm[q * 3 + 1] - nrm[k * 3 + 1]) * py + (nrm[q * 3 + 2] - nrm[k * 3 + 2]) * pz) / d2;
@@ -491,6 +515,32 @@ function buildShape(n, w, out, offset, rmaxFixed, snap, snapAt) {
     }
     curv[k] = c < -12 ? -12 : c > 12 ? 12 : c;
   }
+}
+
+/**
+ * Work out one shape and write its two layers and the way to its arrises, a little at a time: each `next()` does a
+ * few milliseconds of it, and the last returns what the shape is.
+ * @returns {Generator<void, {cls:number, ground:number, top:number, big:number}>} in units where its radius at the ground is 1
+ */
+function* shapeSteps(n, w, out, offset, rmaxFixed, snap, snapAt) {
+  const { N, NN, rad, tone, fresh, bed, nrm, curv, wide } = w;
+  const job = shapeJob(n);
+  for (let k = 0; k < NN; k += N * 8) { texels(w, job, k, Math.min(NN, k + N * 8)); yield; }
+  const m = measure(w, job.def);
+  const sc = 1 / m.foot;                // every rock is brought to the same radius at the ground, so "size" means the same for each
+  const info = { cls: job.def.cls, ground: m.ground * sc, top: m.top * sc, big: m.big * sc };
+  // Where the block's arrises are. A ball's vertices fall where they fall, and a rock drawn with a few hundred of
+  // them has every edge planed off to the width of a triangle: a block comes out a loaf. So each texel is told the
+  // way to the nearest arris of the block (of the block as it broke, before it weathered: its joints and breaks, not
+  // every pit), and the rock shader moves a vertex that lies near one onto it (see snapDir). The triangles then meet
+  // along the rock's edges and corners, and what lies between is flat, as the faces are.
+  normals(w, w.rad0);
+  arrises(w);
+  yield;
+  for (let j = 0; j < N; j += 16) { snapRows(w, snap, snapAt, j, Math.min(N, j + 16)); yield; }
+  normals(w, rad);
+  bends(w, m.foot);
+  yield;
   blurInto(w, curv, wide, Math.max(2, Math.round(N / 26)));          // creases shade what lies round them
   const q8 = (v) => (v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255));
   const o1 = offset, o2 = offset + NN * 4;
@@ -511,20 +561,22 @@ export const SHAPE_RMAX = 2.6;
 export const SNAP_REACH = 9;
 
 /**
- * Build the atlas, all at once (`buildRockAtlas(N)`), or a shape at a time so a frame is never held
- * up: `const a = rockAtlas(N); for (let k = 0; k < a.count; k++) a.build(k);`
+ * Build the atlas, all at once (`buildRockAtlas(N)`), a shape at a time (`a.build(k)`), or a few milliseconds at a
+ * time so that a frame is never held up: `const it = a.steps(k); while (!it.next().done) ...` (the last step files
+ * what the shape is under `a.shapes[k]`).
  * Layer 2k is shape k's normal (rgb) and radius / SHAPE_RMAX (a); layer 2k + 1 how proud or hollow
  * the spot is (r: 0 a deep crease, 0.5 level, 1 a sharp edge), the tone of its face (g), whether
- * that face is a fresh break (b) and how much the rock shows its bedding there (a). A shape's `ground`
- * is the height of the ground on it and `top` its highest point, in units where its radius at the ground is 1.
+ * that face is a fresh break (b) and how much the rock shows its bedding there (a). `snap` holds, two bytes a
+ * texel and a layer a shape, the way to the nearest arris (see snapDir). A shape's `ground` is the height of the
+ * ground on it and `top` its highest point, in units where its radius at the ground is 1; until a shape is built
+ * only its class is known.
  */
 export function rockAtlas(N = 128) {
   const w = workspace(N), K = DEFS.length;
   const atlas = { data: new Uint8Array(N * N * 4 * K * 2), snap: new Uint8Array(N * N * 2 * K), snapReach: SNAP_REACH, size: N, layers: K * 2, count: K, rmax: SHAPE_RMAX, shapes: [], classes: [[], [], [], []],
-    build(k) { atlas.shapes[k] = buildShape(k, w, atlas.data, k * 2 * N * N * 4, SHAPE_RMAX, atlas.snap, k * N * N * 2); } };
-  // what each shape is and how it stands is wanted before its picture is: a coarse pass gives that at once
-  const coarse = workspace(32);
-  for (let k = 0; k < K; k++) { const s = buildShape(k, coarse, null, 0, SHAPE_RMAX); atlas.shapes.push(s); atlas.classes[s.cls].push(k); }
+    * steps(k) { atlas.shapes[k] = yield* shapeSteps(k, w, atlas.data, k * 2 * N * N * 4, SHAPE_RMAX, atlas.snap, k * N * N * 2); },
+    build(k) { const it = atlas.steps(k); while (!it.next().done); } };
+  for (let k = 0; k < K; k++) { const cls = DEFS[k](rng(SEEDS[k] * 7919 + 13)).cls; atlas.shapes.push({ cls, ground: 0, top: 1, big: 1 }); atlas.classes[cls].push(k); }
   return atlas;
 }
 export function buildRockAtlas(N = 128) {

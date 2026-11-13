@@ -32,9 +32,7 @@ await g.page.evaluate(() => {
       const out = [];
       for (const [node, set] of G.ctx.rocks.sets) {
         if (node.used < G.ctx.terrain.frame - 2) continue;
-        // (how many numbers a rock takes is the scatter's business: a set that has been drawn says how many rocks it holds)
-        if (!set.inst || !set.inst.length) continue;
-        const d = set.data, o = set.origin, st = d.length / (set.inst.length / 16);
+        const d = set.data, o = set.origin, st = G.ctx.rocks.stride;
         for (let i = 0; i < d.length; i += st) {
           const p = pos.clone().set(o[0] + d[i], o[1] + d[i + 1], o[2] + d[i + 2]), v = p.clone().sub(pos), dist = v.length();
           if (dist > reach) continue;

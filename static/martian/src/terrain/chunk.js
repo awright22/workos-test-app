@@ -5,7 +5,7 @@
  */
 import { faceToDir, FINEST } from '../planet/height.js';
 import { DETAIL_FRAME as DF, R } from '../planet/constants.js';
-import { gnoise3, hashU } from '../core/math.js';
+import { gnoise3, hashU, smoothstep } from '../core/math.js';
 
 const PI_4 = Math.PI / 4;
 /** Metres across half a cube face, measured along its middle (face coordinate 1). */
@@ -140,7 +140,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
     // stones lie on this very mesh; boulders (carried by a coarser chunk, to be seen from afar) on the finest one, which
     // is what is drawn wherever anyone is near enough to see how a boulder sits
     const grid = level === fineLevel
-      ? { T, unit, at(gi, gj, C, o) { const k = (gj - gy0) * W + (gi - gx0); C[o] = px[k]; C[o + 1] = py[k]; C[o + 2] = pz[k]; C[o + 3] = rad[k]; C[o + 4] = geoIn[k * 4] / 127.5; C[o + 5] = geoIn[k * 4 + 2] / 255; } }
+      ? { T, unit, at(gi, gj, C, o) { const k = (gj - gy0) * W + (gi - gx0); C[o] = px[k]; C[o + 1] = py[k]; C[o + 2] = pz[k]; C[o + 3] = rad[k]; C[o + 4] = geoIn[k * 4] / 127.5; C[o + 5] = geoIn[k * 4 + 2] / 255; C[o + 6] = geoIn[k * 4 + 1] / 255; } }
       : planetGrid(planet, face, G, fineLevel);
     out.rocks = scatterRocks(planet, face, level, ix, iy, rocks, ox, oy, oz, grid);
   }
@@ -178,14 +178,15 @@ export function chunkIndices(G) {
 }
 
 /** Numbers per rock in a chunk's list (see scatterRocks). */
-export const ROCK_STRIDE = 9;
+export const ROCK_STRIDE = 10;
 /** What a rock is: the scatter chooses by region, the rock field (world/rocks.js) picks a shape of that kind. */
 export const ROCK_ANGULAR = 0, ROCK_ROUNDED = 1, ROCK_SLAB = 2, ROCK_COBBLE = 3;
 
 /**
  * The vertices of the terrain mesh at `level`, worked out on demand: what a rock stands on when the
  * chunk that carries it is not the one that is drawn under it. `at(gi, gj, C, o)` writes a vertex's
- * position, its radius, the land's own slope there and how near a lava flow's edge it lies.
+ * position, its radius, the land's own slope there, how near a lava flow's edge it lies and how much of it is
+ * the top of a flow.
  */
 export function planetGrid(planet, face, G, level) {
   const T = G << level, unit = 2 / T, minW = Math.max(planet.finest, chunkSpacing(level, G) * 1.25);
@@ -198,19 +199,19 @@ export function planetGrid(planet, face, G, level) {
       faceToDir(face, s, t, d2);
       const edge = gi <= 0 || gi >= T || gj <= 0 || gj >= T;
       const r = edge ? planet.radius(d2[0], d2[1], d2[2], minW) : planet.radiusFace(face, s, t, d2[0], d2[1], d2[2], minW);
-      c = [d2[0] * r, d2[1] * r, d2[2] * r, r, planet.baseSlope(), planet.flowEdge()];
+      c = [d2[0] * r, d2[1] * r, d2[2] * r, r, planet.baseSlope(), planet.flowEdge(), planet.flowCover()];
       cache.set(key, c);
     }
-    C[o] = c[0]; C[o + 1] = c[1]; C[o + 2] = c[2]; C[o + 3] = c[3]; C[o + 4] = c[4]; C[o + 5] = c[5];
+    C[o] = c[0]; C[o + 1] = c[1]; C[o + 2] = c[2]; C[o + 3] = c[3]; C[o + 4] = c[4]; C[o + 5] = c[5]; C[o + 6] = c[6];
   } };
 }
 
-const _C = new Float64Array(24);
+const _C = new Float64Array(32);
 /**
  * The point of a terrain mesh above face coordinates (s, t): on the very triangle that is drawn
  * there (each square is cut along the diagonal buildChunk chooses). Writes the point (3) and the
- * triangle's outward normal (3) into `out`, then the land's own slope and the nearness of a lava
- * flow's edge.
+ * triangle's outward normal (3) into `out`, then the land's own slope, the nearness of a lava
+ * flow's edge and (ninth, where `out` has room for it) how much of the place is the top of a flow.
  *
  * A rock placed by the height function itself stands on ground the mesh may not show. The mesh
  * joins its samples with flat triangles, and across a dune's crest or a crater's rim that cuts the
@@ -224,12 +225,12 @@ export function meshPoint(grid, s, t, out) {
   let fu = (s + 1) / grid.unit - gi, fv = (t + 1) / grid.unit - gj;
   fu = fu < 0 ? 0 : fu > 1 ? 1 : fu; fv = fv < 0 ? 0 : fv > 1 ? 1 : fv;
   const C = _C;
-  grid.at(gi, gj, C, 0); grid.at(gi + 1, gj, C, 6); grid.at(gi, gj + 1, C, 12); grid.at(gi + 1, gj + 1, C, 18);      // a, b, c, e
+  grid.at(gi, gj, C, 0); grid.at(gi + 1, gj, C, 8); grid.at(gi, gj + 1, C, 16); grid.at(gi + 1, gj + 1, C, 24);      // a, b, c, e
   // the triangle the point is in: P = P0 + w1 (P1 - P0) + w2 (P2 - P1), as offsets into C
   let p0, p1, p2, w1, w2;
-  if (Math.abs(C[3] - C[21]) < Math.abs(C[9] - C[15])) {                 // this square is cut a-e
-    if (fv >= fu) { p0 = 0; p1 = 12; p2 = 18; w1 = fv; w2 = fu; } else { p0 = 0; p1 = 6; p2 = 18; w1 = fu; w2 = fv; }
-  } else if (fu + fv <= 1) { p0 = 6; p1 = 0; p2 = 12; w1 = 1 - fu; w2 = fv; } else { p0 = 12; p1 = 18; p2 = 6; w1 = fu; w2 = 1 - fv; }
+  if (Math.abs(C[3] - C[27]) < Math.abs(C[11] - C[19])) {                // this square is cut a-e
+    if (fv >= fu) { p0 = 0; p1 = 16; p2 = 24; w1 = fv; w2 = fu; } else { p0 = 0; p1 = 8; p2 = 24; w1 = fu; w2 = fv; }
+  } else if (fu + fv <= 1) { p0 = 8; p1 = 0; p2 = 16; w1 = 1 - fu; w2 = fv; } else { p0 = 16; p1 = 24; p2 = 8; w1 = fu; w2 = 1 - fv; }
   const ax = C[p1] - C[p0], ay = C[p1 + 1] - C[p0 + 1], az = C[p1 + 2] - C[p0 + 2];
   const bx = C[p2] - C[p1], by = C[p2 + 1] - C[p1 + 1], bz = C[p2 + 2] - C[p1 + 2];
   const x = C[p0] + ax * w1 + bx * w2, y = C[p0 + 1] + ay * w1 + by * w2, z = C[p0 + 2] + az * w1 + bz * w2;
@@ -237,19 +238,31 @@ export function meshPoint(grid, s, t, out) {
   let l = Math.hypot(nx, ny, nz) || 1;
   if (nx * x + ny * y + nz * z < 0) l = -l;
   out[0] = x; out[1] = y; out[2] = z; out[3] = nx / l; out[4] = ny / l; out[5] = nz / l;
-  out[6] = C[4]; out[7] = C[5];
+  out[6] = C[4]; out[7] = C[5]; out[8] = C[6];
   return out;
 }
 
-const _m = new Float64Array(8), _q = new Float64Array(8), _rim = new Float64Array(12), _near = [0, 0, 0];
+/**
+ * How much of the ground at a place in a lava field is bare basalt, 0..1, as the ground's shader draws it
+ * (render/terrain-material.js: `basalt`): the back of a flow, or lava that ponded and froze level. A rock there
+ * is the flow's own dark rock, and no dust has drifted against it.
+ * @param {number} rise  the land's own slope there, rise over run
+ * @param {number} flowTop  how much of it is the top of a lava flow
+ */
+export function bareLava(rise, flowTop) {
+  const slope = 1 - 1 / Math.sqrt(1 + rise * rise);
+  return Math.max(smoothstep(0.30, 0.62, flowTop), 1 - smoothstep(0.004, 0.05, slope));
+}
+
+const _m = new Float64Array(10), _q = new Float64Array(10), _rim = new Float64Array(12), _near = [0, 0, 0];
 /**
  * Rocks for one chunk, placed by a hash of the chunk's address so the same rock is always in
  * the same place. Boulder fields are patchy and denser on rough, old terrain; small stones are
  * everywhere; none lies on a cliff, a ledge's riser or a crater's wall. Returns ROCK_STRIDE
  * numbers per rock: where it meets the ground, relative to the chunk origin (3); the ground's
  * normal there (3); its radius at the ground in metres; what kind it is (the whole part: angular,
- * rounded, slab, cobble) plus a random 0..1 for shape and colour; and how far to sink it so that
- * uneven ground leaves no gap under it.
+ * rounded, slab, cobble) plus a random 0..1 for shape and colour; how far to sink it so that
+ * uneven ground leaves no gap under it; and how much of the ground it lies on is bare lava.
  * @param {'big'|'small'} kind
  * @param {{T:number, unit:number, at:Function}} grid  the mesh it rests on (see meshPoint)
  */
@@ -266,7 +279,7 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
   let density = big ? (0.0010 + 0.0085 * rough * rough) * (0.15 + 0.85 * patch) : (0.05 + 0.16 * rough) * (0.35 + 0.65 * patch);
   // stones thin out toward the poles (and nothing lies on the ice itself: the rock field sees to that, having the colour map)
   if (lat > 0.93) density *= lat > 0.985 ? 0.03 : lat > 0.97 ? 0.12 : 1 - 0.88 * (lat - 0.93) / 0.04;
-  const lava = planet.lava(d[0], d[1], d[2]);
+  const lava = planet.lava(d[0], d[1], d[2]), lavaField = smoothstep(0, 0.36, lava);         // (the second as the ground's shader weighs it)
   density *= 1 + (big ? 3.4 : 1.6) * lava;                                                   // a lava field is strewn with its own rubble
   // the first landing sites were rock gardens, and look it in every picture sent home
   for (const g of ROCK_GARDENS) {
@@ -320,6 +333,8 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     // cliffs are; the mesh's says where a ledge's riser or a crater's wall is, which the land's slope cannot.
     const steep = _m[6];
     if (steep > 0.8 || (steep > 0.5 && keep < (steep - 0.5) / 0.3)) continue;
+    // (on a lava field: is this the back of a flow, or a lava lake's floor, or the dust between?)
+    const bare = lavaField > 0 ? lavaField * bareLava(steep, _m[8]) : 0;
     // (the extra stones of a wall lie on the wall's own ground and within a stone's roll of its foot, not out on the
     // level beyond: the land is looked at sixteen metres off each way for something steep)
     if (more > 1) {
@@ -383,7 +398,7 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     }
     out[k++] = px - ox; out[k++] = py - oy; out[k++] = pz - oz;
     out[k++] = nx; out[k++] = ny; out[k++] = nz;
-    out[k++] = size; out[k++] = cls + Math.min(0.999, v); out[k++] = drop;
+    out[k++] = size; out[k++] = cls + Math.min(0.999, v); out[k++] = drop; out[k++] = bare;
   }
   return k === out.length ? out : out.slice(0, k);
 }
