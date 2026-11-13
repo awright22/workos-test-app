@@ -96,6 +96,8 @@ let _slope = 0, _du = 0, _dv = 0;
 /** How far the place last asked about lies out on a caldera's level floor, 0..1, and how far inside a caldera's
  *  reach it is at all, 0..1 (set by _caldera). */
 let _floor = 0, _zone = 0;
+/** How far down in a gully the place last asked about lies, 0 on a spur's crest to 1 in a chute's floor (0 off steep ground). */
+let _chute = 0;
 // The gnomonic face coordinates as vectors: a face's directions are A + sc·B + tc·C (see faceToDir).
 const FACE_B = [[0, 0, -1], [0, 0, 1], [1, 0, 0], [1, 0, 0], [1, 0, 0], [-1, 0, 0]];
 const FACE_C = [[0, -1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, -1, 0]];
@@ -106,6 +108,7 @@ const FACE_C = [[0, -1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, -
  * high is a ripple, and on a hillside one twenty metres high is a mountain).
  */
 const GULLIES = [[150, 13], [56, 5], [21, 1.8]];
+const CHUTE_SHARE = [0.5, 0.33, 0.17];
 /** Headings of the patches of spur and gully last asked about: a small direct-mapped table (see _gully). */
 const GULLY_SLOTS = 4093;
 const _gk = new Int32Array(GULLY_SLOTS * 4).fill(0x7fffffff), _gd = new Float64Array(GULLY_SLOTS * 3);
@@ -239,7 +242,8 @@ export class Planet {
     let base = this._caldera(this._mola(), x, y, z, minW);
     // (a caldera's wall is a collapse scar, fluted a little, not a canyon wall worn into buttresses: full-size spurs
     // there stood up over the brim as a row of teeth)
-    if (_slope > 0.22 && _floor < 1) base += this._gully(x, y, z, minW) * (1 - _floor) * (1 - 0.85 * _zone);
+    _chute = 0;
+    if (_slope > 0.22 && _floor < 1) { base += this._gully(x, y, z, minW) * (1 - _floor) * (1 - 0.85 * _zone); _chute *= (1 - _floor) * (1 - 0.85 * _zone); }
     base = this._ledges(base, x, y, z, minW);
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
@@ -258,6 +262,8 @@ export class Planet {
    *  levelled building site it lies. */
   flowCover() { return _cover; }
   baseSlope() { return _slope; }
+  /** Likewise: how far down in a gully it lies, 0 on a spur to 1 in a chute's floor. */
+  gullyFloor() { return _chute; }
   padWeight() { return _padW; }
 
   /**
@@ -398,7 +404,7 @@ export class Planet {
     if (m <= 0 || minW >= GULLIES[0][0] / 4) return 0;
     m = m * m * (3 - 2 * m);
     const px = x * R, py = y * R, pz = z * R, rise = _slope < 0.35 ? 0.35 : _slope > 2.2 ? 2.2 : _slope;
-    let h = 0, steeper = 0;
+    let h = 0, steeper = 0, chute = 0;
     for (let o = 0; o < 3; o++) {
       const lam = GULLIES[o][0], amp = GULLIES[o][1] * rise;
       if (minW >= lam / 4) break;
@@ -438,10 +444,16 @@ export class Planet {
       const wave = sum / wsum;
       // crests (the spurs) a little rounded, hollows (the chutes) round and floored with what fell down them. (A
       // knife-edged crest shows on a skyline as a tooth.) 0.45 is the mean.
-      h += (1 - Math.sqrt(wave * wave + 0.06) - 0.45) * amp * w;
+      const deep = Math.sqrt(wave * wave + 0.06);
+      h += (1 - deep - 0.45) * amp * w;
       steeper += amp * w * 2 / lam;
+      // how far down in a chute this is, the big gullies counting most (what a far, coarse mesh cannot draw it does not colour)
+      // (patches of wave blended together seldom reach a full swing: the ground is below its mean from about half a swing)
+      const aw = wave < 0 ? -wave : wave;
+      chute += (aw < 0.3 ? 0 : aw > 0.65 ? 1 : (aw - 0.3) / 0.35) * CHUTE_SHARE[o] * w;
     }
     _slope += steeper * m * 0.8;
+    _chute = chute * m;
     return h * m;
   }
 

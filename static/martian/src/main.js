@@ -31,7 +31,7 @@ import { initDiag } from './ui/diag.js';
 import { LampPool } from './world/lamps.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { setStainLight, World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
-import { dustUniforms, setGlow, preloadModels } from './world/models.js';
+import { dustUniforms, mirrorUniforms, setGlow, preloadModels } from './world/models.js';
 import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
@@ -159,6 +159,8 @@ function draw(dt, focus) {
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
   dustUniforms.uRim.value = e.modelRim || 0;
+  mirrorUniforms.uSkyHor.value.copy(e.sky.fogColor); mirrorUniforms.uSkyTop.value.copy(e.sky.ambientSky);
+  if (e.envGround) mirrorUniforms.uGroundLit.value.copy(e.envGround.material.color);
   if (ctx.terrainUniforms) {
     const tu = ctx.terrainUniforms, high = e.camera.position.length() - R;
     tu.uDust.value = S.started ? S.storm.i : 0; tu.uDay.value = e.sky.day;

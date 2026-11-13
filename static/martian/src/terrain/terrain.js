@@ -149,6 +149,7 @@ export class Terrain {
     g.setAttribute('aTex', new THREE.BufferAttribute(c.tex, 3));
     g.setAttribute('aUv', new THREE.BufferAttribute(c.uv, 3));
     g.setAttribute('aGeo', new THREE.BufferAttribute(c.geo, 4, true));
+    g.setAttribute('aChute', new THREE.BufferAttribute(c.chute, 1, true));
     g.setIndex(new THREE.BufferAttribute(c.idx, 1));        // (each chunk cuts its own squares: see buildChunk)
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), c.radius);
     const mesh = new THREE.Mesh(g, this.material);

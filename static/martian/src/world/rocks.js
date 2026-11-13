@@ -166,9 +166,21 @@ function rockMaterial(uniforms, rmax, detail) {
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
         material.specularColor *= 0.25; material.specularColorBlended *= 0.25; material.specularF90 *= 0.25;`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
-        normal = normalize(vRockRot * rockN);`);
+        normal = normalize(vRockRot * rockN);`)
+      // The horizon. Level ground seen at a grazing angle, well out, melts into the haze (see the terrain's material),
+      // and a boulder standing on it must melt with it: left crisp, it sat on the sky's edge like a thing on a table.
+      // A rock knows where on the planet it lies, which is the level ground's normal; one on a hillside (its own
+      // "up" well off the planet's) is left alone, as the hillside is.
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+        {
+          vec3 rockUpV = normalize(mat3(viewMatrix) * vRockLies.xyz);
+          float rockGraze = abs(dot(normalize(vViewPosition), rockUpV));
+          float rockLevel = smoothstep(0.93, 0.98, dot(vRockRot[1], rockUpV));
+          float rockRim = (1.0 - smoothstep(0.004, 0.05, rockGraze)) * smoothstep(110.0, 240.0, length(vViewPosition)) * 0.72 * rockLevel;
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, rockRim);
+        }`);
   };
-  mat.customProgramCacheKey = () => 'rock7-' + detail;
+  mat.customProgramCacheKey = () => 'rock8-' + detail;
   return mat;
 }
 /** The rocks in the shadow maps: the shadow pass must push the vertices out the same way. */

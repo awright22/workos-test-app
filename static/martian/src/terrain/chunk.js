@@ -33,7 +33,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
   const minW = Math.max(planet.finest, spacing * 1.25);
   const W = G + 3;                                   // one extra ring for normals
   const px = new Float64Array(W * W), py = new Float64Array(W * W), pz = new Float64Array(W * W), rad = new Float64Array(W * W);
-  const geoIn = new Uint8Array(W * W * 4);
+  const geoIn = new Uint8Array(W * W * 4), chuteIn = new Uint8Array(W * W);
   let minR = Infinity, maxR = -Infinity;
   // global vertex indices across the whole face, so shared edges get bit-identical coordinates
   const T = G << level, unit = 2 / T, gx0 = ix * G - 1, gy0 = iy * G - 1;
@@ -52,6 +52,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
       // (asked for now: they describe the place radius() was last called for)
       geoIn[k * 4] = Math.min(255, planet.baseSlope() * 127.5); geoIn[k * 4 + 1] = planet.flowCover() * 255;
       geoIn[k * 4 + 2] = Math.min(255, planet.flowEdge() * 255); geoIn[k * 4 + 3] = planet.padWeight() * 255;
+      chuteIn[k] = Math.min(255, planet.gullyFloor() * 255);
       if (i > 0 && j > 0 && i < W - 1 && j < W - 1) { if (r < minR) minR = r; if (r > maxR) maxR = r; }
     }
   }
@@ -72,6 +73,8 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
   // what the place is, a byte each: the land's own slope (rise over run, halved), how much of it is the top of a
   // lava flow, how near a flow's edge, how far inside a levelled site
   const geo = new Uint8Array((N + S) * 4);
+  // and how far down in a gully it lies (a spur is bare rock, a chute is floored with scree)
+  const chute = new Uint8Array(N + S);
   const pos = new Float32Array((N + S) * 3);
   const nor = new Int8Array((N + S) * 3);
   const tex = new Float32Array((N + S) * 3);
@@ -87,6 +90,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
       uv[v * 3] = fs * FACE_M - us0; uv[v * 3 + 1] = ft * FACE_M - vs0;
       uv[v * 3 + 2] = toEdge >= 16 ? 0 : toEdge <= 5 ? 1 : 1 - (toEdge - 5) / 11;
       geo[v * 4] = geoIn[k * 4]; geo[v * 4 + 1] = geoIn[k * 4 + 1]; geo[v * 4 + 2] = geoIn[k * 4 + 2]; geo[v * 4 + 3] = geoIn[k * 4 + 3];
+      chute[v] = chuteIn[k];
       tex[v * 3] = DF[0] * x + DF[1] * y + DF[2] * z - tx; tex[v * 3 + 1] = DF[3] * x + DF[4] * y + DF[5] * z - ty; tex[v * 3 + 2] = DF[6] * x + DF[7] * y + DF[8] * z - tz;
       const r2 = lx * lx + ly * ly + lz * lz;
       if (r2 > radius2) radius2 = r2;
@@ -111,6 +115,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
     tex[sv * 3] = tex[v * 3]; tex[sv * 3 + 1] = tex[v * 3 + 1]; tex[sv * 3 + 2] = tex[v * 3 + 2];
     uv[sv * 3] = uv[v * 3]; uv[sv * 3 + 1] = uv[v * 3 + 1]; uv[sv * 3 + 2] = uv[v * 3 + 2];
     geo[sv * 4] = geo[v * 4]; geo[sv * 4 + 1] = geo[v * 4 + 1]; geo[sv * 4 + 2] = geo[v * 4 + 2]; geo[sv * 4 + 3] = geo[v * 4 + 3];
+    chute[sv] = chute[v];
     sv++;
   };
   for (let i = 0; i < G; i++) skirt(i, 0);          // top edge, left to right
@@ -130,7 +135,7 @@ export function buildChunk(planet, face, level, ix, iy, G, rocks, fineLevel = le
       }
     }
   }
-  const out = { pos, nor, tex, uv, geo, idx, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
+  const out = { pos, nor, tex, uv, geo, chute, idx, origin: [ox, oy, oz], radius: Math.sqrt(radius2) + drop, minR, maxR };
   if (rocks) {
     // stones lie on this very mesh; boulders (carried by a coarser chunk, to be seen from afar) on the finest one, which
     // is what is drawn wherever anyone is near enough to see how a boulder sits
@@ -236,7 +241,7 @@ export function meshPoint(grid, s, t, out) {
   return out;
 }
 
-const _m = new Float64Array(8), _q = new Float64Array(8), _rim = new Float64Array(12);
+const _m = new Float64Array(8), _q = new Float64Array(8), _rim = new Float64Array(12), _near = [0, 0, 0];
 /**
  * Rocks for one chunk, placed by a hash of the chunk's address so the same rock is always in
  * the same place. Boulder fields are patchy and denser on rough, old terrain; small stones are
@@ -268,7 +273,22 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     const away = Math.acos(Math.min(1, d[0] * g[0] + d[1] * g[1] + d[2] * g[2])) * R;
     if (away < g[3]) density *= 1 + g[4] * (1 - away / g[3]);
   }
-  const n = Math.min(big ? 160 : 300, Math.floor(side * side * density));
+  // Under a wall lies what has fallen from it. Where this chunk takes in steep land (its middle or a corner), there
+  // are more stones to place, and below they are kept only on the wall's lower slopes and at its foot: its benches,
+  // its scree and the first of the level ground. (A canyon wall rose from clean sand with not a block at its foot.)
+  let wall = 0;
+  for (let q = 0; q < 5; q++) {
+    faceToDir(face, s0 + span * (q === 4 ? 0.5 : q & 1 ? 0.85 : 0.15), t0 + span * (q === 4 ? 0.5 : q & 2 ? 0.85 : 0.15), d);
+    planet.radius(d[0], d[1], d[2], side / 4);
+    wall = Math.max(wall, Math.min(1, Math.max(0, (planet.baseSlope() - 0.14) / 0.3)));
+  }
+  faceToDir(face, s0 + span / 2, t0 + span / 2, d);
+  // (so many to the square metre whatever the country: the plain a canyon is cut in may have almost none of its own)
+  const more = 1 + wall * (1 - lava) * (big ? 0.013 : 0.09) / density;
+  density *= more;
+  // (most of a wall's extra stones are thrown away again below, being asked for all over the chunk and kept only at
+  // the wall's foot: so many more may be asked for)
+  const n = Math.min((big ? 160 : 300) * (more > 1 ? 2.5 : 1), Math.floor(side * side * density));
   const out = new Float32Array(n * ROCK_STRIDE);
   let seed = hashU(ix, iy, face, level * 7 + (big ? 1 : 2));
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
@@ -292,7 +312,7 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     if (!clear) continue;
     // (its radius where it meets the ground: most boulders are knee-high, a few stand taller than a man; a stone is
     // nothing he cannot step over, since only boulders are in his way)
-    const size = big ? Math.min(3.4, 0.38 * Math.pow(1 - u * 0.985, -0.6)) : 0.07 + 0.25 * u * u;
+    let size = big ? Math.min(3.4, 0.38 * Math.pow(1 - u * 0.985, -0.6)) : 0.07 + 0.25 * u * u;
     meshPoint(grid, s, t, _m);
     const px = _m[0], py = _m[1], pz = _m[2];
     let nx = _m[3], ny = _m[4], nz = _m[5], drop;
@@ -300,6 +320,20 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     // cliffs are; the mesh's says where a ledge's riser or a crater's wall is, which the land's slope cannot.
     const steep = _m[6];
     if (steep > 0.8 || (steep > 0.5 && keep < (steep - 0.5) / 0.3)) continue;
+    // (the extra stones of a wall lie on the wall's own ground and within a stone's roll of its foot, not out on the
+    // level beyond: the land is looked at sixteen metres off each way for something steep)
+    if (more > 1) {
+      let on = Math.min(1, Math.max(0, (steep - 0.13) / 0.2));
+      const e = 16 / FACE_M;
+      for (let q = 0; q < 4 && on < 1; q++) {
+        faceToDir(face, s + (q === 0 ? e : q === 1 ? -e : 0), t + (q === 2 ? e : q === 3 ? -e : 0), _near);
+        planet.radius(_near[0], _near[1], _near[2], 8);
+        on = Math.max(on, Math.min(1, Math.max(0, (planet.baseSlope() - 0.3) / 0.4)));
+      }
+      if ((pick * 7.31) % 1 > (1 + (more - 1) * on) / more) continue;
+      // (what comes down a wall is blocks, not gravel: bigger than the stones of the plain)
+      if (big) size = Math.min(3.4, size * (1 + 0.6 * on * wall));
+    }
     let c = nx * d[0] + ny * d[1] + nz * d[2];
     let tilt = Math.sqrt(Math.max(0, 1 - c * c)) / Math.max(c, 0.05);
     if (tilt > tiltMost || (tilt > tiltEasy && keep2 < (tilt - tiltEasy) / (tiltMost - tiltEasy))) continue;

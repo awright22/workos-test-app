@@ -40,13 +40,27 @@ export async function openGame(o = {}) {
   await page.goto(o.quality === 'auto' ? `http://127.0.0.1:${port}/${o.query ? '?' + o.query : ''}` : `http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
   const loadMs = Date.now() - t0;
+  // A page that stops answering must fail the test, not hang it: one whole run stood for half an hour on a single
+  // step with the browser drawing something it never finished, and there was nothing to say where the game was.
+  // So the page is asked every twenty seconds where it is and what it is drawing, and a call into it that has not
+  // returned in fifteen minutes throws with the last answer.
+  let heard = null;
+  const beat = setInterval(() => {
+    page.evaluate(() => { const G = window.__MG; return G && G.ready ? { site: G.World && G.World.spawn ? [+G.World.spawn.lat.toFixed(3), +G.World.spawn.lon.toFixed(3)] : null, paused: !!G.paused, info: G.info ? G.info() : null } : null; })
+      .then((v) => { if (v) heard = { ...v, at: new Date().toISOString() }; }).catch(() => {});
+  }, 20000);
+  beat.unref();
   const game = {
     page, errors, loadMs, port,
     /** Run a function in the page with access to window.__MG as its first argument. */
-    eval: (fn, arg) => page.evaluate(`(${fn.toString()})(window.__MG, ${JSON.stringify(arg === undefined ? null : arg)})`),
+    eval: (fn, arg, ms = 900000) => {
+      let timer;
+      const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`the page did not answer in ${ms / 1000} s. Last heard from it: ${JSON.stringify(heard)}`)), ms); });
+      return Promise.race([page.evaluate(`(${fn.toString()})(window.__MG, ${JSON.stringify(arg === undefined ? null : arg)})`), late]).finally(() => clearTimeout(timer));
+    },
     shot: async (name) => { const p = path.join(outDir, name + '.png'); await page.screenshot({ path: p, timeout: 120000 }); return p; },
     /** Let the game run for `seconds` of game time by stepping its clock (independent of frame rate). */
-    close: async () => { await browser.close(); server.close(); },
+    close: async () => { clearInterval(beat); await browser.close(); server.close(); },
   };
   return game;
 }

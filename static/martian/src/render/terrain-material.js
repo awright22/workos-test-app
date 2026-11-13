@@ -83,6 +83,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
         attribute vec3 aTex;
+        attribute float aChute;
+        varying float vChute;
         attribute vec3 aUv;
         attribute vec4 aGeo;
         uniform float uRelief;
@@ -93,6 +95,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         varying vec3 vGeoNormal;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vTex = aTex;
+        vChute = aChute;
         vUv3 = aUv;
         vGeo = aGeo;
         vPlanetPos = (modelMatrix * vec4(position, 1.0)).xyz;
@@ -114,6 +117,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform float uDust;
         uniform float uDay;
         uniform float uSpace;
+        varying float vChute;
         varying vec3 vTex;
         varying vec3 vUv3;
         varying vec4 vGeo;
@@ -220,7 +224,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // Near, the mesh's own slope says where: a ledge's riser is rock and its bench is dust. Far off, the land's
         // slope does, which every level of detail agrees on, so no edge shows where a fine mesh meets a coarse one.
         float rockSlope = mix(slope, max(landSlope, slope * 0.5), smoothstep(90.0, 320.0, viewDist));
-        float rock = smoothstep(0.12, 0.30, rockSlope * (1.0 + lava * 0.7) + hMid * 0.10 * fMid + hFar * 0.06);
+        // Cliff and talus. A canyon wall is not one banded surface. Hard beds stand as dark cliffs; between and below
+        // them lies what has fallen off them, at the angle loose rock rests at (a little over thirty degrees): smooth
+        // and pale, with the beds buried under it. So bare rock starts where scree will no longer lie, and from
+        // where dust slides to there the ground is scree. (On lava a flow's edge is bare from a gentler slope, as before.)
+        float rs = rockSlope * (1.0 + lava * 0.7) + hMid * 0.10 * fMid + hFar * 0.06;
+        float rock = mix(smoothstep(0.165, 0.30, rs), smoothstep(0.12, 0.30, rs), lava);
+        float scree = smoothstep(0.07, 0.125, rs) * (1.0 - rock) * (1.0 - lava) * (1.0 - ice);
         // and along each flow's edge lies the rubble it shed: a dark band, broken up by the noise so it does not follow the mesh
         float rubble = smoothstep(0.30, 0.66, vGeo.z + hMid * 0.5 * fMid + hFar * 0.3 + hLump * 0.4 * fLump);
         rock = max(rock, rubble * 0.9);
@@ -237,7 +247,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec4 band = texture(uGrain, vec3(alt * 0.13 + hFar * 0.3 + wob * 0.55, 0.37, 0.71));
         float beds = texture(uGrain, vec3(alt * 0.029 + hFar * 0.15 + wob * 0.2, 0.83, 0.21)).a;
         float bedTone = mix(0.5, smoothstep(0.30, 0.70, beds * 0.68 + band.a * 0.32), 1.0 - smoothstep(260.0, 1200.0, viewDist));
-        vec3 rockCol = alb * mix(vec3(0.50, 0.45, 0.46), vec3(0.98, 0.88, 0.80), bedTone);
+        vec3 rockCol = alb * mix(vec3(0.44, 0.40, 0.41), vec3(0.88, 0.79, 0.72), bedTone);
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
         // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
         rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.060, 0.058), 0.75) * mix(1.0, 0.72 + 0.56 * bedTone, smoothstep(0.22, 0.45, slope)), lava * 0.9);
@@ -260,7 +270,19 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         grad += (nCrag.rgb - 0.5) * (1.25 * craggy);
         float cragTone = (nCrag.a - 0.5) * craggy;
         col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7), rock * 0.9);
-        grad += pDir * ((band.r - 0.5) * 2.4 * rock) * (1.0 - smoothstep(300.0, 1500.0, viewDist));
+        // Spur and gully. The beds show on the spurs, which are bare rock. A chute between two spurs is floored with
+        // what fell from them: scree with no beds in it, running down the wall in a pale tongue. (Without it a wall
+        // was banded from end to end like a layer cake, and its spurs could only be seen by their shading.)
+        float talus = smoothstep(0.24, 0.50, vChute + hMid * 0.2 * fMid + hFar * 0.12) * rock * (1.0 - lava);
+        // scree: the wall's own rock broken small and mixed with dust, a shade darker and greyer than the plain, with
+        // no beds in it. A stone's throw off it is lumpy; further off it is mottled and ridged by the same crags as
+        // the rock. (Flat-coloured, a slope of it seen from its foot was a blur. Underfoot the lumps are left out: at
+        // their size they are not stones but dark blotches on the ground.)
+        float screeAll = max(scree, talus);
+        vec3 screeCol = alb * vec3(0.80, 0.755, 0.75) * (1.0 + hLump * 0.5 * nearLump * smoothstep(9.0, 26.0, viewDist) + hMid * 0.34 * fMid + hFar * 0.2 + (nCrag.a - 0.5) * 0.6 * fCrag);
+        col = mix(col, screeCol, screeAll * 0.86);
+        grad += (nLump.rgb - 0.5) * (0.7 * nearLump * smoothstep(9.0, 26.0, viewDist) * screeAll) + (nCrag.rgb - 0.5) * (0.75 * fCrag * screeAll);
+        grad += pDir * ((band.r - 0.5) * 2.4 * rock * (1.0 - talus)) * (1.0 - smoothstep(300.0, 1500.0, viewDist));
         // stones are basalt, not dust: darker and greyer than the sand they lie in
         col = mix(col, col * vec3(0.74, 0.78, 0.84), stone * 0.75);
         // dusty water ice: pale blue-white, banded with dust, brightest where frost lies in the hollows
@@ -321,6 +343,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain21' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain26' + (o.fine !== false ? 'F' : '');
   return mat;
 }

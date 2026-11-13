@@ -118,7 +118,7 @@ const DUST = {
   default: 0.3,
   // (the second review: decades-old landers were a uniform beige wash, and his own gear showroom-clean.
   //  Dust now lies mostly on what faces up and near the ground, so less of it goes further.)
-  hab: 0.46, rover: 0.5, astronaut: 0.42, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
+  hab: 0.46, rover: 0.5, astronaut: 0.34, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
   pathfinder: 0.4, viking: 0.6, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
@@ -130,6 +130,8 @@ const GROUND = /^ground_dust/;
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
 export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 } };
+/** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
+export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { value: new THREE.Color(0.76, 0.47, 0.235) }, uSkyTop: { value: new THREE.Color(0.52, 0.32, 0.16) }, uGroundLit: { value: new THREE.Color(0.3, 0.15, 0.08) } };
 
 let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
@@ -331,8 +333,16 @@ function mergeSkinned(scene, dust) {
     if (!ones.length) continue;
     const first = ones[0];
     if (!ones.every((o) => o.parent === first.parent && o.skeleton.bones.length === first.skeleton.bones.length)) continue;
+    // A packed model's vertices are whole numbers (0 to 65535), and its node carries the scale and offset that turn
+    // them into metres. Skinning ignores that node (the bones' own matrices undo the packing), so the shader saw
+    // "positions" thousands of units tall: dust that gathers near the ground never reached his boots, and the
+    // mottle on his suit was noise. The vertices are put into metres here, and the binding takes the packing out.
+    // (the packing sits on the mesh's own node or, for a mesh of several materials, on the group that holds them)
+    scene.updateMatrixWorld(true);
+    const unpack = first.matrixWorld.clone(), repack = unpack.clone().invert();
     const geos = ones.map((o) => {
       const g = floatGeometry(o.geometry, o.material.color, o.material.roughness, o.material.metalness, group === 'head' ? 0 : dust);
+      g.applyMatrix4(unpack);
       const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
       const idx = new Uint16Array(si.count * 4), wgt = new Float32Array(si.count * 4);
       for (let i = 0; i < si.count; i++) {
@@ -349,7 +359,7 @@ function mergeSkinned(scene, dust) {
     mesh.name = group;
     mesh.frustumCulled = false;
     first.parent.add(mesh);
-    mesh.bind(first.skeleton, first.bindMatrix);
+    mesh.bind(first.skeleton, first.bindMatrix.clone().multiply(repack));
     for (const o of ones) { o.parent.remove(o); o.geometry.dispose(); }
   }
 }
@@ -367,9 +377,14 @@ function prepare(gltf, name) {
     o.receiveShadow = true;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
+      const name = m.name || '';
+      // What belongs to the mesh is set on every mesh. (It was set with the material, once: of a model's panes of glass
+      // only the first cast no shadow, so a glass dome shaded its own floor like a tin one, and of its monitors only
+      // the first had a picture laid on it.)
+      if (name.startsWith('glass_clear') || EMISSIVE.test(name) || name.startsWith('solar_cell')) o.castShadow = false;
+      if (name.startsWith('screen')) screenUVs(o);
       if (seen.has(m)) continue;
       seen.add(m);
-      const name = m.name || '';
       if (name.startsWith('glass_clear')) {
         // (not mirror-smooth: a lamp a metre away would otherwise reflect as a white-out)
         // (and dark in itself: a pane takes a glint from a lamp, it does not light up like a sheet of paper held to it)
@@ -386,7 +401,6 @@ function prepare(gltf, name) {
         o.castShadow = false;
         if (name.startsWith('screen')) {
           // a monitor shows something: the models carry no pictures, so the panels are drawn here and each screen laid on one
-          screenUVs(o);
           m.emissiveMap = screenTexture(); m.emissive.setRGB(1, 1, 1); m.color.setRGB(0.02, 0.03, 0.04); m.roughness = 0.25;
         }
       } else if (name === 'void') {
@@ -402,6 +416,26 @@ function prepare(gltf, name) {
       } else if (name.startsWith('visor')) {
         // the gold visor is a mirror: it shows the sky, the horizon and the sun
         m.color.setRGB(0.80, 0.50, 0.14); m.metalness = 1; m.roughness = 0.07; m.envMapIntensity = 1.9;
+        // (The blurred sky map gave it two flat bands of orange, and it read as a painted disc. A curved mirror on
+        // Mars shows a bright horizon bowed across it, darker sky above, darker ground below, and goes pale at its
+        // rim: drawn here from where each point of the visor is looking, so the curve of the glass can be seen.)
+        m.onBeforeCompile = (sh) => {
+          Object.assign(sh.uniforms, mirrorUniforms);
+          sh.fragmentShader = sh.fragmentShader
+            .replace('#include <common>', '#include <common>\nuniform vec3 uDustHere; uniform vec3 uSkyHor; uniform vec3 uSkyTop; uniform vec3 uGroundLit;')
+            .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+            {
+              vec3 mV = normalize(vViewPosition);
+              vec3 mR = reflect(-mV, normal);
+              float el = dot(mR, normalize((viewMatrix * vec4(uDustHere, 0.0)).xyz));
+              vec3 mSky = mix(uSkyHor * 1.25, uSkyTop * 0.62, smoothstep(0.03, 0.7, el));
+              vec3 mGround = uGroundLit * mix(0.5, 1.05, smoothstep(-0.75, -0.04, el));
+              vec3 mScene = mix(mGround, mSky, smoothstep(-0.02, 0.03, el));
+              float mEdge = pow(1.0 - clamp(dot(normal, mV), 0.0, 1.0), 4.0);
+              reflectedLight.indirectSpecular = mScene * mix(diffuse * 1.5, vec3(1.0), mEdge * 0.8);
+            }`);
+        };
+        m.customProgramCacheKey = () => 'visor2';
       }
       if (m.metalness > 0.5 && !name.startsWith('visor')) { m.envMapIntensity = 1.25; m.roughness = Math.max(m.roughness, 0.2); }
       // (thin sheet seen from both sides: a petal with its back cut away showed only its ribs)

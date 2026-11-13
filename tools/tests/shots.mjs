@@ -55,7 +55,7 @@ const scenes = {
   'inside-machines': async () => ev(async (G) => { G.tpLocal(-1.5, 0.5, 1.9); G.look(-0.25); G.tick(0.05, 30); await G.settle(); }),
   'inside-farm': async () => ev(async (G) => { G.tpLocal(1.5, -0.5, -1.3); G.look(-0.15); G.tick(0.05, 30); await G.settle(); }),
   'walk-plain': async () => ev(async (G) => { G.setLocalTime(9.5); G.tpLocal(40, 120, 0.4); G.look(-0.08); G.input.keys['w'] = true; G.tick(0.05, 26); G.input.keys['w'] = false; await G.settle(); }),
-  'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 7); G.look(-0.1); G.tick(0.05, 40); await G.settle(); }),
+  'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 4.6); G.look(-0.16); G.tick(0.05, 40); await G.settle(); }),
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); G.input.keys['w'] = false; await G.settle(); }),
   'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.tick(0.05, 30); await G.settle(); }),
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
@@ -68,6 +68,10 @@ const scenes = {
   // the north wall of Valles Marineris at 296 E: about 13 m of drop in every 4 m of ground, a hundred metres in all
   'canyon-rim': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
   'canyon-wall': async () => ev(async (G) => { await G.tp(-12.19, 293, 3.14); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
+  // on the wall itself, looking along it: scree underfoot, the spurs' rock beside
+  'canyon-climb': async () => ev(async (G) => { await G.tp(-12.235, 292.86, 1.3); G.setLocalTime(15); G.look(0.05); G.tick(0.05, 40); await G.settle(); }),
+  // at the wall's foot, close under it
+  'canyon-foot': async () => ev(async (G) => { await G.tp(-12.205, 292.86, 1.9); G.setLocalTime(10.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'canyon-floor': async () => ev(async (G) => { await G.tp(-11.75, 293, 1.5); G.setLocalTime(9.5); G.look(0.1); G.tick(0.05, 40); await G.settle(); }),
   'olympus': async () => ev(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.look(0.02); G.tick(0.05, 40); await G.settle(); }),
   // from forty-five metres up, looking along the flank: the lava tongues are a pattern no one sees from eye height
@@ -79,7 +83,7 @@ const scenes = {
   // every built model, seen by a free camera with the astronaut beside it for scale
   'yard': () => model((G) => G.World.uplinkRing.position, 10, 325, 10.5, { stand: [3.6, 200], height: 2.4 }),
   'pile': () => model((G) => G.World.soilPiles[3].group.position, 5.5, 140, 15, { stand: [2.6, 230] }),
-  'debris-a': () => model((G) => G.World.pods[0].group.position, 6.5, 120, 9.5, { stand: [3.2, 40] }),
+  'debris-a': () => model((G) => G.World.pods[0].group.position, 6.5, 120, 9.5, { stand: [3.2, 40], height: 1.35, aim: 1.15 }),
   'debris-b': () => model((G) => G.World.pods[1].group.position, 6, 240, 9.5, { stand: [3.0, 160] }),
   'debris-c': () => model((G) => G.World.pods[2].group.position, 5.5, 30, 9.5, { stand: [2.8, 300] }),
   'rtg': () => model((G) => G.World.rtgSite.group.position, 4.2, 150, 16, { stand: [1.8, 70] }),
@@ -92,6 +96,9 @@ const scenes = {
     return G.World.builtMeshes[0].group.position;
   }, 16, 55, 10, { stand: [7.5, 10], height: 2.6, aim: 1.6 }),
   'greenhouse-inside': async () => ev(async (G) => { G.photo(null); G.tpAround(G.World.builtMeshes[0].group.position, 1.2, 210); G.setLocalTime(10); G.look(-0.2); G.tick(0.05, 40); await G.settle(); }),
+  // the dome's floor from above, through the glazing: the frame's shadows should lie across it
+  'greenhouse-above': async () => ev(async (G) => { const p = G.World.builtMeshes[0].group.position.clone(); G.photo(p, 2.2, 30, 7.5, 0.2); G.tick(0.05, 2); await G.settle(); }),
+  '-camera-back-3': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
   'greenhouse-door': async () => ev(async (G) => { G.tpAround(G.World.builtMeshes[0].group.position, 7.5, 28.6); G.setLocalTime(10); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'greenhouse-night': () => model((G) => G.World.builtMeshes[0].group.position, 14, 60, 21.5, { stand: [6, 80], height: 2.2, aim: 1.6 }),
   'solar-kit': () => model((G) => G.World.builtMeshes[1].group.position, 4.6, 150, 15.5, { stand: [2.2, 80] }),
@@ -113,7 +120,7 @@ const scenes = {
   'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
   // the figure himself, close, from the side and from behind (he stands at the spot and the camera goes round him)
   'astronaut-side': async () => ev(async (G) => { const p = G.player.pos.clone(); G.tpAround(p, 0.01, 0); G.setLocalTime(9.5); G.tick(0.05, 40); G.photo(G.player.pos.clone(), 3.4, 90, 1.25, 0.95); await G.settle(); }),
-  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 20, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
+  'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 200, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
   '-camera-back-2': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
   'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
