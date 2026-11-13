@@ -75,7 +75,9 @@ export function updateDevils(dt) {
   if (!S.started || S.over || S.mode === 'cutscene') { if (devils.length) clearDevils(); return; }
   maybeSpawn(dt);
   const e = ctx.engine, fog = e.scene.fog, sky = e.sky;
-  const lit = Math.min(1.5, 0.3 + sky.sunIntensity * 0.3);
+  // (dust is lit by what lights the ground: with a floor of 0.3 a devil caught by nightfall stood as a pale column
+  // against black ground. And a devil is the day's heat: with the sun down it dies away.)
+  const lit = Math.min(1.5, 0.05 + sky.sunIntensity * 0.3), sunUp = clamp(localSunEl() / 0.14, 0, 1);
   for (let i = devils.length - 1; i >= 0; i--) {
     const d = devils[i];
     d.age += dt;
@@ -84,7 +86,7 @@ export function updateDevils(dt) {
     d.dir.addScaledVector(d.u, -d.dir.dot(d.u));
     _t.crossVectors(d.u, d.dir);
     d.dir.addScaledVector(_t, Math.sin(d.age * 0.23 + d.radius) * 0.12 * dt).normalize();
-    const fade = clamp(Math.min(d.age / 6, (d.life - d.age) / 8), 0, 1) * clamp(1 - S.storm.i * 4, 0, 1);
+    const fade = clamp(Math.min(d.age / 6, (d.life - d.age) / 8), 0, 1) * clamp(1 - S.storm.i * 4, 0, 1) * sunUp;
     if (d.age >= d.life || fade <= 0 && d.age > 6) { retire(i); continue; }
     const base = _p.copy(d.u).multiplyScalar(surfaceAt(d.u) - 0.3);
     const m = d.view.mesh, U = d.view.uniforms;
