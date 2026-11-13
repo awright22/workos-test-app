@@ -307,7 +307,7 @@ export function newSol() {
   if (!S.sleeping && ate !== 'skipped') toast(`SOL ${S.sol}`, 'Dawn', `Breakfast: ${ate} (−${dawnAccount.took} food, ${foodTotal()} left). Another sol alone: morale ${Math.round(S.morale)}.`, { yields: true });
   if (!S.flags.moraleTold) {
     S.flags.moraleTold = true;
-    setTimeout(() => log('MORALE is how I am holding up. Bad days wear it down. Variety on the plate, a hot dinner, music and word from home lift it, and then I work faster.', 'sys'), 16000);
+    setTimeout(() => log('MORALE is how I am holding up. Bad days wear it down. Variety on the plate, a hot dinner, music and word from home lift it, and then I work faster.'), 16000);      // (his own voice: it is him he is talking about)
   }
   if (moraleBand() !== band) {
     const now = moraleBand();

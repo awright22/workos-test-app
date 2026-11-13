@@ -19,7 +19,7 @@
 //
 // Exits non-zero if anything is found. (The map's own labels are drawn on a canvas and are not measured here.)
 import { SIZES, walk } from './ui-shots.mjs';
-import { auditInPage, auditLines } from './audit-lib.mjs';
+import { auditInPage, auditLines, settledInPage } from './audit-lib.mjs';
 
 const arg = (k) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').slice(k.length + 3);
 const want = arg('size'), only = arg('only') ? arg('only').split(',') : null;
@@ -37,6 +37,8 @@ for (const size of SIZES) {
     res = await walk(size, {
       shoot, reducedMotion: true, only,
       onState: async (state, page) => {
+        // (measured at rest: a card half-way through fading in would be passed over as invisible)
+        await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
         const lines = auditLines(await page.evaluate(auditInPage, safe));
         states++;
         if (verbose) console.log(`    ${state}: ${lines.length} found`);

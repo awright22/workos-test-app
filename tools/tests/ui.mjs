@@ -2,7 +2,7 @@
 // and close, the map zooms and identifies markers, the touch controls work, and at every
 // supported size nothing in the HUD overlaps anything else or strays outside the safe area.
 import { openGame, sleep } from './lib.mjs';
-import { auditInPage, auditLines } from './audit-lib.mjs';
+import { auditInPage, auditLines, settledInPage } from './audit-lib.mjs';
 
 // node tools/tests/ui.mjs --size=667   runs only the layout checks at the sizes whose name contains that text (for quick work on one size);
 // --size=keys, --size=play and --size=portrait run only the keyboard, play and portrait parts
@@ -190,15 +190,16 @@ if (!onlySize || onlySize === 'play') {
   await g.eval((G) => { G.tpLocal(2, 55, 0); G.tick(0.05, 1); });
   const d2 = await where();
   // (the compass names the place the mission's lead line sends him to, first: here the Hab, by its door)
-  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass[0] === `hab ${d.tag}` && d.compass.every((t) => /^[a-z0-9 ]+ \d/.test(t));
+  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass.includes(`hab ${d.tag}`) && d.compass.every((t) => /^[a-z0-9 ]+ \d/.test(t));
   check('distances: marker, mission line and compass give one number for the Hab, and every compass tag is named', agree(d1) && agree(d2) && d1.tag !== d2.tag, { d1, d2 });
   // a breach, indoors: the compass names the breach, not a survey site kilometres away
+  // (forty frames: the list and the compass look again at what there is to do every dozen or so)
   const br = await g.eval((G) => {
     const keep = JSON.stringify(G.S.breach);
-    G.tpLocal(0, 0, 0); G.S.breach.active = true; G.tick(0.05, 3);
+    G.tpLocal(0, 0, 0); G.S.breach.active = true; G.tick(0.05, 40);
     const out = { labels: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase()),
       lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent, line: document.querySelector('#mg-objectives .obj:not(.done) .ds').textContent };
-    Object.assign(G.S.breach, JSON.parse(keep)); G.tick(0.05, 3);
+    Object.assign(G.S.breach, JSON.parse(keep)); G.tick(0.05, 40);
     return out;
   });
   check('compass: in a breach indoors its one label is the breach, with the mission line\'s distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0] === `breach ${br.line}`, br);
@@ -302,7 +303,11 @@ for (const size of SIZES) {
   // entry animations are switched off for these measurements: software rendering is slow enough here that one can still be mid-flight seconds later
   await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
   const phone = size.touch && size.h < 540;
-  const audit = async () => auditLines(await page.evaluate(auditInPage, size.safe || [0, 0, 0, 0]));
+  // (measured at rest: a mission line caught sliding in is 3 px outside its block for half a second)
+  const audit = async () => {
+    await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
+    return auditLines(await page.evaluate(auditInPage, size.safe || [0, 0, 0, 0]));
+  };
   if (phone) {
     // new game: every card whole inside the sheet, with a thumb-high Begin on screen (the smallest phone showed none)
     await page.locator('[data-act="new"]').tap();

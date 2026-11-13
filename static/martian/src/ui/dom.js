@@ -342,6 +342,17 @@ function nextToast() {
     `<div class="ti">${icon(kind === 'ach' ? 'trophy' : kind === 'disc' ? 'pin' : 'info')}</div>` +
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${chem(esc(t.title))}</div>${t.note ? `<div class="t3">${chem(esc(t.note))}</div>` : ''}</div>`);
   root.classList.add('has-toast');
+  // On a phone the card stands between the gauges and the stick. One that would reach the stick keeps one line of its
+  // note (whole sentences of it), or none: it never lies over the thing his thumb is on.
+  if (layout.compact && layout.touch && t.note) {
+    const joy = UI.joy.getBoundingClientRect(), t3 = node.querySelector('.t3');
+    const reaches = () => joy.height > 2 && node.getBoundingClientRect().bottom > joy.top - 4;
+    if (t3 && reaches()) {
+      node.classList.add('tight');
+      t3.innerHTML = chem(esc(fitSentences(t3, t.note)));
+      if (reaches()) t3.remove();
+    }
+  }
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
   cur.timer = setTimeout(() => closeToast(cur, false), life);

@@ -152,6 +152,24 @@ export function auditInPage(safe) {
     }
   }
 
+  // ---- a badge, a chip or a button drawn over text that is not its own (its frame and icon can cover a word
+  //      where its own lettering does not touch it)
+  for (const n of root.querySelectorAll('.badge, .chip, .mg-btn')) {
+    if (!shown(n)) continue;
+    const r = n.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    const layer = layerOf(n);
+    for (const l of lines) {
+      if (l.layer !== layer || n.contains(l.p) || l.p.contains(n)) continue;
+      const iw = Math.min(r.right, l.v.right) - Math.max(r.left, l.v.left), ih = Math.min(r.bottom, l.v.bottom) - Math.max(r.top, l.v.top);
+      if (iw < 3 || ih < 0.4 * (l.v.bottom - l.v.top)) continue;
+      const key = name(n) + '|' + name(l.p) + '|' + said(l);
+      if (pairs.has(key)) continue;
+      pairs.add(key);
+      out.over.push(`“${said(l)}” (${name(l.p)}) is under ${name(n)} “${words(n)}”`);
+    }
+  }
+
   // ---- text cut by the edge of the box it is in or by the screen: a line that is partly showing and partly not
   //      (a line sliced through by a card's edge; a word hanging off the side of its button). Text that a scrolling
   //      region has scrolled out of sight is not this: a scrolling region says there is more with its cue (below).
@@ -211,6 +229,19 @@ export function auditInPage(safe) {
     if (below && !cueShown) out.clipped.push(`scrolls with nothing to say so: ${name(n)}`);
   }
   return out;
+}
+
+/**
+ * True once nothing on the page is part-way through a finite animation or transition. Runs in the browser: wait
+ * for it before measuring, or a dialog still fading in is measured as not there at all. (An animation's clock only
+ * moves when a frame is drawn, and software rendering under load draws one a second.)
+ */
+export function settledInPage() {
+  return document.getAnimations().every((a) => {
+    if (a.playState !== 'running') return true;
+    const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+    return !!t && !isFinite(t.endTime);
+  });
 }
 
 /** Offender lines from an audit, as one list (for a test's detail), most serious kinds first. */

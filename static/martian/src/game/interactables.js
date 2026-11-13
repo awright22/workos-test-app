@@ -68,7 +68,7 @@ addI({
       case 'growing':
         if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Not enough water (5 L): burn hydrazine at the rig';
         // (a reading, not a lock: there is nothing to do to it yet)
-        return statusText(`${cropOf(pl).name}: ${Math.round(pl.growth * 100)}% grown${pl.watered < cropOf(pl).waterings ? ', water again at half' : ''}`);
+        return statusText(`${cropOf(pl).name}: ${Math.round(pl.growth * 100)}% grown${pl.watered < cropOf(pl).waterings ? ', water again at 50%' : ''}`);
       case 'ready': case 'dead': return true;
     }
     return false;

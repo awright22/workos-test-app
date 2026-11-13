@@ -382,7 +382,12 @@ function fitObjectives(now) {
   if (layout.touch) for (const b of [UI.tCam, UI.tSprint, UI.tExit, UI.tCandle]) { const r = b.getBoundingClientRect(); if (r.height > 2) limit = Math.min(limit, r.top - 8); }
   rows.sort((a, b) => (a.el.compareDocumentPosition(b.el) & 4 ? -1 : 1));
   const over = () => UI.objectives.getBoundingClientRect().bottom > limit;
-  for (let i = rows.length - 1; i >= 1 && over(); i--) rows[i].el.classList.add('cut');
+  // What gives way, in order: the lines after the next thing to do, from the last; then the line just ticked off
+  // (it has had its jingle). The next thing to do is never the one to go: after the numbers the list was a single
+  // struck-through line, with the farm, which had just become the mission, cut from under it.
+  const lead = Math.max(0, rows.findIndex((n) => n.cls !== 'done'));
+  for (let i = rows.length - 1; i > lead && over(); i--) rows[i].el.classList.add('cut');
+  for (let i = lead - 1; i >= 0 && over(); i--) rows[i].el.classList.add('cut');
   // (a first line and a reason that both run long can be too tall on their own: the reason gives way, then the line
   // is held to two; the journal has both whole. The block never reaches the buttons under it, whatever it says.)
   if (over()) UI.objectives.classList.add('no-why');
@@ -486,8 +491,9 @@ export function updateCompass() {
   if (!cp.w) compassGeometry();
   if (!cp.w) return;                                     // not laid out yet
   // what is out there changes slowly: refresh the list and the bearings a few times a second (or at once after a jump)
-  if (now - cp.listAt > 0.2 || cp.from.distanceToSquared(pp) > 9) {
-    cp.listAt = now; cp.from.copy(pp);
+  // (or after a dozen frames, as with the mission list: a game stepped by its debug hook runs them in no time at all)
+  if (now - cp.listAt > 0.2 || (cp.calls = (cp.calls || 0) + 1) >= 12 || cp.from.distanceToSquared(pp) > 9) {
+    cp.listAt = now; cp.calls = 0; cp.from.copy(pp);
     cp.marks = compassTargets(pp);
     const seen = new Set();
     for (const m of cp.marks) {

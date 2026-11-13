@@ -8,6 +8,10 @@
 
 /* movement stick: touch anywhere in the lower left and the stick appears under the thumb */
 #mg-joyzone { position: absolute; left: 0; bottom: 0; width: 44%; height: 62%; pointer-events: auto; touch-action: none; }
+/* (on a phone the stick rests a little lower: the gauges over it are a name over a bar now, and taller, and a card
+   under them needs the room) */
+.mg-compact #mg-joy { bottom: calc(var(--sab) + .5rem); }
+@media (max-width: 760px) { .mg-compact #mg-joy { bottom: calc(var(--sab) + .25rem); } }
 #mg-joy { position: absolute; left: calc(var(--sal) + 1.5rem); bottom: calc(var(--sab) + 1.25rem); width: 7.5rem; height: 7.5rem; border-radius: 50%;
   border: 1px solid rgba(245, 240, 232, .32); background: radial-gradient(circle, rgba(14, 12, 11, .1) 40%, rgba(14, 12, 11, .42) 100%);
   opacity: .8; transition: opacity .2s; }
