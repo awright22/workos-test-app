@@ -154,7 +154,11 @@ function placeLabels(you, storms) {
   }
   boxes.push([you.x - 13 * U, you.y - 13 * U, 26 * U, 26 * U]);
   for (const m of markers) { if (m.under) continue; const q = m.small ? 7 * U : r; boxes.push([m.x - q, m.y - q, q * 2, q * 2]); }
-  c.font = `600 ${12 * U}px "Barlow Condensed", sans-serif`;
+  // (What is lettered on the map is in capitals, and capitals are as tall as seven tenths of their size: a marker's
+  //  name is 13 px at the least, as every label in capitals on a phone is; a place's name and a storm's, 12. The map
+  //  is drawn on a canvas, which tests/audit-lib.mjs cannot measure: at 667 wide these were 10.8 and 11 px.)
+  const LS = Math.max(13, 12 * U);
+  c.font = `600 ${LS}px "Barlow Condensed", sans-serif`;
   const byPri = markers.slice().sort((a, b) => a.pri - b.pri);
   for (const m of byPri) {
     if (m.under || (!m.label && m !== selected && !m.group)) continue;
@@ -163,7 +167,7 @@ function placeLabels(you, storms) {
     //  simply the Hab: "Hab & 4 more" made a new player ask four more what, of the rover and the debris at its door.)
     const base = (m.label || (m === selected ? m.title : '')).trim(), extra = m.group && !m.home ? m.group.length - 1 : 0;
     const text = (base ? base + (extra ? ` & ${extra} more` : '') : `${extra + 1} here`).toUpperCase();
-    const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = 15 * U;
+    const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = LS + 3 * U;
     // how far a marker's centre is from a label's box
     const gap = (o, x, y) => Math.hypot(Math.max(x - o.x, 0, o.x - (x + w)), Math.max(y - o.y, 0, o.y - (y + h)));
     // (a label belongs to the marker it is nearest: "OPPORTUNITY +1" sat over the ascent vehicle's marker and read as its name)
@@ -181,17 +185,17 @@ function placeLabels(you, storms) {
     const [x, y] = spots[at];
     m.named = true;
     boxes.push([x, y, w, h]); named.push([x, y, w, h]);
-    out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true });
+    out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: LS, bold: true });
   }
   // storm cells are named where there is room
-  c.font = `600 ${Math.max(11, 11 * U)}px "Barlow Condensed", sans-serif`;
+  c.font = `600 ${Math.max(12, 11 * U)}px "Barlow Condensed", sans-serif`;
   for (const st of storms) {
     const text = 'DUST STORM';
     const w = c.measureText(text).width + (text.length * 1.4 + 8) * U, h = 15 * U;
     const x = st.x - w / 2, y = st.y - h / 2;
     if (x < 4 || x + w > W - 4 || y < 4 || y + h > H - 4 || !free(x, y, w, h)) continue;
     boxes.push([x, y, w, h]);
-    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: Math.max(11, 11 * U), bold: true, spacing: 1.4 * U });
+    out.push({ text, x: x + 4 * U, y: st.y, color: 'rgba(250,228,196,.95)', size: Math.max(12, 11 * U), bold: true, spacing: 1.4 * U });
   }
   // place names: the largest first; small ones appear as you zoom in
   const places = [];
@@ -203,7 +207,7 @@ function placeLabels(you, storms) {
     if (px < 26) continue;
     const lat = Math.abs(p.lat) > 86 ? Math.sign(p.lat) * 84 : p.lat;
     const x = sx(p.lon), y = sy(lat);
-    const size = Math.max(11, clampN(9 + px / 28, 10, 15) * U);
+    const size = Math.max(12, clampN(9 + px / 28, 10, 15) * U);
     const spacing = size * 0.22;
     c.font = `500 ${size}px "Barlow Condensed", sans-serif`;
     const text = p.name.toUpperCase();
