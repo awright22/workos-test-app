@@ -284,7 +284,7 @@
 /* while his life is in the balance the log keeps quiet: the banner has the floor */
 .mg-compact.is-critical #mg-log { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */
-.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--sat) + var(--m) + var(--vit) + .5rem); }
+.mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--vit-b, calc(var(--sat) + var(--m) + var(--vit))) + .5rem); }
 /* (a card that would reach the stick gives up its second line of note: ui/dom.js measures it) */
 .mg-compact .toast.tight .t3 { -webkit-line-clamp: 1; }
 .mg-compact.has-toast #mg-log { visibility: hidden; }
@@ -320,7 +320,7 @@
    never trims what the fitting has passed. With the same 8 px taken off here it cut the block's own foot at 667.) */
 .mg-compact.mg-touch #mg-tr { max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - 3rem - 7.375rem - max(2.75rem, 44px)); overflow: hidden; }
 
-.mg-compact #mg-log { bottom: auto; top: calc(var(--sat) + var(--m) + var(--vit) + .5rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
+.mg-compact #mg-log { bottom: auto; top: calc(var(--vit-b, calc(var(--sat) + var(--m) + var(--vit))) + .5rem); width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); gap: .25rem; }
 .mg-compact .mg-line { grid-template-columns: 2.25rem 1fr; column-gap: .375rem; padding: .25rem .5rem .3125rem .4375rem; font-size: .6875rem; line-height: 1.32; }
 .mg-compact .mg-line .who { font-size: .5625rem; letter-spacing: .12em; }
 

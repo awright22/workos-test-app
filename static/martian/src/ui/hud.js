@@ -151,6 +151,12 @@ function objRow(key) {
 let wayEl = null, wayShown = false, wayKey = '', waySide = 1, zonesAt = -1, zoneAge = 0;
 const zones = [];                    // what the marker keeps clear of: [left, top, right, bottom, kind] in px
 onLayout(() => { zonesAt = -1; });
+// Where the panel of gauges ends. On a phone the log and the cards stand a fixed gap under it; the style sheet used to
+// work the panel's height out from its parts, and was 2 or 3 px short, so that gap was 5 px where 8 was meant. Now
+// the panel is measured, whenever its size changes (the bars arriving, a new scale) and before the next paint.
+function measureVitals() { const b = UI.vitals.getBoundingClientRect().bottom; if (b > 0) root.style.setProperty('--vit-b', Math.round(b) + 'px'); }
+if (typeof ResizeObserver === 'function') new ResizeObserver(measureVitals).observe(UI.vitals);
+onLayout(() => requestAnimationFrame(measureVitals));
 /** The boxes of everything on the HUD that is showing now (kind 0), the prompt and the rover's panel (1), and the figure in the middle (2). */
 function readZones(w, h) {
   zones.length = 0;
