@@ -70,8 +70,8 @@ the local time and the weather, step the simulation without drawing, and place a
 | Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 5: NEARLY. A convincing globe with a thin rim; on the title screen itself it is nearly black (X4); no launch picture |
 | Models | Every object is a purpose-built model; nothing reads as a primitive | 37 models. Lander and prop pass after the review: Perseverance has its own model, solar cells are consistent, the wreck, airbags, parachute, soil heap, ice and uplink dish are rebuilt, the greenhouse has a door. Second review owed |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Twelve clips blended. Idle rebuilt as a relaxed stand (8 s); he takes his helmet off where there is air. Not yet reviewed in motion; feet dip up to 4 cm in cross-fades |
-| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Third independent review: NEARLY. The spine works (breach, Hab, two machines, the numbers, the farm, buttons one at a time); a new player still hesitates at the points in Y19, and nothing says to sleep (Y13) |
-| Interface | Every screen is legible and unclipped at 1280x720 through 2560x1440 and at phone sizes under the notch and status bar; touch has a pause button | Third independent review: desktop not judged (owed), phone NOT MET (no visible Begin on the smallest phone, a suit timer that does not follow the gauge, the waypoint's tag over other things, 7–9 px text, targets of 30–40 px; Y1–Y19 below). The interface suite is now 157 checks (it was 96), with a test that fills the log and the mission list with long text at every size, and a new audit (`tests/ui-audit.mjs`) that measures text size, target size and clipping in the page at both phone sizes |
+| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fourth independent review: NEARLY. There is always a named task with a reason and a distance, the buttons arrive one at a time and night is announced; a new player still hesitates at the points in Z22, the bars are explained only in prose (Z9), and the screen flashes red as the suit is saved (Z8) |
+| Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fourth independent review (phone only): 844 wide NEARLY (nothing clipped, nothing overlapping, every target 44 px, no text under 11 px; short on finish: gauges that are 3 px lines, numbers that contradict each other in an emergency), 667 wide NOT MET (three broken screens: Z1–Z3). The interface suite is 157 checks with long text forced into the log and the mission list at every size, and an audit (`tests/ui-audit.mjs`) measures text size, target size and clipping in the page at both phone sizes; it did not catch Z1–Z3, so it must learn to measure rows printing over each other and cards cut by the screen |
 | Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Synthesised in the browser, no audio files. Measured offline: peaks under -1.4 dBFS with everything at once, calm day about -34 LUFS, storm -18. **Nobody has listened to it**: timbre and musicality are judged only from spectrograms. Calm beds are mostly below 300 Hz and will be faint on a phone speaker |
 | Feel | Walking, jumping and driving have weight; the camera never clips through walls or ground | New controllers in. The camera treats the Hab, its airlock and greenhouse domes as rooms from inside and as obstacles from outside. Not yet reviewed in motion |
 | Depth | "On par with Stardew Valley or Animal Crossing": many systems that feed each other, and always something worth doing | Survival, five crops with a pantry and cooked dinners, morale, field science with 17 materials and NASA grants, equipment wear, crafting and ten upgrades, four deployables, seven survey tasks, fourteen landers to salvage, dust storms and dust devils, mail from Earth and the Hermes, nine comforts to make for the Hab, photo mode, nineteen achievements. Still thin: things to do with a second greenhouse, anything to do with other people's hardware beyond salvage |
@@ -297,12 +297,46 @@ desktop-only review is owed.
 | Y18 | Smaller: the Hab icon over the compass N; blank lower halves on installed cards; the same photograph sentence on every lander card; VIEW against CAMERA; the candle button says only "O2"; "my", "He", "fueled" beside "colour" | part fixed: VIEW throughout, "+O2 candle", the photograph sentence said once, installed upgrades under their own heading. "my panels" in sample notes and American spellings in place notes still open |
 | Y19 | First ten minutes, where a new player hesitates: hint chips that never leave and cover the airlock prompt; six bars, a card and a button arriving at once; "soil" against "regolith" with no marker for the heaps; the Journal introduced as NASA's tasks before any contact; the lead task flips to solar panels after one bed with power at 75% and rising; "Missing 2 Scrap Metal" with no hint where scrap comes from; why burn hydrazine now and what "carefully" risks | part fixed: hint chips go after eight metres walked and yield to the prompt; the six bars arrive on stepping into the Hab; the farm leads until three beds are in and its marker stands on the heap or the bed; missing materials say where they come from; a finished objective shows ticked. The bars guide is still something the player has to open |
 
+**Fourth interface review** (phone only, after the work on Y1–Y19; 55 states at 844 wide, 51 at
+667, a 28-step walk-through): **phone at 844 wide NEARLY, small phone at 667 NOT MET, first ten
+minutes NEARLY.** "At 844, mostly yes at a glance, until the emergencies and the numbers are read
+closely. At 667, no, because of three broken screens." Found gone from the third review's list:
+the missing Begin, the suit timer against the gauge, the marker landing on things, distances
+disagreeing, text under 11 px, Sound hidden in Settings, titles running into reasons, the map's
+duplicate names, statistics under three names, and most of the first-ten hesitations.
+
+| # | Finding | State |
+| --- | --- | --- |
+| Z1 | Small phone, colony inventory: rows have a fixed height and their descriptions wrap, so rows print over each other | open |
+| Z2 | Small phone, journal discoveries: a lander card's badge and year are drawn over its name; "MARS 6" breaks inside the name | open |
+| Z3 | Small phone, rescue screen: the card cuts off its last line and its button | open |
+| Z4 | Oxygen emergency: the ring says 21 with "1:14 left" and the message under it says "Suit O2 at 25%", tagged HAB; the banner and the task say the same thing again | open |
+| Z5 | In the Hab during a breach the compass tag names a survey site 4.6 km off | open |
+| Z6 | At 844 the six gauges are lines 34 px long and 3 px tall with 6 px arrows; the colour-blind hatching cannot be seen; the small phone uses another design whose fill ends inside the word | open |
+| Z7 | One frame after waking has no HUD at all | open |
+| Z8 | A red wash over the screen at the moment the suit is sealed; the old prompt still up | open |
+| Z9 | The six bars are explained only in the third paragraph of a card and behind the menu; nothing on the panel says it can be tapped | open |
+| Z10 | Numbers that read as bugs: "the last 17 entries" over two; "13 to plant" against 6 potatoes; "14 sols with nothing to eat" then "15 short"; a storm banner with power rising; Hab oxygen just dropped with an up arrow; food −2 beside one breakfast; the ring "150" with no unit; "Harvest potatoes (0 so far)" with no target | open |
+| Z11 | Numbers that matter are 11 px, not 13: waypoint tags, the task's distance, the compass tag, the rover's percentages, the map scale | open |
+| Z12 | Night is said twice in the same words (a card and the task) | open |
+| Z13 | Leaving the rover: two controls and three names (Exit, Step out, Leave the rover) | open |
+| Z14 | Unlabelled controls: the idle action button is a bare circle, the refused state a bare padlock; compass icons without names; the comms desk says USE | open |
+| Z15 | The fade at the end of a list reads as "disabled" (the last rows of Controls and the bars guide) | open |
+| Z16 | Settings: slider thumbs 24 x 28 px, switches 52 x 28, a 43 px segment; one thumb orange and three cream with no meaning | open |
+| Z17 | Small phone: a map hint cut short on the marker view; headers and a banner title that wrap | open |
+| Z18 | Map: "+6" unexplained until tapped; at 667 a label sits over another marker; markers under the tool buttons | open |
+| Z19 | Tight gaps: 4–6 px in the top-centre stack; cards 4–8 px under the bars panel | open |
+| Z20 | Alignment: the selected menu item indented 6 px; the recommended card raised 3 px; an orphan statistics tile; "3.4 km / walked" against "3.4 / km walked"; no title on the small phone's Settings; three "ready" badges at once | open |
+| Z21 | Wording: "Pull the antenna" when no antenna has been mentioned; "slow going here" without saying where it is fast; photo mode against the camera-shaped VIEW button | open |
+| Z22 | First ten minutes, where a new player still hesitates: the first log message competes with the task; nothing says what inspecting a machine told him; how many loads a bed needs; "10 to plant" for a bed that takes one; a panel prompt no task has asked for; the water burn never asked for and its cost in air not warned; the colony screen a dead end on day one | open |
+
 ## Open items
 
 | # | Item | State |
 | --- | --- | --- |
 | 21 | Act on the fifth picture review (X1–X15 above) | in progress: landmarks, lighting, storm, ice, blast marks and the camera are acted on and wait for a sixth review; the rocks pass (X6) and the outcrop and wreck models are in hand; interior light pools, paths worn into the ground and region-specific landmarks are open |
-| 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed); a fourth review is owed. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
+| 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
+| 28 | Act on the fourth interface review (Z1–Z22 above), the three broken small-phone screens and the emergency contradictions first | in hand |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
 | 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | after story mode is finished |
