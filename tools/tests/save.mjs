@@ -23,18 +23,20 @@ const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name
 // Sol 12 of 45 under the old, shorter sols is Sol 7 of 25 now
 check('title offers to continue the old save, its sol converted', /continue\s*sol 7\b/i.test(title), title.split('\n').filter((l) => /continue|new game|sol/i.test(l)));
 await g.page.locator('#mg-panel button', { hasText: 'CONTINUE' }).click();
-await sleep(600);
+// The notices are typed into the log one after the other, a second or two after the game continues, and fade ten
+// seconds later: watch the log from this moment until both have been seen. (Watched only after the checks below,
+// on a busy machine they had come and gone before the watching began, and the check failed on a game that had
+// told the player everything.)
+let logText = '';
+for (let i = 0; i < 240 && !(/real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText)); i++) {
+  await sleep(250);
+  logText += '\n' + await g.page.locator('#mg-log').innerText();
+}
 const s = await g.eval(async (G) => { await G.settle(); return { sol: G.S.sol, potatoes: G.S.potatoes, scrap: G.S.inv.scrap, tank1: !!G.S.upgrades.tank1, pf: G.S.pf.connected, plots: G.World.plots.length, plot6: G.World.plots[6] && G.World.plots[6].state,
   built: G.World.builtMeshes.map((b) => b.kind), pods: G.World.pods.length, alt: +(G.player.pos.length() - G.surfaceAt(G.player.pos)).toFixed(3), started: G.S.started }; });
 check('progress carried over', s.started && s.sol === 7 && s.potatoes === 9 && s.scrap === 7 && s.tank1 && s.pf, s);
 check('greenhouse and its crops rebuilt', s.built[0] === 'greenhouse' && s.plots === 10 && s.plot6 === 'growing', s);
 check('astronaut stands on the new ground', Math.abs(s.alt) < 0.01, s.alt);
-// the notices are typed into the log one after the other and fade: watch the log until both have been seen
-let logText = '';
-for (let i = 0; i < 60 && !(/real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText)); i++) {
-  await sleep(500);
-  logText += '\n' + await g.page.locator('#mg-log').innerText();
-}
 check('player is told what changed', /real orbital elevation/.test(logText) && /Mission clock recalibrated/.test(logText), logText.slice(-300));
 const resaved = await g.eval((G) => { G.saveGame(); const d = JSON.parse(localStorage.getItem('stranded2-save')); return { v: d.v, log: Array.isArray(d.log) ? d.log.length : -1, line: d.log && d.log[0] }; });
 check('re-saved in the current format', resaved.v === 4, resaved.v);
