@@ -364,6 +364,9 @@ function prepare(gltf, name) {
         m.transparent = true; m.depthWrite = false; m.opacity = 0.2; m.roughness = 0.12; m.metalness = 0.0;
         m.color.setRGB(0.035, 0.045, 0.055);
         m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
+        // (and its glint from a lamp is a glint: the helmet lamp three metres off still burnt a white star into a pane)
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= 0.07;'); };
+        m.customProgramCacheKey = () => 'glass1';
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;

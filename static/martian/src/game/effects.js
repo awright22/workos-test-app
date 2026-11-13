@@ -24,7 +24,11 @@ export function initEffects() {
     _r.set(1, 0, 0).applyQuaternion(_q);
     _p.copy(player.pos).addScaledVector(_r, e.foot ? 0.12 : -0.12);
     onGround(_p);
-    ctx.vfx.mark('boot', _p, _f);
+    // (a print lies on the slope it was pressed into: laid level, half of it is under the ground on a hillside)
+    onGround(_ta.copy(_p).addScaledVector(_f, 0.18)); onGround(_tb.copy(_p).addScaledVector(_f, -0.18));
+    _tn.subVectors(_ta, _tb).normalize();
+    _tn.crossVectors(_r, _tn).normalize();
+    ctx.vfx.mark('boot', _p, _f, _tn);
     ctx.vfx.puff(_p, { count: e.run ? 4 : 2, speed: e.run ? 0.9 : 0.5, up: 0.35, spread: 0.12, size: e.run ? 0.34 : 0.24, life: 1.3, dir: _d.copy(_f).multiplyScalar(-0.5) });
   });
   on('land', (e) => {
@@ -42,24 +46,24 @@ export function updateEffects(dt) {
       const G = World.rover.group;
       _f.set(0, 0, -1).applyQuaternion(roverF.q);
       _r.set(1, 0, 0).applyQuaternion(roverF.q);
-      // tyre tracks: a pair of marks laid end to end (each is 0.9 m long), so the ruts are unbroken
+      // tyre tracks: a pair of marks laid end to end (each is 0.48 m long), so the ruts are unbroken
       // (at speed the rover covers several marks' length in a frame: lay each of them, back along the way it came)
       trackDist += v * dt;
       const dir = Math.sign(roverF.speed) || 1;
       let laid = 0;
-      while (trackDist >= 0.88 && laid < 12) {
-        trackDist -= 0.88;
+      while (trackDist >= 0.44 && laid < 24) {
+        trackDist -= 0.44;
         laid++;
         for (const side of [-1.22, 1.22]) {
           _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, (-1.9 - trackDist) * dir);
           // each mark lies along the ground from its back end to its front end (right × along = the ground's normal)
-          onGround(_ta.copy(_p).addScaledVector(_f, 0.46)); onGround(_tb.copy(_p).addScaledVector(_f, -0.46));
+          onGround(_ta.copy(_p).addScaledVector(_f, 0.24)); onGround(_tb.copy(_p).addScaledVector(_f, -0.24));
           _tn.subVectors(_ta, _tb).normalize();
           _tn.crossVectors(_r, _tn).normalize();
           ctx.vfx.mark('tyre', _p.addVectors(_ta, _tb).multiplyScalar(0.5), _f, _tn);
         }
       }
-      if (laid >= 12) trackDist = 0;
+      if (laid >= 24) trackDist = 0;
       // dust plumes off the rear wheels, heavier with speed
       plumeT += dt * Math.min(40, 6 + v * 1.2);
       while (plumeT > 1) {

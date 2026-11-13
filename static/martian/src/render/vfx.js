@@ -279,10 +279,13 @@ export class Vfx {
           float k = clamp(age / aInfo.y, 0.0, 1.0);
           // fast at first, then hanging in the thin air
           float travel = (1.0 - exp(-age * 2.2)) / 2.2;
-          vec3 p = position + aVel * travel - uUp * (0.35 * age * age * 0.5);
+          // (a puff is a disc facing the eye, centred on the dust: kicked up at ground level, its lower half was under
+          // the ground and showed as a pale shape cut off in a straight line. It rides up by nearly its own radius.)
+          float span = aInfo.z * (0.6 + 1.9 * k);
+          vec3 p = position + aVel * travel - uUp * (0.35 * age * age * 0.5) + uUp * (span * 0.42);
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = clamp(aInfo.z * (0.6 + 1.9 * k) * uPx / max(-mvPosition.z, 0.3), 1.0, 220.0);
+          gl_PointSize = clamp(span * uPx / max(-mvPosition.z, 0.3), 1.0, 220.0);
           vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k) * 0.34;
           vTone = aInfo.w;
           #include <fog_vertex>
@@ -338,7 +341,7 @@ export class Vfx {
   // ---------------------------------------------------------------------------------------
   _initMarks(n) {
     this.markN = n;
-    const mk = (kind, w, l) => {
+    const mk = (kind, w, l, n) => {
       const geo = new THREE.PlaneGeometry(w, l);
       geo.rotateX(-Math.PI / 2);
       const mat = new THREE.MeshBasicMaterial({ color: 0x1c0d06, alphaMap: markTexture(kind), transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, fog: true });
@@ -346,10 +349,12 @@ export class Vfx {
       m.count = 0; m.frustumCulled = false; m.renderOrder = 2;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.scene.add(m);
-      return { mesh: m, i: 0, used: 0, world: new Float64Array(n * 3), quat: new Float32Array(n * 4), anchor: new THREE.Vector3() };
+      return { mesh: m, n, i: 0, used: 0, world: new Float64Array(n * 3), quat: new Float32Array(n * 4), anchor: new THREE.Vector3() };
     };
-    this.boots = mk('boot', 0.17, 0.36);
-    this.tyres = mk('tyre', 0.50, 0.92);
+    this.boots = mk('boot', 0.17, 0.36, n);
+    // (short marks, twice as many: a mark is flat, and one 0.9 m long bridged the sand's ripples, its middle under
+    // each crest, so a track showed as dashes)
+    this.tyres = mk('tyre', 0.50, 0.48, n * 2);
   }
 
   /** Press a mark into the ground. `forward` is the direction of travel (world). */
@@ -357,7 +362,7 @@ export class Vfx {
    *  caller knows it: a mark laid level on a slope or across a ripple is half buried, and a track shows as dashes. */
   mark(kind, pos, forward, up) {
     const set = kind === 'boot' ? this.boots : this.tyres;
-    const k = set.i; set.i = (set.i + 1) % this.markN; set.used = Math.min(this.markN, set.used + 1);
+    const k = set.i; set.i = (set.i + 1) % set.n; set.used = Math.min(set.n, set.used + 1);
     if (up) _n.copy(up); else _n.copy(pos).normalize();
     _q.setFromUnitVectors(_y, _n);
     // heading within the tangent plane
