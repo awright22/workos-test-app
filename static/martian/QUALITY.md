@@ -82,13 +82,13 @@ return in fifteen minutes now fails its test and prints the site and what was be
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
-| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 6 (iPhone size): **MET** |
-| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 6: **MET** |
-| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 6: NEARLY. Stars, silhouette and lamp pool are right on the plain; at the base the lights do not light the ground (P9) |
-| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 6: NEARLY. Visibility collapses, the Hab is a ghost and the lamps have haloes; little blows past the camera (P13) |
-| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 6: NEARLY. No artefacts and both caps have ice; the ice still reads as plaster (P8) and the astronaut floats in one picture (P5) |
-| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 6: NEARLY. The title's globe is MET; the launch has no spectacle (P2) |
-| Models | Every object is a purpose-built model; nothing reads as a primitive | Round 6: **MET**. Weak ones: Beagle 2, the loose shards at Schiaparelli, Curiosity's power unit (P16) |
+| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 7 (iPhone size): **MET** |
+| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 7: **MET** |
+| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 7: NEARLY. Stars, silhouette, lamp pool and headlight cone work; buildings do not light the ground (Q3) |
+| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 7: NEARLY. Visibility collapses and the sun is a dim disc; the dust is smooth ribbons with no grit, and the airlock stays crisp (Q9) |
+| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 7: NEARLY. No artefacts; the cap reads as a snowfield and the outcrop as a toy (Q8) |
+| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 7: **MET**. The launch itself still lacks spectacle (Q1) |
+| Models | Every object is a purpose-built model; nothing reads as a primitive | Round 7: NEARLY. Everything built meets the bar (the rocket, the pods, the rover, the landers); rocks, the commonest object, do not (Q4) |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Fourteen clips blended. Idle is a relaxed, asymmetric stand (8 s); he takes his helmet off where there is air; kneeling has clips of its own. The builder's checks find no sliding or sinking foot in any clip. Not yet reviewed in motion |
 | First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fifth independent review: NEARLY. At every step there is one task with a distance, a compass tag, a world marker and a hold prompt, and most earlier hesitations are answered. Remaining: a pile-up at the moment the suit is sealed (J2), a bare "LOCKED" at the first empty bed (J3), a distance labelled AIRLOCK that looks wrong (J4), and no word on the long-term goal (J16) |
 | Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fifth independent review (phone only, incomplete: see the review): 844 wide NEARLY (clean, unclipped, clear of the notch, one product; short on settings controls under 44 px, an 18 px help button, labels under 11 px and a few numbers that read as bugs); 667 wide NEARLY, provisionally (its three broken screens are fixed; its HUD and map were not seen). The suite's audit measures 128 phone states and finds nothing, which the review shows is not the same as nothing to find |
@@ -257,6 +257,49 @@ tank, Mars 3's petals, most of the storm and of the wash toward the sun. Best: `
 | P17 | Framing: the astronaut hides the rocket's base (`mav`); no sky (`debris-a`); the rover small under a big sky; `astronaut-back` shows his front | acted on in the picture script: `mav` is taken from beside the rocket, `debris-a` from lower with the sky in it, `rover-park` from nearer, and `astronaut-back` from behind him. To re-review |
 | P18 | Small: a faint pale dot in the day sky (a moon); a stretched scarp at Mars 3; the glass greenhouse casts a solid shadow; a moon behind the word GAME on the title | part done: the greenhouse's shadow is its frame's lattice, not a solid (see P12). The pale dot in the day sky, the scarp at Mars 3 and the moon behind the title still open |
 
+### Round 7 (iPhone size, the preset a phone starts on; 68 pictures, all seen)
+
+| Area | Verdict |
+| --- | --- |
+| Day | **MET** |
+| Dawn and dusk | **MET** |
+| Orbit (title, launch) | **MET** (was NEARLY) |
+| Night | NEARLY: stars, silhouette, lamp pool and headlights work; buildings do not light the ground |
+| Dust storm | NEARLY: visibility collapses and the sun is a dim disc; the dust is smooth ribbons with no grit |
+| Poles | NEARLY: no artefacts; the cap reads as a snowfield and the outcrop as a toy |
+| Valles Marineris | NEARLY (was NOT MET): a great canyon from inside; not from its rim, from across or close to the wall |
+| Olympus Mons | NEARLY (was NOT MET): the caldera reads as a caldera; the flanks are not legible lava |
+| Terrain | NEARLY: saw-teeth gone; a stretched scarp, a smeared wall, rocks through boots, dark smudges |
+| Models | NEARLY (was MET): what men built meets the bar; rocks, the commonest object, do not |
+| Astronaut | NEARLY: fingers and a relaxed stance; plastic, clean, leans back, not lit by the scene at midday |
+| Interiors | NEARLY: a real sense of place; flat light, a blank monitor, blown whites in the greenhouse |
+| Overall | NEARLY: "About a third of frames could pass for a polished stylised release; none would be mistaken for AAA realism." |
+
+Best five: `dawn`, `hab-morning`, `canyon-climb`, `mav`, `pod`. Worst five: `canyon-rim`, `launch`, `greenhouse-above`,
+`lander-beagle-2`, `olympus-flows`.
+
+Of round 6's list it found fixed or gone: the caldera's teeth and saw-toothed edge (P1), the floating at the pole (P5), the
+rectangles and orbs of the rover's tracks (P6), the three weak models (P16), most of the framing (P17), the greenhouse's solid
+shadow, the Hab's empty trays and the ball of a head. Still there, in whole or part, and carried into the list below: the
+launch, the canyon, the flanks, the midday astronaut, the ice, the night's lights, the repeating rocks, the ruler horizons,
+the interiors' light, the storm's grit, the stains.
+
+| # | Finding | State |
+| --- | --- | --- |
+| Q1 | The launch still has little spectacle: `launch` is a rocket on a clean cone in an empty sky, with no dust skirt, smoke column or ground; in `launch-climb` the sky is brown with stars showing through it, the surface is a blur and the smoke is five cotton blobs; in `launch-orbit` the ship is small, end-on and flat-lit, the planet has no day-night line and no ascent stage is in sight | open |
+| Q2 | From the rim Valles Marineris is a pit: a far side close enough to count its boulders, a left wall like a watercolour wash, a floor with concentric swirls like wood grain (`canyon-rim`); a hazy striped escarpment with rounded tops (`canyon`); a banded hillside with no cliff, ledge or talus (`canyon-wall`); a wall of smooth bulging folds (`canyon-foot`). From inside it reads as a great canyon (`canyon-climb`, `canyon-floor`) | open |
+| Q3 | Buildings do not light the night: the greenhouse's own light is a blown starburst and nothing lands outside it; the airlock face is evenly near-white and the whole dome evenly pale; the rover's headlight cone has ruler-straight edges; two pale orange blobs glow on the ground ahead of him outside the lamp pool (`twilight`, `night-plain`); a white disc with a halo in `twilight`; a dust devil glows in the dark (`rover-night`) | part done since the pictures were taken: dust devils die away when the sun is down and are lit as the ground is. The rest open |
+| Q4 | Rocks are the weakest and the commonest object: dark buns and clean wedges repeat; tan flat-shaded chips; a boulder field of smooth clay potatoes; rocks sit on the sand, not in it, and one big boulder looks undercut (`day-sun`); rocks pass through his boots where he is put down; orange rocks on dark lava (`olympus`) | open |
+| Q5 | Flat sites still end like a table: a crisp straight horizon with boulders in silhouette on it (Beagle 2 worst; Viking 1, InSight, Zhurong, Schiaparelli, Phoenix, Pathfinder, `mav`) | open |
+| Q6 | The astronaut: with the sun ahead his back is still as bright as lit sand at midday (`day-sun`, `walk-plain`, `canyon-floor`, `hab-dusk`) and there is no rim light; in every profile he stands rocked back on his heels, about five degrees off plumb; the suit is smooth plastic, the legs and boots clean white, the visor two bands and a dot | open |
+| Q7 | Olympus's flanks are not legible as lava: rounded dark lobes like melted chocolate with a blurred surface (`olympus-flows`), a dark hillside with soft orange blotches (`olympus`) | open |
+| Q8 | Ice is a snowfield with a toy on it: matte, no glint; the outcrop is faceted gem blocks with pinstripes; a tan shadow in `ice`; the lamp a pale aura at his waist in `south-pole`; the crack net on red ground at Mars 3 | open |
+| Q9 | Storm dust is too smooth: large soft ribbons with clean edges, no grit or fast streaks; the airlock face stays crisp at a range where rocks are veiled | open |
+| Q10 | Interiors are flat-lit (no pools under the lamps, weak shadows, a blank desk monitor, feet cut in `inside-game-cam`); the greenhouse is over-bright (a blown white funnel, ring lights pure white, bare soil in both trays, panes with no tint so it reads as an open frame; he is cut at the thighs); `greenhouse-above` is a blotchy pink floor under a busy frame | open |
+| Q11 | Stains and seams: dark smudges with nothing to cast them (`hab-noon`, `yard`, `pile`, `lander-viking-1`); a saturated dark-red region (`debris-a`); one crisp line between dark red and tan ground across `dawn-light`; a stretched one-step scarp with a square corner at Mars 3; camouflage mottling on the caldera floor | open |
+| Q12 | The driving rover looks parked: no tracks, no wheel dust, no cue of motion (`rover-drive`) | open |
+| Q13 | Small: the title's moon sits against the end of the subtitle; two orange ghost dots at the bottom of `walk-plain`; a pale speck over the ground at Pathfinder; a pale cube on the caldera's skyline and a pale blob boulder on a far dune (`debris-b`); a few single-triangle shards at Schiaparelli; Viking 1 one cream colour; `dusk` near black in its lower half; `astronaut-back` still shows his front | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -422,7 +465,8 @@ suit seal (Z8), the ring's "150" and the shortfall that grows by one (Z10), the 
 | --- | --- | --- |
 | 31 | **The owner's iPhone.** First report from the real phone: the preview failed at startup with "Something broke / Input body is disturbed". Cause: the elevation file's loader filled a buffer of the length the server stated; GitHub Pages sends the file compressed and states the compressed length, so more bytes arrived than the buffer held, and the loader's fallback then re-read a download it was already reading, which Safari refuses. No test saw it because the test server stated no length and compressed nothing. | fixed in the loader; the test server now serves as the published site does (the old loader fails the smoke test against it); the failure screen's Reload clears the game's offline cache first. **Not yet confirmed on the phone.** Everything Safari-specific is still unproven here (only Chromium is installed): the next report from the phone decides what comes next |
 | 21 | Act on the fifth picture review (X1–X15 above) | acted on and reviewed again: see round 6 |
-| 29 | Act on the sixth picture review (P1–P18 above), the caldera's faults and the floating astronaut first, then the launch and the landmarks | in progress |
+| 29 | Act on the sixth picture review (P1–P18 above) | acted on and reviewed again: see round 7 |
+| 32 | Act on the seventh picture review (Q1–Q13 above): the launch, the canyon from its rim, the night's lights and the rocks first | in progress |
 | 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
 | 28 | Act on the fourth interface review (Z1–Z22 above) | acted on (seventeen fixed, five part fixed) and reviewed again: see the fifth review |
 | 30 | Act on the fifth interface review (J1–J17 above); walk the small phone's HUD, map, new-game screen and journal, which the reviewer could not open | a helper has the list |
