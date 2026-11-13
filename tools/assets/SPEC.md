@@ -49,7 +49,9 @@ library should gain.
   the vertex colour. Lit hard and with that glow on top, a body lighter than about a fifth
   washes out to white, so paint the body dark, darker with depth and in cracks, and keep
   near-white for edges and seams; brown painted on it comes out mauve, so dust in ice is a matte
-  material of its own). Baked ambient occlusion is
+  material of its own), `void` (the dark of a hole or an opening: the game draws it pure black
+  and lays no dust on it, so a patch of it on a surface reads as a hole cut through, like the
+  slots in Curiosity's wheels). Baked ambient occlusion is
   stored per vertex and multiplied into the colour; dust and weathering are added by the game's
   shader, so model clean hardware.
 - Detail comes from geometry: bevelled edges, panel seams, fasteners, handrails, cable runs,
@@ -270,18 +272,27 @@ dust). Each ≤ 14,000 triangles, each with an anchor `col_body` carrying a suit
 `pathfinder.glb` (three open petals with solar cells, the camera mast, antennas, deflated
 airbags around the base, ramps; the Sojourner rover is a part `sojourner` beside it),
 `viking.glb`, `mars3.glb` (the Soviet lander with four open petals; also used for Mars 6),
-`beagle2.glb` (lid open, only two of the four solar petals deployed), `mer.glb` (Spirit and
+`beagle2.glb` (lid open beside the base on its hinge; only two of the four solar discs deployed,
+standing off the lid on hinge towers, the third sprung a little and jammed, the fourth still
+stowed; the instrument arm folded in the base), `mer.glb` (Spirit and
 Opportunity; part `mast`), `phoenix.glb`, `insight.glb` (with the domed seismometer and the
-heat probe on the ground beside it), `msl.glb` (Curiosity; parts `mast` and `arm`), `m2020.glb`
+heat probe on the ground beside it), `msl.glb` (Curiosity; parts `mast` and `arm`; its power unit
+is a finned cylinder between two low heat-exchanger plates that leave it in view), `m2020.glb`
 (Perseverance; the same parts and collider, with its own wheels, mast head, turret and sample
 housing), `ingenuity.glb`, `zhurong.glb`, `schiaparelli_wreck.glb` (an impact site, ≤ 12,000 triangles: the
 crushed 1.65 m lander tilted in a low crater, a third of its drum still standing under torn gold
 blanket and the rest blown out across the ground; a slab of the tiled back shell, with a second
 collider `col_backshell`; a torn parachute; all on a blast patch of `ground_dust` about 7.6 m
 across. Soot is painted per vertex after the bake: metal, foil and blanket keep their own
-colours away from the burst).
+colours away from the burst. No loose piece of wreckage is a card: each has the thickness of what
+it was torn from, is snapped or curled, shows what it is made of along its torn edge (honeycomb
+between black skins, ribs on wall plate, the silvered back of foil) and has a second colour).
 Lander builders start with `weathered()`, which roughens the palette metals: flat polished facets
 mirror the sun into the bloom. Solar cells on landers are matte and sit on a `cell_grid`.
+A colour the palette lacks, on a part too small for a material of its own (a caution placard, the
+chips of a colour target, a cable sleeve), is a white part tinted per vertex after the bake:
+`Tints` in `landers.py`. The game lays an even film of dust over the cells of the old landers,
+which leaves them paler than their surround: tint them down by half where they should read dark.
 
 ## Family E — deployables and props (`props.py`)
 
