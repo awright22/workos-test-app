@@ -14,6 +14,9 @@ const page = g.page, ev = g.eval;
 await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
 let failed = 0;
 const audit = async () => {
+  // (two frames first, as the walk waits before it measures: the game marks a list that scrolls on its next frame
+  //  or the one after, and on a slow machine that is longer than any fixed wait)
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.waitForFunction(settledInPage, null, { timeout: 30000, polling: 100 }).catch(() => {});
   return auditLines(await page.evaluate(auditInPage, safe)).filter((l) => /^(over|clipped|outside)/.test(l));
 };
