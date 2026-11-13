@@ -1,104 +1,154 @@
 #!/usr/bin/env node
 /*
  * A contact sheet of the rock atlas (static/martian/src/world/rock-shapes.js), drawn without a
- * browser: every shape from two sides, standing in the ground at its own ground line, lit by a
- * sun and a sky, with dust on what faces up. For designing shapes quickly; the game's own
- * pictures (tests/shots.mjs) are the real check.
+ * browser. Every shape is drawn as the game draws it: the same ball of triangles (world/rock-ball.js)
+ * pushed out to the shape's surface, each pixel shaded by the shape's stored normal, standing in the
+ * ground at its own ground line, lit by a sun and a sky, dark stone with dust on what faces up. Each
+ * shape is shown from two sides at the size of a boulder a few metres off (a ball of 320 triangles)
+ * and twice more at the size of a rock across the valley (80 triangles, a few dozen pixels), because
+ * a shape that reads close to may be a bun or a pyramid far off. For designing shapes quickly; the
+ * game's own pictures (tests/shots.mjs, tests/rock-look.mjs) are the real check.
  *
- *   node tools/rock-preview.mjs [out.png] [--size 128]
+ *   node tools/rock-preview.mjs [out.png] [--size 128] [--shapes 0-7] [--cuts 4] [--nosnap]
  */
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildRockAtlas, shapeUv } from '../static/martian/src/world/rock-shapes.js';
+import { buildRockAtlas, shapeUv, snapDir } from '../static/martian/src/world/rock-shapes.js';
+import { ballMesh, ballSnap } from '../static/martian/src/world/rock-ball.js';
+import { gnoise3 } from '../static/martian/src/core/math.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const sizeArg = args.indexOf('--size');
-const N = sizeArg >= 0 ? Number(args[sizeArg + 1]) : 128;
+const opt = (name, d) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : d; };
+const N = Number(opt('--size', 128)), CUTS = Number(opt('--cuts', 4)), SNAP = !args.includes('--nosnap'), _d = [0, 0, 0];
 const out = args[0] && !args[0].startsWith('--') ? args[0] : path.join(here, 'tests', '.cache', 'rock-sheet.png');
 
 const t0 = performance.now();
 const atlas = buildRockAtlas(N);
 console.log(`atlas: ${atlas.shapes.length} shapes, ${N} px, built in ${(performance.now() - t0).toFixed(0)} ms, rmax ${atlas.rmax.toFixed(3)}`);
-atlas.shapes.forEach((s, i) => console.log(`  ${i}: class ${s.cls}  ground ${s.ground.toFixed(2)}  top ${s.top.toFixed(2)}  widest ${s.big.toFixed(2)}${s.big > atlas.rmax ? '  TOO BIG FOR SHAPE_RMAX' : ''}  (stands ${(s.top - s.ground).toFixed(2)} above the ground for a foot radius of 1)`));
+atlas.shapes.forEach((s, i) => console.log(`  ${String(i).padStart(2)}: class ${s.cls}  ground ${s.ground.toFixed(2)}  top ${s.top.toFixed(2)}  widest ${s.big.toFixed(2)}${s.big > atlas.rmax ? '  TOO BIG FOR SHAPE_RMAX' : ''}  (stands ${(s.top - s.ground).toFixed(2)} above the ground for a foot radius of 1)`));
+const [from, to] = opt('--shapes', `0-${atlas.shapes.length - 1}`).split('-').map(Number);
+const which = []; for (let i = from; i <= (to === undefined ? from : to); i++) which.push(i);
 
-const uv = [0, 0], smp = [0, 0, 0, 0];
-function sample(layer, x, y, z) {
+const uv = [0, 0];
+/** One layer of the atlas along a direction, bilinear, into `o` (four numbers, 0..1). */
+function sample(layer, x, y, z, o) {
   shapeUv(x, y, z, uv);
   const fx = Math.min(N - 1.001, Math.max(0, uv[0] * N - 0.5)), fy = Math.min(N - 1.001, Math.max(0, uv[1] * N - 0.5));
   const ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy;
-  const o = layer * N * N * 4, a = o + (iy * N + ix) * 4, b = a + 4, c = a + N * 4, d = c + 4, D = atlas.data;
-  for (let k = 0; k < 4; k++) smp[k] = ((D[a + k] * (1 - u) + D[b + k] * u) * (1 - v) + (D[c + k] * (1 - u) + D[d + k] * u) * v) / 255;
-  return smp;
+  const a = layer * N * N * 4 + (iy * N + ix) * 4, b = a + 4, c = a + N * 4, d = c + 4, D = atlas.data;
+  for (let k = 0; k < 4; k++) o[k] = ((D[a + k] * (1 - u) + D[b + k] * u) * (1 - v) + (D[c + k] * (1 - u) + D[d + k] * u) * v) / 255;
+  return o;
 }
-const radius = (shape, x, y, z) => sample(shape * 2, x, y, z)[3] * atlas.rmax;
+const _s = [0, 0, 0, 0], A = [0, 0, 0, 0], B = [0, 0, 0, 0];
+const radius = (shape, x, y, z) => sample(shape * 2, x, y, z, _s)[3] * atlas.rmax;
 
-const CW = 236, CH = 190, COLS = Math.ceil(atlas.shapes.length / 2), VIEWS = [[0.5, 0.2], [2.7, 0.42]];
-const W = CW * COLS, H = CH * 4;
-const img = new Uint8Array(W * H * 3);
 const sun = (() => { const v = [-0.55, 0.62, 0.56]; const l = Math.hypot(...v); return v.map((x) => x / l); })();
-const soil = [0.62, 0.40, 0.26], stone = [0.34, 0.27, 0.23];
-const tone = (c) => Math.round(255 * Math.pow(Math.min(1, Math.max(0, c)), 1 / 2.2));
+const SOIL = [0.34, 0.205, 0.125], SUN = [3.0, 2.75, 2.4], SKY = [0.42, 0.36, 0.3], BOUNCE = [0.2, 0.13, 0.085];
+const tone = (c) => Math.round(255 * Math.pow(Math.min(1, Math.max(0, c * 0.62)), 1 / 2.2));
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-for (let n = 0; n < atlas.shapes.length; n++) {
-  const sh = atlas.shapes[n];
-  for (let vw = 0; vw < 2; vw++) {
-    const [az, el] = VIEWS[vw];
-    // camera axes: looking at the rock from azimuth az, elevation el
-    const f = [-Math.cos(el) * Math.cos(az), -Math.sin(el), -Math.cos(el) * Math.sin(az)];
-    const rx = [-Math.sin(az), 0, Math.cos(az)];
-    const up = [rx[1] * f[2] - rx[2] * f[1], rx[2] * f[0] - rx[0] * f[2], rx[0] * f[1] - rx[1] * f[0]].map((x) => -x);
-    const ox = (n % COLS) * CW, oy = (Math.floor(n / COLS) * 2 + vw) * CH;
-    const span = 3.3;                                   // world units across the cell
-    for (let py = 0; py < CH; py++) for (let px = 0; px < CW; px++) {
-      const sx = (px / CW - 0.5) * span, sy = (0.62 - py / CH) * span * CH / CW;
-      // ray origin on a plane 4 units out; the rock's centre is at -ground below the ground (ground at y = 0 here)
-      const cy = -sh.ground;
-      const o = [rx[0] * sx + up[0] * sy - f[0] * 4, rx[1] * sx + up[1] * sy - f[1] * 4 + 0.35, rx[2] * sx + up[2] * sy - f[2] * 4];
-      let col = [0.80, 0.66, 0.50];                     // sky
-      // the ground plane y = 0
-      let tg = f[1] < 0 ? -o[1] / f[1] : Infinity;
-      // march the rock
-      let hit = -1, tPrev = 2.2, fPrev = 1;
-      for (let t = 2.2; t < 6; t += 0.02) {
-        const x = o[0] + f[0] * t, y = o[1] + f[1] * t - cy, z = o[2] + f[2] * t;
-        const l = Math.hypot(x, y, z);
-        const fv = l - radius(n, x / l, y / l, z / l);
-        if (fv < 0) {
-          let a = tPrev, b = t;
-          for (let k = 0; k < 7; k++) { const m = (a + b) / 2; const mx = o[0] + f[0] * m, my = o[1] + f[1] * m - cy, mz = o[2] + f[2] * m; const ml = Math.hypot(mx, my, mz); if (ml - radius(n, mx / ml, my / ml, mz / ml) < 0) b = m; else a = m; }
-          hit = (a + b) / 2; break;
-        }
-        tPrev = t; fPrev = fv;
-      }
-      if (hit > 0 && hit < tg) {
-        const x = o[0] + f[0] * hit, y = o[1] + f[1] * hit - cy, z = o[2] + f[2] * hit, l = Math.hypot(x, y, z);
-        const A = sample(n * 2, x / l, y / l, z / l).slice(), B = sample(n * 2 + 1, x / l, y / l, z / l).slice();
-        let nx = A[0] * 2 - 1, ny = A[1] * 2 - 1, nz = A[2] * 2 - 1; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
-        const hollow = B[0] - 0.5;
-        const dust = Math.min(1, Math.max(0, (ny - 0.3 - hollow * 1.2) / 0.45));
-        const ao = Math.min(1, Math.max(0.45, 0.8 + hollow * 1.6));
-        const lit = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]) * 1.5 + (0.32 + 0.22 * ny);
-        const skirt = Math.max(0, 1 - (y + cy) / 0.1);
-        col = [0, 1, 2].map((k) => (stone[k] * (1 + (B[1] - 0.5) * 0.35) * (1 - B[2] * 0.25) * (1 - dust) + soil[k] * dust) * (1 - skirt * 0.6) + soil[k] * skirt * 0.6).map((c) => c * lit * ao);
-      } else if (tg < Infinity) {
-        const gx = o[0] + f[0] * tg, gz = o[2] + f[2] * tg;
-        // a shadow on the ground: march toward the sun from the ground point
-        let shade = 1;
-        for (let t = 0.03; t < 3; t += 0.04) {
-          const x = gx + sun[0] * t, y = sun[1] * t - cy, z = gz + sun[2] * t, l = Math.hypot(x, y, z);
-          if (l - radius(n, x / l, y / l, z / l) < 0) { shade = 0.42; break; }
-        }
-        const lit = (sun[1] * 1.5 * (shade < 1 ? 0 : 1) + 0.5);
-        col = soil.map((c) => c * lit);
-      }
-      const p = ((oy + py) * W + ox + px) * 3;
-      img[p] = tone(col[0]); img[p + 1] = tone(col[1]); img[p + 2] = tone(col[2]);
+/** Is the point (in the rock's frame, its centre at the origin) in the rock's shadow? Marched toward the sun. */
+function shaded(shape, x, y, z, far) {
+  for (let t = 0.04; t < far; t += 0.045) {
+    const px = x + sun[0] * t, py = y + sun[1] * t, pz = z + sun[2] * t, l = Math.hypot(px, py, pz);
+    if (l < radius(shape, px / l, py / l, pz / l) - 0.03) return true;
+  }
+  return false;
+}
+
+/**
+ * Draw one shape into the sheet: a cell cw x ch at (x0, y0), seen from azimuth az and elevation el, `ppu` pixels to
+ * the rock's foot radius, with a ball of 20 cuts^2 triangles. `seed` varies the stone's tone as the game does.
+ */
+function draw(img, W, x0, y0, cw, ch, shape, az, el, ppu, cuts, bare) {
+  const sh = atlas.shapes[shape], ball = ballMesh(cuts), P = ball.positions, I = ball.index, nv = P.length / 3;
+  const f = [-Math.cos(el) * Math.cos(az), -Math.sin(el), -Math.cos(el) * Math.sin(az)];
+  const rx = [-Math.sin(az), 0, Math.cos(az)];
+  const up = [f[1] * rx[2] - f[2] * rx[1], f[2] * rx[0] - f[0] * rx[2], f[0] * rx[1] - f[1] * rx[0]];
+  if (up[1] < 0) { up[0] = -up[0]; up[1] = -up[1]; up[2] = -up[2]; }
+  const cy = -sh.ground;                                // the rock's centre above the ground (the ground is y = 0)
+  const cxp = cw / 2, cyp = ch * 0.66;
+  // the ball's vertices pushed out to the surface, then to the screen
+  const V = new Float32Array(nv * 3), S = new Float32Array(nv * 3);
+  for (let i = 0; i < nv; i++) {
+    if (SNAP) snapDir(atlas, shape, P[i * 3], P[i * 3 + 1], P[i * 3 + 2], ballSnap(cuts, N), _d); else { _d[0] = P[i * 3]; _d[1] = P[i * 3 + 1]; _d[2] = P[i * 3 + 2]; }
+    const dx = _d[0], dy = _d[1], dz = _d[2], r = radius(shape, dx, dy, dz);
+    const x = dx * r, y = dy * r, z = dz * r;
+    V[i * 3] = x; V[i * 3 + 1] = y; V[i * 3 + 2] = z;
+    const wy = y + cy;
+    S[i * 3] = cxp + (x * rx[0] + wy * rx[1] + z * rx[2]) * ppu; S[i * 3 + 1] = cyp - (x * up[0] + (wy - 0.3) * up[1] + z * up[2]) * ppu; S[i * 3 + 2] = x * f[0] + wy * f[1] + z * f[2];
+  }
+  const depth = new Float32Array(cw * ch).fill(1e9), hit = new Float32Array(cw * ch * 3), got = new Uint8Array(cw * ch);
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t], b = I[t + 1], c = I[t + 2];
+    const ax = S[a * 3], ay = S[a * 3 + 1], bx = S[b * 3], by = S[b * 3 + 1], qx = S[c * 3], qy = S[c * 3 + 1];
+    const area = (bx - ax) * (qy - ay) - (qx - ax) * (by - ay);
+    if (Math.abs(area) < 1e-9) continue;
+    const minX = Math.max(0, Math.floor(Math.min(ax, bx, qx))), maxX = Math.min(cw - 1, Math.ceil(Math.max(ax, bx, qx)));
+    const minY = Math.max(0, Math.floor(Math.min(ay, by, qy))), maxY = Math.min(ch - 1, Math.ceil(Math.max(ay, by, qy)));
+    for (let py = minY; py <= maxY; py++) for (let px = minX; px <= maxX; px++) {
+      const sx = px + 0.5, sy = py + 0.5;
+      const w0 = ((bx - sx) * (qy - sy) - (qx - sx) * (by - sy)) / area, w1 = ((qx - sx) * (ay - sy) - (ax - sx) * (qy - sy)) / area, w2 = 1 - w0 - w1;
+      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      const z = w0 * S[a * 3 + 2] + w1 * S[b * 3 + 2] + w2 * S[c * 3 + 2], k = py * cw + px;
+      if (z >= depth[k]) continue;
+      depth[k] = z; got[k] = 1;
+      hit[k * 3] = w0 * V[a * 3] + w1 * V[b * 3] + w2 * V[c * 3]; hit[k * 3 + 1] = w0 * V[a * 3 + 1] + w1 * V[b * 3 + 1] + w2 * V[c * 3 + 1]; hit[k * 3 + 2] = w0 * V[a * 3 + 2] + w1 * V[b * 3 + 2] + w2 * V[c * 3 + 2];
     }
   }
+  const sd = shape * 7.3 + 1.7;
+  for (let py = 0; py < ch; py++) for (let px = 0; px < cw; px++) {
+    const k = py * cw + px;
+    // where this pixel's ray meets the ground
+    const sx = (px + 0.5 - cxp) / ppu, sy = (cyp - py - 0.5) / ppu;
+    const ox = rx[0] * sx + up[0] * sy, oy = rx[1] * sx + up[1] * sy + 0.3, oz = rx[2] * sx + up[2] * sy;
+    const tg = f[1] < 0 ? -oy / f[1] : Infinity, gz = tg < Infinity ? (ox + f[0] * tg) * f[0] + 0 * f[1] + (oz + f[2] * tg) * f[2] : Infinity;
+    let col = [0.80, 0.66, 0.50].map((c) => c * 1.5);                     // sky
+    if (got[k] && depth[k] < gz) {
+      const x = hit[k * 3], y = hit[k * 3 + 1], z = hit[k * 3 + 2], l = Math.hypot(x, y, z);
+      sample(shape * 2, x / l, y / l, z / l, A); sample(shape * 2 + 1, x / l, y / l, z / l, B);
+      let nx = A[0] * 2 - 1, ny = A[1] * 2 - 1, nz = A[2] * 2 - 1; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+      const g1 = gnoise3(x * 5 + sd, y * 5, z * 5) * 0.5 + 0.5, g2 = gnoise3(x * 17 - sd, y * 17 + 3, z * 17) * 0.5 + 0.5, stain = gnoise3(x * 1.4 + sd, y * 1.4 - sd, z * 1.4) * 0.5 + 0.5;
+      const hollow = B[0] - 0.5, high = y + cy;
+      // (as the rock shader: dark stone, each face its own tone, a fresh break darker; dust on what faces the sky and
+      // in the hollows, banked against the foot)
+      const film = (bare ? 0.2 : 0.62) * (1 + (B[1] - 0.5) * 0.7) + (B[1] - 0.5) * 0.3 - B[2] * 0.16 + (stain - 0.5) * 0.36;
+      const lum = SOIL[0] * 0.3 + SOIL[1] * 0.55 + SOIL[2] * 0.15;
+      const k0 = 0.50 + 0.30 * Math.min(1, Math.max(0, film));
+      const stone = SOIL.map((c) => (lum * 0.5 + c * 0.5) * k0);
+      let dust = sstep(0.30, 0.68, ny * 0.9 + 0.1 - hollow * 0.8 - B[2] * 0.15 + (g1 - 0.5) * 0.22 + (g2 - 0.5) * 0.2 + (bare ? -0.1 : 0.06));
+      const skirt = 1 - sstep(0.0, 0.1, high + (g1 - 0.5) * 0.08);
+      dust = Math.max(dust, skirt * 0.85);
+      const ao = (0.6 + 0.4 * sstep(0.12, 0.46, B[0])) * (0.7 + 0.3 * sstep(-0.02, 0.16, high));
+      const lit = shaded(shape, x + nx * 0.03, y + ny * 0.03, z + nz * 0.03, 2.6) ? 0 : Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]);
+      const amb = 0.5 + 0.5 * ny;
+      col = [0, 1, 2].map((c) => (stone[c] * (1 - dust) + SOIL[c] * dust) * (1 + (g2 - 0.5) * 0.2) * ao * (SUN[c] * lit + SKY[c] * amb + BOUNCE[c] * (1 - amb)));
+    } else if (tg < Infinity) {
+      const gx = ox + f[0] * tg, gzz = oz + f[2] * tg;
+      const sh0 = shaded(shape, gx, -cy, gzz, 3.2);
+      // (shade close under the rock, as the game's contact shade)
+      const rr = Math.hypot(gx, gzz), near = 1 - 0.35 * (1 - sstep(1.0, 1.35, rr));
+      col = [0, 1, 2].map((c) => SOIL[c] * near * (SUN[c] * (sh0 ? 0 : sun[1]) + SKY[c]));
+    }
+    const p = ((y0 + py) * W + x0 + px) * 3;
+    img[p] = tone(col[0]); img[p + 1] = tone(col[1]); img[p + 2] = tone(col[2]);
+  }
 }
+
+// the sheet: a column a shape; two rows near (one of them swept bare), then a row of two far views
+const CW = 236, CH = 176, FH = 64, COLS = Math.min(8, which.length), ROWS = Math.ceil(which.length / COLS);
+const W = CW * COLS, H = (CH * 2 + FH) * ROWS;
+const img = new Uint8Array(W * H * 3);
+which.forEach((n, q) => {
+  const x0 = (q % COLS) * CW, y0 = Math.floor(q / COLS) * (CH * 2 + FH);
+  draw(img, W, x0, y0, CW, CH, n, 0.5, 0.2, 62, CUTS, false);
+  draw(img, W, x0, y0 + CH, CW, CH, n, 2.7, 0.36, 62, CUTS, true);
+  draw(img, W, x0, y0 + CH * 2, CW / 2, FH, n, 4.4, 0.12, 15, 2, false);
+  draw(img, W, x0 + CW / 2, y0 + CH * 2, CW / 2, FH, n, 1.5, 0.12, 15, 2, true);
+});
 
 // a minimal PNG
 const crcTable = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });

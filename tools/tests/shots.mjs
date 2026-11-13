@@ -145,6 +145,9 @@ for (const [name, setup] of Object.entries(scenes)) {
   const silent = name.startsWith('-') || name === 'free-camera-off' || name === 'storm-over' || name === 'photo-off';
   if (!want(name) || silent) { if (silent) await setup(); continue; }
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });   // nobody suffocates mid-shoot
+  // (a scene that is not about the rover starts on foot, whatever ran before it: with --only, the scenes after
+  // `rover-drive` were taken from the driver's seat)
+  if (!name.startsWith('rover')) await ev((G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); } });
   await setup();
   await ev((G) => { G.paused = false; });
   await sleep(700);
