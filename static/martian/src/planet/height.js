@@ -140,9 +140,9 @@ let _padW = 0;
  * half-width of the flow's edge in noise units, and how much of the flank the flow leaves bare.
  */
 const LOBES = [
-  [700, 95, 5.5, 0.05, 0.02],
-  [320, 36, 3.0, 0.045, 0.0],
-  [130, 15, 1.2, 0.05, 0.08],
+  [700, 95, 7.5, 0.05, 0.02],
+  [320, 36, 4.4, 0.045, 0.0],
+  [130, 15, 1.7, 0.05, 0.08],
 ];
 /** The cone is cut into this many sectors, each with its own field of flows (see _flows). */
 const SECTORS = 8;
@@ -244,7 +244,7 @@ export class Planet {
     const rough = this._rough();
     const flows = this._flows(x, y, z, minW);
     // (a lava field is smoother than old cratered ground between its flow fronts, and a caldera's floor is level)
-    const r = R + base + flows + this._detail(x, y, z, rough, minW) * (1 - 0.4 * _lava) * (1 - 0.93 * _floor);
+    const r = R + base + flows + this._detail(x, y, z, rough, minW) * (1 - 0.68 * _lava) * (1 - 0.93 * _floor);
     _padW = 0;
     return this.pads.length ? this._pad(x, y, z, r) : r;
   }
