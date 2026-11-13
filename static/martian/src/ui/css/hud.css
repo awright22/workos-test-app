@@ -686,9 +686,10 @@
 /* The clock says what its second figure is: "SOL 1 · RESCUE SOL 25" (ui/hud.js leaves it out until he knows of it). */
 #mg-clock .sol, #mg-clock .meta { white-space: nowrap; flex: none; }
 #mg-clock .sol .of i { font-style: normal; color: var(--ink-3); margin-right: .25em; }
-#mg-clock .sol .of u { text-decoration: none; }
-/* (on a phone "SOL 1  RESCUE 25" has the room, and the sol the rescue falls on needs no second "sol") */
-.mg-compact #mg-clock .sol .of u { display: none; }
+/* (a phone's clock is a line of its own, with room for "SOL 1  RESCUE 25"; on a wide screen the clock shares its line
+   with the time and the temperature, and the rescue heads the mission list under it: "MISSION … RESCUE SOL 25") */
+#mg-root:not(.mg-compact) #mg-clock .sol .of { display: none; }
+#mg-objectives .hd b { letter-spacing: .14em; }
 @media (max-width: 760px) { .mg-compact #mg-clock { gap: .4375rem; } .mg-compact #mg-clock .meta .dn, .mg-compact #mg-clock .meta .sep { display: none; } }
 #mg-clock .sol .of:not(:empty) { margin-left: .625rem; text-transform: uppercase; letter-spacing: .08em; }
 .mg-compact #mg-clock .sol .of:not(:empty) { margin-left: .5rem; font-size: var(--t13); font-weight: 600; letter-spacing: .04em; color: var(--ink); }

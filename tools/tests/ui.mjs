@@ -183,7 +183,7 @@ if (!onlySize || onlySize === 'play') {
     jrn.lit.join() === 'journal' && /journal/i.test(jrn.card) && jrn.btns.join() === 'journal', { rec, food, jrn });
   // (the plan is on the card he puts down himself, not on a line of the log that passes while he is at a bed)
   check('the numbers: the card says where it all leads (a radio, the rocket in Schiaparelli, the sol), in meals, and the clock then names the rescue',
-    /meals left/i.test(sheet.text) && /radio/.test(sheet.later) && /Schiaparelli/.test(sheet.later) && /Sol \d+/.test(sheet.later) && /rescue\s*sol \d+/i.test(food.clock), { later: sheet.later, clock: food.clock });
+    /meals left/i.test(sheet.text) && /radio/.test(sheet.later) && /Schiaparelli/.test(sheet.later) && /Sol \d+/.test(sheet.later) && /rescue\s*\d+/i.test(food.clock), { later: sheet.later, clock: food.clock });
   await noToast();
   // out of the door: the Map, to the left of the Journal, which does not move; and with the first load of regolith, the Colony
   const jx = await page.evaluate(() => document.querySelector('#mg-trow [data-t="journal"]').getBoundingClientRect().left);

@@ -442,7 +442,7 @@ export function updateObjectivesHud() {
   if (now - fitAt > 1) fitObjectives(now);
 }
 function rebuildObjectives(now) {
-  if (!objHead) objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span>');
+  if (!objHead) objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span><b></b>');
   // (on a touch screen the block is pressed to bring the reason under its first line back)
   if (!objTap && layout.touch) {
     objTap = true;
@@ -900,7 +900,10 @@ export function updateHud() {
   setText('sol', UI.clockSol, String(S.sol));
   // (The second figure says what it is, and is not there before he knows of it: "SOL 1 / 25" stood on the screen from
   //  the first second, and nothing ever said that 25 was the rescue.)
-  setText('of', UI.clockOf, S.flags.didMath || S.sol > 1 ? `<i>Rescue</i> <u>Sol </u>${S.rescueSol}` : '');
+  const knows = !!S.flags.didMath || S.sol > 1;
+  setText('of', UI.clockOf, knows ? `<i>Rescue</i> ${S.rescueSol}` : '');
+  // (on a wide screen the clock's line has no room for it beside the time and the temperature: it heads the mission list)
+  if (objHead) setText('ofHd', objHead.lastChild, knows ? `Rescue Sol ${S.rescueSol}` : '');
   setText('time', UI.clockTime, fmtClock());
   // (the temperature is the weather: in the Hab, or in the rover's cabin, it is not his, and it is not shown)
   const outTemp = !(S.inside && S.mode === 'walk');
