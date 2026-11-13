@@ -54,6 +54,13 @@ UI.suit = el('div', null, 'suit', UI.vitals,
   // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
   //  inside a 54 px ring the name was 9 px capitals)
   '<div class="cap">SUIT <span class="chem">O<sub>2</sub></span></div><div class="st t-num"></div>');
+/**
+ * Where the panel of gauges ends. On a phone the log and the cards stand a fixed gap under it, by this figure. It is
+ * taken again whenever the panel's size changes (ui/hud.js watches it), when the panel gains or loses its bars, and
+ * before a card is fitted to the room under it: a card fitted against the figure from before the bars arrived was a
+ * line too tall, and came to rest on the stick.
+ */
+export function measureVitals() { const b = UI.vitals.getBoundingClientRect().bottom; if (b > 0) root.style.setProperty('--vit-b', Math.round(b) + 'px'); }
 UI.suitArc = UI.suit.querySelector('.arc');
 UI.suitNum = UI.suit.querySelector('.num');
 UI.suitState = UI.suit.querySelector('.st');
@@ -360,6 +367,7 @@ function nextToast() {
   // to one line, "Spend 60 seconds outside in a…", where closer setting has room for two.)
   const t3 = node.querySelector('.t3');
   if (layout.compact && t3) {
+    measureVitals();
     const joy = UI.joy.getBoundingClientRect();
     // (8 px clear of it, as everything on the HUD is of its neighbour. The card is measured where it will stand, not
     //  where it is now: it arrives by sliding down, so its own box at this moment is 8 px too high.)
@@ -588,6 +596,7 @@ function flag(name, on) {
   if (flags[name] === on) return;
   flags[name] = on;
   root.classList.toggle(name, on);
+  if (name === 'is-cold') measureVitals();              // (the panel is one number in the first minute, and taller after)
 }
 // A scrolling region with more below carries a "More" mark at its foot (and a short fade at its head when
 // there is more above). Without one, a list cut off by the bottom of a phone's screen looks like the end of

@@ -284,7 +284,7 @@ if (!onlySize || onlySize === 'play') {
     uplink: (document.querySelector('#mg-journal .empty') || { textContent: '' }).textContent,
   }));
   check('journal: the Tasks tab counts the tasks its page lists', jc.tab > 0 && jc.tab === jc.listed, jc);
-  check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /radio/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /\d km/.test(jc.wayText) && /radio/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
+  check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /radio/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /\d\skm/.test(jc.wayText) && /radio/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
   await page.keyboard.press('Escape');
   // FOOD on the HUD is the sum of the rows under Food in the inventory (13 was set against a list that came to 22)
   await g.eval((G) => { const S = G.S; G.farm.farm(); window.__larder = JSON.stringify([S.pantry, S.potatoes]); S.pantry.radish = 3; S.pantry.soy = 2; S.potatoes = 4; G.tpLocal(0, 0, 0); G.tick(0.05, 3); });
