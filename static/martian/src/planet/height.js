@@ -382,9 +382,13 @@ export class Planet {
       const share = wide > 0.6 ? 0.6 + (wide - 0.6) * far * far * (3 - 2 * far) : 0.6;
       let v = (u - (1 - share)) / share, g = 0, dg = 0;
       if (v > 0) {
-        // a scree foot, then the wall: the lower third of the rise is a ramp, the rest stands steep
-        g = v < 0.4 ? 0.3 * v * v / 0.16 : 0.3 + 0.7 * ((v - 0.4) / 0.6) * ((v - 0.4) / 0.6) * (3 - 2 * (v - 0.4) / 0.6);
-        dg = (v < 0.4 ? 0.6 * v / 0.16 : 0.7 * 6 * ((v - 0.4) / 0.6) * (1 - (v - 0.4) / 0.6) / 0.6) / share;
+        // a scree foot, then the wall: the lower third of the rise is a ramp that steepens, and the wall carries on
+        // from it at the same slope and eases off to the brim. (The wall used to start level again where the ramp
+        // ended: a bench with a sharp lip all round the bowl, and wherever that lip ran across the mesh's grain it
+        // was a row of teeth with a saw-toothed shadow.)
+        const t = (v - 0.4) / 0.6;
+        g = v < 0.4 ? 0.3 * v * v / 0.16 : 0.3 * (2 * t * t * t - 3 * t * t + 1) + 0.9 * (t * t * t - 2 * t * t + t) + (3 * t * t - 2 * t * t * t);
+        dg = (v < 0.4 ? 0.6 * v / 0.16 : (-1.5 * t * t + 0.6 * t + 0.9) / 0.6) / share;
       }
       const flat = v <= 0 ? 1 : v >= 0.25 ? 0 : 1 - v * 4;
       _floor = zone * flat; _zone = zone;

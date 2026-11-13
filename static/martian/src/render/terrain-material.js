@@ -166,7 +166,12 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float pond = lava * (1.0 - smoothstep(0.004, 0.05, landSlope + (hMid * 0.03 + hLump * 0.015) * fMid));
         // The top of a flow is bare basalt with dust only in its hollows; between flows the dust lies deep.
         // (This is what makes a volcano's flank read as lava from any distance: dark tongues on red ground.)
-        float basalt = lava * max(smoothstep(0.30, 0.62, flowTop + hMid * 0.26 * fMid + hFar * 0.18), pond);
+        // (Far off, a flow's edge is known only at the corners of big triangles, and a hard line drawn through them
+        // runs along their diagonals in a saw-tooth: so with distance the edge is drawn softer and is pushed about by
+        // the twelve-metre grain as well.)
+        vec4 nCrag = texture(uGrain, vTex / 12.0 + vec3(0.37, 0.11, 0.59));
+        float farEdge = smoothstep(50.0, 180.0, viewDist);
+        float basalt = lava * max(smoothstep(mix(0.30, 0.12, farEdge), mix(0.62, 0.84, farEdge), flowTop + hMid * 0.26 * fMid + hFar * 0.18 + (nCrag.a - 0.5) * 0.5 * farEdge), pond);
 
         // ---- 2D layers on level ground: slope of the surface in the texture's own axes ----
         vec2 flatSlope = vec2(0.0);
@@ -265,7 +270,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // Crags. Past a hundred metres a wall had only the broadest relief to shade it and hung like drapery; a lava
         // field from the air was a smooth hump. The grain volume again at twelve metres a period, strong, on bare rock
         // and on the tops of flows, from sixty metres out to a kilometre and a half (nearer, the lumps take over).
-        vec4 nCrag = texture(uGrain, vTex / 12.0 + vec3(0.37, 0.11, 0.59));
         float fCrag = smoothstep(40.0, 140.0, viewDist) * (1.0 - smoothstep(700.0, 1500.0, viewDist));
         float craggy = max(rock, basalt * (1.0 - pond)) * fCrag;
         grad += (nCrag.rgb - 0.5) * (1.25 * craggy);
@@ -355,6 +359,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain29' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain30' + (o.fine !== false ? 'F' : '');
   return mat;
 }
