@@ -24,7 +24,7 @@ const R2D = 180 / Math.PI;
 const view = { lon: 180, lat: 0, ppd: 0 };      // centre and scale (CSS pixels per degree)
 let goal = null;                                 // the view being eased to, or null
 let cv = null, c = null, wrap = null, legend = null, info = null, statusPos = null, statusHint = null, scaleEl = null, scaleLbl = null;
-let W = 0, H = 0, dpr = 1, raf = 0, opened = false, statusBar = null, hintShown = 0, hintTimer = 0;
+let W = 0, H = 0, dpr = 1, raf = 0, opened = false, statusBar = null, hintShown = 0, hintTimer = 0, touchHint = null;
 let U = 1;                                       // the interface scale: 1 at a 16 px root; everything drawn on the canvas follows it
 let markers = [], selected = null, hover = null;
 const col = {};
@@ -450,9 +450,11 @@ export function initMap(body) {
     '<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><i></i><span></span></span>');
   statusBar = status;
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
+  // (on a touch screen the hint is a chip of the map's own, over the status bar, not a part of the bar)
+  touchHint = el('div', null, 'map-hint gone', wrap);
   scaleEl = status.querySelector('.map-scale i'); scaleLbl = status.querySelector('.map-scale span');
   // (on a phone the key and a marker's card share the map: opening one puts the other away)
-  const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); if (on && layout.compact && selected) showInfo(null); };
+  const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); if (on && layout.compact && selected) showInfo(null); if (on && touchHint) touchHint.classList.add('gone'); };
   setLegend(false);                     // (closed until asked for: open, it covered a corner of the map)
 
   tools.addEventListener('click', (ev) => {
@@ -475,7 +477,7 @@ export function initMap(body) {
     pts.set(ev.pointerId, local(ev));
     if (pts.size === 1) { moved = 0; downAt = performance.now(); }
     if (layout.compact && !legend.hidden) setLegend(false);       // (on a phone the key covers a third of the map)
-    if (layout.touch) statusHint.classList.add('gone');           // (the hint has been read once the map is touched)
+    touchHint.classList.add('gone');                              // (the hint has been read once the map is touched)
     if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); moved = 99; }
     goal = null;
   });
@@ -531,10 +533,11 @@ export function openMap() {
   // How the map is worked. With a mouse it stays in the status bar. On a phone the bar carries the map's buttons, so the
   // hint is a chip over the map the first couple of times it is opened, and goes when the map is touched. (In the bar
   // it was cut to "tap for det…" on the small phone.)
-  statusHint.textContent = layout.touch ? 'Pinch to zoom · tap anything for details' : 'Drag to pan · wheel to zoom · click for details';
+  statusHint.textContent = 'Drag to pan · wheel to zoom · click for details';
+  touchHint.textContent = 'Pinch to zoom · tap anything for details';
   clearTimeout(hintTimer);
-  statusHint.classList.toggle('gone', layout.touch && hintShown >= 2);
-  if (layout.touch && hintShown < 2) { hintShown++; hintTimer = setTimeout(() => statusHint.classList.add('gone'), 8000); }
+  touchHint.classList.toggle('gone', !layout.touch || hintShown >= 2);
+  if (layout.touch && hintShown < 2) { hintShown++; hintTimer = setTimeout(() => touchHint.classList.add('gone'), 8000); }
   resize();
   if (!opened && W) {
     opened = true;

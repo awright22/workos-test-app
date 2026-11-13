@@ -358,9 +358,12 @@
 .mg-touch.mg-compact .map-tools .mg-iconbtn[aria-pressed="true"] { background: rgba(255, 180, 84, .12); }
 .mg-touch.mg-compact .map-status .pos { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mg-touch.mg-compact .map-info { max-height: calc(100% - max(2.75rem, 44px) - 1rem); }
-.mg-touch .map-status .hint { position: absolute; left: 50%; bottom: calc(100% + .625rem); transform: translateX(-50%); overflow: visible; padding: .4375rem .75rem; border-radius: 1rem;
-  background: rgba(10, 9, 8, .88); border: 1px solid var(--line-2); color: var(--ink); font-size: var(--t12); letter-spacing: .08em; pointer-events: none; transition: opacity .3s; }
-.mg-touch .map-status .hint.gone { opacity: 0; visibility: hidden; }
+.mg-touch .map-status .hint { display: none; }
+.map-hint { position: absolute; left: 50%; bottom: calc(2.5rem + .625rem); transform: translateX(-50%); padding: .4375rem .75rem; border-radius: 1rem; white-space: nowrap;
+  background: rgba(10, 9, 8, .88); border: 1px solid var(--line-2); color: var(--ink); font: 500 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase;
+  pointer-events: none; transition: opacity .3s; }
+.mg-touch.mg-compact .map-hint { bottom: calc(max(2.75rem, 44px) + .625rem); }
+.map-hint.gone { opacity: 0; visibility: hidden; }
 .mg-compact .map-scale span { font-size: var(--t13); letter-spacing: .06em; color: var(--ink); }
 
 /* Statistics on a phone: four tiles to a row, and a last row that is not full is shared out among its tiles (one tile
