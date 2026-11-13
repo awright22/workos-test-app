@@ -1,11 +1,12 @@
 // What a screenshot review measures by eye, measured in the page: text set under 11 px, touch targets
-// under 44 px, controls that reach outside the safe area, and text cut off by its box.
+// under 44 px, controls that reach outside the safe area, text cut off by its box, text printed over other
+// text, and content cut by the edge of the box or dialog it is in, or by the screen.
 // `auditInPage` runs inside the browser (pass it to page.evaluate with the safe-area insets); it must not
 // refer to anything outside itself.
 
 /**
  * @param {number[]} safe  [top, right, bottom, left] safe-area insets in px
- * @returns {{ text: string[], targets: string[], outside: string[], cut: string[] }} one line per offender
+ * @returns {{ text: string[], targets: string[], outside: string[], cut: string[], over: string[], clipped: string[] }} one line per offender
  */
 export function auditInPage(safe) {
   const [st, sr, sb, sl] = safe || [0, 0, 0, 0];
@@ -41,7 +42,7 @@ export function auditInPage(safe) {
     return parts.join(' ');
   };
   const words = (n) => (n.getAttribute('aria-label') || n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 28);
-  const out = { text: [], targets: [], outside: [], cut: [] };
+  const out = { text: [], targets: [], outside: [], cut: [], over: [], clipped: [] };
 
   // ---- text under 11 px (a subscript 2, and text for screen readers only, are not reading text)
   const seen = new Set();
@@ -91,10 +92,120 @@ export function auditInPage(safe) {
     if (!n.textContent.trim() || !shown(n)) continue;
     if ((clipsX && n.scrollWidth > n.clientWidth + 1) || (clamps && n.scrollHeight > n.clientHeight + 2)) out.cut.push(`${name(n)}  “${n.textContent.trim().slice(0, 40)}”`);
   }
+
+  // ---- every line of text on the screen, as the box it is drawn in (the part its scrolling regions leave showing)
+  /** The layer a thing is drawn in: text in one layer is laid out against the rest of that layer. The HUD, the toasts and the touch controls are one. */
+  const layerOf = (n) => { let a = n; while (a.parentElement && a.parentElement !== root) a = a.parentElement; return /^mg-(hud|toast|touch)$/.test(a.id) ? 'play' : (a.id || a.className); };
+  /** The block a text node's line belongs to: lines of one paragraph are set by the browser and are not compared with each other. */
+  const blockOf = (n) => { for (let a = n; a && a !== root; a = a.parentElement) if (styleOf(a).display !== 'inline') return a; return root; };
+  /** The box that clips a thing: its scrolling and clipping ancestors, and itself where it clips its own text. */
+  const clipOf = (p) => {
+    let box = { left: 0, top: 0, right: W, bottom: H };
+    for (let a = p; a && a !== root; a = a.parentElement) {
+      const cs = styleOf(a);
+      if (/(auto|scroll|hidden|clip)/.test(cs.overflowY + cs.overflowX)) {
+        const c = a.getBoundingClientRect();
+        box = { left: Math.max(box.left, c.left), top: Math.max(box.top, c.top), right: Math.min(box.right, c.right), bottom: Math.min(box.bottom, c.bottom) };
+      }
+    }
+    return box;
+  };
+  const lines = [];
+  const perParent = new Map();
+  const range = document.createRange();
+  const tw2 = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (tw2.nextNode()) {
+    const t = tw2.currentNode;
+    if (!t.nodeValue.trim()) continue;
+    const p = t.parentElement;
+    if (!p || p.closest('sub, sup, .sr, canvas, svg, #mg-boot, #mg-rotate, [aria-hidden="true"]')) continue;
+    let info = perParent.get(p);
+    if (!info) { info = { shown: shown(p) }; if (info.shown) { info.clip = clipOf(p); info.layer = layerOf(p); info.block = blockOf(p); } perParent.set(p, info); }
+    if (!info.shown) continue;
+    range.selectNodeContents(t);
+    for (const r of range.getClientRects()) {
+      if (r.width < 2 || r.height < 4) continue;
+      const c = info.clip;
+      const v = { left: Math.max(r.left, c.left), top: Math.max(r.top, c.top), right: Math.min(r.right, c.right), bottom: Math.min(r.bottom, c.bottom) };
+      if (v.right - v.left < 2 || v.bottom - v.top < 3) continue;                 // scrolled out of its list, or clipped away
+      lines.push({ full: r, v, p, t, layer: info.layer, block: info.block });
+    }
+  }
+  const said = (l) => l.t.nodeValue.replace(/\s+/g, ' ').trim().slice(0, 26);
+
+  // ---- text printed over other text (rows of a list that run into each other; a badge on top of a name)
+  const pairs = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    const a = lines[i];
+    for (let j = i + 1; j < lines.length; j++) {
+      const b = lines[j];
+      if (a.layer !== b.layer || a.block === b.block) continue;
+      const iw = Math.min(a.v.right, b.v.right) - Math.max(a.v.left, b.v.left);
+      const ih = Math.min(a.v.bottom, b.v.bottom) - Math.max(a.v.top, b.v.top);
+      if (iw < 3 || ih < 0.4 * Math.min(a.v.bottom - a.v.top, b.v.bottom - b.v.top)) continue;
+      const key = name(a.p) + '|' + name(b.p) + '|' + said(a) + '|' + said(b);
+      if (pairs.has(key)) continue;
+      pairs.add(key);
+      out.over.push(`“${said(a)}” (${name(a.p)}) and “${said(b)}” (${name(b.p)}) share [${Math.round(Math.max(a.v.left, b.v.left))},${Math.round(Math.max(a.v.top, b.v.top))} ${Math.round(iw)}x${Math.round(ih)}]`);
+    }
+  }
+
+  // ---- text cut by the edge of the box it is in or by the screen: a line that is partly showing and partly not
+  //      (a line sliced through by a card's edge; a word hanging off the side of its button). Text that a scrolling
+  //      region has scrolled out of sight is not this: a scrolling region says there is more with its cue (below).
+  const BOXES = '.card, .rcp, .dlg, .toast, .choice, .stat, .inv-row, .mg-btn, .badge, .chip, .menu-item, .diff, .set-row, .obj, .mg-line, .row, #mg-prompt, .tabs button, .col-bar, .pane-hd, .map-info, .map-status, .scr-hd';
+  const cutSeen = new Set();
+  for (const l of lines) {
+    const f = l.full;
+    const off = f.left < -1 || f.right > W + 1 || f.top < -1 || f.bottom > H + 1;
+    const box = l.p.closest(BOXES);
+    let outBox = false;
+    if (box) { const r = box.getBoundingClientRect(); outBox = f.left < r.left - 1.5 || f.right > r.right + 1.5 || f.top < r.top - 1.5 || f.bottom > r.bottom + 1.5; }
+    // sliced: more than a sliver of the line is hidden by a clipping ancestor that does not scroll
+    let sliced = false;
+    const hidX = (f.right - f.left) - (l.v.right - l.v.left), hidY = (f.bottom - f.top) - (l.v.bottom - l.v.top);
+    if (hidX > 2 || hidY > 2) {
+      for (let a = l.p; a && a !== root; a = a.parentElement) {
+        const cs = styleOf(a);
+        if (!/(hidden|clip)/.test(cs.overflowY + cs.overflowX)) continue;
+        if (cs.textOverflow === 'ellipsis' || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none')) continue;      // reported as "cut" above
+        const c = a.getBoundingClientRect();
+        if (f.left < c.left - 1 || f.right > c.right + 1 || f.top < c.top - 1 || f.bottom > c.bottom + 1) { sliced = name(a); break; }
+      }
+    }
+    if (!off && !outBox && !sliced) continue;
+    const key = name(l.p) + said(l);
+    if (cutSeen.has(key)) continue;
+    cutSeen.add(key);
+    out.clipped.push(`${off ? 'off the screen' : sliced ? 'cut by ' + sliced : 'outside its ' + name(box)}: “${said(l)}” (${name(l.p)})`);
+  }
+
+  // ---- a box that clips and does not scroll, with more in it than it shows
+  const DECOR = '#mg-root, .map-wrap, .tk, .fl, .strip, #mg-compass, #mg-compass *, .ring, canvas, svg, svg *, .sr, #mg-boot, #mg-boot *, #mg-flash, #mg-joy, #mg-joy *, .prog, .prog *';
+  for (const n of root.querySelectorAll('*')) {
+    if (n.matches(DECOR) || !n.firstElementChild && !n.textContent.trim()) continue;
+    const cs = styleOf(n);
+    const clipY = /(hidden|clip)/.test(cs.overflowY), clipX = /(hidden|clip)/.test(cs.overflowX);
+    if (!clipY && !clipX) continue;
+    if (cs.textOverflow === 'ellipsis' || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none')) continue;          // reported as "cut" above
+    if (!n.textContent.trim() || !shown(n)) continue;
+    const more = (clipY && n.scrollHeight > n.clientHeight + 2) || (clipX && n.scrollWidth > n.clientWidth + 2);
+    if (more) out.clipped.push(`holds more than it shows (${n.scrollWidth}x${n.scrollHeight} in ${n.clientWidth}x${n.clientHeight}): ${name(n)}  “${n.textContent.replace(/\s+/g, ' ').trim().slice(0, 30)}”`);
+  }
+
+  // ---- a scrolling region with more below says so (the "More" cue), and one that is at its end does not
+  for (const n of root.querySelectorAll('.mg-scroll')) {
+    if (!shown(n)) continue;
+    const below = n.scrollHeight - n.clientHeight - n.scrollTop > 6;
+    const cue = n.querySelector(':scope > .more-cue');
+    const cueShown = !!cue && getComputedStyle(cue).visibility === 'visible';
+    if (below && !cueShown) out.clipped.push(`scrolls with nothing to say so: ${name(n)}`);
+  }
   return out;
 }
 
 /** Offender lines from an audit, as one list (for a test's detail), most serious kinds first. */
 export function auditLines(a) {
-  return [...a.outside.map((x) => 'outside: ' + x), ...a.cut.map((x) => 'cut: ' + x), ...a.targets.map((x) => 'target: ' + x), ...a.text.map((x) => 'text: ' + x)];
+  return [...(a.over || []).map((x) => 'over: ' + x), ...(a.clipped || []).map((x) => 'clipped: ' + x), ...a.outside.map((x) => 'outside: ' + x), ...a.cut.map((x) => 'cut: ' + x),
+    ...a.targets.map((x) => 'target: ' + x), ...a.text.map((x) => 'text: ' + x)];
 }

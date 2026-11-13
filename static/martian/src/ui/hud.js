@@ -131,7 +131,7 @@ export function objectiveWhere(o) {
 /** The distance an objective's line shows: the same number its marker carries. */
 export function objectiveDist(o) { const w = objectiveWhere(o); return w ? fmtDist(w.d) : ''; }
 export const objDone = new Set();
-let objSeeded = false, objThrottle = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
+let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
 const objFrom = new THREE.Vector3();
 const objNodes = new Map();          // row key -> { el, tx, ds, wy, o, q, text, dist, cls, why }
 const objDoneAt = {};                // objective id -> time it was completed (shown ticked for a moment)
@@ -291,7 +291,9 @@ export function updateObjectivesHud() {
   updateUnlocks();                    // (every frame: a screen's button must not lag the thing that earned it)
   const now = perf(), from = fromPos();
   // (a jump in position, such as a checkpoint restored, does not wait for the list's next turn)
-  if (now - objThrottle >= 0.3 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objFrom.copy(from); rebuildObjectives(now); }
+  // (or eighteen frames, whichever comes first: a game stepped by its debug hook runs many frames in no time at all, and a
+  //  list rebuilt by the clock alone was left showing "get to air" beside a full tank in the pictures taken that way)
+  if (now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   for (const n of objNodes.values()) {
     let dist = '';
     if (n.cls !== 'done') {

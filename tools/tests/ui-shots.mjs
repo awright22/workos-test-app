@@ -8,11 +8,15 @@
 // through its debug hooks (window.__MG for the game, window.__UI for menus) in headless
 // Chromium with software WebGL, so it is slow: about two minutes a size. It exits non-zero
 // if the page logged a console error.
+//
+// The walk through the states is exported: tests/ui-audit.mjs takes the same walk and measures each state in
+// the page instead of photographing it, so every picture a reviewer is shown is a state the audit has measured.
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mkdir, rm } from 'node:fs/promises';
 import { openGame, sleep, outDir } from './lib.mjs';
 
-const SIZES = [
+export const SIZES = [
   { name: '1280x720', w: 1280, h: 720 },
   { name: '1920x1080', w: 1920, h: 1080 },
   { name: '2560x1440', w: 2560, h: 1440 },
@@ -23,26 +27,39 @@ const SIZES = [
   { name: 'portrait-390x844', w: 390, h: 844, touch: true, safe: '47,0,34,0', portrait: true },
 ];
 const arg = (k) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split('=')[1].split(',') : null; };
-const wantSizes = arg('size'), only = arg('only');
 const errors = [];
 let total = 0;
 
-async function run(size) {
+/**
+ * Walk the interface through its states at one size.
+ * @param {object} size  one of SIZES
+ * @param {object} [o]
+ * @param {boolean} [o.shoot]          photograph each state (default true)
+ * @param {string[]|null} [o.only]     only states whose name contains one of these
+ * @param {boolean} [o.reducedMotion]  turn the game's reduced-motion setting on first (a measurement wants things at rest)
+ * @param {(label: string, page: object) => Promise<void>} [o.onState]  called at each state, once it is on the screen
+ */
+export async function walk(size, o = {}) {
+  const shoot = o.shoot !== false, only = o.only || null;
   const t0 = Date.now();
   const g = await openGame({ width: size.w, height: size.h, touch: size.touch, quality: 'low', query: size.safe ? 'safe=' + size.safe : '' });
   const dir = path.join(outDir, 'ui', size.name);
-  if (!only) await rm(dir, { recursive: true, force: true });
-  await mkdir(dir, { recursive: true });
+  if (shoot) {
+    if (!only) await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+  }
   const page = g.page;
+  if (o.reducedMotion) await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
   let n = 0;
   /** `sub` (a letter) files the picture beside the previous one, as 05b-..., without taking a number: the numbers stay the same at every size. */
   const shot = async (name, wait = 500, sub = '') => {
     if (!sub) n++;
     await sleep(wait);                                              // waited even when the state is filtered out: later steps rely on the timing
-    if (only && !only.some((o) => name.includes(o))) return;
+    if (only && !only.some((x) => name.includes(x))) return;
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    await page.screenshot({ path: path.join(dir, `${String(n).padStart(2, '0')}${sub}-${name}.png`), timeout: 120000 });
-    total++;
+    const label = `${String(n).padStart(2, '0')}${sub}-${name}`;
+    if (shoot) { await page.screenshot({ path: path.join(dir, label + '.png'), timeout: 120000 }); total++; }
+    if (o.onState) await o.onState(label, page);
   };
   /** Wait until no toast is showing or queued, so the next one fired is the one photographed. */
   const toastsDone = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});
@@ -60,8 +77,9 @@ async function run(size) {
   // ---------------------------------------------------------------- portrait: the game asks for landscape
   if (size.portrait) {
     await shot('rotate-title', 1800);
+    const errs = g.errors.slice();
     await g.close();
-    return;
+    return { states: n, seconds: ((Date.now() - t0) / 1000).toFixed(0), errors: errs };
   }
 
   // ---------------------------------------------------------------- menus before the game
@@ -93,6 +111,19 @@ async function run(size) {
   // ---------------------------------------------------------------- the first minute: suit leaking
   await ev(async (G) => { await G.start(2.0, 303.7); G.paused = true; G.tick(0.05, 30); });
   await shot('hud-coldopen', 2200);
+  // (the opening as a new player meets it: the door, the moment the suit is sealed, the bars arriving, the numbers)
+  await ev((G) => { G.tpLocal(0, 10.0, 0); G.tick(0.05, 6); });
+  await shot('hud-airlock', 400, 'b');
+  await ev((G) => { G.hold(2.6); G.tick(0.05, 24); });
+  await shot('hud-suit-sealed', 300, 'c');
+  await ev((G) => { G.tpLocal(0, 3, 0); G.tick(0.05, 30); });
+  await shot('hud-bars-arrive', 900, 'd');
+  await ev((G) => { G.S.checkedSystems = { oxy: true, rec: true }; G.tpLocal(0, -5.0); G.tick(0.05, 6); });
+  await shot('hud-comms-desk', 300, 'e');
+  await ev((G) => { G.hold(1.1); });
+  await shot('the-numbers', 600, 'f');
+  await ev(() => { const b = document.querySelector('#mg-panel .btns button'); if (b) b.click(); });
+  await toastsDone();
 
   // ---------------------------------------------------------------- on foot by day
   await ev((G) => { G.skipIntro(); G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
@@ -139,6 +170,14 @@ async function run(size) {
   await ui((U, G) => { U.setSetting('colorBlind', true); G.S.water = 9; G.S.power = 18; G.tick(0.05, 3); });
   await shot('hud-colour-blind-safe', 300);
   await ui((U, G) => { U.setSetting('colorBlind', false); G.S.water = 42; G.S.power = 72; });
+  // the most the HUD ever carries: two banners, a toast, a long line in the log and a critical tank
+  await ev((G) => { window.__keep = JSON.stringify(G.S.breach); G.setStorm(0.9); G.S.suit = 9; G.S.breach.active = true; G.tick(0.05, 6); });
+  await toastsDone();
+  await ui((U) => { U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.toast('WARNING', 'Storm cell overhead', 'Visibility is down to a few metres. Keep the Hab in sight.'); });
+  await sleep(900);
+  await ev((G) => { G.tick(0.05, 4); });                          // (the game is stopped here: a step, so the marker has seen the toast)
+  await shot('hud-everything-at-once', 300, 'b');
+  await ev((G) => { Object.assign(G.S.breach, JSON.parse(window.__keep)); G.setStorm(0); G.S.storm.i = 0; G.tick(0.05, 6); });
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.tick(0.05, 40); });
 
   // toasts (each fired once nothing else is showing or queued: fired blind, it was photographed one picture late,
@@ -207,6 +246,9 @@ async function run(size) {
   const box = await page.locator('#mg-mapcanvas').boundingBox();
   await page.mouse.click(box.x + box.width / 2 - 2, box.y + (box.height - 40) / 2);
   await shot('map-zoomed-marker');
+  await click('.map-tools [data-a="legend"]');
+  await shot('map-key', 300, 'b');
+  await click('.map-tools [data-a="legend"]');
   await ev((G) => { G.S.flags.mapRevealed = true; });
   await page.locator('#mg-mapcanvas').focus();
   await key('0');
@@ -280,7 +322,10 @@ async function run(size) {
   // ---------------------------------------------------------------- sleeping through the night
   await ev((G) => { G.setLocalTime(21); G.tpLocal(-5.0, -6.2); G.tick(0.05, 4); });
   if (await ev((G) => G.S.breach.active)) await shot('hud-breach');
-  await ev((G) => { G.S.breach.active = false; G.S.breach.done = true; G.syncAllVisuals(); G.tick(0.05, 2); G.hold(1.4); });
+  await ev((G) => { G.S.breach.active = false; G.S.breach.done = true; G.syncAllVisuals(); G.tick(0.05, 4); });
+  await shot('hud-bunk-at-night', 300, 'b');
+  await ev((G) => { G.hold(1.4); });
+  await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 60000 });
   await shot('sleep', 1300);
   await ev(() => { const b = document.querySelector('#mg-panel .sleep .wake'); if (b) b.click(); });
   await sleep(500);
@@ -300,15 +345,24 @@ async function run(size) {
   await ev((G) => { G.tick(0.05, 900); });
   await shot('win', 900);
 
-  console.log(`  ${size.name}: ${n} states in ${((Date.now() - t0) / 1000).toFixed(0)} s; console errors: ${g.errors.length}`);
-  for (const e of g.errors) errors.push(`${size.name}: ${e}`);
+  const took = ((Date.now() - t0) / 1000).toFixed(0);
+  const found = g.errors.slice();
   await g.close();
+  return { states: n, seconds: took, errors: found };
 }
 
-for (const size of SIZES) {
-  if (wantSizes && !wantSizes.some((s) => size.name.includes(s))) continue;
-  try { await run(size); } catch (e) { errors.push(`${size.name}: ${e.message}`); console.error(`  ${size.name} FAILED: ${e.message}`); }
+// run as a script: photograph
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const wantSizes = arg('size'), only = arg('only');
+  for (const size of SIZES) {
+    if (wantSizes && !wantSizes.some((s) => size.name.includes(s))) continue;
+    try {
+      const r = await walk(size, { only });
+      console.log(`  ${size.name}: ${r.states} states in ${r.seconds} s; console errors: ${r.errors.length}`);
+      for (const e of r.errors) errors.push(`${size.name}: ${e}`);
+    } catch (e) { errors.push(`${size.name}: ${e.message}`); console.error(`  ${size.name} FAILED: ${e.message}`); }
+  }
+  console.log(`${total} screenshots in ${path.join(outDir, 'ui')}`);
+  if (errors.length) { console.log('ERRORS:\n' + errors.slice(0, 20).join('\n')); process.exit(1); }
+  process.exit(0);
 }
-console.log(`${total} screenshots in ${path.join(outDir, 'ui')}`);
-if (errors.length) { console.log('ERRORS:\n' + errors.slice(0, 20).join('\n')); process.exit(1); }
-process.exit(0);

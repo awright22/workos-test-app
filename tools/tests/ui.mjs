@@ -183,14 +183,25 @@ if (!onlySize || onlySize === 'play') {
   const where = () => g.eval(() => ({
     tag: document.querySelector('#mg-way b').textContent, shown: getComputedStyle(document.getElementById('mg-way')).display !== 'none',
     line: document.querySelector('#mg-objectives .obj:not(.done) .ds').textContent, lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent,
-    compass: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none').map((s) => s.textContent.toLowerCase()),
+    compass: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase()),
   }));
   await g.eval((G) => { G.S.inv.regolith = 2; G.tpLocal(0, 30, 0); G.tick(0.05, 1); });       // (a bed to fill: the way leads in through the airlock door)
   const d1 = await where();
   await g.eval((G) => { G.tpLocal(2, 55, 0); G.tick(0.05, 1); });
   const d2 = await where();
-  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass.includes(`hab · ${d.tag}`) && d.compass.every((t) => /^[a-z0-9 ]+ · \d/.test(t));
+  // (the compass names the place the mission's lead line sends him to, first: here the Hab, by its door)
+  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass[0] === `hab ${d.tag}` && d.compass.every((t) => /^[a-z0-9 ]+ \d/.test(t));
   check('distances: marker, mission line and compass give one number for the Hab, and every compass tag is named', agree(d1) && agree(d2) && d1.tag !== d2.tag, { d1, d2 });
+  // a breach, indoors: the compass names the breach, not a survey site kilometres away
+  const br = await g.eval((G) => {
+    const keep = JSON.stringify(G.S.breach);
+    G.tpLocal(0, 0, 0); G.S.breach.active = true; G.tick(0.05, 3);
+    const out = { labels: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase()),
+      lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent, line: document.querySelector('#mg-objectives .obj:not(.done) .ds').textContent };
+    Object.assign(G.S.breach, JSON.parse(keep)); G.tick(0.05, 3);
+    return out;
+  });
+  check('compass: in a breach indoors its one label is the breach, with the mission line\'s distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0] === `breach ${br.line}`, br);
   // inside, a thing outside is marked at the door with the whole walk; the marker's number is still the line's
   await g.eval((G) => { G.S.inv.regolith = 0; G.tpLocal(0, 0, 0); G.tick(0.05, 2); });
   const d3 = await where();
@@ -203,6 +214,16 @@ if (!onlySize || onlySize === 'play') {
     return why ? { below: why.getBoundingClientRect().top >= tx.bottom - 1, title: o.querySelector('.tx').textContent, why: why.textContent } : null;
   });
   check('journal: a task\'s reason is on its own line under the title', jr && jr.below && jr.why.length > 8 && !jr.title.includes(jr.why), jr);
+  // the log: as many entries on the page as its heading counts (a rule meant for the HUD's log hid all but two of seventeen)
+  await page.evaluate(() => { for (let i = 0; i < 9; i++) window.__UI.log(`Entry ${i}: checked the seals again.`, i % 2 ? 'sys' : 'log'); });
+  await page.locator('.journal [data-tab="log"]').click();
+  const jl = await page.evaluate(() => ({
+    head: (document.querySelector('#mg-journal .jr-body .pane-hd span') || {}).textContent,
+    shown: [...document.querySelectorAll('#mg-journal .jlog .mg-line')].filter((n) => getComputedStyle(n).display !== 'none' && +getComputedStyle(n).opacity > 0.5).length,
+    who: [...new Set([...document.querySelectorAll('#mg-journal .jlog .who')].map((n) => n.firstChild.textContent))],
+  }));
+  check('journal: the log shows as many entries as its heading says, each with a speaker', jl.shown >= 9 && new RegExp(`\\b${jl.shown} entries`).test(jl.head) && jl.who.every((w) => /^[A-Z]+$/.test(w)), jl);
+  await page.locator('.journal [data-tab="tasks"]').click();
   await page.keyboard.press('Escape');
 
   // night: sleep leads the list and is said aloud; the account carries the new sol and explains itself; nothing more is taken on waking
@@ -220,11 +241,14 @@ if (!onlySize || onlySize === 'play') {
     sol: G.S.sol, food: G.farm.foodTotal(), morale: G.S.morale,
   }));
   check('night: the account is headed with the new sol, and says what breakfast took and why morale moved',
-    acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(\d+ meals? left\)/.test(n)) && acct.notes.some((n) => /^Morale \d+.*another sol alone.*a night in the bunk/.test(n)), acct);
+    acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(−\d+ food, \d+ left\)/.test(n)) && acct.notes.some((n) => /^Morale \d+.*another sol alone.*a night in the bunk/.test(n)), acct);
   await g.eval(() => document.querySelector('#mg-panel .sleep .wake').click());
   await sleep(300);
   const woke = await g.eval((G) => { G.tick(0.05, 900); return { sol: G.S.sol, food: G.farm.foodTotal(), morale: G.S.morale, lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent }; });
   check('night: nothing more is eaten or lost in the first minute awake', woke.sol === acct.sol && woke.food === acct.food && woke.morale >= acct.morale - 0.01 && !/sleep/i.test(woke.lead), { woke, acct });
+  // (the HUD is there the moment the account closes: it used to fade back, and a slow frame showed the world with no HUD at all)
+  const back = await page.evaluate(() => { const cs = getComputedStyle(document.getElementById('mg-hud')); return { vis: cs.visibility, op: +cs.opacity, bars: getComputedStyle(document.getElementById('mg-vitals')).visibility }; });
+  check('night: on waking the HUD is back at once, not fading in', back.vis === 'visible' && back.op > 0.99 && back.bars === 'visible', back);
   errors += g.errors.length;
   if (g.errors.length) console.log(JSON.stringify(g.errors.slice(0, 4)).slice(0, 800));
   await g.close();
@@ -320,7 +344,7 @@ for (const size of SIZES) {
     await page.locator('#mg-panel [data-act="back"]').tap();
   }
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.paused = true; G.tick(0.05, 20); });
-  await page.evaluate(() => { window.__UI.log('Suit O2 at 46% and leaking. The Hab is that way. RUN.', 'sys'); });
+  await page.evaluate(() => { window.__UI.log('Suit holed: 46 on the gauge and falling. The Hab is that way. RUN.', 'suit'); });
   await sleep(700);
   let bad = layoutProblems(await rects(page), size);
   check(`${size.name}: first minute, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
@@ -406,6 +430,14 @@ for (const size of SIZES) {
     const hd = await page.evaluate(([st, sr, sb, sl]) => { const r = document.querySelector('#mg-map .close').getBoundingClientRect(); return r.right <= innerWidth - sr && r.top >= st && r.width >= 40 && r.height >= 40; }, size.safe);
     check(`${size.name}: the screen's close button is inside the safe area and thumb-sized`, hd);
     await page.locator('#mg-map .close').tap();
+    // a phone's gauges: a band that can be read at arm's length (they were lines 34 px long and 3 px tall)
+    if (size.w < 900) {
+      const gz = await page.evaluate(() => [...document.querySelectorAll('#mg-vitals .res .row')].map((r) => {
+        const t = r.querySelector('.tk').getBoundingClientRect(), v = r.querySelector('.val'), l = r.querySelector('.lb');
+        return { w: Math.round(t.width), h: Math.round(t.height), num: parseFloat(getComputedStyle(v).fontSize), name: parseFloat(getComputedStyle(l).fontSize), f: getComputedStyle(r).getPropertyValue('--f') };
+      }));
+      check(`${size.name}: each gauge is a band at least 60 px long and 6 px tall, its number at 13 px or more`, gz.length === 6 && gz.every((z) => z.w >= 60 && z.h >= 6 && z.num >= 12.95 && z.name >= 10.95 && z.f !== ''), gz);
+    }
     // the action button carries the verb for what is in reach, and holding it works the interaction
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });
     const verb = await page.locator('#mg-tE .vb').innerText();

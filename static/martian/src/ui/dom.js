@@ -379,11 +379,28 @@ export function restoreLog(lines) {
   logHistory.length = 0;
   if (Array.isArray(lines)) for (const l of lines) if (l && typeof l.text === 'string') logHistory.push({ text: l.text, voice: VOICES[l.voice] ? l.voice : 'log', sol: +l.sol || 1 });
 }
-/** As much of a text as fits in `room` letters, ending at the end of a sentence where it can (never mid-word). */
-function wholeSentences(text, room) {
-  if (text.length <= room) return text;
-  const cut = text.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-  return end > 40 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
+/**
+ * As much of a text as its line on the HUD has room for, ending at the end of a sentence where it can and never
+ * mid-word. The room is measured, not counted: `tx` is the line's text box, which clamps what it shows. (Counted in
+ * letters, an entry that ran a few letters over was cut by the clamp in the middle of a sentence; and "I'm just..."
+ * was taken for the end of one.)
+ */
+function fitSentences(tx, full) {
+  tx.textContent = full;
+  // (a log that is not on the screen just now, behind a toast or in the first minute, cannot be measured: count letters)
+  const measured = tx.clientHeight > 0, room = window.innerWidth <= 760 ? 105 : 125;
+  const over = () => (measured ? tx.scrollHeight > tx.clientHeight + 2 : tx.textContent.length > room);
+  if (!over()) return full;
+  const ends = [];
+  const re = /[.!?]["')\]]?(?=\s)/g;
+  for (let m = re.exec(full); m; m = re.exec(full)) if (full[m.index - 1] !== '.' && m.index > 24) ends.push(m.index + m[0].length);      // (an ellipsis runs on)
+  let text = full;
+  for (let k = ends.length - 1; k >= 0 && over(); k--) { text = full.slice(0, ends[k]); tx.textContent = text; }
+  if (over()) {
+    const words = text.split(' ');
+    while (words.length > 3 && over()) { words.pop(); text = words.join(' ').replace(/[,;:.]+$/, '') + '…'; tx.textContent = text; }
+  }
+  return text;
 }
 /**
  * Say something in the log. `cls` is the voice ('nasa', 'sys' for the Hab, 'suit', 'disc', or none for his own).
@@ -394,12 +411,13 @@ export function log(full, cls, o) {
   logHistory.push({ text: full, voice, sol: S.sol });
   if (logHistory.length > 120) logHistory.shift();
   if (o && o.quiet) return;
-  // A phone's log has the room between the bars and the stick: six short lines. A longer entry shows as many whole
-  // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
-  const text = layout.compact ? wholeSentences(full, window.innerWidth <= 760 ? 120 : 150) : full;
   const line = el('div', null, 'mg-line ' + voice, UI.log, `<span class="who">${VOICES[voice]}</span><span class="tx" aria-hidden="true"></span><span class="sr"></span>`);
   const tx = line.querySelector('.tx');
   line.querySelector('.sr').textContent = full;
+  // A phone's log has the room between the bars and the stick: a few short lines. A longer entry shows as many whole
+  // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
+  const text = layout.compact ? fitSentences(tx, full) : full;
+  tx.textContent = '';
   const done = () => {
     setTimeout(() => { line.classList.add('fade'); setTimeout(() => line.remove(), 1300); }, 9500);
   };

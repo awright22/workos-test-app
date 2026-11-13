@@ -40,7 +40,7 @@ await shot('new-game', 'Choosing a difficulty.');
 await tapSel('[data-diff="survival"]');
 await page.waitForFunction(() => window.__MG && window.__MG.S.started, null, { timeout: 180000 });
 await ev(async (G) => { await G.settle(); });
-await shot('crash-first-seconds', 'The game begins: he comes to on the sand, 85 m from the Hab, suit leaking.', 2500);
+await shot('crash-first-seconds', 'The game begins: he comes to on the sand, some 75 m from the Hab, suit leaking.', 2500);
 // (ten seconds of the game's own time, stepped: left to run, software rendering got through about one of them, and
 // the suit's countdown looked stuck)
 await ev((G) => { G.paused = true; G.tick(0.05, 180); });
@@ -63,7 +63,7 @@ await shot('comms-desk', 'At the comms desk.');
 await hold(1.1);
 await shot('the-numbers', 'Running the numbers.', 2500);
 await ev(() => { const b = document.querySelector('#mg-panel .btns button, #mg-panel button.primary'); if (b) b.click(); });
-await shot('after-the-numbers', 'Back in the room after the numbers: the mission list has grown.', 2500);
+await shot('after-the-numbers', 'Back in the room after the numbers: the done line is struck through, and the farm is the next task.', 2500);
 await ev((G) => { G.tpLocal(-6.7, -3.2); G.tick(0.05, 6); });
 await shot('empty-bed', 'At a farm bed with no soil.');
 await ev((G) => { G.tpNear(G.World.soilPiles[0].group.position, 1.2); G.tick(0.05, 10); });
@@ -86,8 +86,8 @@ await hold(2.2);
 await shot('water-made', 'After the burn.', 3000);
 for (const [key, id, what] of [['m', 'map', 'The map, opened for the first time.'], ['c', 'colony', 'The colony screen.'], ['j', 'journal', 'The journal.']]) {
   if (size.touch) await tapSel(`#mg-trow [data-t="${id}"]`); else await page.keyboard.press(key);
-  // (the screen fades in over the HUD fading out: wait for the HUD to be gone, however slowly this machine draws)
-  await page.waitForFunction(() => +getComputedStyle(document.getElementById('mg-hud')).opacity < 0.02, null, { timeout: 30000 }).catch(() => {});
+  // (the HUD goes at once when a screen opens: wait for that, however slowly this machine draws)
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('mg-hud')).visibility === 'hidden', null, { timeout: 30000 }).catch(() => {});
   await shot(id, what, 1500);
   await page.keyboard.press('Escape');
   await sleep(400);
