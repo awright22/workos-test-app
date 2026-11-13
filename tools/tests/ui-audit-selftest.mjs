@@ -99,7 +99,10 @@ await sleep(500);
 await page.locator('#mg-panel button >> text=/punch it/i').click();
 await ev((G) => { G.tick(0.05, 900); });
 await sleep(900);
-check('a card that cuts its own last line and button', await audit(), await withFault('.dlg { max-height: 300px !important; } .dlg-bd { overflow: visible !important; flex: none !important; }'), /^(clipped|outside): /);
+// (the card is held 80 px shorter than what it holds, whatever that is: the screen has been made shorter since the
+//  fault was found, and a fixed 300 px no longer cut it)
+const cardH = await page.evaluate(() => Math.round(document.querySelector('#mg-panel .dlg').getBoundingClientRect().height));
+check('a card that cuts its own last line and button', await audit(), await withFault(`.dlg { max-height: ${cardH - 80}px !important; } .dlg-bd { overflow: visible !important; flex: none !important; }`), /^(clipped|outside): /);
 
 if (g.errors.length) { failed++; console.log('  console errors: ' + JSON.stringify(g.errors.slice(0, 4))); }
 await g.close();
