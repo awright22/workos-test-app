@@ -2,7 +2,7 @@
 // summary and the NASA uplink terminal. Pure presentation: the game passes in what to show and
 // what to do (see game/flow.js, game/sim.js, game/story.js). Death, rescue and other plain
 // dialogs go through showOverlay in ui/dom.js.
-import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast } from './dom.js';
+import { UI, openOverlay, hideOverlay, showOverlay, esc, log, toast, dropPointer } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { missionList, suitTimeLeft } from './hud.js';
@@ -132,6 +132,7 @@ export function showNewGame(o, back) {
  * the bars themselves. (The premise card points at "the six bars"; nothing said what any of them was.)
  */
 export function showBarsGuide(onDone) {
+  dropPointer();
   const o2 = 'O<sub>2</sub>';
   const rows = [
     ['suit', `Suit ${o2}`, `The air on your back: the ring. It drains outside and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long the tank lasts at a walk. Empty, you start to die.`],
@@ -352,7 +353,9 @@ const KEYBOARD = [
 const TOUCH = [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
   ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle'], ['Switch view', `${icon('eye')}View`],
-  ['Map', `${icon('map')}Top right`], ['Colony and fabrication', `${icon('colony')}Top right`], ['Journal', `${icon('journal')}Top right`], ['Pause, settings', `${icon('pause')}Top right`], ['Photo mode', 'In the pause menu'],
+  // (the four buttons at the top right carry their own names: one line for the three screens and one for the menu,
+  //  and the whole list fits a phone held sideways without scrolling. A line apiece ran to seven rows.)
+  ['Journal, colony, map', 'Buttons, top right'], ['Pause, settings, photo mode', `${icon('pause')}Menu`],
 ];
 export function showControls(back, which) {
   const mode = which || (layout.touch ? 'touch' : 'keys');

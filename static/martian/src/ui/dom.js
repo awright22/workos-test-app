@@ -343,13 +343,16 @@ function nextToast() {
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${chem(esc(t.title))}</div>${t.note ? `<div class="t3">${chem(esc(t.note))}</div>` : ''}</div>`);
   root.classList.add('has-toast');
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
-  const cur = toastNow = { node, yields: !!t.yields, timer: 0 };
+  const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
   cur.timer = setTimeout(() => closeToast(cur, false), life);
 }
+/** Put the pointer at the bars away: he has opened what it points to. */
+export function dropPointer() { if (toastNow && toastNow.point) closeToast(toastNow, true); }
 /**
  * Queue a notice. `o.yields` marks a reminder (night has fallen, a new sol): it is shown like any other, but gives
- * up the screen at once if news arrives while it is up. `o.life` is the least time it stays, in milliseconds.
- * `o.point` draws it as a pointer at the panel it stands under on a phone (the bars).
+ * up the screen at once if news arrives while it is up. `o.life` is the least time it stays, in milliseconds;
+ * `o.soft` is how long it stays when something else is waiting behind it (a long-lived pointer must not hold up
+ * the news). `o.point` draws it as a pointer at the panel it stands under on a phone (the bars).
  */
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
@@ -361,9 +364,15 @@ export function toast(kicker, title, note, o) {
     const cut = note.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
     note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
   }
-  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point) });
+  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0 });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
+  else if (toastNow && toastNow.soft) {
+    const cur = toastNow, left = Math.max(0, cur.soft - (performance.now() - cur.since));
+    clearTimeout(cur.timer);
+    cur.soft = 0;
+    cur.timer = setTimeout(() => closeToast(cur, false), left);
+  }
 }
 
 // ------------------------------------------------------------------------------------------
@@ -388,7 +397,7 @@ export function restoreLog(lines) {
 function fitSentences(tx, full) {
   tx.textContent = full;
   // (a log that is not on the screen just now, behind a toast or in the first minute, cannot be measured: count letters)
-  const measured = tx.clientHeight > 0, room = window.innerWidth <= 760 ? 105 : 125;
+  const measured = tx.clientHeight > 0, room = window.innerWidth <= 760 ? 95 : 105;
   const over = () => (measured ? tx.scrollHeight > tx.clientHeight + 2 : tx.textContent.length > room);
   if (!over()) return full;
   const ends = [];
@@ -531,7 +540,9 @@ function flag(name, on) {
 function scrollCue(n) {
   // (more than a few pixels of it: the last of a box's own padding is not "more")
   const more = ((n.scrollTop > 4 ? 'up ' : '') + (n.scrollHeight - n.clientHeight - n.scrollTop > 10 ? 'down' : '')).trim();
-  if (n.dataset.more !== more) n.dataset.more = more;
+  // (the mark sticks to the foot of the box's contents, which stops short of the box's own foot by its padding:
+  //  the style sheet moves it down by that much, so nothing shows under its shelf)
+  if (n.dataset.more !== more) { n.dataset.more = more; if (more) n.style.setProperty('--foot', getComputedStyle(n).paddingBottom); }
   const last = n.lastElementChild;
   if (more && (!last || !last.classList.contains('more-cue'))) {
     const old = n.querySelector(':scope > .more-cue');

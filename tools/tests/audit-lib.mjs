@@ -162,17 +162,24 @@ export function auditInPage(safe) {
     const off = f.left < -1 || f.right > W + 1 || f.top < -1 || f.bottom > H + 1;
     const box = l.p.closest(BOXES);
     let outBox = false;
-    if (box) { const r = box.getBoundingClientRect(); outBox = f.left < r.left - 1.5 || f.right > r.right + 1.5 || f.top < r.top - 1.5 || f.bottom > r.bottom + 1.5; }
+    // (up and down, a line's box is its type's full height, a third of it empty over the capitals and under the
+    //  baseline: a tight row may let that empty part hang out of it and still hold every letter)
+    if (box) {
+      const r = box.getBoundingClientRect(), slack = Math.max(1.5, 0.34 * parseFloat(styleOf(l.p).fontSize));
+      outBox = f.left < r.left - 1.5 || f.right > r.right + 1.5 || f.top < r.top - slack || f.bottom > r.bottom + slack;
+    }
     // sliced: more than a sliver of the line is hidden by a clipping ancestor that does not scroll
     let sliced = false;
     const hidX = (f.right - f.left) - (l.v.right - l.v.left), hidY = (f.bottom - f.top) - (l.v.bottom - l.v.top);
     if (hidX > 2 || hidY > 2) {
       for (let a = l.p; a && a !== root; a = a.parentElement) {
         const cs = styleOf(a);
-        if (!/(hidden|clip)/.test(cs.overflowY + cs.overflowX)) continue;
+        // (each way on its own: a list that scrolls down and clips sideways cuts nothing by its foot)
+        const clipX = /(hidden|clip)/.test(cs.overflowX), clipY = /(hidden|clip)/.test(cs.overflowY);
+        if (!clipX && !clipY) continue;
         if (cs.textOverflow === 'ellipsis' || (cs.webkitLineClamp && cs.webkitLineClamp !== 'none')) continue;      // reported as "cut" above
         const c = a.getBoundingClientRect();
-        if (f.left < c.left - 1 || f.right > c.right + 1 || f.top < c.top - 1 || f.bottom > c.bottom + 1) { sliced = name(a); break; }
+        if ((clipX && (f.left < c.left - 1 || f.right > c.right + 1)) || (clipY && (f.top < c.top - 1 || f.bottom > c.bottom + 1))) { sliced = name(a); break; }
       }
     }
     if (!off && !outBox && !sliced) continue;

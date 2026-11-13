@@ -273,7 +273,7 @@ function updateUnlocks() {
       if (unlocksSeeded && !(s.quiet && s.quiet())) {
         // (the bars, on a touch screen: one line under the panel itself, pointing at it, that stays long enough to be read.
         // They used to be explained in the third paragraph of a card that covered them.)
-        if (s.id === 'bars' && layout.touch) toast('What keeps you alive', 'Tap the bars for what each means', '', { point: true, life: 14000 });
+        if (s.id === 'bars' && layout.touch) toast('What keeps you alive', 'Tap the bars for what each means', '', { point: true, life: 14000, soft: 5000 });
         else toast('NEW', s.name, s.key ? (layout.touch ? s.line : `${s.line} Press ${s.key}.`) : `${s.line} ${s.keys}`);
         Snd.jingle();
       }

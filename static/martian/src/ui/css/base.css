@@ -149,7 +149,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 /* More above: a short fade at the head. More below: a mark at the foot that says so (ui/dom.js puts it there).
    The foot used to fade over 40 px instead, and the last rows of a list read as rows that were switched off. */
 .mg-scroll[data-more~="up"] { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 .875rem); mask-image: linear-gradient(to bottom, transparent, #000 .875rem); }
-.more-cue { position: sticky; bottom: 0; z-index: 3; display: block; height: 0; grid-column: 1 / -1; pointer-events: none; visibility: hidden; }
+.more-cue { position: sticky; bottom: calc(-1 * var(--foot, 0px)); z-index: 3; display: block; height: 0; grid-column: 1 / -1; pointer-events: none; visibility: hidden; }
 .mg-scroll[data-more~="down"] > .more-cue { visibility: visible; }
 /* (the mark stands on a shelf across the foot: what is under the shelf is the part still to come, and no line of text
    is left showing with a pill across the middle of it) */

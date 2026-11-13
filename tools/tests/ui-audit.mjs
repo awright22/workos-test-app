@@ -15,6 +15,7 @@
 //   node tools/tests/ui-audit.mjs --size=667          one size (matches by substring)
 //   node tools/tests/ui-audit.mjs --only=colony,win   only states whose name contains one of these
 //   node tools/tests/ui-audit.mjs --verbose           name every state as it is measured
+//   node tools/tests/ui-audit.mjs --shoot             photograph each state as well (into .cache/ui/<size>/, as ui-shots does)
 //
 // Exits non-zero if anything is found. (The map's own labels are drawn on a canvas and are not measured here.)
 import { SIZES, walk } from './ui-shots.mjs';
@@ -23,6 +24,7 @@ import { auditInPage, auditLines } from './audit-lib.mjs';
 const arg = (k) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').slice(k.length + 3);
 const want = arg('size'), only = arg('only') ? arg('only').split(',') : null;
 const verbose = process.argv.includes('--verbose');
+const shoot = process.argv.includes('--shoot');
 let bad = 0, states = 0;
 
 for (const size of SIZES) {
@@ -33,7 +35,7 @@ for (const size of SIZES) {
   let res;
   try {
     res = await walk(size, {
-      shoot: false, reducedMotion: true, only,
+      shoot, reducedMotion: true, only,
       onState: async (state, page) => {
         const lines = auditLines(await page.evaluate(auditInPage, safe));
         states++;

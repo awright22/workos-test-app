@@ -224,6 +224,7 @@
 .mg-compact .stats { margin-top: .75rem; }
 .mg-compact .stat { padding: .4375rem .5rem; gap: .1875rem; }
 .mg-compact .stat b { font-size: 1.125rem; }
+.mg-compact .stat b small { font-size: var(--t12); }
 .mg-compact .stat span { font-size: .5625rem; }
 /* the rescue screen: the record of the run on the left, the numbers on the right, his last entry across the foot
    (down the left column it ran to five lines, and a phone held sideways had to scroll for the end of it) */
