@@ -170,7 +170,9 @@ export class Sky {
           // Phobos and Deimos. Truly they are a fifth of a degree and a twentieth across, which on a screen is a
           // star and less than a star: they are drawn four times that, so that one is a moon and the other a moonlet.
           // Both can be seen by day, palely.
-          float moonVis = (1.0 - uDust * 0.95) * mix(0.25, 1.0, max(night, airless)) * smoothstep(-0.01, 0.05, dot(v, uUp) + airless);
+          // (by day they are put out: at a quarter of their light a moon in a butterscotch sky was a pale speck that read
+          // as a fault in the picture; they come up through the dusk)
+          float moonVis = (1.0 - uDust * 0.95) * smoothstep(0.1, 0.7, max(night, airless)) * smoothstep(-0.01, 0.05, dot(v, uUp) + airless);
           // (kept under what the bloom picks up: a moon is lit rock, not a lamp)
           // (dark rock, a fifteenth as bright as the sand it shines on: at 0.85 the disc clipped to white in the wide-open
           // exposure of twilight and read as a second sun)

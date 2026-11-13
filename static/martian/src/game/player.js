@@ -167,10 +167,13 @@ export function buildAstronaut() {
   // (and a short reach: carried to fifty metres it floodlit the whole Hab from across the yard, and nothing was dark)
   // (and no brighter than this: white things three metres off, a dome's floor or an airlock wall, burn out long before
   // the ground at his feet looks lit)
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 26, 0.52, 0.85, 1.8);
+  // (and a beam, not a glow: a wide lamp that fell off fast lit a pool at his own feet, which from behind him was a
+  // pale cloud round his waist. Narrower, aimed further out and falling off more slowly, it lays a long oval on the
+  // ground from four paces ahead to a dozen.)
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 26, 0.40, 0.8, 1.35);
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
-  tgt.position.set(0, -1.1, 8);
+  tgt.position.set(0, -0.8, 8);
   lamp.position.set(0, 0.12, 0.1);
   at.add(lamp, tgt);
   lamp.target = tgt;
@@ -288,7 +291,7 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 38 : lerp(anim.lamp.intensity, lampOn * 38, damp(0.25, dt));
+  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 24 : lerp(anim.lamp.intensity, lampOn * 24, damp(0.25, dt));
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
