@@ -34,6 +34,8 @@ const fromPos = () => (S.mode === 'rover' ? World.rover.group.position : player.
 export function distTo(pos) { return groundDist(fromPos(), pos); }
 const thirsty = (p) => p.state === 'growing' && p.growth >= 0.42 && p.watered < (CROPS[p.crop] || CROPS.potato).waterings;
 const farAfield = () => groundDist(fromPos(), World.hab.position) > 600;
+/** Out of air on foot: is the rover, with air in it, nearer than the airlock? */
+const airAtRover = () => S.roverO2 > 6 && distTo(World.rover.group.position) < distTo(siteLocalToWorld(World.hab, 0, 1.3, 11.7, _door));
 /** Night has fallen and it is a time he can sleep: the bunk, or the rover's seat, will take him to dawn. */
 const bedtime = () => !S.flags.coldOpen && !!S.flags.suitSealed && !S.sleeping && S.mode !== 'cutscene' && sleepTime() === true && localSunEl() < -0.02;
 /** The next thing the farm wants, so the list can say it and the marker can stand on it: a bed to plant, a bed to fill, or the heap to dig. */
@@ -54,43 +56,44 @@ function farmStep() {
  * flat battery).
  */
 export const OBJECTIVES = [
-  { id: 'reach', urgent: true, text: () => 'Suit breach — get to the Hab', why: 'The suit is losing air. The airlock door reseals it.',
+  { id: 'reach', urgent: true, place: 'Hab', icon: 'hab', text: () => 'Suit breach — get to the Hab', why: 'The suit is losing air. Seal it at the airlock door.',
     pos: () => habPoint(0, 1.3, 11.7), shown: () => true, done: () => S.flags.suitSealed },
   // out of doors with a quarter of a tank left: nothing else is the mission until he is breathing something else
   { id: 'air', urgent: true, text: () => (S.suit < suitCap() * 0.12 ? 'Suit O2 critical — get to air' : 'Suit O2 low — get to air'), why: 'An empty tank is minutes from the end.',
-    pos: () => { const far = distTo(habPoint(0, 1.3, 11.7)); return S.roverO2 > 6 && distTo(World.rover.group.position) < far ? above(World.rover.group.position, 1.6) : habPoint(0, 1.3, 11.7); },
+    place: () => (airAtRover() ? 'Rover' : 'Hab'), icon: () => (airAtRover() ? 'rover' : 'hab'),
+    pos: () => (airAtRover() ? above(World.rover.group.position, 1.6) : habPoint(0, 1.3, 11.7)),
     shown: () => !S.flags.coldOpen && S.mode === 'walk' && !S.inside && !S.inAirlock && S.suit < suitCap() * 0.25, done: () => false },
-  { id: 'breach', urgent: true, text: () => 'Hab breach: seal it', why: 'Air is going out through the far wall, behind the comms desk.',
+  { id: 'breach', urgent: true, place: 'Breach', icon: 'warning', text: () => 'Hab breach: seal it', why: 'Air is going out through the far wall, behind the comms desk.',
     pos: () => habPoint(0, 1.6, -HAB_R + 0.5), shown: () => S.breach.active, done: () => !S.breach.active },
   // (nothing said it was time to sleep: at 20:16 and 89 below, the list still led with the solar panels)
-  { id: 'sleep', press: () => true, text: () => (S.mode === 'rover' || farAfield() ? 'Camp in the rover until dawn' : 'Sleep until dawn in the bunk'),
+  { id: 'sleep', press: () => true, place: () => (farAfield() ? 'Rover' : 'Bunk'), text: () => (S.mode === 'rover' || farAfield() ? 'Camp in the rover until dawn' : 'Sleep until dawn in the bunk'),
     why: 'The night is deadly cold. Sleep skips to dawn and mends you.',
     pos: () => (S.mode === 'rover' ? null : farAfield() ? above(World.rover.group.position, 1.6) : habPoint(-5.0, 1.1, -4.9)), shown: bedtime, done: () => false },
-  { id: 'systems', text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, why: 'They make your air and your water. Know what keeps you alive.',
+  { id: 'systems', place: () => (S.checkedSystems.oxy ? 'Reclaimer' : 'Oxygenator'), text: () => `Inspect the oxygenator and reclaimer (${Object.keys(S.checkedSystems).length}/2)`, why: 'They make your air and your water. Know what keeps you alive.',
     pos: () => (S.checkedSystems.oxy ? habPoint(5.9, 1.4, -0.4) : habPoint(5.6, 1.4, -3.6)), shown: () => S.flags.suitSealed, done: () => Object.keys(S.checkedSystems).length >= 2 },
-  { id: 'math', text: () => 'Run the numbers at the comms desk', why: 'How long will the food last?',
+  { id: 'math', place: 'Comms desk', text: () => 'Check the numbers at the comms desk', why: 'How long will the food last?',
     pos: () => habPoint(0, 1.3, -6.6), shown: () => Object.keys(S.checkedSystems).length >= 2, done: () => S.flags.didMath },
-  { id: 'water', text: () => 'Water the farm beds: they have stopped growing', why: 'A bed stalls at half grown until it is watered again.',
+  { id: 'water', place: 'Farm bed', text: () => 'Water the farm beds: they have stopped growing', why: 'A bed stalls at half grown until it is watered again.',
     pos: () => { const p = World.plots.find(thirsty); return p ? above(p.worldPos, 0.9) : null; }, shown: () => World.plots.some(thirsty), done: () => false },
   // "farm or starve" is the premise: the farm leads until three beds are in, whatever else has joined the list
-  { id: 'farm', text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, why: () => farmStep().why,
+  { id: 'farm', place: () => (farmStep().heap ? 'Heap' : 'Farm bed'), text: () => `Start the farm — plant 3 beds (${Math.min(plantedPlots(), 3)}/3)`, why: () => farmStep().why,
     pos: () => { const f = farmStep(); return f.bed ? above(f.bed.worldPos, 0.9) : f.heap ? above(f.heap.group.position, 1.1) : null; },
     shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
-  { id: 'hydra', text: () => 'Make water: burn hydrazine at the rig', why: 'A burn makes 28 L for the beds, and eats a little Hab air.',
+  { id: 'hydra', place: 'Rig', text: () => 'Make water: burn hydrazine at the rig', why: 'A burn makes 28 L for the beds, and eats a little Hab air.',
     pos: () => habPoint(4.2, 1.3, 2.6), shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
-  { id: 'panels', press: () => S.power < 45, text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, why: 'Dust on the panels starves the Hab of power.',
+  { id: 'panels', place: 'Panels', press: () => S.power < 45, text: () => `Wipe down solar panels (${Math.min(S.stats.panels, 3)}/3)`, why: 'Dust on the panels starves the Hab of power.',
     pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? above(p.group.getWorldPosition(_wv), 1.2) : null; },
     shown: () => !!S.flags.suitSealed && (plantedPlots() > 0 || S.sol > 1 || S.power < 55), done: () => S.stats.panels >= 3 },
-  { id: 'pf', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'), why: 'Its radio is the only way to tell Earth you are alive.',
+  { id: 'pf', place: () => (S.pf.loaded ? 'Uplink' : 'Pathfinder'), icon: 'dish', text: () => (S.pf.loaded ? 'Bring Pathfinder to the uplink ring' : 'Recover Pathfinder — Ares Vallis'), why: 'Its radio is the only way to tell Earth you are alive.',
     pos: () => above(S.pf.loaded ? World.uplink.position : World.pathfinder.position, 2), shown: () => S.flags.pfRevealed, done: () => S.pf.connected },
-  { id: 'harvest', text: () => `Harvest potatoes (${S.stats.potatoes} so far)`,
+  { id: 'harvest', place: 'Farm bed', text: () => 'Bring in the first harvest',
     why: () => (World.plots.some((p) => p.state === 'ready') ? 'A bed is ripe: bring it in.' : 'Beds take about two and a half sols, and a second watering.'),
     pos: () => { const p = World.plots.find((x) => x.state === 'ready'); return p ? above(p.worldPos, 0.9) : null; },
     shown: () => plantedPlots() > 0, done: () => S.stats.potatoes >= 4 || S.stats.produce > 0 },
-  { id: 'dinner', text: () => 'Cook a dinner at the food shelf', why: 'A cooked meal lifts morale; in good spirits work goes faster.',
+  { id: 'dinner', place: 'Food shelf', text: () => 'Cook a dinner at the food shelf', why: 'A cooked meal lifts morale; in good spirits work goes faster.',
     pos: () => habPoint(4.2, 1.4, 4.8), shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: 'The Hermes is coming back for you.', shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
-  { id: 'mav', text: () => 'Get to the MAV — Schiaparelli', why: 'It is the only rocket on the planet.',
+  { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Get to the MAV — Schiaparelli', why: 'It is the only rocket on the planet.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
 /** The reason an objective gives (some change with what is in hand). */
@@ -105,7 +108,7 @@ export function missionList() {
   }
   return out.sort((a, b) => b.rank - a.rank);
 }
-const _wh = { pos: new THREE.Vector3(), d: 0, near: 0 };
+const _wh = { pos: new THREE.Vector3(), d: 0, near: 0, via: '' };
 /**
  * Where the marker for an objective stands and how far there is to go: { pos, d, near }, or null when it has no
  * place. The Hab has one way in. From outside, a thing inside it is marked at the airlock door, with the distance to
@@ -119,15 +122,16 @@ export function objectiveWhere(o) {
   const from = fromPos(), hab = World.hab.position, onFoot = S.mode === 'walk';
   const pIn = groundDist(_wh.pos, hab) < HAB_R - 0.3;
   const meIn = onFoot && S.inside && groundDist(from, hab) < HAB_R;
-  if (pIn && !meIn && !(onFoot && S.inAirlock)) { siteLocalToWorld(World.hab, 0, 1.3, 11.7, _wh.pos); _wh.d = _wh.near = groundDist(from, _wh.pos); }
-  else if (!pIn && meIn) { const on = groundDist(siteLocalToWorld(World.hab, 0, 1.3, HAB_R - 0.9, _door), _wh.pos); _wh.pos.copy(_door); _wh.near = groundDist(from, _door); _wh.d = _wh.near + on; }
+  _wh.via = '';
+  if (pIn && !meIn && !(onFoot && S.inAirlock)) { siteLocalToWorld(World.hab, 0, 1.3, 11.7, _wh.pos); _wh.d = _wh.near = groundDist(from, _wh.pos); _wh.via = 'in'; }
+  else if (!pIn && meIn) { const on = groundDist(siteLocalToWorld(World.hab, 0, 1.3, HAB_R - 0.9, _door), _wh.pos); _wh.pos.copy(_door); _wh.near = groundDist(from, _door); _wh.d = _wh.near + on; _wh.via = 'out'; }
   else _wh.d = _wh.near = groundDist(from, _wh.pos);
   return _wh;
 }
 /** The distance an objective's line shows: the same number its marker carries. */
 export function objectiveDist(o) { const w = objectiveWhere(o); return w ? fmtDist(w.d) : ''; }
 export const objDone = new Set();
-let objSeeded = false, objThrottle = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
+let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0;
 const objFrom = new THREE.Vector3();
 const objNodes = new Map();          // row key -> { el, tx, ds, wy, o, q, text, dist, cls, why }
 const objDoneAt = {};                // objective id -> time it was completed (shown ticked for a moment)
@@ -147,6 +151,12 @@ function objRow(key) {
 let wayEl = null, wayShown = false, wayKey = '', waySide = 1, zonesAt = -1, zoneAge = 0;
 const zones = [];                    // what the marker keeps clear of: [left, top, right, bottom, kind] in px
 onLayout(() => { zonesAt = -1; });
+// Where the panel of gauges ends. On a phone the log and the cards stand a fixed gap under it; the style sheet used to
+// work the panel's height out from its parts, and was 2 or 3 px short, so that gap was 5 px where 8 was meant. Now
+// the panel is measured, whenever its size changes (the bars arriving, a new scale) and before the next paint.
+function measureVitals() { const b = UI.vitals.getBoundingClientRect().bottom; if (b > 0) root.style.setProperty('--vit-b', Math.round(b) + 'px'); }
+if (typeof ResizeObserver === 'function') new ResizeObserver(measureVitals).observe(UI.vitals);
+onLayout(() => requestAnimationFrame(measureVitals));
 /** The boxes of everything on the HUD that is showing now (kind 0), the prompt and the rover's panel (1), and the figure in the middle (2). */
 function readZones(w, h) {
   zones.length = 0;
@@ -186,7 +196,7 @@ export function updateWaypoint(camera) {
   if (behind) { nx = -nx; ny = -ny; const m = Math.max(Math.abs(nx), Math.abs(ny), 1e-3); nx /= m; ny = Math.min(ny / m, -0.2); }
   const px = (nx * 0.5 + 0.5) * w, py = (-ny * 0.5 + 0.5) * h;
   // the marker's own box about its point (the diamond above, the distance under it), and the ring it keeps to
-  const bx = rem * 1.75 + 6, up = rem * 1.4 + 5, dn = rem * 0.8 + 6;
+  const bx = rem * 1.875 + 6, up = rem * 1.4 + 5, dn = rem * 0.95 + 6;
   const L = layout.safe[3] + bx + 4, R = w - layout.safe[1] - bx - 4, T = layout.safe[0] + up + 4, B = h - layout.safe[2] - dn - 4;
   const now = perf();
   // (looked at again five times a second, and every tenth frame whatever the clock says: a log line or a toast must not sit under the marker for long)
@@ -248,7 +258,7 @@ export function updateWaypoint(camera) {
  */
 export const SCREEN_UNLOCKS = [
   // the bars come up as he first steps into the Hab: at the door there is one number, the suit's
-  { id: 'bars', flag: 'uiBars', name: 'The six bars', line: 'What keeps you alive, top left.', tap: 'Tap them to see what each is.', keys: 'The pause menu says what each one is.',
+  { id: 'bars', flag: 'uiBars', name: 'The six bars', line: 'What keeps you alive, top left.', keys: 'The pause menu says what each one is.',
     when: () => !S.flags.coldOpen && (S.inside || Object.keys(S.checkedSystems).length >= 1 || !!S.flags.didMath || S.sol > 1), quiet: () => !!S.flags.didMath },
   { id: 'colony', flag: 'uiColony', name: 'Colony', key: 'C', line: 'Your stores, the fabricator and upgrades.',
     when: () => !S.flags.coldOpen && (Object.keys(S.checkedSystems).length >= 1 || S.flags.didMath || S.sol > 1) },
@@ -266,7 +276,13 @@ function updateUnlocks() {
     if (!S.flags[s.flag] && s.when()) {
       S.flags[s.flag] = true;
       // (what a loaded game already had is not news)
-      if (unlocksSeeded && !(s.quiet && s.quiet())) { toast('NEW', s.name, s.key ? (layout.touch ? s.line : `${s.line} Press ${s.key}.`) : `${s.line} ${layout.touch ? s.tap : s.keys}`); Snd.jingle(); }
+      if (unlocksSeeded && !(s.quiet && s.quiet())) {
+        // (the bars, on a touch screen: one line under the panel itself, pointing at it, that stays long enough to be read.
+        // They used to be explained in the third paragraph of a card that covered them.)
+        if (s.id === 'bars' && layout.touch) toast('What keeps you alive', 'Tap the bars for what each means', '', { point: true, life: 14000, soft: 5000 });
+        else toast('NEW', s.name, s.key ? (layout.touch ? s.line : `${s.line} Press ${s.key}.`) : `${s.line} ${s.keys}`);
+        Snd.jingle();
+      }
     }
     if (shownScreens[s.id] !== !!S.flags[s.flag]) { shownScreens[s.id] = !!S.flags[s.flag]; root.classList.toggle('no-' + s.id, !S.flags[s.flag]); }
   }
@@ -281,7 +297,9 @@ export function updateObjectivesHud() {
   updateUnlocks();                    // (every frame: a screen's button must not lag the thing that earned it)
   const now = perf(), from = fromPos();
   // (a jump in position, such as a checkpoint restored, does not wait for the list's next turn)
-  if (now - objThrottle >= 0.3 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objFrom.copy(from); rebuildObjectives(now); }
+  // (or eighteen frames, whichever comes first: a game stepped by its debug hook runs many frames in no time at all, and a
+  //  list rebuilt by the clock alone was left showing "get to air" beside a full tank in the pictures taken that way)
+  if (now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   for (const n of objNodes.values()) {
     let dist = '';
     if (n.cls !== 'done') {
@@ -326,7 +344,7 @@ function rebuildObjectives(now) {
   }
   // night: said once as it falls, as well as listed
   const night = list.some((e) => e.o.id === 'sleep');
-  if (night && !sleepTold && objSeeded) toast('NIGHT', 'Time to sleep', farAfield() || S.mode === 'rover' ? 'Park up: the rover’s seat will do until dawn.' : 'The bunk in the Hab skips the cold hours and mends you.', { yields: true });
+  if (night && !sleepTold && objSeeded) toast('Night', 'Time to sleep', '', { yields: true });
   sleepTold = night;
   objSeeded = true;
   // the two nearest active survey tasks
@@ -370,7 +388,12 @@ function fitObjectives(now) {
   if (layout.touch) for (const b of [UI.tCam, UI.tSprint, UI.tExit, UI.tCandle]) { const r = b.getBoundingClientRect(); if (r.height > 2) limit = Math.min(limit, r.top - 8); }
   rows.sort((a, b) => (a.el.compareDocumentPosition(b.el) & 4 ? -1 : 1));
   const over = () => UI.objectives.getBoundingClientRect().bottom > limit;
-  for (let i = rows.length - 1; i >= 1 && over(); i--) rows[i].el.classList.add('cut');
+  // What gives way, in order: the lines after the next thing to do, from the last; then the line just ticked off
+  // (it has had its jingle). The next thing to do is never the one to go: after the numbers the list was a single
+  // struck-through line, with the farm, which had just become the mission, cut from under it.
+  const lead = Math.max(0, rows.findIndex((n) => n.cls !== 'done'));
+  for (let i = rows.length - 1; i > lead && over(); i--) rows[i].el.classList.add('cut');
+  for (let i = lead - 1; i >= 0 && over(); i--) rows[i].el.classList.add('cut');
   // (a first line and a reason that both run long can be too tall on their own: the reason gives way, then the line
   // is held to two; the journal has both whole. The block never reaches the buttons under it, whatever it says.)
   if (over()) UI.objectives.classList.add('no-why');
@@ -425,17 +448,32 @@ function compassGeometry() {
 }
 const wrapDeg = (d) => { d %= 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; };
 
-/** Everything the compass can point at, most important first. */
+/** The first thing on the mission list that is still to do, where its marker stands, and what that place is called. */
+function leadPlace() {
+  if (!S.started || S.over || S.mode === 'cutscene') return null;
+  const lead = missionList().find((e) => !e.done);
+  const at = lead ? objectiveWhere(lead.o) : null;
+  if (!at) return null;
+  const o = lead.o, of = (v, d) => (typeof v === 'function' ? v() : v || d);
+  // (by the door: from outside the place to make for is the Hab, from inside the airlock)
+  return { o, pos: at.pos.clone(), name: at.via === 'in' ? 'Hab' : at.via === 'out' ? 'Airlock' : of(o.place, 'Task'), icon: at.via === 'in' ? 'hab' : at.via === 'out' ? 'exit' : of(o.icon, 'target') };
+}
+/**
+ * Everything the compass can point at, most important first. The mission's first line leads: its mark stands where
+ * the marker in the world does and carries the same distance, indoors as well as out. (In the Hab during a breach
+ * the strip used to name a survey site 4.6 km away, in blue, over the red banner.)
+ */
 function compassTargets(pp) {
   const out = [];
-  const add = (id, ic, name, pos, o) => out.push({ id, icon: ic, name, pos, cls: '', pin: false, ...o });
-  // (from outside, the way to the breach is the airlock door: the mark stands there, as the mission's marker does, so the two give one distance)
-  if (S.breach.active) add('br', 'warning', 'Breach', S.inside ? siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1, new THREE.Vector3()) : siteLocalToWorld(World.hab, 0, 1.3, 11.7, new THREE.Vector3()), { cls: 'danger', pin: true });
+  const lead = leadPlace();
+  const add = (id, ic, name, pos, o) => { if (!lead || groundDist(lead.pos, pos) > 3) out.push({ id, icon: ic, name, pos, cls: '', pin: false, ...o }); };
+  if (lead) out.push({ id: 'lead:' + lead.icon, icon: lead.icon, name: lead.name, pos: lead.pos, cls: lead.o.urgent ? 'danger' : 'main', pin: true, lead: lead.o });
+  if (S.breach.active && !(lead && lead.o.id === 'breach')) add('br', 'warning', 'Breach', S.inside ? siteLocalToWorld(World.hab, 0, 0, -HAB_R + 1, new THREE.Vector3()) : siteLocalToWorld(World.hab, 0, 1.3, 11.7, new THREE.Vector3()), { cls: 'danger', pin: true });
   if (S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected) add('pf', 'dish', 'Pathfinder', World.pathfinder.position, { cls: 'main', pin: true });
   if (S.pf.loaded && !S.pf.connected) add('up', 'dish', 'Uplink', World.uplink.position, { cls: 'main', pin: true });
   if (S.flags.mavRevealed && !S.won) add('mav', 'rocket', 'MAV', World.mav.position, { cls: 'main', pin: true });
   // (the Hab's mark is its airlock door: the point the mission marker stands on when the way leads inside)
-  if (!S.inside) add('hab', 'hab', 'Hab', siteLocalToWorld(World.hab, 0, 1.3, 11.7, new THREE.Vector3()), { pin: true, cls: S.flags.coldOpen ? 'main' : '' });
+  if (!S.inside) add('hab', 'hab', 'Hab', siteLocalToWorld(World.hab, 0, 1.3, 11.7, new THREE.Vector3()), { pin: true });
   if (!S.flags.coldOpen && S.mode !== 'rover') add('rover', 'rover', 'Rover', World.rover.group.position);
   const act = QUEST_DEFS.filter(q => S.quests[q.id] === 'active' && questTargetPos(q))
     .map(q => ({ q, d: groundDist(pp, questTargetPos(q)) }))
@@ -459,15 +497,16 @@ export function updateCompass() {
   if (!cp.w) compassGeometry();
   if (!cp.w) return;                                     // not laid out yet
   // what is out there changes slowly: refresh the list and the bearings a few times a second (or at once after a jump)
-  if (now - cp.listAt > 0.2 || cp.from.distanceToSquared(pp) > 9) {
-    cp.listAt = now; cp.from.copy(pp);
+  // (or after a dozen frames, as with the mission list: a game stepped by its debug hook runs them in no time at all)
+  if (now - cp.listAt > 0.2 || (cp.calls = (cp.calls || 0) + 1) >= 12 || cp.from.distanceToSquared(pp) > 9) {
+    cp.listAt = now; cp.calls = 0; cp.from.copy(pp);
     cp.marks = compassTargets(pp);
     const seen = new Set();
     for (const m of cp.marks) {
       seen.add(m.id);
       m.bearing = absBearing(pp, m.pos) * R2D;
       let n = cp.nodes[m.id];
-      if (!n) n = cp.nodes[m.id] = { el: el('div', null, 'mk', UI.compassMarks, icon(m.icon)), cls: null, lab: el('span', null, null, UI.compassDists), text: null, shown: null };
+      if (!n) n = cp.nodes[m.id] = { el: el('div', null, 'mk', UI.compassMarks, icon(m.icon)), cls: null, lab: el('span', null, null, UI.compassDists, '<i></i> <b class="t-num"></b>'), text: null, shown: null, w: 0 };
       m.node = n;
       const cls = m.cls;
       if (n.cls !== cls) { n.el.className = 'mk' + (cls ? ' ' + cls : ''); n.cls = cls; n.state = null; }
@@ -493,39 +532,67 @@ export function updateCompass() {
     c.x = mid + rel * ppd;
     if (on) c.el.style.transform = `translateX(${c.x.toFixed(1)}px)`;
   }
-  // markers: the list is in priority order, so earlier ones win space
+  // where each mark stands on the strip, how far it is, and which one he is facing
   const iconW = layout.rem * (layout.compact ? 1.1 : 1.35);
-  const placed = [], labels = [];
-  let focus = null, focusRel = 7;
+  let focus = null, focusRel = 7, urgent = false;
   for (const m of cp.marks) {
-    const n = m.node;
-    m.d = distTo(m.pos);                                  // (every frame, with the marker's and the mission line's)
+    // (every frame, with the marker's and the mission line's: the lead's is the mission line's own number)
+    const at = m.lead ? objectiveWhere(m.lead) : null;
+    m.d = at ? at.d : distTo(m.pos);
     const rel = wrapDeg(m.bearing - heading);
-    const off = Math.abs(rel) > EDGE;
-    let state = 'on';
-    if (m.d < 6 || (off && !m.pin)) state = 'hide';
-    const x = mid + clamp(rel, -EDGE, EDGE) * ppd;
-    if (state !== 'hide') {
-      let near = 1e9;
-      for (const px of placed) near = Math.min(near, Math.abs(px - x));
-      if (near < iconW * 0.45) state = 'hide';
-      else if (near < iconW * 0.95) state = 'small';
-      else if (off) state = rel < 0 ? 'off left' : 'off right';
-      if (state !== 'hide') placed.push(x);
-    }
-    if (state !== n.state) {
-      n.state = state;
-      n.el.style.display = state === 'hide' ? 'none' : '';
-      n.el.classList.toggle('small', state === 'small');
-      n.el.classList.toggle('dim', state === 'small');
-      n.el.classList.toggle('off', state.startsWith('off'));
-      n.el.classList.toggle('left', state === 'off left');
-      n.el.classList.toggle('right', state === 'off right');
-    }
-    m.x = x; m.state = state;
-    if (state !== 'hide') {
-      n.el.style.transform = `translateX(${x.toFixed(1)}px)`;
-      if (!off && Math.abs(rel) < focusRel) { focusRel = Math.abs(rel); focus = m; }
+    m.off = Math.abs(rel) > EDGE;
+    m.rel = rel;
+    m.x = mid + clamp(rel, -EDGE, EDGE) * ppd;
+    m.gone = (m.lead ? (at ? at.near : 0) < 2.4 : m.d < 6) || (m.off && !m.pin);
+    m.labelled = false;
+    if (m.lead && m.lead.urgent) urgent = true;          // (also when he is standing on it: with his life in the balance the strip names nothing else)
+    if (!m.gone && !m.off && Math.abs(rel) < focusRel) { focusRel = Math.abs(rel); focus = m; }
+  }
+  // Labels: what it is and how far. The mission's mark first, then the one he faces, then the rest while there is
+  // room. A mark that gets no label is drawn as a dot, not as a picture with no name: turn to it and it says what it is.
+  // (With his life in the balance, the strip names the one thing.)
+  const labels = [];
+  const tryLabel = (m, cls) => {
+    const n = m.node, text = m.name + '|' + fmtDist(m.d);
+    if (n.text !== text) { n.text = text; n.lab.firstChild.textContent = m.name; n.lab.lastChild.textContent = fmtDist(m.d); n.w = n.lab.offsetWidth; }
+    const w = n.w + 6;
+    const a = w >= cp.w ? mid : clamp(m.x, w / 2, cp.w - w / 2);
+    for (const [l, r] of labels) if (a - w / 2 < r && a + w / 2 > l) return false;
+    labels.push([a - w / 2, a + w / 2]);
+    const c = cls + (m.cls ? ' ' + m.cls : '');
+    if (n.labCls !== c) { n.labCls = c; n.lab.className = c; }
+    n.lab.style.left = a.toFixed(1) + 'px';
+    return true;
+  };
+  const leadMark = cp.marks.find((m) => m.lead && !m.gone);
+  if (leadMark) leadMark.labelled = tryLabel(leadMark, 'focus');
+  if (!urgent) {
+    if (focus && !focus.labelled) focus.labelled = tryLabel(focus, 'focus');
+    for (const m of cp.marks) if (!m.labelled && !m.gone) m.labelled = tryLabel(m, '');
+  }
+  // the marks themselves: labelled ones as their pictures (earlier ones win where two would touch), the others as dots
+  const placed = [];
+  for (const pass of [true, false]) {
+    for (const m of cp.marks) {
+      if (m.labelled !== pass) continue;
+      let state = m.gone ? 'hide' : pass ? (m.off ? (m.rel < 0 ? 'off left' : 'off right') : 'on') : 'dot';
+      if (state !== 'hide') {
+        let near = 1e9;
+        for (const px of placed) near = Math.min(near, Math.abs(px - m.x));
+        if (near < iconW * (pass ? 0.6 : 0.75)) state = 'hide'; else if (pass) placed.push(m.x);
+      }
+      const n = m.node;
+      if (state !== n.state) {
+        n.state = state;
+        n.el.style.display = state === 'hide' ? 'none' : '';
+        n.el.classList.toggle('dot', state === 'dot');
+        n.el.classList.toggle('off', state.startsWith('off'));
+        n.el.classList.toggle('left', state === 'off left');
+        n.el.classList.toggle('right', state === 'off right');
+      }
+      if (state !== 'hide') n.el.style.transform = `translateX(${m.x.toFixed(1)}px)`;
+      const shown = pass && state !== 'hide';
+      if (n.shown !== shown) { n.shown = shown; n.lab.style.visibility = shown ? '' : 'hidden'; }
     }
   }
   // a mark standing where a compass letter is takes its place (the Hab's icon was drawn over the N)
@@ -533,31 +600,6 @@ export function updateCompass() {
     let under = false;
     if (c.on) for (const px of placed) if (Math.abs(px - c.x) < iconW * 0.8) { under = true; break; }
     if (under !== c.under) { c.under = under; c.el.style.visibility = under ? 'hidden' : ''; }
-  }
-  // labels: every one says what it is and how far, the mark you face first; a mark with no room for its label goes without
-  const chW = layout.rem * 0.42;
-  const tryLabel = (m, text, cls) => {
-    const w = text.length * chW + layout.rem * 1.3;          // the label's own plate and a little air
-    const a = clamp(m.x, w / 2, cp.w - w / 2);
-    for (const [l, r] of labels) if (a - w / 2 < r && a + w / 2 > l) return false;
-    labels.push([a - w / 2, a + w / 2]);
-    const n = m.node;
-    if (n.text !== text) { n.text = text; n.lab.textContent = text; }
-    const c = cls + (m.cls ? ' ' + m.cls : '');
-    if (n.labCls !== c) { n.labCls = c; n.lab.className = c; }
-    n.lab.style.left = a.toFixed(1) + 'px';
-    return true;
-  };
-  const named = (m) => `${m.name} · ${fmtDist(m.d)}`;
-  for (const m of cp.marks) m.labelled = false;
-  if (focus) focus.labelled = tryLabel(focus, named(focus), 'focus');
-  for (const m of cp.marks) {
-    if (m.labelled || m.state === 'hide' || m.state === 'small') continue;
-    m.labelled = tryLabel(m, named(m), '');
-  }
-  for (const m of cp.marks) {
-    const n = m.node;
-    if (n.shown !== m.labelled) { n.shown = m.labelled; n.lab.style.display = m.labelled ? '' : 'none'; }
   }
 }
 
@@ -574,7 +616,7 @@ export function fmtClock() {
 }
 const minus = (n) => (n < 0 ? '−' + Math.abs(n) : String(n));
 
-const hud = { tod: null, prev: {}, rate: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null };
+const hud = { tod: null, prev: {}, rate: {}, jump: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null };
 function setText(key, node, html) { if (hud.text[key] !== html) { hud.text[key] = html; node.innerHTML = html; } }
 function setLevel(key, node, frac, warnAt, critAt) {
   const c = frac < critAt ? 'crit' : frac < warnAt ? 'warn' : '';
@@ -587,7 +629,9 @@ function track(key, value, dt) {
   hud.prev[key] = value;
   if (prev === undefined || dt <= 0 || dt > 1) return hud.rate[key] || 0;
   const inst = (value - prev) / dt;
-  if (Math.abs(value - prev) > 6) return hud.rate[key] || 0;          // a refill, a meal, a save loaded: not a trend
+  // a refill, a burn, a save loaded: not a trend. But it is news: the arrow shows which way it went for a few seconds
+  // (the Hab's air had just dropped seven points and the arrow beside it pointed up, because it was already recovering)
+  if (Math.abs(value - prev) > 6) { hud.jump[key] = { dir: value > prev ? 1 : -1, t: 5 }; return hud.rate[key] || 0; }
   const old = hud.rate[key] || 0;
   // a real change (stepping out of the airlock, breaking into a run, the sun going down) shows at once; jitter is smoothed
   const jump = inst * old <= 0 || Math.abs(inst) < Math.abs(old) * 0.5 || Math.abs(inst) > Math.abs(old) * 1.5;
@@ -650,12 +694,13 @@ export function updateHud() {
   for (const [k, frac, txt, raw] of rows) {
     const b = UI.bars[k];
     const f = clamp(frac, 0, 1).toFixed(3);
-    if (hud.text[k + 'f'] !== f) { hud.text[k + 'f'] = f; b.fill.style.transform = `scaleX(${f})`; }
+    if (hud.text[k + 'f'] !== f) { hud.text[k + 'f'] = f; b.fill.style.transform = `scaleX(${f})`; b.wrap.style.setProperty('--f', f); }
     setText(k, b.val, txt);
     setLevel(k, b.wrap, frac, k === 'morale' ? 0.3 : 0.22, k === 'morale' ? 0.12 : 0.1);
     if (raw !== null) {
-      const r = track(k, raw, dt);
-      const tr = r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
+      const r = track(k, raw, dt), j = hud.jump[k];
+      if (j && (j.t -= dt) <= 0) hud.jump[k] = null;
+      const tr = hud.jump[k] ? (j.dir > 0 ? 'up' : 'dn') : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
       if (hud.cls[k + 't'] !== tr) { hud.cls[k + 't'] = tr; b.trend.className = 'tr' + (tr ? ' ' + tr : ''); }
     }
   }
@@ -675,8 +720,8 @@ export function updateHud() {
     setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed) * 3.6)));
     const pf = S.roverPower / roverPowerCap(), of = S.roverO2 / BAL.roverO2Cap;
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
-    a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`;
-    b.fill.style.transform = `scaleX(${clamp(of, 0, 1).toFixed(3)})`;
+    a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`; a.wrap.style.setProperty('--f', clamp(pf, 0, 1).toFixed(3));
+    b.fill.style.transform = `scaleX(${clamp(of, 0, 1).toFixed(3)})`; b.wrap.style.setProperty('--f', clamp(of, 0, 1).toFixed(3));
     setText('rpwr', a.val, `${Math.round(pf * 100)}<small>%</small>`);
     setText('ro2', b.val, `${Math.round(of * 100)}<small>%</small>`);
     setLevel('rpwr', a.wrap, pf, 0.2, 0.08);
@@ -705,6 +750,7 @@ export function updateHud() {
     const nAl = Math.min(al.length, 2);                                               // toasts sit below however many alerts there are
     root.style.setProperty('--al', nAl);
     root.style.setProperty('--al2', Math.max(0, nAl - 1));
+    root.classList.toggle('has-alert', nAl > 0);                                      // (on a phone a banner takes the region label's place)
     UI.alerts.innerHTML = al.slice(0, 2).map(([cls, ic, title, note, short]) => `<div class="alert ${cls}">${icon(ic)}<span>${title}</span><small>${narrow ? short : note}</small></div>`).join('');
   }
 

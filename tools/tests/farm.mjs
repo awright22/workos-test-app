@@ -32,7 +32,7 @@ s = await ev((G) => {
   return out;
 });
 check('a bed of soil asks what to plant and takes a seed packet and 5 L',
-  s.label === 'Plant this bed…' && s.rows.length === 3 && /Radishes \| Ready in 1\.1 sols · 1 watering · yields 3 \| 2 to plant/.test(s.rows[1]) && s.plot.state === 'growing' && s.plot.crop === 'radish' && s.seeds === 1 && Math.abs(s.water - 55) < 0.1 && s.uiOpen === false, s);
+  s.label === 'Plant this bed…' && s.rows.length === 3 && /Radishes \| Ready in 1\.1 sols · 1 watering · yields 3 \| Seed for 2 beds/.test(s.rows[1]) && s.plot.state === 'growing' && s.plot.crop === 'radish' && s.seeds === 1 && Math.abs(s.water - 55) < 0.1 && s.uiOpen === false, s);
 
 s = await ev((G) => {
   const out = {}, pl = G.World.plots[0];

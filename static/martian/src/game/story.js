@@ -96,7 +96,7 @@ export function offerQuests() {
   for (const q of QUEST_DEFS) if (!S.quests[q.id]) S.quests[q.id] = 'active';
   // retro-complete survey tasks for landers already stripped before the uplink
   for (const name of Object.keys(S.salvaged)) onQuestEvent('salvage', name);
-  log('NASA uploaded survey tasks — old landers with parts worth saving. Check the journal [J]. They pay in supply pods.', 'nasa');
+  log('NASA uploaded survey tasks — old landers with parts worth saving. They are in the journal, and they pay in supply pods.', 'nasa');
   // the care package: ice drill blueprint arrives with the first pod
   dropSupplyPod({ scrap: 3, rations: 3, candle: 1, seedSoy: 2 }, 'Open NASA care package').blueprint = 'drill';   // Botany sent beans
 }
@@ -121,7 +121,7 @@ export function onQuestEvent(type, name) {
     if (q.bp) pod.blueprint = q.bp;
     if (q.reveal) {
       S.flags.mapRevealed = true;
-      log('InSight\'s data came with NASA\'s full survey map. Every landmark, revealed. [M]', 'nasa');
+      log('InSight\'s data came with NASA\'s full survey map. Every landmark, revealed: see the map.', 'nasa');
     }
     log(`Survey task complete: ${q.name}. NASA is sending a pod.`, 'nasa');
   }
@@ -289,7 +289,9 @@ export function winGame() {
     // (each statistic has one name, here, in the journal and on the death screen)
     stats: [
       ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
-      ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Discoveries', st.discoveries],
+      // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
+      //  and "3.4 / Km walked" here were the same number written two ways)
+      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', st.discoveries],
       ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,

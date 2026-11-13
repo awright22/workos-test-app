@@ -62,7 +62,7 @@
 /* each tool has its word under it, at every size */
 .map-tools .mg-iconbtn { grid-template-rows: auto auto; align-content: center; gap: .1875rem; }
 .map-tools .mg-iconbtn .ic { width: 1.0625rem; height: 1.0625rem; }
-.map-tools .cap { display: block; font: 600 .625rem/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.map-tools .cap { display: block; font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .map-info .grp { color: var(--ink-3); }
 .map-info .grp b { font: 600 .6875rem/1 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin-right: .25rem; }
 .map-legend { position: absolute; left: 1rem; bottom: 3.25rem; width: 13.5rem; padding: .75rem .875rem .8125rem; background: rgba(14, 12, 11, .86); border: 1px solid var(--line-2); border-radius: .1875rem; }
@@ -197,7 +197,7 @@
 /* two fingers zoom a touch screen: the buttons would only cover the map */
 .mg-touch.mg-compact .map-tools [data-a="in"], .mg-touch.mg-compact .map-tools [data-a="out"], .mg-touch.mg-compact .map-tools .gap { display: none; }
 /* the key lies along the bottom in two columns, clear of the tools, and goes when the map is touched */
-.mg-compact .map-legend { left: .5rem; right: 3.75rem; bottom: 2.5rem; width: auto; padding: .5rem .625rem; }
+.mg-compact .map-legend { left: .5rem; right: .5rem; bottom: calc(max(2.75rem, 44px) + .5rem); width: auto; padding: .5rem .625rem; }
 .mg-compact .map-legend ul { gap: .1875rem 1rem; grid-template-columns: 1fr 1fr; }
 .mg-compact .map-legend li { font-size: .6875rem; gap: .4375rem; }
 .mg-compact .map-legend li i { width: 1rem; height: 1rem; }
@@ -318,4 +318,57 @@
 /* (a count on a colony tab is how many things there can be made now, and says so, on a phone as well: bare, it read as a
    total and disagreed with the tab's own heading. The narrowest phones give up the tabs' icons to make the room.) */
 @media (max-width: 760px) { .mg-compact .colony .tabs button .ic { display: none; } }
-.mg-compact .tabs button em::before { content: ""; display: inline-block; width: .375rem; height: .375rem; margin-right: .1875rem; border-radius: 50%; background: var(--accent); vertical-align: .0625rem; }
+
+/* ================================================================ fourth review: rows that grow, headers that wrap */
+/* A pane's rows take the height of what is in them. (A pane is a grid of a fixed height that scrolls. With its rows left
+   on "auto", a row whose item sets a min-height was given that height and no more once the pane was full, so on the
+   small phone a description of two lines was printed through the row under it.) */
+.pane.on, .mg-compact .pane.on { grid-auto-rows: min-content; }
+.inv-row .nm { overflow-wrap: anywhere; }
+
+/* A card's header: the mark hangs in the margin, the name comes first and is never squeezed by its badges; the badges sit
+   beside the name where both fit on a line, and take the next line, under the name, where they do not. (On the small
+   phone a lander's badge and year were printed over its name.) */
+.card-hd { position: relative; flex-wrap: wrap; gap: .25rem .625rem; padding-left: 1.875rem; min-height: 1.3125rem; }
+.card-hd > .ic { position: absolute; left: 0; top: .0625rem; margin-top: 0; }
+.card h4, .rcp-hd h4 { flex: 1 1 auto; }
+.card h4 .nm { display: inline-block; max-width: 100%; }
+.card h4 small { margin-left: .0625rem; white-space: nowrap; }
+.rcp-hd { flex-wrap: wrap; gap: .25rem .625rem; }
+.card-hd .tags, .rcp-hd .tags { display: flex; flex-wrap: wrap; gap: .25rem; }
+/* a card locked for another reason: its one reason, in the place the button would be */
+.rcp-ft .why.gate { color: var(--ink-2); }
+.rcp.locked .chip b { color: var(--ink-2); }
+
+/* The colony's banner: its title is one line; the sentence beside it wraps. */
+.col-bar b { white-space: nowrap; flex: none; }
+.col-bar > span { min-width: 0; }
+
+/* A colony tab's count is how many things there can be made now: a pill, with the word on the open tab only. */
+.colony .tabs button em { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .4375rem; border-radius: .625rem;
+  background: var(--accent); color: var(--accent-ink); font-weight: 600; letter-spacing: .04em; line-height: 1; }
+.colony .tabs button:not([aria-selected="true"]) em { background: rgba(255, 180, 84, .2); color: var(--accent); }
+
+/* The map on a phone. Its three buttons (You, Hab, Key) are in the status bar, which is as tall as a thumb needs, so
+   nothing on the map is under them (a storm and an unknown signal were). The hint is a chip over the map that goes when
+   the map is touched; the scale's figure is one of the numbers that matter, at 13 px. */
+.mg-touch.mg-compact .map-status { height: max(2.75rem, 44px); padding-right: calc(3 * max(3rem, 48px) + .75rem); gap: .625rem; }
+.mg-touch.mg-compact .map-tools { top: auto; right: .25rem; bottom: 0; flex-direction: row; gap: 0; z-index: 1; }
+.mg-touch.mg-compact .map-tools .mg-iconbtn { width: max(3rem, 48px); height: max(2.75rem, 44px); border: 0; border-left: 1px solid var(--line-2); border-radius: 0; background: transparent; }
+.mg-touch.mg-compact .map-tools .mg-iconbtn[aria-pressed="true"] { background: rgba(255, 180, 84, .12); }
+.mg-touch.mg-compact .map-status .pos { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mg-touch.mg-compact .map-info { max-height: calc(100% - max(2.75rem, 44px) - 1rem); }
+.mg-touch .map-status .hint { display: none; }
+.map-hint { position: absolute; left: 50%; bottom: calc(2.5rem + .625rem); transform: translateX(-50%); padding: .4375rem .75rem; border-radius: 1rem; white-space: nowrap;
+  background: rgba(10, 9, 8, .88); border: 1px solid var(--line-2); color: var(--ink); font: 500 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase;
+  pointer-events: none; transition: opacity .3s; }
+.mg-touch.mg-compact .map-hint { bottom: calc(max(2.75rem, 44px) + .625rem); }
+.map-hint.gone { opacity: 0; visibility: hidden; }
+.mg-compact .map-scale span { font-size: var(--t13); letter-spacing: .06em; color: var(--ink); }
+
+/* Statistics on a phone: four tiles to a row, and a last row that is not full is shared out among its tiles (one tile
+   sat alone on a fourth row). */
+.mg-compact .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mg-compact .stat-grid .stat:last-child:nth-child(4n + 1) { grid-column: 1 / -1; }
+.mg-compact .stat-grid .stat:last-child:nth-child(4n + 2), .mg-compact .stat-grid .stat:nth-last-child(2):nth-child(4n + 1) { grid-column: span 2; }
+.mg-compact .stat-grid .stat:last-child:nth-child(4n + 3) { grid-column: span 2; }

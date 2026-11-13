@@ -1,5 +1,6 @@
 /* Touch controls: shown only on touch devices, only while playing, never under a menu.
- * Everything sits inside the safe areas (notch, rounded corners, home indicator). */
+ * Everything sits inside the safe areas (notch, rounded corners, home indicator).
+ * Everything a thumb presses is at least 44 real pixels each way, whatever the interface scale has made of a rem. */
 #mg-touch { position: absolute; inset: 0; display: none; pointer-events: none; z-index: 8; }
 .mg-touch.is-playing #mg-touch { display: block; }
 .mg-touch.is-modal #mg-touch, .mg-touch.is-cutscene #mg-touch { display: none; }
@@ -7,6 +8,10 @@
 
 /* movement stick: touch anywhere in the lower left and the stick appears under the thumb */
 #mg-joyzone { position: absolute; left: 0; bottom: 0; width: 44%; height: 62%; pointer-events: auto; touch-action: none; }
+/* (on a phone the stick rests a little lower: the gauges over it are a name over a bar now, and taller, and a card
+   under them needs the room) */
+.mg-compact #mg-joy { bottom: calc(var(--sab) + .5rem); }
+@media (max-width: 760px) { .mg-compact #mg-joy { bottom: calc(var(--sab) + .25rem); } }
 #mg-joy { position: absolute; left: calc(var(--sal) + 1.5rem); bottom: calc(var(--sab) + 1.25rem); width: 7.5rem; height: 7.5rem; border-radius: 50%;
   border: 1px solid rgba(245, 240, 232, .32); background: radial-gradient(circle, rgba(14, 12, 11, .1) 40%, rgba(14, 12, 11, .42) 100%);
   opacity: .8; transition: opacity .2s; }
@@ -22,36 +27,37 @@
 
 .mg-tbtn { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .125rem; pointer-events: auto;
   touch-action: none; cursor: pointer; border: 1px solid rgba(245, 240, 232, .4); border-radius: 50%; background: rgba(14, 12, 11, .6);
-  color: var(--ink); font: 600 .625rem/1 var(--f-cond); letter-spacing: .14em; transition: background .12s, border-color .12s, transform .12s; }
+  color: var(--ink); font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .1em; transition: background .12s, border-color .12s, transform .12s, opacity .12s; }
 .mg-tbtn .ic { width: 1.25rem; height: 1.25rem; }
 .mg-tbtn:active, .mg-tbtn.down { background: rgba(245, 240, 232, .26); transform: scale(.95); }
 .mg-tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
-/* the action button shows the verb for whatever is in reach, and fills as it is held */
+/* The action button. Something to do: the verb, HOLD under it, and the ring fills as it is held. Something in
+   the way: a padlock over the word LOCKED, in a dashed ring. Nothing in reach: an empty ring, dimmed. (It has
+   been "USE / HOLD", "— / HOLD" and a bare icon with nothing to use: each read as a control with no name.) */
 #mg-tE { right: calc(var(--sar) + 1.125rem); bottom: calc(var(--sab) + 1.25rem); width: 5.375rem; height: 5.375rem; border-color: rgba(245, 240, 232, .3); gap: .1875rem; }
 #mg-tE .ring { inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); }
 #mg-tE .ring .trk { stroke: transparent; }
 #mg-tE .ring .arc { stroke: var(--accent); stroke-width: 5; stroke-dashoffset: 100; transition: none; }
+#mg-tE .vi, #mg-tE .vb, #mg-tE .vh { display: none; }
+#mg-tE .vi .ic { width: 1.5rem; height: 1.5rem; }
 #mg-tE .vb { font-size: .9375rem; letter-spacing: .1em; color: var(--ink-2); }
 #mg-tE .vh { font-size: max(.6875rem, 11px); letter-spacing: .18em; color: var(--ink-3); }
-/* nothing in reach: a hand, dim, and no words. Something in the way: a padlock. Something to do: the verb, and HOLD. */
-#mg-tE .vi { display: grid; place-items: center; color: var(--ink-3); }
-#mg-tE .vi .ic { width: 1.625rem; height: 1.625rem; }
-#mg-tE .vi .ic:last-child, #mg-tE .vb, #mg-tE .vh { display: none; }
-#mg-tE.verb .vi { display: none; }
+#mg-tE:not(.verb):not(.no) { opacity: .42; }
 #mg-tE.verb .vb, #mg-tE.verb .vh { display: block; }
-#mg-tE.no .vi .ic:first-child { display: none; }
-#mg-tE.no .vi .ic:last-child { display: block; }
 #mg-tE.ready { border-color: var(--accent); background: rgba(40, 26, 10, .62); }
 #mg-tE.ready .vb { color: var(--ink); }
 #mg-tE.ready .vh { color: var(--accent); }
 #mg-tE.no { border-style: dashed; }
+#mg-tE.no .vi { display: grid; place-items: center; color: var(--ink-2); }
+#mg-tE.no .vb { display: block; font-size: max(.6875rem, 11px); letter-spacing: .16em; }
 #mg-tE.holding { background: rgba(255, 180, 84, .22); }
+
 #mg-tJump, #mg-tExit { right: calc(var(--sar) + 7rem); bottom: calc(var(--sab) + 1.5rem); width: 3.625rem; height: 3.625rem; }
 #mg-tSprint { right: calc(var(--sar) + 5.5rem); bottom: calc(var(--sab) + 5.75rem); width: 3.625rem; height: 3.625rem; }
-#mg-tCam { right: calc(var(--sar) + 1.75rem); bottom: calc(var(--sab) + 7.375rem); width: 2.75rem; height: 2.75rem; }
+#mg-tCam { right: calc(var(--sar) + 1.75rem); bottom: calc(var(--sab) + 7.375rem); width: 2.75rem; height: 2.75rem; min-width: 44px; min-height: 44px; }
 /* the candle stands left of RUN (above it, it took the room the mission list needs for its reason) */
-#mg-tCandle { right: calc(var(--sar) + 9.5rem); bottom: calc(var(--sab) + 6.125rem); width: 3rem; height: 3rem; gap: .0625rem; letter-spacing: .02em;
+#mg-tCandle { right: calc(var(--sar) + 9.5rem); bottom: calc(var(--sab) + 6.125rem); width: 3rem; height: 3rem; min-width: 44px; min-height: 44px; gap: .0625rem; letter-spacing: .02em;
   border-color: var(--cold); color: var(--cold); }
 #mg-tCandle i { font: 600 .875rem/1 var(--f-cond); font-style: normal; }
 #mg-tCandle > span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: 0; }
@@ -62,65 +68,54 @@
 .is-rover #mg-tJump, .is-rover #mg-tSprint { display: none; }
 .is-cold #mg-tCam { display: none; }
 
-/* pause and the three screens, top right */
-#mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .375rem; pointer-events: auto; }
-#mg-trow .mg-tbtn { position: static; width: 2.75rem; height: 2.75rem; border-radius: .375rem; }
-#mg-trow .mg-tbtn .ic { width: 1.3125rem; height: 1.3125rem; }
+/* pause and the three screens, top right: each with its word under it */
+#mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .25rem; pointer-events: auto; }
+#mg-trow .mg-tbtn { position: static; width: 2.75rem; height: 2.75rem; min-width: 48px; min-height: 46px; border-radius: .375rem; }
+#mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
+#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .02em; color: var(--ink); }
+#mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
 .is-cold #mg-trow .mg-tbtn[data-t] { display: none; }
 /* each screen's button arrives when the screen first has something to show (ui/hud.js) */
 .no-map #mg-trow .mg-tbtn[data-t="map"], .no-colony #mg-trow .mg-tbtn[data-t="colony"], .no-journal #mg-trow .mg-tbtn[data-t="journal"] { display: none; }
 .no-map .scr-nav [data-screen="map"], .no-colony .scr-nav [data-screen="colony"], .no-journal .scr-nav [data-screen="journal"] { display: none; }
-
-.mg-compact #mg-trow .mg-tbtn { width: 2.625rem; height: 2.625rem; }
 /* tablets and other large touch screens: the clock and mission move below the buttons */
 .mg-touch:not(.mg-compact) #mg-tr { top: calc(var(--m) + var(--sat) + 3.5rem); }
-
-/* ================================================================ a thumb needs 44 px
-   (the interface's rem is 16 px on a phone, so 2.75rem) */
-.mg-compact #mg-trow .mg-tbtn { width: 2.75rem; height: 2.75rem; }
-.mg-touch .mg-btn.small { min-height: 2.75rem; padding-left: 1rem; padding-right: 1rem; }
-.mg-touch .tabs button { min-height: 2.75rem; }
-.mg-touch .mg-seg button { min-height: 2.75rem; }
-.mg-touch .mg-range { height: 2.75rem; }
-.mg-touch .mg-range::-webkit-slider-thumb { width: 1.5rem; height: 1.75rem; margin-top: calc(-.875rem + 1px); }
-.mg-touch #mg-photo .mg-btn { min-height: 2.75rem; }
-/* nothing has the keyboard's focus on a touch screen: no ring round whatever was opened first */
-.mg-touch :focus-visible { outline: none !important; }
-.mg-touch .diff:focus-visible, .mg-touch .menu-item:focus-visible, .mg-touch .choice:focus-visible { border-color: var(--line-2); background: transparent; box-shadow: none; }
-
-/* ---------------------------------------------------------------- touch targets
-   Forty-four real pixels, whatever the interface scale has made of a rem (sized in rem, the top-right
-   buttons came out at 42 and menu rows at 35). */
-.mg-touch #mg-trow .mg-tbtn, .mg-touch #mg-tCam, .mg-touch #mg-tCandle { min-width: 44px; min-height: 44px; }
-.mg-touch .mg-btn, .mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .colony .tabs button, .mg-touch .journal .tabs button { min-height: 44px; }
-.mg-touch .menu-item, .mg-touch.mg-compact #mg-overlay.k-pause .menu-item { min-height: 44px; }
-.mg-touch .mg-switch { min-width: 52px; min-height: 30px; }
-/* (a switch is small to look at; its row is what is pressed) */
-.mg-touch .set-row { min-height: 44px; }
-.mg-touch .map-info .x, .mg-touch .choice, .mg-touch .x { min-width: 44px; min-height: 44px; }
 
 /* the bars can be tapped: they open the guide to what each one is */
 .mg-touch.is-playing:not(.is-modal) #mg-vitals { pointer-events: auto; }
 
-/* the words under the top-right buttons and the camera button */
-#mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
-#mg-trow .mg-tbtn span, #mg-tCam span { font: 600 max(.6875rem, 11px)/1 var(--f-cond); letter-spacing: .02em; color: var(--ink); }
-#mg-trow .mg-tbtn .ic, #mg-tCam .ic { width: 1.0625rem; height: 1.0625rem; }
-.mg-touch #mg-trow .mg-tbtn { min-width: 48px; min-height: 46px; }
-.mg-touch #mg-trow { gap: .25rem; }
-/* the words on the round buttons (JUMP, RUN, EXIT) */
-.mg-tbtn { font-size: max(.6875rem, 11px); letter-spacing: .1em; }
-
-/* ---------------------------------------------------------------- forty-four pixels, whatever a narrower rule says
-   (the compact rules for sheets, dialogs, tabs and option groups are more specific than the ones above and set
-   40 px and 36 px: on a touch screen a thumb's height is not negotiable) */
+/* ---------------------------------------------------------------- menus, sheets and screens under a thumb
+   (the compact rules for sheets, dialogs, tabs and option groups are more specific than plain ones and set 40 px and
+   36 px: on a touch screen a thumb's height is not negotiable) */
 .mg-touch .mg-btn, .mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .menu-item, .mg-touch .choice, .mg-touch .scr-nav button { min-height: 44px !important; }
-.mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .scr-nav button { min-width: 44px; }
-.mg-touch .mg-range { height: max(2.75rem, 44px); }
+.mg-touch .mg-seg button, .mg-touch .tabs button, .mg-touch .scr-nav button { min-width: 48px; }
+.mg-touch .mg-btn.small { padding-left: 1rem; padding-right: 1rem; }
 .mg-touch .mg-iconbtn { width: max(2.75rem, 44px); height: max(2.75rem, 44px); }
-/* a switch's row is what is pressed (ui/menus.js) */
+.mg-touch .map-info .x, .mg-touch .x { min-width: 44px; min-height: 44px; }
+/* a slider's handle is a thumb wide, on a track a thumb high */
+.mg-touch .mg-range { height: max(2.75rem, 44px); }
+.mg-touch .mg-range::-webkit-slider-thumb { width: max(2.75rem, 44px); height: 2rem; margin-top: calc(-1rem + 1px); border-radius: .25rem; }
+.mg-touch .mg-range::-moz-range-thumb { width: max(2.75rem, 44px); height: 2rem; border-radius: .25rem; }
+/* a switch is big enough to see which way it is; its whole row is what is pressed (ui/menus.js) */
+.mg-touch .mg-switch { width: 3.75rem; height: 2rem; }
+.mg-touch .mg-switch::after { width: 1.5rem; height: 1.5rem; margin-top: -.75rem; }
+.mg-touch .mg-switch[aria-checked="true"]::after { transform: translateX(1.75rem); }
 .mg-touch .set-row { min-height: 44px !important; }
 .mg-touch .set-row.tap { cursor: pointer; }
-/* no hover on a touch screen: a card stays lit after the tap that opened the sheet under it */
-.mg-touch .diff:hover { background: rgba(245, 240, 232, .035); border-color: var(--line-2); border-top-color: var(--ink-4); transform: none; }
+
+/* ---------------------------------------------------------------- nothing hovers, and nothing has the keyboard's focus
+   A finger leaves "hover" on whatever it last touched and focus on whatever was opened first: left alone, one menu
+   entry stood 6 px to the right of the rest, one difficulty card 3 px higher than its neighbours, and one slider's
+   handle was amber for no reason. */
+.mg-touch :focus-visible { outline: none !important; }
+.mg-touch .menu-item:hover, .mg-touch .menu-item:focus-visible { padding-left: 1.125rem; border-left-color: transparent; background: transparent; color: var(--ink-2); }
+.mg-touch .menu-item:hover .mi-s, .mg-touch .menu-item:focus-visible .mi-s { color: var(--ink-3); }
+.mg-touch .menu-item:active { background: linear-gradient(90deg, rgba(255, 180, 84, .16), rgba(255, 180, 84, 0) 85%); }
+/* (the first choice is marked as the first by its rule, in line with the others) */
+.mg-touch .menu-item.first, .mg-touch .menu-item.first:hover, .mg-touch .menu-item.first:focus-visible { border-left-color: var(--accent); color: var(--ink); }
+.mg-touch .diff:hover, .mg-touch .diff:focus-visible { background: rgba(245, 240, 232, .035); border-color: var(--line-2); border-top-color: var(--ink-4); transform: none; box-shadow: none; }
 .mg-touch .diff:active { border-color: var(--accent); }
+.mg-touch .choice:hover, .mg-touch .choice:focus-visible { background: rgba(245, 240, 232, .04); border-color: var(--line-2); border-left-color: var(--line); }
+.mg-touch .choice:active { border-color: var(--accent); }
+.mg-touch .mg-range:hover::-webkit-slider-thumb, .mg-touch .mg-range:focus-visible::-webkit-slider-thumb { background: var(--ink); }
+.mg-touch .mg-range:active::-webkit-slider-thumb { background: var(--accent); }
