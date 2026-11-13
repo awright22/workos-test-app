@@ -158,7 +158,7 @@ function draw(dt, focus) {
   const exposureBias = photo.on ? photoCamera() : 1;
   e.camera.updateMatrixWorld();
   ctx.terrain.update(e.camera.position);
-  ctx.rocks.update(e.camera.position);
+  ctx.rocks.update(e.camera.position, S.started && S.mode === 'walk' ? player.pos : null);
   updateSites(e.camera.position);
   const sealed = S.started && !!World.sealedInside && !S.over;
   ctx.outdoor.visible = !sealed;

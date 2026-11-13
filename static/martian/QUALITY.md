@@ -593,7 +593,7 @@ button (J7), new-player hesitations (J17).
   swings it up on the same boom to look down at him, up to twenty degrees to see his boots past a rise,
   further only as the boom also shortens. (It used to zoom in until only his helmet showed.)
 - **A rock is a ball with a surface laid over it.** `world/rock-shapes.js` builds, at load, a texture array of
-  sixteen rocks, each stored as direction → distance and normal (with hollows, face tone and fresh breaks). The
+  twenty-six rocks (sixteen until the eighth round's rocks pass: see "A rock keeps its edges" above), each stored as direction → distance and normal (with hollows, face tone and fresh breaks). The
   rock shader pushes a ball's vertices out to that surface and lights each pixel by the stored normal, so a
   boulder of 80 triangles is shaded like one of 1,280, and more shapes cost no more draw calls. Rocks, stones
   and gravel rest on the triangle the terrain mesh draws under them (`meshPoint` in `terrain/chunk.js`), not on

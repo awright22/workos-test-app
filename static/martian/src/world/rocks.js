@@ -26,8 +26,6 @@ import { GLSL_GROUND_GRADE } from '../render/terrain-material.js';
 import { dirToFace, faceToDir } from '../planet/height.js';
 import { R } from '../planet/constants.js';
 import { ctx } from '../game/ctx.js';
-import { S } from '../game/state.js';
-import { player } from '../game/player.js';
 import { ROCK_STRIDE, ROCK_ANGULAR, ROCK_SLAB, ROCK_COBBLE, bareLava, meshPoint, planetGrid } from '../terrain/chunk.js';
 import { rockAtlas } from './rock-shapes.js';
 import { ballMesh, ballSnap } from './rock-ball.js';
@@ -740,7 +738,9 @@ export class RockField {
   }
 
   /** Call once a frame after terrain.update(). */
-  update(camPos) {
+  /** @param {THREE.Vector3} camPos
+   *  @param {THREE.Vector3|null} [boots]  where he stands, when he is on foot (null in the rover, on the title, in a cutscene) */
+  update(camPos, boots = null) {
     this.uniforms.uHere.value.copy(camPos).normalize();
     if (!this.ready) return;
     this.shade.light();
@@ -750,8 +750,9 @@ export class RockField {
     // instance matrices are stored relative to an anchor near the camera, to stay float32-exact
     if (refill) this.anchor.copy(camPos);
     // where his boots are, for the stones under them (on foot only: the rover's wheels ride over what they meet)
-    const feet = this.uniforms.uFeet.value, onFoot = S.started && S.mode === 'walk';
-    feet.set(player.pos.x - this.anchor.x, player.pos.y - this.anchor.y, player.pos.z - this.anchor.z, onFoot ? 1 : 0);
+    // (handed in by the game: the world does not reach into the game for it)
+    const feet = this.uniforms.uFeet.value;
+    if (boots) feet.set(boots.x - this.anchor.x, boots.y - this.anchor.y, boots.z - this.anchor.z, 1); else feet.w = 0;
     if (!refill) return;
     this.dirty = false;
     this.lastCam.copy(camPos);
