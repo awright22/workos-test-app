@@ -236,7 +236,9 @@ export class Engine {
       // under the roof, so people and furniture stand on the floor instead of floating over it
       this.sun.color.setRGB(1.0, 0.93, 0.82);
       // (a little under what would light the room evenly: the fittings then make pools, and the corners fall away)
-      this.sun.intensity = p.power === false ? 0.06 : 2.5;
+      // (and now well under: the ceiling's own fittings are point lights with real pools under them, and this even
+      // light from above is only what the room bounces back. At 2.5 it was the whole picture and the floor was one tone.)
+      this.sun.intensity = p.power === false ? 0.06 : 1.1;
       this.sun.position.copy(_u);
       sh.roof = p.roof || null; sh.radius = 3.0; sh.autoUpdate = true;
     } else {

@@ -203,7 +203,9 @@ export function buildHabColony(spawn) {
     // light is the sun again, and these carry the room.
     // (each strip lights the floor under it and falls off toward the wall: with a reach of twenty-six metres and a slow
     // decay the four of them lit the room as evenly as a shop)
-    if (a) addLamp(a, { color: 0xffe4c4, power: 24, range: 12.5, decay: 2.0, level: () => powered() * (World.sealedInside ? 0.8 : 1), room: true });
+    // (a short reach: four fittings that each lit the whole room lit it evenly, like an office. Each now lights the
+    // floor under it and a little more, and the walls and the far side fall away.)
+    if (a) addLamp(a, { color: 0xffe4c4, power: 54, range: 7.5, decay: 2.0, level: () => powered() * (World.sealedInside ? 0.8 : 1), room: true });
   }
   // the grow lights over the farm: two pink pools, one for each pair of trays
   for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 4.2, range: 5, level: powered, room: true });
