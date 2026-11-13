@@ -21,8 +21,8 @@ How it is put together
 
 The game shows one of two groups above the neck ring, by material name: the helmet (materials
 helmet_white, helmet_dark, helmet_metal, helmet_light and visor_gold: shell, visor, rim, ear hubs,
-lamps, base ring and the neck bellows) or the bare head (head_skin, head_cap, head_dark). Every
-other surface belongs to the suit and is always drawn.
+lamps, base ring and the neck bellows) or the bare head (head_skin, head_cap, head_hair, head_dark:
+any material whose name starts with head_). Every other surface belongs to the suit and is always drawn.
 
 --out writes the finished file somewhere else (for trying things without touching the game's copy).
 --anim-only reuses the cached mesh (tools/assets/.cache/raw/astronaut_mesh.glb) and only rebuilds
@@ -342,9 +342,9 @@ def oriented(bm, verts, origin, z_axis, x_hint=(1, 0, 0)):
     return verts
 
 
-def bolt(bm, p, n, r=0.0042, h=0.0045, seg=5):
-    """A small fastener head at p, standing along n."""
-    v = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=r, radius2=r * 0.75, depth=h)['verts']
+def bolt(bm, p, n, r=0.0042, h=0.0045, seg=4):
+    """A small fastener head at p, standing along n (no face underneath: it sits on a surface)."""
+    v = add_lathe(bm, [(r, -h * 0.5), (r * 0.75, h * 0.5)], seg=seg, cap_start=False)
     oriented(bm, v, Vector(p) + Vector(n).normalized() * (h * 0.4), n)
 
 
@@ -598,9 +598,12 @@ def build_torso(M):
     grid(bm, rows, close_u=True, out_from=(0, 0.01, 1.40))
     M.add('collar_pad', bm, 'suit_grey', 'chest', smooth=60, tint=BELLOWS)
 
-    # ---- shoulder (scye) housings on the HUT and the bearing rings the arms turn in
+    # ---- shoulder (scye) housings on the HUT and the bearing rings the arms turn in. The housing
+    # is the shell's shoulder: a low dome behind the bearing that runs in to the neck ring and
+    # closes there. (It was an open cone that widened inwards, and its rim stood seven centimetres
+    # clear of the shoulder beside the neck as a thin pointed fin, the more plainly with the helmet off.)
     bm = bm_new()
-    v = add_lathe(bm, [(0.114, -0.105), (0.107, -0.07), (0.095, -0.052), (0.089, -0.047)], seg=20, cap_start=False, cap_end=False)
+    v = add_lathe(bm, [(0.0, -0.128), (0.050, -0.111), (0.082, -0.084), (0.097, -0.060), (0.095, -0.052), (0.089, -0.047)], seg=16, cap_start=False, cap_end=False)
     oriented(bm, v, SHOULDER, SCYE_AXIS)
     M.add('scye_housing_L', bm, 'suit_white', 'chest', mirror=True, smooth=60)
     bm = bm_new()
@@ -669,7 +672,7 @@ def build_torso(M):
             lo, hi = (mid_a, hi) if inside(HIP + d * R) else (lo, mid_a)
         loop.append(HIP + (cax * math.cos(lo) + (e1 * math.cos(ph) + e2 * math.sin(ph)) * math.sin(lo)) * R)
     bm = bm_new()
-    add_tube(bm, loop + [loop[0], loop[1]], 0.0075, seg=5, caps=False)
+    add_tube(bm, loop + [loop[0], loop[1]], 0.0075, seg=4, caps=False)
     M.add('leg_binding_L', bm, 'suit_grey', 'hips', mirror=True, smooth=100)
     # a small belt pouch with a flap, front left
     bm = bm_new()
@@ -805,20 +808,22 @@ def build_backpack(M):
         for z in (1.02, 1.50):
             add_box(bm, (0.05, 0.05, 0.05), (sx * 0.165, yb - 0.018, z))
     M.add('pack_bumpers', bm, 'rubber', 'chest', bevel=0.012)
-    # hoses from the pack around the waist to the chest unit
+    # hoses from the pack around the waist to the chest unit. They lie close along the flank, a
+    # centimetre off the waist flange: the elbows hang beside them, and every millimetre the hose
+    # stands out is a millimetre further out that the arms have to hang.
     for sx, nm in ((1, 'L'), (-1, 'R')):
-        ctrl = [(sx * 0.178, 0.20, 1.085), (sx * 0.205, 0.15, 1.092), (sx * 0.208, 0.05, 1.11), (sx * 0.198, -0.05, 1.14),
-                (sx * 0.172, -0.125, 1.185), (sx * 0.142, -0.168, 1.23), (sx * 0.124, -0.186, 1.252)]
+        ctrl = [(sx * 0.178, 0.20, 1.085), (sx * 0.196, 0.15, 1.090), (sx * 0.191, 0.05, 1.106), (sx * 0.187, -0.05, 1.137),
+                (sx * 0.166, -0.125, 1.185), (sx * 0.142, -0.168, 1.23), (sx * 0.124, -0.186, 1.252)]
         pts = path_points(ctrl, 14)
         bm = bm_new()
         add_tube(bm, pts, 0.0135, seg=7)
         M.add('hose_' + nm, bm, 'rubber', 'chest', smooth=70)
         bm = bm_new()
         for a, b in ((pts[0], pts[1]), (pts[-1], pts[-2])):
-            v = add_lathe(bm, [(0.019, -0.004), (0.019, 0.016), (0.016, 0.02), (0.0145, 0.02)], seg=8, cap_end=False)
+            v = add_lathe(bm, [(0.019, -0.004), (0.019, 0.016), (0.016, 0.02), (0.0145, 0.02)], seg=7, cap_end=False)
             oriented(bm, v, a, (Vector(b) - Vector(a)).normalized())
         for i in (7,):                                      # hose clip along the run
-            v = add_lathe(bm, [(0.0155, -0.006), (0.017, -0.004), (0.017, 0.004), (0.0155, 0.006)], seg=8, cap_start=False, cap_end=False)
+            v = add_lathe(bm, [(0.0155, -0.006), (0.017, -0.004), (0.017, 0.004), (0.0155, 0.006)], seg=7, cap_start=False, cap_end=False)
             oriented(bm, v, pts[i], (pts[i + 1] - pts[i - 1]).normalized())
         M.add('hose_fittings_' + nm, bm, 'aluminium', 'chest', smooth=50)
 
@@ -838,8 +843,9 @@ def group_materials():
     alias('helmet_metal', 'aluminium')         # base ring, hub bolts, lamp bezels, camera lens
     alias('helmet_light', 'light_white')       # lamp lenses (emissive)
     mat('head_skin', color=SKIN, metallic=0.0, roughness=0.62)
-    mat('head_cap', color=(0.80, 0.79, 0.76), metallic=0.0, roughness=0.88)       # cap fabric, undershirt collar, eye whites
-    mat('head_dark', color=(0.060, 0.056, 0.052), metallic=0.0, roughness=0.60)   # hair, brows, eyes, ear pieces, strap, microphone
+    mat('head_cap', color=(0.80, 0.79, 0.76), metallic=0.0, roughness=0.88)       # cap fabric (the ear pieces are tinted slate), undershirt collar, eye whites
+    mat('head_dark', color=(0.060, 0.056, 0.052), metallic=0.0, roughness=0.60)   # eyes, lids, the line of the mouth, earphones, microphone
+    mat('head_hair', color=(0.150, 0.086, 0.046), metallic=0.0, roughness=0.78)   # short brown hair, brows
 
 
 SKIN = (0.62, 0.37, 0.26)
@@ -935,12 +941,17 @@ LAMP_C = Vector((HELMET_C.x + 0.172, HELMET_C.y - 0.052, HELMET_C.z + 0.088))
 # ==============================================================================================
 # The bare head (materials head_*): the game shows it in place of the helmet indoors.
 #
-# A man in his thirties in a communications cap: a white centre panel from forehead to nape,
-# dark side panels carrying the earphone cups, a chin strap and a boom microphone; short dark
-# hair shows at the forehead, the temples and the nape. Forms are clean and slightly simplified,
-# to sit with the suit and to read from three metres. The skin is a grid whose columns and rows
-# are placed on the features (nose, lips, eye sockets, brow), shaped by a midline profile and a
-# few bumps, and shaded a little by hand in its vertex colours. Cap and hair are shells over the
+# A man in his thirties in a cloth communications cap. The game's camera is behind him, so the
+# back of the head is the view that matters most, and from there it has to be a head and not a
+# ball: the cap is a snug crown that stops on the bulge of the skull (a white centre panel, a
+# pale grey panel either side, and a slate ear piece that comes down in front of each ear to the
+# earphone and the chin strap); below it short brown hair runs round from ear to ear, down to a
+# hairline on the nape; the ears stand off the head in skin colour, each with a small black
+# earphone over its hollow; and under the hairline the neck goes down into the collar. A boom
+# microphone comes round from the left earphone. Forms are clean and slightly simplified, to sit
+# with the suit and to read from three metres. The skin is a grid whose columns and rows are
+# placed on the features (nose, lips, eye sockets, brow), shaped by a midline profile and a few
+# bumps, and shaded a little by hand in its vertex colours. Cap and hair are shells over the
 # skull whose edges turn in and end under the surface below, so no back face is ever exposed
 # (the game draws front faces only). The head stays inside the helmet with room to spare.
 # ==============================================================================================
@@ -966,15 +977,23 @@ FACE_XS = [0.0, 0.0065, 0.0135, 0.0205, 0.0285, 0.0365, 0.0445, 0.054, 0.0645]  
 FACE_TH = [math.asin((x / 0.0730) ** 1.4) for x in FACE_XS] + [76 * D2R, 90 * D2R]
 BACK_TH = [84 * D2R, 99 * D2R, 112 * D2R, 126 * D2R, 142 * D2R, 160 * D2R, 180 * D2R]
 CAP_C = Vector((0.0, 0.006, 1.676))      # between the ears: the cap's panels are laid out round this axis
-CAP_PSI = [24, 28, 35, 45, 60, 75, 90, 105, 120, 135, 145, 152, 156]     # columns, degrees from the left ear
-CAP_PF = Curve([(0, 38), (15, 37), (30, 34), (45, 27), (55, 10), (62, -20), (66, -45)])        # front edge: pitch against degrees off the midline
-CAP_PB = Curve([(0, 211), (15, 213), (30, 218), (45, 228), (55, 238), (62, 247), (66, 256)])   # back edge
-CAP_ROWS = 10
+CAP_PSI = [12, 16, 22, 30, 38, 46, 60, 75, 90, 105, 120, 134, 142, 150, 158, 164, 168]     # columns, degrees from the left ear
+CAP_PF = Curve([(0, 38), (15, 37), (30, 34), (44, 27), (52, 14), (60, -12), (68, -42), (74, -62), (78, -74)])     # front edge: pitch against degrees off the midline
+CAP_PB = Curve([(0, 190), (15, 188), (30, 182), (44, 168), (52, 150), (60, 124), (68, 98), (74, 90), (78, 87)])   # back edge: across the back of the skull, then up and over the ear
+CAP_ROWS = 8
 CAP_T = 0.0055                           # thickness of the cap over the skull
-HAIR_F = Curve([(0, 0.0175), (15, 0.0150), (30, 0.0125), (45, 0.0160), (55, 0.0170), (62, 0.0120), (66, 0.0040)])    # hair showing in front of the cap
-HAIR_B = Curve([(0, 0.0230), (15, 0.0230), (30, 0.0215), (45, 0.0170), (55, 0.0100), (62, 0.0030), (66, 0.0010)])    # and below it at the nape
-HAIR_TINT = (0.62, 0.42, 0.30)           # dark brown, out of the warm grey of head_dark
-FLAP_TINT = (0.52, 0.52, 0.56)           # charcoal side panels, cups, strap and microphone
+CAP_SIDE = 44.5                          # the ear pieces are the cells further than this from the midline (degrees)
+HAIR_F = Curve([(0, 0.0175), (15, 0.0150), (30, 0.0125), (44, 0.0160), (52, 0.0170), (60, 0.0120), (68, 0.0040), (78, 0.0010)])    # hair showing in front of the cap
+HAIR_TH = [82, 86, 95, 106, 119, 134, 150, 165, 180]      # the hair on the back and sides: columns, degrees round the head from the front
+HAIRLINE = Curve([(82, 1.6470), (86, 1.6460), (95, 1.6430), (106, 1.6365), (119, 1.6270), (134, 1.6170), (150, 1.6095), (165, 1.6050), (180, 1.6035)])
+HAIR_T = 0.0036                          # how far short hair stands off the skull (the cap lies over it)
+SLATE = (0.235, 0.25, 0.285)             # the cap's ear pieces and chin strap: head_cap's cloth dyed slate grey
+CAP_GREY = (0.56, 0.57, 0.60)            # the panels between the white centre panel and the ear pieces
+HAIR_TINT = (0.80, 0.80, 0.80)           # brows and the hair at the forehead, a shade darker than the back of the head
+FLAP_TINT = (0.52, 0.52, 0.56)           # black plastic: earphones and microphone
+EAR_Y, EAR_Z = 0.0190, 1.6670            # middle of the left ear (its front edge is 17 mm ahead of this, at the jaw joint)
+EAR_W, EAR_H = 0.0170, 0.0310            # half its width and half its height
+EAR_OUT = 0.0215                         # how far the rim stands off the skull at the back
 
 
 def head_sec(z):
@@ -1270,12 +1289,15 @@ def build_head(M):
         pts.append(face_point(th, z))
         nrm.append(head_normal(th, z))
     ribbon(bm, pts, nrm, [0.0030, 0.0033, 0.0030, 0.0023, 0.0014], 0.0015, sink=0.0022, out_from=C0)
-    M.add('brow_L', bm, 'head_dark', 'head', mirror=True, smooth=60, tint=HAIR_TINT)
+    M.add('brow_L', bm, 'head_hair', 'head', mirror=True, smooth=60, tint=HAIR_TINT)
 
-    # ---- the cap: a shell over the skull laid out round the axis through the ears, from its
-    # front edge over the top to its back edge, with a rolled hem along both that ends under
-    # the hair or the skin. Its ends lie under the earphone cups. The cells of the two side
-    # panels are pieces of their own in the dark material, so the seams are clean lines.
+    # ---- the cap: a shell over the top of the skull laid out round the axis through the ears, from
+    # its front edge over the crown to its back edge, with a rolled hem along both that ends under
+    # the hair or the skin. It is a snug cloth cap, not a hood: at the back it stops on the bulge
+    # of the skull and leaves the hair of the nape and the ears in view, and its edge climbs over
+    # each ear to the ear piece, a slate panel that comes down in front of the ear and carries the
+    # earphone. The ends of the grid lie under the earphones. The cells of the two ear pieces are
+    # pieces of their own, so the seams are clean lines.
     nc = len(CAP_PSI)
     off = [abs(ps - 90.0) for ps in CAP_PSI]
     fr = [[skull_frame(lerp(float(CAP_PF(o)[0]), float(CAP_PB(o)[0]), i / CAP_ROWS) * D2R, ps * D2R) for ps, o in zip(CAP_PSI, off)] for i in range(CAP_ROWS + 1)]
@@ -1293,65 +1315,110 @@ def build_head(M):
     Eb, Nb, Db = edge(fr[-1], 1.0)
     P = [[Ef[j] + Df[j] * 0.0024 - Nf[j] * 0.0016 for j in range(nc)], [Ef[j] + Df[j] * 0.0030 + Nf[j] * 0.0034 for j in range(nc)]]
     P += [[f[0] + f[1] * CAP_T for f in row] for row in fr]
-    P += [[Eb[j] + Db[j] * 0.0030 + Nb[j] * 0.0034 for j in range(nc)], [Eb[j] + Db[j] * 0.0024 - Nb[j] * 0.0016 for j in range(nc)]]
-    side = [j for j in range(nc - 1) if max(off[j], off[j + 1]) > 30.5]
-    for nm, cols, material, tint in (('cap_crown', [j for j in range(nc - 1) if j not in side], 'head_cap', (1.0, 1.0, 1.0)),
-                                     ('cap_side_L', [j for j in side if CAP_PSI[j] < 90], 'head_dark', FLAP_TINT),
-                                     ('cap_side_R', [j for j in side if CAP_PSI[j] > 90], 'head_dark', FLAP_TINT)):
+    P += [[Eb[j] + Db[j] * 0.0034 + Nb[j] * 0.0046 for j in range(nc)], [Eb[j] + Db[j] * 0.0028 - Nb[j] * 0.0016 for j in range(nc)]]
+    side = [j for j in range(nc - 1) if max(off[j], off[j + 1]) > CAP_SIDE]
+    mid = [j for j in range(nc - 1) if j not in side and max(off[j], off[j + 1]) > 30.5]
+    for nm, cols, tint in (('cap_crown', [j for j in range(nc - 1) if j not in side and j not in mid], (1.0, 1.0, 1.0)),
+                           ('cap_mid_L', [j for j in mid if CAP_PSI[j] < 90], CAP_GREY),
+                           ('cap_mid_R', [j for j in mid if CAP_PSI[j] > 90], CAP_GREY),
+                           ('cap_side_L', [j for j in side if CAP_PSI[j] < 90], SLATE),
+                           ('cap_side_R', [j for j in side if CAP_PSI[j] > 90], SLATE)):
         bm = bm_new()
         grid_cells(bm, P, [(r, j) for r in range(len(P) - 1) for j in cols], out_from=C0)
-        M.add(nm, bm, material, 'head', smooth=70, tint=tint)
-    # short hair showing beyond the cap: bands that start under the hem and end in the skin
-    for nm, (E, N, D), width in (('hair_front', (Ef, Nf, Df), HAIR_F), ('hair_nape', (Eb, Nb, Db), HAIR_B)):
-        wd = [float(width(o)[0]) for o in off]
-        bm = bm_new()
-        grid(bm, [[E[j] - D[j] * 0.0060 + N[j] * 0.0020 for j in range(nc)],
-                  [E[j] + D[j] * max(wd[j] - 0.0028, 0.0004) + N[j] * 0.0036 for j in range(nc)],
-                  [E[j] + D[j] * max(wd[j], 0.0008) - N[j] * 0.0024 for j in range(nc)]], out_from=C0)
-        M.add(nm, bm, 'head_dark', 'head', smooth=70, tint=HAIR_TINT)
-    # earphone cups over the ears, at the ends of the cap
+        M.add(nm, bm, 'head_cap', 'head', smooth=70, tint=tint)
+    # short hair showing in front of the cap: a band that starts under the hem and ends in the skin
+    wd = [float(HAIR_F(o)[0]) for o in off]
+    bm = bm_new()
+    grid(bm, [[Ef[j] - Df[j] * 0.0060 + Nf[j] * 0.0020 for j in range(nc)],
+              [Ef[j] + Df[j] * max(wd[j] - 0.0028, 0.0004) + Nf[j] * 0.0036 for j in range(nc)],
+              [Ef[j] + Df[j] * max(wd[j], 0.0008) - Nf[j] * 0.0024 for j in range(nc)]], out_from=C0)
+    M.add('hair_front', bm, 'head_hair', 'head', smooth=70, tint=HAIR_TINT)
+    # the hair of the back and sides: a shell over the skull from the hairline of the nape, which
+    # rises behind each ear, up under the cap. Its bottom row and its front columns end in the skin.
+    ths = [math.radians(t) for t in HAIR_TH] + [-math.radians(t) for t in reversed(HAIR_TH[:-1])]
+
+    def hair_pt(th, k):
+        a = abs(math.degrees(th))
+        hl = float(HAIRLINE(a)[0])
+        z, lift = ((hl - 0.0050, -0.0025), (hl + 0.0030, HAIR_T * 0.9), (lerp(hl, 1.700, 0.55), HAIR_T), (1.728, HAIR_T))[k]
+        if a < 84.0:
+            lift = -0.0022
+        return head_base(th, z) + head_normal(th, z) * lift
+    bm = bm_new()
+    grid(bm, [[hair_pt(th, k) for th in ths] for k in range(4)], out_from=C0)
+    M.add('hair_back', bm, 'head_hair', 'head', smooth=80)
+    # ---- ears: the rim, the hollow inside it, and the back of the ear down to the skull. From
+    # behind it is the back of the ear that shows, standing off the head.
+
+    def skull_x(y, z):
+        a, yf, yb, n = head_sec(z)
+        b = (HEAD_CY - yf) if y < HEAD_CY else (yb - HEAD_CY)
+        return a * max(1.0 - abs((y - HEAD_CY) / b) ** n, 0.0) ** (1.0 / n)
+    rim, rim_b, hollow, base = [], [], [], []
+    for k in range(8):
+        a = TAU * k / 8
+        pp = EAR_W * math.cos(a) * (1.0 - 0.30 * max(0.0, -math.sin(a)))             # narrower at the lobe
+        qq = EAR_H * math.sin(a)
+        y, z = EAR_Y + pp + 0.19 * qq, EAR_Z + qq                                    # the top leans back
+        out = 0.0030 + (pp + EAR_W) / (2 * EAR_W) * (EAR_OUT - 0.0030) * (1.0 - 0.25 * max(0.0, -math.sin(a)))
+        rim.append(Vector((skull_x(y, z) + out, y, z)))
+        rim_b.append(Vector((skull_x(y, z) + out - 0.0036, y - 0.0012 * math.cos(a), z - 0.0012 * math.sin(a))))
+        y2, z2 = EAR_Y + 0.55 * pp + 0.19 * qq - 0.0015, EAR_Z + 0.58 * qq
+        hollow.append(Vector((skull_x(y2, z2) + max(out * 0.45, 0.0015), y2, z2)))
+        y3, z3 = EAR_Y - 0.0090 + 0.0070 * math.cos(a) + 0.19 * 0.62 * qq, EAR_Z + 0.62 * qq
+        base.append(Vector((skull_x(y3, z3) - 0.0020, y3, z3)))
+    bm = bm_new()
+    grid(bm, [base, rim_b, rim, hollow], close_u=True, cap_last=True, out_from=Vector((skull_x(EAR_Y, EAR_Z) + 0.004, EAR_Y, EAR_Z)))
+    M.add('ear_L', bm, 'head_skin', 'head', mirror=True, smooth=75, soft_ao=0.35, tint=(1.0, 0.93, 0.90))
+    # earphones: a small black can over the hollow of each ear, held by the ear piece of the cap
     p = skull_frame(0.0, 0.0)[0]
     n = sum((skull_frame(TAU * k / 3, 8 * D2R)[1] for k in range(3)), Vector()).normalized()
+    n = (n + Vector((0.0, -0.22, 0.0))).normalized()          # tipped to lie on the ear, whose back edge stands further out
     bm = bm_new()
-    v = add_lathe(bm, [(0.034, -0.0085), (0.034, 0.0065), (0.026, 0.0125), (0.0, 0.0140)], seg=12, cap_start=False)
-    bmesh.ops.transform(bm, matrix=Matrix.Diagonal((1.12, 1.0, 1.0, 1.0)), verts=v)
-    oriented(bm, v, p + n * (CAP_T - 0.0005), n, x_hint=(0, 0, 1))
+    v = add_lathe(bm, [(0.0162, -0.0080), (0.0162, 0.0030), (0.0125, 0.0066), (0.0, 0.0074)], seg=10, cap_start=False)
+    oriented(bm, v, p + n * 0.0100, n, x_hint=(0, 0, 1))
     if sum(f.normal.dot(f.calc_center_median() - p) for f in bm.faces if not f.normal_update()) < 0:
         bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     M.add('ear_cup_L', bm, 'head_dark', 'head', mirror=True, smooth=50, tint=FLAP_TINT)
-    # chin strap: from under each cup down the jaw and under the chin
+    # chin strap: from under each earphone down the jaw and under the chin
     pts, nrm = [], []
     for a in (86, 78, 66, 52, 38, 20, 0, -20, -38, -52, -66, -78, -86):
         th = a * D2R
         k = smooth01((62 - abs(a)) / 28.0)                 # 0 on the side of the jaw, 1 underneath
-        up = lerp(0.044, 0.004, smooth01((86 - abs(a)) / 26.0))
+        up = lerp(0.060, 0.004, smooth01((86 - abs(a)) / 26.0))
         pts.append(face_point(th, jaw_z(th) + up).lerp(head_jaw(th).lerp(head_ledge(th), 0.30), k))
         nrm.append(head_normal(th, jaw_z(th) + up).lerp(Vector((0, 0, -1)), k).normalized())
     bm = bm_new()
     ribbon(bm, pts, nrm, 0.0058, 0.0020, sink=0.0030, out_from=C0)
-    M.add('chin_strap', bm, 'head_dark', 'head', smooth=60, tint=FLAP_TINT)
-    # boom microphone from the left cup to the corner of the mouth
+    M.add('chin_strap', bm, 'head_cap', 'head', smooth=60, tint=SLATE)
+    # boom microphone from the left earphone to the corner of the mouth
     bm = bm_new()
-    add_tube(bm, path_points([(0.086, -0.010, 1.652), (0.091, -0.034, 1.638), (0.083, -0.066, 1.624), (0.062, -0.094, 1.616), (0.037, -0.110, 1.613)], 6), 0.0026, seg=4)
+    add_tube(bm, path_points([(0.090, -0.006, 1.664), (0.093, -0.034, 1.642), (0.083, -0.066, 1.625), (0.062, -0.094, 1.616), (0.037, -0.110, 1.613)], 6), 0.0026, seg=4)
     add_ico(bm, 0.0072, (0.034, -0.1115, 1.613), subdiv=1, scale=(1.25, 0.9, 0.9))
     M.add('mic_boom', bm, 'head_dark', 'head', smooth=80, tint=FLAP_TINT)
 
 
-def hinge(M, name, centre, axis, radius, up_dir, bar_len, bar_w, bones, off):
+def hinge(M, name, centre, axis, radius, up_dir, bar_len, bar_w, bones, off, slim=False):
     """Joint bearing on the side of an elbow or knee: a pivot disc on the upper bone and a
-    link bar along each bone. `off` = distance of the disc from the limb axis."""
+    link bar along each bone. `off` = distance of the disc from the limb axis. `slim` is the
+    bearing on the inner side of a joint, which faces the body or the other leg: a flat disc
+    and plain bars that stand 6 mm off the joint, not 14 (an arm hangs closer to the flank for
+    it, and it is hardly ever in view)."""
     axis = Vector(axis).normalized()
     c = Vector(centre) + axis * off
     bm = bm_new()
-    v = add_lathe(bm, [(radius, -0.004), (radius, 0.006), (radius * 0.82, 0.01), (radius * 0.45, 0.01), (radius * 0.45, 0.014), (0, 0.014)], seg=10, cap_start=False)
+    if slim:
+        v = add_lathe(bm, [(radius, -0.004), (radius, 0.003), (radius * 0.80, 0.006), (0, 0.006)], seg=8, cap_start=False)
+    else:
+        v = add_lathe(bm, [(radius, -0.004), (radius, 0.006), (radius * 0.82, 0.01), (radius * 0.45, 0.01), (radius * 0.45, 0.014), (0, 0.014)], seg=10, cap_start=False)
     oriented(bm, v, c, axis)
     M.add(name + '_pivot_L', bm, 'aluminium', bones[0], mirror=True, smooth=50)
     for k, (bone, sgn) in enumerate(((bones[0], 1), (bones[1], -1))):
         d = Vector(up_dir).normalized() * sgn
         bm = bm_new()
-        v = add_box(bm, (bar_w, bar_len, 0.007))
-        oriented(bm, v, c + d * (bar_len / 2 + radius * 0.5) + axis * (0.001 - 0.003 * k), axis, x_hint=d.cross(axis))
-        M.add('%s_link%d_L' % (name, k), bm, 'aluminium', bone, mirror=True, bevel=0.002)
+        v = add_box(bm, (bar_w, bar_len, 0.005 if slim else 0.007))
+        oriented(bm, v, c + d * (bar_len / 2 + radius * 0.5) + axis * ((-0.0005 if slim else 0.001) - (0.002 if slim else 0.003) * k), axis, x_hint=d.cross(axis))
+        M.add('%s_link%d_L' % (name, k), bm, 'aluminium', bone, mirror=True, bevel=0.0 if slim else 0.002)
 
 
 def build_arm(M):
@@ -1393,7 +1460,7 @@ def build_arm(M):
     conv.loft(bm, rib_rows(0.228, 0.037, 4), seg=14)
     M.add('elbow_L', bm, 'suit_grey', w_arm, mirror=True, smooth=50, tint=BELLOWS)
     hinge(M, 'elbow', ELBOW, ARM_U, 0.021, -ARM_DIR, 0.06, 0.02, ('upper_arm_L', 'forearm_L'), 0.064)
-    hinge(M, 'elbow_in', ELBOW, -ARM_U, 0.021, -ARM_DIR, 0.06, 0.02, ('upper_arm_L', 'forearm_L'), 0.064)
+    hinge(M, 'elbow_in', ELBOW, -ARM_U, 0.021, -ARM_DIR, 0.06, 0.02, ('upper_arm_L', 'forearm_L'), 0.064, slim=True)
     # elbow pad on the back of the joint (rides on the forearm)
     bm = bm_new()
     conv.pad(bm, 0.33, 90 * D2R, 0.046, 0.043, 0.014, corner=0.02, bevel=0.007, dome=0.006)
@@ -1416,46 +1483,120 @@ def build_arm(M):
     oriented(bm, add_box(bm, (0.02, 0.026, 0.01)), arm.P(0.545, 270 * D2R, 0.012), arm.N(0.545, 270 * D2R), x_hint=ARM_DIR)
     M.add('wrist_latch_L', bm, 'plastic_black', 'forearm_L', mirror=True)
 
-    # ---- glove: gauntlet, palm, mitten fingers curling towards the palm (-U), separate thumb
+    glove = build_glove(M)
+    return arm, glove
+
+
+# ---- The glove ---------------------------------------------------------------------------------
+# One bone moves the whole hand, so the fingers are modelled in the pose they keep: the relaxed
+# half-curl of a pressurised glove, which hangs naturally, closes round the rover's yoke and rests
+# on a bench or a knee. Four separate fingers, a little spread, each a little more curled than the
+# one before it from the index to the little finger, and a thumb standing off the front of the
+# palm. The fabric is white; the rubber caps on the last joints, the palm pad, the bar across the
+# palm and the pads over the knuckles are the dark parts that make it read as a hand at a distance.
+# Positions are (u, v, s) in the arm's frame: u from the palm (-) to the back of the hand (+),
+# v from the thumb's edge (-, the front) to the little finger's (+), s down the arm from the shoulder.
+HAND_FINGERS = [  # name, knuckle (u, v, s), spread (degrees towards +v), radius, lengths of the three joints, bend at each (degrees)
+    ('index', (0.0030, -0.0398, 0.6700), -6.0, 0.0130, (0.035, 0.024, 0.023), (15.0, 27.0, 16.0)),
+    ('middle', (0.0035, -0.0133, 0.6745), -1.5, 0.0132, (0.039, 0.026, 0.024), (20.0, 31.0, 18.0)),
+    ('ring', (0.0030, 0.0133, 0.6705), 3.0, 0.0129, (0.036, 0.024, 0.023), (25.0, 35.0, 20.0)),
+    ('little', (0.0015, 0.0390, 0.6615), 8.5, 0.0117, (0.028, 0.019, 0.020), (30.0, 39.0, 22.0)),
+]
+GRIP_UVS = (-0.038, 0.0, 0.688)        # where the middle of a tool's handle lies, across the palm in the crook of the fingers (they close round 45 mm)
+TIP_TINT = (0.78, 0.79, 0.84)          # the moulded rubber caps of the fingertips, a shade darker and bluer than the grey webbing
+
+
+def hand_pt(u, v, s):
+    return SHOULDER + ARM_U * u + Vector((0.0, v, 0.0)) + ARM_DIR * s
+
+
+def hand_vec(u, v, s):
+    return (ARM_U * u + Vector((0.0, v, 0.0)) + ARM_DIR * s).normalized()
+
+
+def digit(bm_a, bm_b, base, fwd, palm, lens, bends, r, seg=6, root=0.012, cap_at=0.45, cap_lift=0.0013):
+    """A finger or a thumb: a tube from the knuckle at `base` through joints `lens` apart, bent at
+    the knuckle and at each joint by `bends` degrees from `fwd` towards `palm` (unit, at right
+    angles). The fabric (bm_a) starts `root` behind the knuckle, inside the hand, and ends inside
+    the rubber cap (bm_b), which starts part-way along the second joint and closes the tip."""
+    side = fwd.cross(palm).normalized()
+    ang, J, d, up = 0.0, [Vector(base)], [], []
+    for ln, b in zip(lens, bends):
+        ang += rad(b)
+        d.append(fwd * math.cos(ang) + palm * math.sin(ang))
+        up.append(fwd * math.sin(ang) - palm * math.cos(ang))
+        J.append(J[-1] + d[-1] * ln)
+
+    def ring(c, u, rr, k=1.0):
+        return [c + side * (rr * math.cos(TAU * j / seg)) + u * (rr * k * math.sin(TAU * j / seg)) for j in range(seg)]
+
+    def mitre(i, rr):                                     # the ring at joint i, in the plane that halves the bend
+        return ring(J[i], (up[i - 1] + up[i]).normalized(), rr, 1.0 / math.cos(rad(bends[i]) / 2))
+    rf = r * 0.95                                          # the fabric where the cap begins
+    c0 = J[1] + d[1] * (lens[1] * cap_at)
+    rc = rf + cap_lift
+    grid(bm_a, [ring(J[0] - d[0] * root, up[0], r), mitre(1, r * 0.98), ring(c0 + d[1] * 0.004, up[1], rf)], close_u=True, out_from=J[1])
+    tip = J[-1]
+    grid(bm_b, [ring(c0, up[1], rf - 0.0008), ring(c0 + d[1] * 0.0008, up[1], rc), mitre(2, rc), ring(tip - d[2] * (rc * 1.05), up[2], rc * 0.97),
+                ring(tip - d[2] * (rc * 0.34), up[2], rc * 0.66)], close_u=True, cap_last=True, out_from=J[2])
+    return J, d, up
+
+
+def plate(bm, c, n, along, hl, hw, h, inset=0.0035, sink=0.003):
+    """A small raised pad: a rectangle at c with normal n, `hl` half-long along `along`, `hw` half-wide,
+    standing h above c; its sides slope in and start under the surface."""
+    n = Vector(n).normalized()
+    a = (Vector(along) - n * Vector(along).dot(n)).normalized()
+    b = n.cross(a)
+    lo = [c + a * (sa * hl) + b * (sb * hw) - n * sink for sa, sb in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
+    hi = [c + a * (sa * (hl - inset)) + b * (sb * (hw - inset)) + n * h for sa, sb in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
+    grid(bm, [lo, hi], close_u=True, cap_last=True, out_from=c - n * 0.01)
+
+
+def build_glove(M):
+    """Left glove; mirrored to the right. Returns the tube of the gauntlet and palm."""
     glove = Tube(ARM_FRAME, stations=[
         # s,     rx (thickness), ry (width), cu,     cv,   n
         (0.552, 0.045, 0.045, 0.000, 0.0, 2.0),
-        (0.585, 0.040, 0.045, 0.000, 0.0, 2.2),
-        (0.612, 0.031, 0.048, -0.002, 0.0, 2.6),
-        (0.650, 0.028, 0.052, -0.003, 0.001, 2.9),
-        (0.688, 0.026, 0.051, -0.005, 0.002, 2.9),
-        (0.720, 0.023, 0.049, -0.013, 0.003, 2.8),
-        (0.750, 0.021, 0.045, -0.026, 0.003, 2.7),
-        (0.772, 0.016, 0.038, -0.040, 0.003, 2.5),
-        (0.782, 0.008, 0.024, -0.047, 0.003, 2.2),
+        (0.585, 0.039, 0.0445, 0.000, 0.0, 2.2),
+        (0.608, 0.029, 0.046, -0.002, 0.0, 2.6),
+        (0.636, 0.0255, 0.0515, -0.003, 0.000, 2.9),
+        (0.660, 0.0225, 0.0535, -0.002, 0.000, 3.0),
+        (0.672, 0.0195, 0.0525, 0.000, -0.0005, 3.0),
+        (0.680, 0.0120, 0.0470, 0.001, -0.0010, 2.8),
     ])
     bm = bm_new()
-    glove.loft(bm, [0.552, 0.57, 0.59, 0.615, 0.65, 0.688, 0.704], seg=16)
+    glove.loft(bm, [0.552, 0.57, 0.59, 0.61, 0.636, 0.660, 0.672, 0.680], seg=16, cap1=True)
     M.add('glove_L', bm, 'suit_white', 'hand_L', mirror=True, smooth=60)
+    # fingers and thumb
+    fab, tips = bm_new(), bm_new()
+    palm = hand_vec(-1.0, 0.0, 0.0)
+    for name, (u, v, s), spread, r, lens, bends in HAND_FINGERS:
+        fwd = hand_vec(0.0, math.sin(rad(spread)), math.cos(rad(spread)))
+        digit(fab, tips, hand_pt(u, v, s), fwd, palm, lens, bends, r)
+    M.add('fingers_L', fab, 'suit_white', 'hand_L', mirror=True, smooth=70, tint=(0.95, 0.95, 0.94))
+    M.add('fingertips_L', tips, 'suit_grey', 'hand_L', mirror=True, smooth=70, tint=TIP_TINT)
+    # the thumb leaves the front edge of the palm near the wrist and turns in towards the fingers
+    fab, tips = bm_new(), bm_new()
+    fwd = hand_vec(-0.30, -0.56, 0.78)
+    towards = hand_vec(-0.50, 0.70, 0.45)
+    towards = (towards - fwd * towards.dot(fwd)).normalized()
+    digit(fab, tips, hand_pt(-0.010, -0.031, 0.607), fwd, towards, (0.041, 0.030, 0.026), (0.0, 17.0, 19.0), 0.0152, root=0.016, cap_at=0.5)
+    M.add('thumb_L', fab, 'suit_white', 'hand_L', mirror=True, smooth=70, tint=(0.95, 0.95, 0.94))
+    M.add('thumbtip_L', tips, 'suit_grey', 'hand_L', mirror=True, smooth=70, tint=TIP_TINT)
+    # trim: the gauntlet strap, the bar that keeps the palm from ballooning, a pad over each knuckle
     bm = bm_new()
-    glove.loft(bm, [0.698, 0.72, 0.75, 0.772, 0.782], seg=16, cap1=True, lift=0.0015)
-    M.add('fingers_L', bm, 'suit_grey', 'hand_L', mirror=True, smooth=70)
+    glove.band(bm, 0.572, 0.594, 0.004, seg=16, edge=0.004)
+    glove.band(bm, 0.6385, 0.6545, 0.0048, seg=16, edge=0.004)
+    for name, (u, v, s), spread, r, lens, bends in HAND_FINGERS:
+        th = math.asin(max(-1.0, min(1.0, spow(v / 0.0535, 1.5))))
+        plate(bm, glove.P(s - 0.0055, th, 0.0), glove.N(s - 0.0055, th), ARM_DIR, 0.0100, 0.0112, 0.0042, inset=0.0042)
+    M.add('glove_trim_L', bm, 'suit_grey', 'hand_L', mirror=True, smooth=50)
+    # palm grip pad
     bm = bm_new()
-    glove.band(bm, 0.572, 0.594, 0.004, seg=16, edge=0.004)                                        # gauntlet strap
-    glove.panel(bm, 0.612, 0.69, 125 * D2R, 235 * D2R, 0.0035, ns=2, nth=3)                        # palm grip pad
-    glove.panel(bm, 0.668, 0.702, -62 * D2R, 62 * D2R, 0.006, ns=1, nth=3, bevel=0.004)            # knuckle guard
-    M.add('glove_trim_L', bm, 'suit_grey', 'hand_L', mirror=True, smooth=60)
-    bm = bm_new()
-    for k in (-1, 0, 1):                                                                           # finger grooves on the back of the mitten
-        add_tube(bm, [glove.P(s, (0 + k * 30) * D2R, 0.0022) for s in (0.706, 0.73, 0.755, 0.773)], 0.0026, seg=4)
-    M.add('finger_seams_L', bm, 'rubber', 'hand_L', mirror=True, smooth=100)
-    # thumb: a short tube from the front edge of the palm
-    o, U, V, D = ARM_FRAME
-    base = o + U * -0.008 + V * -0.042 + D * 0.622
-    tdir = (U * -0.34 + V * -0.60 + D * 0.72).normalized()
-    side = tdir.cross(U).normalized()
-    thumb = Tube((base, side.cross(tdir).normalized(), side, tdir), stations=[
-        (0.0, 0.021, 0.023, 0, 0, 2.0), (0.035, 0.0195, 0.021, 0, 0, 2.0), (0.065, 0.0175, 0.018, -0.004, 0, 2.0),
-        (0.088, 0.0135, 0.014, -0.009, 0, 2.0), (0.097, 0.006, 0.006, -0.012, 0, 2.0)])
-    bm = bm_new()
-    thumb.loft(bm, [0.0, 0.035, 0.065, 0.088, 0.097], seg=8, cap0=True, cap1=True)
-    M.add('thumb_L', bm, 'suit_grey', 'hand_L', mirror=True, smooth=70)
-    return arm, glove
+    glove.panel(bm, 0.610, 0.667, 122 * D2R, 238 * D2R, 0.0028, ns=2, nth=3)
+    M.add('palm_pad_L', bm, 'rubber', 'hand_L', mirror=True, smooth=60)
+    return glove
 
 
 def build_wrist_computer(M, arm):
@@ -1515,7 +1656,7 @@ def build_leg(M):
     conv.loft(bm, rib_rows(0.34, 0.045, 4), seg=16)
     M.add('knee_L', bm, 'suit_grey', w_leg, mirror=True, smooth=50, tint=BELLOWS)
     hinge(M, 'knee', KNEE + Vector((0, 0.004, 0)), (1, 0, 0), 0.027, (0, 0, 1), 0.075, 0.024, ('thigh_L', 'shin_L'), 0.087)
-    hinge(M, 'knee_in', KNEE + Vector((0, 0.004, 0)), (-1, 0, 0), 0.027, (0, 0, 1), 0.075, 0.024, ('thigh_L', 'shin_L'), 0.087)
+    hinge(M, 'knee_in', KNEE + Vector((0, 0.004, 0)), (-1, 0, 0), 0.027, (0, 0, 1), 0.075, 0.024, ('thigh_L', 'shin_L'), 0.087, slim=True)
     # knee pad: a hard shell on the front of the joint, strapped to the top of the shin
     bm = bm_new()
     conv.pad(bm, 0.447, 270 * D2R, 0.07, 0.062, 0.016, corner=0.03, bevel=0.009, dome=0.012, n_th=2, n_s=2)
@@ -1660,7 +1801,7 @@ ANCHORS = {  # name: (bone, rest position)
     'lamp_L': ('head', LAMP_C + Vector((0, -0.048, 0))),
     'lamp_R': ('head', _mx(LAMP_C + Vector((0, -0.048, 0)))),
     'eye': ('head', HELMET_C + Vector((0.0, -0.085, -0.005))),
-    'hand_grip_R': ('hand_R', _mx(SHOULDER + ARM_U * -0.038 + ARM_DIR * 0.655)),
+    'hand_grip_R': ('hand_R', _mx(hand_pt(*GRIP_UVS))),
 }
 
 
@@ -1995,6 +2136,14 @@ def relaxed_arms(p, fwd=3.0, out=11.0, bend=20.0, twist=8.0):
 
 
 IDLE_T = 8.0
+IDLE_EASE = 14.0                 # how far the knee of the leg that carries no weight is bent (degrees)
+# Idle's arms are not a pair. The right, over the standing leg, hangs close and all but straight
+# with the hand beside the thigh; the left hangs a little wider with the elbow bent, so the
+# forearm comes forward and the hand sits in front of the hip. (fwd, out and twist are measured
+# from the vertical: see hang_arm. A suit under pressure does hold its arms off the body, and
+# idle_pose says what stops them hanging closer than this.)
+IDLE_ARM = {'R': dict(fwd=-3.0, out=7.0, bend=14.0, twist=10.0, flex=10.0, roll=16.0),
+            'L': dict(fwd=-6.0, out=13.0, bend=32.0, twist=11.0, flex=14.0, roll=22.0)}
 
 
 def hang_arm(p, side, fwd, out, bend, twist, flex=8.0, roll=0.0):
@@ -2037,10 +2186,12 @@ def stand_on(p, ankles, knees, pitch=0.0, turn=0.0):
 
 
 def idle_pose(t=0.0):
-    """Standing at rest, upright: the weight on the right leg, that knee all but straight and the
-    hip over the ankle; the left foot a little forward and turned out with its knee eased; the
-    pelvis pushed over the standing foot and the shoulders tilted the other way; the arms hanging
-    at his sides, hands beside the thighs; the head off centre and level.
+    """Standing at rest, upright, and not like a doll: nothing in it is mirrored. The weight is on
+    the right leg, that knee all but straight and the hip over the ankle; the left foot a little
+    forward and turned out with its knee eased, so that hip hangs two degrees lower; the pelvis
+    pushed over the standing foot and the shoulders tipped four degrees the other way, the right
+    one low; the right arm hanging close with the hand beside the thigh, the left bent with the
+    hand in front of the hip (see IDLE_ARM); the head turned a little to the left of the chest.
     Over eight seconds: two breaths, a slow drift of the weight, and one look to the right.
     (The left foot leads because WorkKneel kneels with the left foot forward: it stays in this
     footprint all the way down and up.)
@@ -2048,10 +2199,12 @@ def idle_pose(t=0.0):
     shoulders and never in the height of the hips. Seen from the side the trunk leans about a
     degree and a half forward under the pack and the hips sit a centimetre ahead of the ankles:
     it is meant to be played as it is, with no correction added to the spine.
-    The arms hang from the vertical with the elbows 10 and 12 degrees bent. They are kept this
-    far out (about 12 degrees) by the hoses on the flanks, which the inner elbow links pass at
-    15 mm, and the hands are turned thumb-forward because a thumb turned in reaches the thigh
-    pocket. (WorkKneel rests the left hand on the left knee, so that hand never has to pass the leg.)"""
+    The arms hang from the vertical, not from the chest. What sets how close they can hang is the
+    hose along each flank, which the inner elbow bearing passes at about 15 mm: because the trunk
+    leans three degrees towards the standing leg, that is 7 degrees from the vertical for the right
+    arm and 13 for the left. The hands are turned in a little at the wrist bearing, as a hanging
+    hand is, and no further, because a thumb turned right in reaches the thigh pocket.
+    (WorkKneel rests the left hand on the left knee, so that hand never has to pass the leg.)"""
     sup, free, m = 'R', 'L', -1.0                         # supporting side, eased side, mirror sign
     w = TAU / IDLE_T
     ph = 2 * w * t - 0.6
@@ -2066,19 +2219,21 @@ def idle_pose(t=0.0):
     feet = {sup: dict(x=m * 0.105, y=0.0, yaw=m * 6.0), free: dict(x=m * -0.135, y=-0.035, yaw=m * -14.0)}
     # as the weight goes further onto the standing leg that knee locks a little more and the other eases
     tilt = stand_on(p, {s: foot_pose(f['x'], f['y'], 0.0, f['yaw'])[0] for s, f in feet.items()},
-                    {sup: 4.6 - 0.4 * shift, free: 7.3 + 0.7 * shift}, pitch=1.0, turn=m * (4.0 + 0.8 * drift))
+                    {sup: 4.6 - 0.4 * shift, free: IDLE_EASE + 0.7 * shift}, pitch=1.0, turn=m * (4.0 + 0.8 * drift))
     # the spine takes the pelvis' tilt back out and a little more: the shoulder is low over the standing leg.
     # As the hips go further over that foot the trunk comes back a little, so the head sways less than the hips.
-    p.q['spine'] = Q(x=0.4 - 0.3 * br, y=-0.5 * tilt + m * (0.5 - 0.15 * settle), z=m * -1.5)
-    p.q['chest'] = Q(x=0.4 - 0.9 * br, y=-0.5 * tilt + m * (0.6 - 0.15 * settle), z=m * (-3.0 - 0.6 * drift + 2.0 * look))
-    p.q['neck'] = Q(x=-0.8 + 0.5 * br, y=m * -1.0, z=m * (-2.5 + 4.0 * look))
-    p.q['head'] = Q(x=-1.0 + 0.4 * br + 0.8 * math.sin(w * t + 0.4) - 1.5 * look, y=m * (-1.6 + 1.2 * look), z=m * (-5.0 + 8.0 * look))
-    p.shrug(sup, up=-1.0 + 1.6 * br, fwd=0.0)
-    p.shrug(free, up=0.8 + 1.6 * br, fwd=0.0)
+    p.q['spine'] = Q(x=0.4 - 0.3 * br, y=-0.5 * tilt + m * (1.1 - 0.15 * settle), z=m * -1.5)
+    p.q['chest'] = Q(x=0.4 - 0.9 * br, y=-0.5 * tilt + m * (1.7 - 0.15 * settle), z=m * (-3.0 - 0.6 * drift + 2.0 * look))
+    p.q['neck'] = Q(x=-0.8 + 0.5 * br, y=m * -0.2, z=m * (-3.0 + 4.0 * look))
+    p.q['head'] = Q(x=-1.0 + 0.4 * br + 0.8 * math.sin(w * t + 0.4) - 1.5 * look, y=m * (-0.6 + 1.2 * look), z=m * (-6.0 + 8.0 * look))
+    p.shrug(sup, up=-1.6 + 1.6 * br, fwd=0.0)
+    p.shrug(free, up=1.2 + 1.6 * br, fwd=1.5)
     p.plant(sup, **feet[sup])
     p.plant(free, pole=(m * -0.25, -1.0, 0.0), **feet[free])
-    hang_arm(p, sup, fwd=-5.0 + 0.6 * late, out=11.5 + 0.4 * late, bend=9.5 + 1.0 * late + 1.0 * look, twist=14.0, flex=8.0, roll=6.0)
-    hang_arm(p, free, fwd=-3.5 + 0.6 * late - 1.0 * look, out=13.5 + 0.4 * late, bend=12.0 + 1.0 * late, twist=10.0, flex=10.0, roll=2.0)
+    a = IDLE_ARM[sup]
+    hang_arm(p, sup, fwd=a['fwd'] + 0.6 * late, out=a['out'] + 0.4 * late, bend=a['bend'] + 1.0 * late + 1.0 * look, twist=a['twist'], flex=a['flex'], roll=a['roll'])
+    a = IDLE_ARM[free]
+    hang_arm(p, free, fwd=a['fwd'] + 0.7 * late - 1.0 * look, out=a['out'] + 0.4 * late, bend=a['bend'] + 1.6 * late + 0.8 * shift, twist=a['twist'], flex=a['flex'] + 1.0 * late, roll=a['roll'])
     return p
 
 
@@ -2416,7 +2571,21 @@ def clip_kneel_up(t):
     return kneel_move(smooth01(1.0 - t / KNEEL_T))
 
 
+# The rover's yoke as the seated driver has it (rover.glb, vehicles.py: the yoke is on a column in
+# front of the left seat, and the game puts this model's origin 0.52 m under the seat anchor).
+# It is a U with a bar across the top, 0.15 m from the hub to each horn, on a column that leans
+# back towards the driver. If the rover's cab is rebuilt these three have to follow.
+YOKE_C = Vector((0.0, -0.565, 0.713))                   # the hub
+YOKE_N = Vector((0.0, 0.85, 0.527)).normalized()        # along the column, towards the driver
+YOKE_UP = Vector((0.0, -0.527, 0.85)).normalized()      # up the face of the yoke
+YOKE_R = 0.15
+DRIVE_HOLD = 4.0                                        # where on the rim the hands hold it, degrees above the bar
+
+
 def clip_drive(t):
+    """Seated at the rover's yoke with a hand on each horn: the horn lies in the crook of the fingers
+    (where hand_grip_R is), thumbs up, the arms reaching forward and down to it, and the hands go
+    round with the small steering motion."""
     w = TAU / 3.0
     steer = 13 * math.sin(w * t) + 5 * math.sin(2 * w * t + 1.0)
     p = Pose()
@@ -2428,11 +2597,12 @@ def clip_drive(t):
     p.q['head'] = Q(x=-1 + 1.0 * math.sin(2 * w * t), z=0.45 * steer)
     for side, sx in SIDES:
         p.plant(side, sx * 0.15, -0.50 + 0.012 * sx * math.sin(w * t + 1), pitch=-8, yaw=sx * 8, pole=(sx * 0.25, -0.3, 1))
-        p.shrug(side, fwd=7)
-        a = rad(steer)
-        grip = Vector((sx * 0.17 * math.cos(a), -0.43, 0.955 + sx * 0.17 * math.sin(a)))
-        hd = Quaternion(Y_AX, -a) @ Vector((0, -0.75, 0.66))
-        p.arm(side, grip - hd.normalized() * 0.085 + Vector((sx * 0.03, 0, 0)), pole=(sx * 0.75, 0.25, -0.6), hand=hand_q(side, hd, (-sx, 0, 0)))
+        p.shrug(side, fwd=9)
+        a = rad(DRIVE_HOLD + sx * steer)
+        out = X_AX * (sx * math.cos(a)) + YOKE_UP * math.sin(a)          # from the hub to this hand's horn
+        grip = YOKE_C + out * YOKE_R
+        wrist = grip + out * -GRIP_UVS[0] + YOKE_N * (GRIP_UVS[2] - L_UPPER - L_FORE)
+        p.arm(side, wrist, pole=(sx * 0.75, 0.25, -0.6), hand=hand_q(side, -YOKE_N, -out))
     return p
 
 
@@ -2627,8 +2797,9 @@ def clip_test(t):
 
 # Notes for whoever plays these clips in the game:
 #   * Idle is eight seconds and stands on the right leg with the left foot 35 mm ahead (see
-#     idle_pose). It stands upright by itself (knees 5 and 7 degrees, hips over the ankles, trunk
-#     1.5 degrees forward, arms at the sides): play it without any added spine rotation.
+#     idle_pose). It stands upright by itself (knees 5 and 14 degrees, hips over the ankles, trunk
+#     1.5 degrees forward, the right arm hanging and the left hand in front of the hip): play it
+#     without any added spine rotation.
 #   * Every clip that starts or ends standing does it in Idle's pose at time 0, exactly (see
 #     stand_pose): JumpStart, Wave, Collapse and KneelDown start in it; Land, Wave and KneelUp end
 #     in it. So restart Idle at time 0 when fading to it. WorkStand stands in Idle's footprints
@@ -2647,17 +2818,21 @@ def clip_test(t):
 #     0.3 m in front of the model's origin and 0.2 m to its right; the hips sit 0.3 m behind it.
 #   * Above the neck ring there are two groups, told apart by material name, and the game shows
 #     one: the helmet (helmet_white, helmet_dark, helmet_metal, helmet_light, visor_gold) and the
-#     bare head (head_skin, head_cap, head_dark). Each fits inside the other's space, so nothing
-#     has to move when they are swapped.
+#     bare head (every material named head_*: head_skin, head_cap, head_hair, head_dark). Each fits
+#     inside the other's space, so nothing has to move when they are swapped.
 #   * Walk and Run are in place. The planted foot moves back at exactly TREADMILL[name] m/s, so
 #     the clip matches the ground when the body is moved at that speed and the clip plays at 1x.
 #   * Drive is seated with the feet on the model's ground plane: the hips bone sits 0.52 m above
 #     the model origin (and straight above it). Put the origin 0.52 m below the seat anchor.
+#     The hands hold the rover's own yoke, whose place the clip quotes from vehicles.py (YOKE_C).
 #   * Collapse is not in place: he drops onto his knees about 0.5 m ahead of where he stood and
 #     falls forward from there, so the body ends between 0 and 1.85 m in front of the origin.
 #   * JumpStart ends on the toes at take-off; Land starts at touch-down and ends in the Idle stance.
 #   * Anchors (lamp_L, lamp_R, eye on the head; hand_grip_R on the right hand): in the rest pose
 #     their axes equal the model's axes, so an anchor's local +Z is the astronaut's forward.
+#     hand_grip_R is in the crook of the fingers, which close round about 45 mm there: put the
+#     middle of a tool's handle on it with the handle along the anchor's Z (across the palm).
+#   * The hands have no finger bones: the fingers keep one relaxed half-curl in every clip.
 CLIPS = [  # name, seconds, samples, loop, function
     ('Idle', IDLE_T, 96, True, clip_idle),
     ('Walk', 0.9, 54, True, clip_walk),
@@ -2740,7 +2915,7 @@ PROXIES = [  # label, bone, depth function on rest-space points (metres inside; 
     ('shin_L', 'shin_L', lambda v: _capsule_depth(v, KNEE, ANKLE, 0.075)),
     ('shin_R', 'shin_R', lambda v: _capsule_depth(v, _mx(KNEE), _mx(ANKLE), 0.075)),
 ]
-HAND_PIECES = ('glove', 'fingers', 'thumb', 'finger_seams', 'wrist_ring', 'wrist_latch', 'forearm', 'wristcomp')
+HAND_PIECES = ('glove', 'fingers', 'fingertips', 'thumb', 'thumbtip', 'wrist_ring', 'wrist_latch', 'forearm', 'wristcomp')
 SOLE_PTS = [('foot', (0, HEEL_Y, 0.0)), ('foot', (0, 0.0, 0.0)), ('toe', (0, BALL.y, 0.0)), ('toe', (0, TOE_TIP.y, 0.0))]
 
 
