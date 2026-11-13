@@ -44,10 +44,16 @@ export async function openGame(o = {}) {
   // step with the browser drawing something it never finished, and there was nothing to say where the game was.
   // So the page is asked every twenty seconds where it is and what it is drawing, and a call into it that has not
   // returned in fifteen minutes throws with the last answer.
-  let heard = null;
+  // (And a page that has answered nothing at all for fifteen minutes ends the test outright: the step that stood
+  // was a key press, which waits on the page with no limit of its own.)
+  let heard = null, answered = Date.now();
   const beat = setInterval(() => {
+    if (Date.now() - answered > 900000) {
+      console.error(`\nThe page has not answered for fifteen minutes; giving up. Last heard from it: ${JSON.stringify(heard)}`);
+      process.exit(3);
+    }
     page.evaluate(() => { const G = window.__MG; return G && G.ready ? { site: G.World && G.World.spawn ? [+G.World.spawn.lat.toFixed(3), +G.World.spawn.lon.toFixed(3)] : null, paused: !!G.paused, info: G.info ? G.info() : null } : null; })
-      .then((v) => { if (v) heard = { ...v, at: new Date().toISOString() }; }).catch(() => {});
+      .then((v) => { answered = Date.now(); if (v) heard = { ...v, at: new Date().toISOString() }; }).catch(() => { answered = Date.now(); });
   }, 20000);
   beat.unref();
   const game = {

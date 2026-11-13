@@ -51,6 +51,19 @@ The debug hook `window.__MG` (see `src/main.js`) can start a game at any site, t
 the local time and the weather, step the simulation without drawing, and place a free camera
 (`photo`) for pictures.
 
+Running these in a cloud session: the browser draws in software, on four cores, inside a
+memory limit of 14 GB shared by everything the session starts. One browser at phone size can
+hold 4 GB. Three or four at once (a test run, a helper's pictures, another helper's test
+run) have filled the limit and had browsers killed. Run one browser at a time, two at most,
+and tell helpers the same.
+
+One whole run also stood for half an hour on a single step of the interface suite (the first
+key press after a new game started from the title), with the browser's four drawing threads
+busy throughout and its page not answering. The cause was not found: twenty random starts
+and a run of the suite by itself did not repeat it. A call into the page that does not
+return in fifteen minutes now fails its test and prints the site and what was being drawn
+(`tests/lib.mjs`), so the next time there will be something to go on.
+
 ## The bar
 
 | Area | Bar | State |
@@ -339,28 +352,28 @@ duplicate names, statistics under three names, and most of the first-ten hesitat
 
 | # | Finding | State |
 | --- | --- | --- |
-| Z1 | Small phone, colony inventory: rows have a fixed height and their descriptions wrap, so rows print over each other | open |
-| Z2 | Small phone, journal discoveries: a lander card's badge and year are drawn over its name; "MARS 6" breaks inside the name | open |
-| Z3 | Small phone, rescue screen: the card cuts off its last line and its button | open |
-| Z4 | Oxygen emergency: the ring says 21 with "1:14 left" and the message under it says "Suit O2 at 25%", tagged HAB; the banner and the task say the same thing again | open |
-| Z5 | In the Hab during a breach the compass tag names a survey site 4.6 km off | open |
-| Z6 | At 844 the six gauges are lines 34 px long and 3 px tall with 6 px arrows; the colour-blind hatching cannot be seen; the small phone uses another design whose fill ends inside the word | open |
-| Z7 | One frame after waking has no HUD at all | open |
-| Z8 | A red wash over the screen at the moment the suit is sealed; the old prompt still up | open |
-| Z9 | The six bars are explained only in the third paragraph of a card and behind the menu; nothing on the panel says it can be tapped | open |
-| Z10 | Numbers that read as bugs: "the last 17 entries" over two; "13 to plant" against 6 potatoes; "14 sols with nothing to eat" then "15 short"; a storm banner with power rising; Hab oxygen just dropped with an up arrow; food −2 beside one breakfast; the ring "150" with no unit; "Harvest potatoes (0 so far)" with no target | open |
-| Z11 | Numbers that matter are 11 px, not 13: waypoint tags, the task's distance, the compass tag, the rover's percentages, the map scale | open |
-| Z12 | Night is said twice in the same words (a card and the task) | open |
-| Z13 | Leaving the rover: two controls and three names (Exit, Step out, Leave the rover) | open |
-| Z14 | Unlabelled controls: the idle action button is a bare circle, the refused state a bare padlock; compass icons without names; the comms desk says USE | open |
-| Z15 | The fade at the end of a list reads as "disabled" (the last rows of Controls and the bars guide) | open |
-| Z16 | Settings: slider thumbs 24 x 28 px, switches 52 x 28, a 43 px segment; one thumb orange and three cream with no meaning | open |
-| Z17 | Small phone: a map hint cut short on the marker view; headers and a banner title that wrap | open |
-| Z18 | Map: "+6" unexplained until tapped; at 667 a label sits over another marker; markers under the tool buttons | open |
-| Z19 | Tight gaps: 4–6 px in the top-centre stack; cards 4–8 px under the bars panel | open |
-| Z20 | Alignment: the selected menu item indented 6 px; the recommended card raised 3 px; an orphan statistics tile; "3.4 km / walked" against "3.4 / km walked"; no title on the small phone's Settings; three "ready" badges at once | open |
-| Z21 | Wording: "Pull the antenna" when no antenna has been mentioned; "slow going here" without saying where it is fast; photo mode against the camera-shaped VIEW button | open |
-| Z22 | First ten minutes, where a new player still hesitates: the first log message competes with the task; nothing says what inspecting a machine told him; how many loads a bed needs; "10 to plant" for a bed that takes one; a panel prompt no task has asked for; the water burn never asked for and its cost in air not warned; the colony screen a dead end on day one | open |
+| Z1 | Small phone, colony inventory: rows have a fixed height and their descriptions wrap, so rows print over each other | fixed: inventory rows grow with their text (the pane's grid gave a row only its least height once the pane was full) |
+| Z2 | Small phone, journal discoveries: a lander card's badge and year are drawn over its name; "MARS 6" breaks inside the name | fixed: a card's header wraps: the name whole, the year after it, badges beside it or on the line under |
+| Z3 | Small phone, rescue screen: the card cuts off its last line and its button | fixed: dialogs have a scrolling body and pinned buttons; the rescue card fits at 667 with its last entry across the foot |
+| Z4 | Oxygen emergency: the ring says 21 with "1:14 left" and the message under it says "Suit O2 at 25%", tagged HAB; the banner and the task say the same thing again | part fixed: the stale "25%" line no longer shows on the HUD (the journal keeps it, tagged SUIT, without a percentage). The banner and the task both remain: two places, where there were four |
+| Z5 | In the Hab during a breach the compass tag names a survey site 4.6 km off | fixed: the compass names the mission's lead place first, and only that in an emergency; indoors in a breach it reads "BREACH 4 m" |
+| Z6 | At 844 the six gauges are lines 34 px long and 3 px tall with 6 px arrows; the colour-blind hatching cannot be seen; the small phone uses another design whose fill ends inside the word | fixed: one design at both phone sizes: name and number over a bar 6 px tall and 121 px long (89 px at 667), arrows 8 px. Low tints the whole row amber; critical is red and ringed; colour-blind mode stripes or cross-hatches the whole bar. (The desktop keeps the thin line.) |
+| Z7 | One frame after waking has no HUD at all | fixed: the HUD shows and hides with menus at once instead of fading (a fade is what a slow frame caught half-way) |
+| Z8 | A red wash over the screen at the moment the suit is sealed; the old prompt still up | fixed: the seal flash is green and brief, the old prompt clears, and the prompt reads "Seal the suit" |
+| Z9 | The six bars are explained only in the third paragraph of a card and behind the menu; nothing on the panel says it can be tapped | fixed: the first time in the Hab a one-line card with a pointer stands under the panel ("Tap the bars for what each means") and the panel carries a "?"; the numbers card lost its third paragraph; the guide is shorter and fits 844 whole |
+| Z10 | Numbers that read as bugs: "the last 17 entries" over two; "13 to plant" against 6 potatoes; "14 sols with nothing to eat" then "15 short"; a storm banner with power rising; Hab oxygen just dropped with an up arrow; food −2 beside one breakfast; the ring "150" with no unit; "Harvest potatoes (0 so far)" with no target | part fixed. Game faults found and fixed: a style rule meant for the HUD's log hid the journal's lines ("17 entries" over two), and a jump in Hab oxygen showed the wrong arrow. Reworded: "Seed for 13 beds" with what a bed takes; the night's account says why the shortfall grew; the breakfast line; "Bring in the first harvest". The storm with power rising was the screenshot script (its pinned storm did not reach the Hab's panels). Open: the suit ring's "150" has no unit |
+| Z11 | Numbers that matter are 11 px, not 13: waypoint tags, the task's distance, the compass tag, the rover's percentages, the map scale | fixed, measured in the page at both phones: waypoint tag, task distance, compass distance, suit time and map scale 13 px; gauge and rover numbers 14 px |
+| Z12 | Night is said twice in the same words (a card and the task) | fixed: night is a two-word card ("Night / Time to sleep"); the task carries the reason |
+| Z13 | Leaving the rover: two controls and three names (Exit, Step out, Leave the rover) | fixed: on touch EXIT is the one control and every text says "Exit the rover"; the keyboard keeps F |
+| Z14 | Unlabelled controls: the idle action button is a bare circle, the refused state a bare padlock; compass icons without names; the comms desk says USE | fixed: the idle action button is dimmed; a refused one shows a padlock and "LOCKED"; compass marks without a name are dots; the comms desk says CHECK. (The idle button is still an empty circle.) |
+| Z15 | The fade at the end of a list reads as "disabled" (the last rows of Controls and the bars guide) | fixed: the bottom fade is gone; a "More" pill on a short shelf marks a list that continues |
+| Z16 | Settings: slider thumbs 24 x 28 px, switches 52 x 28, a 43 px segment; one thumb orange and three cream with no meaning | part fixed: slider thumbs 44 px wide on a 208 px track, switches 60 x 32 in rows worked as a whole, segments at least 48 x 44, all thumbs one colour. Thumbs are 32 px tall, not 44 |
+| Z17 | Small phone: a map hint cut short on the marker view; headers and a banner title that wrap | fixed: the map hint is a whole chip over the map; the samples header, the out-of-range title and the "Candle" row are one line each |
+| Z18 | Map: "+6" unexplained until tapped; at 667 a label sits over another marker; markers under the tool buttons | fixed: "HAB & 6 MORE"; a label is never nearer another marker than its own; on a phone You, Hab and Key sit in the status bar, so nothing is under them |
+| Z19 | Tight gaps: 4–6 px in the top-centre stack; cards 4–8 px under the bars panel | fixed: cards stand 8 px under the bars panel at both sizes (measured); the top-centre stack has 8 to 12 px between its parts |
+| Z20 | Alignment: the selected menu item indented 6 px; the recommended card raised 3 px; an orphan statistics tile; "3.4 km / walked" against "3.4 / km walked"; no title on the small phone's Settings; three "ready" badges at once | fixed: no indent on the selected menu item and no raised card on touch; statistics are 4 x 4; distances read "3.4 km / Walked" everywhere; Settings has its title at 667; tab counts are pills; a locked upgrade shows one reason and no dead button |
+| Z21 | Wording: "Pull the antenna" when no antenna has been mentioned; "slow going here" without saying where it is fast; photo mode against the camera-shaped VIEW button | fixed: no antenna; "Dig regolith here (slow) / The heaps by the airlock are quicker"; the lander hint says "choose Photo mode from MENU", and VIEW has an eye, not a camera |
+| Z22 | First ten minutes, where a new player still hesitates: the first log message competes with the task; nothing says what inspecting a machine told him; how many loads a bed needs; "10 to plant" for a bed that takes one; a panel prompt no task has asked for; the water burn never asked for and its cost in air not warned; the colony screen a dead end on day one | part fixed: the log is hidden during the first minute on a phone; inspecting a machine says what it does and which bar is its own; the heap says "you carry 0 / One load fills one bed"; the panel prompt says "77% output → 100%"; the burn warns that it may cost some of the Hab's air; the day-one fabricator says where materials come from. Also found: after the numbers the phone's mission list had dropped the farm and kept only the struck-through line. Open: VIEW still arrives unintroduced; the "NEW" cards do not point at their buttons; "NEW · MAP" still arrives during the first dig; "Make water" is not on the phone HUD before the burn (only the lead task fits) |
 
 ## Open items
 
@@ -369,7 +382,7 @@ duplicate names, statistics under three names, and most of the first-ten hesitat
 | 21 | Act on the fifth picture review (X1–X15 above) | acted on and reviewed again: see round 6 |
 | 29 | Act on the sixth picture review (P1–P18 above), the caldera's faults and the floating astronaut first, then the launch and the landmarks | in progress |
 | 22 | Act on the third interface review (Y1–Y19 above) | acted on (fourteen fixed, five part fixed) and reviewed again: see the fourth review. Known to be weak still: the phone mission block when its first line and reason run to four lines; the marker hopping on a small phone while driving; long log entries on a phone |
-| 28 | Act on the fourth interface review (Z1–Z22 above), the three broken small-phone screens and the emergency contradictions first | in hand |
+| 28 | Act on the fourth interface review (Z1–Z22 above), the three broken small-phone screens and the emergency contradictions first | acted on (seventeen fixed, five part fixed), to be reviewed again. The audit now walks the same 64 states a phone that the pictures show (they were two lists, which is how three broken screens were in the pictures and not in the audit), has rules for text over text, text cut by its card and lists that scroll unannounced, and a self-test that puts each old fault back and requires the audit to name it. Known to be weak still: the bars panel is 20 px taller, so the log shows four lines at most; the idle action button is an empty circle; the suit ring has no unit |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
 | 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | after story mode is finished |
