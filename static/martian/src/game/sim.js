@@ -432,10 +432,11 @@ export function sleepToDawn(inRover) {
     // (What is in the ground counts toward the wait. Without it the gap grew with every bed planted, since a bed
     //  takes a ration: "14 with nothing to eat" at the desk, then 15 the morning after doing as he was told.)
     const short = wait - meals, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
+    // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
     notes.push(short <= 0 ? `Food for ${sols(meals)}; the rescue is in ${wait}: enough`
       : coming >= short ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: enough, if they come in`
-        : coming > 0 ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: ${short - coming} still to grow`
-          : `Food for ${sols(meals)}; the rescue is in ${wait}: ${short} still to grow`); }
+        : coming > 0 ? `Food for ${sols(meals)}, and the beds hold ${coming} more; the rescue is in ${wait}: ${sols(short - coming)} still with nothing to eat`
+          : `Food for ${sols(meals)}; the rescue is in ${wait}: ${sols(short)} with nothing to eat`); }
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
   const later = rolled && S.sol === 2 && !S.pf.connected

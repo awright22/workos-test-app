@@ -472,6 +472,9 @@ export function log(full, cls, o) {
   while (UI.log.children.length > 4) UI.log.firstChild.remove();
 }
 
+/** Take what is showing off the HUD's log (the journal keeps it): for a moment that is about one thing. */
+export function clearLog() { UI.log.textContent = ''; }
+
 // ------------------------------------------------------------------------------------------
 // The interaction prompt (and the touch action button, which shows the same verb)
 // ------------------------------------------------------------------------------------------

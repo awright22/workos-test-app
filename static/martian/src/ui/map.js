@@ -174,8 +174,9 @@ function placeLabels(you, storms) {
     // (a label keeps inside the map: at an edge it goes to the marker's other side. The Hab and the objective are
     //  always named: where no place is clear, beside the marker all the same; but only after the clear places have
     //  been tried, or "HAB & 6 MORE" was written across the lander next to it.)
-    let at = spots.findIndex(([x, y], k) => x >= 2 && x + w <= W - 2 && free(x, y, w, h) && owned(x, y) && (k < 2 || apart(x, y, w, h)));
-    if (at < 0 && m.pri <= 2) at = 0;
+    // (inside it top and bottom as well: at the head of the map a name was cut in half by the screen's header)
+    let at = spots.findIndex(([x, y], k) => x >= 2 && x + w <= W - 2 && y >= 2 && y + h <= H - 2 && free(x, y, w, h) && owned(x, y) && (k < 2 || apart(x, y, w, h)));
+    if (at < 0 && m.pri <= 2 && m.y - h / 2 >= 2 && m.y + h / 2 <= H - 2) at = 0;
     if (at < 0) continue;
     const [x, y] = spots[at];
     m.named = true;
@@ -541,13 +542,24 @@ export function initMap(body) {
     else if (k === 'ArrowDown') easeTo({ lat: (goal || view).lat - step });
     else if (k === '+' || k === '=') zoomAt(W / 2, H / 2, 1.6, true);
     else if (k === '-' || k === '_') zoomAt(W / 2, H / 2, 1 / 1.6, true);
-    else if (k === '0') easeTo({ ppd: minPpd() });
+    else if (k === '0') easeTo({ ppd: minPpd(), lat: bandLat() });
     else return;
     ev.preventDefault(); ev.stopPropagation();
   });
   onLayout(() => { if (UI.mapScreen.style.display === 'block') { resize(); request(); } });
 }
 
+/**
+ * The latitude the whole-planet view is centred on: the middle of the band its markers are in. (Where the whole
+ * planet does not fit the height of the screen, a view centred on the equator or on the Hab cut the northernmost
+ * lander's marker in half at the top edge.)
+ */
+function bandLat() {
+  const ll = vecToLl(_v1.copy(player.pos).normalize());
+  let lo = ll.lat, hi = ll.lat;
+  for (const m of buildMarkers()) { lo = Math.min(lo, m.lat); hi = Math.max(hi, m.lat); }
+  return (lo + hi) / 2;
+}
 /** Called when the map screen opens: the whole planet, centred on you (your zoom is kept after that). */
 export function openMap() {
   readColours();
@@ -563,12 +575,8 @@ export function openMap() {
   if (!opened && W) {
     opened = true;
     const ll = vecToLl(_v1.copy(player.pos).normalize());
-    view.lon = ll.lon; view.lat = 0; view.ppd = minPpd();
-    // (where the whole planet does not fit the height of the screen, the view starts on the band its markers are in:
-    //  on a wide phone the northernmost lander's marker was cut in half by the top edge)
-    let lo = ll.lat, hi = ll.lat;
-    for (const m of buildMarkers()) { lo = Math.min(lo, m.lat); hi = Math.max(hi, m.lat); }
-    view.lat = (lo + hi) / 2;
+    view.lon = ll.lon; view.ppd = minPpd();
+    view.lat = bandLat();
     clampView(view);
   }
   selected = null;

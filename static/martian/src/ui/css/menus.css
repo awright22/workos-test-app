@@ -487,6 +487,19 @@
 .mg-compact .sheet.tabbed .sheet-hd { gap: max(1rem, 16px); }
 /* (a row's control is 44 px high: the figure beside a slider sits clear of its handle) */
 .mg-touch .set-row .ctl { gap: 1rem; }
+/* the night's account fits the screen whatever it has to say: its notes scroll, its button is always there */
+.sleep.done { display: flex; flex-direction: column; align-items: center; min-height: 0; max-height: 100%; }
+.sleep.done .sum { display: flex; flex-direction: column; align-items: center; min-height: 0; flex: 0 1 auto; }
+.sleep .solbig, .sleep .deltas, .sleep .wake { flex: none; }
+.sleep .deltas { width: 100%; }
+.sleep .notes { flex: 0 1 auto; min-height: 0; width: 100%; --cue-bg: #030303; }
+@media (max-width: 760px) {
+  .mg-compact .sleep .solbig { font-size: 2.5rem; }
+  .mg-compact .sleep .deltas { margin-top: .5rem; }
+  .mg-compact .sleep .delta { padding: .3125rem .25rem; gap: .25rem; }
+  .mg-compact .sleep .notes { margin-top: .5rem; }
+  .mg-compact .sleep .wake { margin-top: .5rem; }
+}
 /* the night's account: what comes after today, once, on the first morning */
 .sleep .notes .today.later { margin-top: 0; color: var(--ink-2); }
 .sleep .notes .today.later b { color: var(--cold); }

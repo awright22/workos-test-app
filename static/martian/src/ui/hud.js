@@ -278,11 +278,13 @@ export const SCREEN_UNLOCKS = [
   // the bars come up as he first steps into the Hab: at the door there is one number, the suit's
   { id: 'bars', flag: 'uiBars', name: 'The six bars', line: 'What keeps you alive, top left.', keys: 'The pause menu says what each one is.',
     when: () => !S.flags.coldOpen && (S.inside || Object.keys(S.checkedSystems).length >= 1 || !!S.flags.didMath || S.sol > 1), quiet: () => !!S.flags.didMath },
-  { id: 'colony', flag: 'uiColony', name: 'Colony', key: 'C', line: 'Your stores, the fabricator and upgrades.',
+  // (a line short enough to stand whole on the smallest phone's card, which has room for one: the longer ones were
+  //  cut to "Your stores, the fabricator and…")
+  { id: 'colony', flag: 'uiColony', name: 'Colony', key: 'C', line: 'Stores, fabricator, upgrades.',
     when: () => !S.flags.coldOpen && (Object.keys(S.checkedSystems).length >= 1 || S.flags.didMath || S.sol > 1) },
-  { id: 'journal', flag: 'uiJournal', name: 'Journal', key: 'J', line: 'Your tasks, what you have found, and the log.',
+  { id: 'journal', flag: 'uiJournal', name: 'Journal', key: 'J', line: 'Tasks, finds and the way home.',
     when: () => !S.flags.coldOpen && (!!S.flags.didMath || S.sol > 1) },
-  { id: 'map', flag: 'uiMap', name: 'Map', key: 'M', line: 'The whole planet, and how far everything is.',
+  { id: 'map', flag: 'uiMap', name: 'Map', key: 'M', line: 'All of Mars, with distances.',
     when: () => !S.flags.coldOpen && (!!S.flags.didMath || S.sol > 1) && (!S.inside || S.sol > 1 || !!S.flags.pfRevealed) },
 ];
 export function screenUnlocked(id) { const s = SCREEN_UNLOCKS.find((x) => x.id === id); return !s || !!S.flags[s.flag]; }

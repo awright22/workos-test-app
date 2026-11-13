@@ -332,26 +332,26 @@ const FEATURE_KIND = { volcano: 'Volcano', basin: 'Impact basin', crater: 'Crate
 const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1));
 
 /**
- * The whole of the way home, in three steps, on the journal's task page from the first sol: what the mission list's
- * lines are for. (After ten minutes of play nothing had said that the rescue is a rocket a long drive away, or that
- * Earth has to be told first.)
+ * The whole of the way home, in three steps, at the head of the journal's task page from the first sol: what the
+ * mission list's lines are for. (After ten minutes of play nothing had said that the rescue is a rocket a long drive
+ * away, or that Earth has to be told first.) A strip, not a page: each step is a few words and one line.
  */
 function wayHomeHtml() {
   const mav = fmtDist(groundDist(World.hab.position, World.mav.position));
-  const radio = S.pf.connected ? 'Done. Houston knows, and sends survey tasks.'
-    : S.pf.loaded ? 'Pathfinder is aboard the rover. Bring it to the uplink ring by the Hab.'
-      : S.flags.pfRevealed ? `Pathfinder’s radio can. It lies in Ares Vallis, ${fmtDist(distTo(World.pathfinder.position))} away: take the rover.`
-        : 'Pathfinder, a lander dead since 1997, has a radio that can. The charts will show where it lies in a few sols.';
+  const radio = S.pf.connected ? 'Houston knows. NASA’s tasks are below.'
+    : S.pf.loaded ? 'Pathfinder is aboard the rover: bring it to the uplink ring.'
+      : S.flags.pfRevealed ? `Pathfinder’s radio can: Ares Vallis, ${fmtDist(distTo(World.pathfinder.position))} away. Take the rover.`
+        : 'An old lander’s radio can. The charts will show where it lies in a few sols.';
   const steps = [
-    ['Every sol', 'Stay alive', 'Food, water, air and power. The mission list has today’s part.', S.won ? 'done' : 'now'],
-    [S.pf.connected ? 'Done' : 'Then', 'Tell Earth you are alive', radio, S.pf.connected ? 'done' : 'next'],
-    [`Sol ${S.rescueSol}`, 'Fly home', `The Ares 4 rocket stands in Schiaparelli, ${mav} from the Hab. ${S.flags.mavRevealed ? 'The launch window is open.' : `It cannot launch before Sol ${S.rescueSol}.`}`, S.won ? 'done' : S.pf.connected ? 'next' : ''],
+    ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
+    [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
+    [`Sol ${S.rescueSol}`, 'Fly home', `The Ares 4 rocket in Schiaparelli, ${mav} from the Hab.${S.flags.mavRevealed ? ' The window is open.' : ''}`, S.pf.connected ? 'next' : ''],
   ];
-  return `<div class="pane-hd">The way home <span>Rescue: Sol ${S.rescueSol}</span></div><ol class="way">` +
+  return '<div class="pane-hd">The way home</div><ol class="way">' +
     steps.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';
 }
 function tasksHtml() {
-  let h = `<div class="pane-hd">Mission <span>Rescue: a rocket in Schiaparelli, Sol ${S.rescueSol}</span></div><div class="obj-list">`;
+  let h = wayHomeHtml() + '<div class="pane-hd">Mission</div><div class="obj-list">';
   let primary = false, open = '', closed = '', nDone = 0;
   // as on the HUD (the same list, the same distances): the most pressing first, each with its reason and how far
   for (const { o, done: d } of missionList()) {
@@ -362,14 +362,14 @@ function tasksHtml() {
     const row = `<div class="obj ${cls}"><i class="mk"></i><span class="tx">${chem(esc(o.text()))}</span><span class="ds t-num">${d ? '' : objectiveDist(o)}</span>${why ? `<span class="why">${chem(esc(why))}</span>` : ''}</div>`;
     if (d) { closed += row; nDone++; } else open += row;
   }
-  h += (open || '<div class="obj"><i class="mk"></i><span class="tx">Stay alive.</span></div>') + '</div>' + wayHomeHtml();
+  h += (open || '<div class="obj"><i class="mk"></i><span class="tx">Stay alive.</span></div>') + '</div>';
   const doneHtml = closed ? `<div class="pane-hd">Done <span>${nDone}</span></div><div class="obj-list done-list">${closed}</div>` : '';
   const active = QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length;
   const done = QUEST_DEFS.filter((q) => S.quests[q.id] === 'done').length;
   h += `<div class="pane-hd">NASA survey tasks <span>${S.pf.connected ? `${active} active · ${done} complete` : 'No uplink'}</span></div>`;
   if (!S.pf.connected) {
     // (what an uplink is and how to come by one: "No uplink" stood over an empty box)
-    return h + `<div class="empty">${icon('dish')}<b>No uplink yet</b>Earth does not know you are alive: step two of the way home. Once Pathfinder’s radio is working, NASA sends survey tasks here and pays for them in supply pods and blueprints.</div>` + doneHtml;
+    return h + `<div class="empty">${icon('dish')}<b>No uplink yet</b>Earth does not know you are alive. Once a radio is working (the second step of the way home), NASA sends survey tasks here, and pays for them in supply pods and blueprints.</div>` + doneHtml;
   }
   const list = QUEST_DEFS.map((q) => ({ q, st: S.quests[q.id], pos: questTargetPos(q) }))
     .map((x) => ({ ...x, d: x.pos ? distTo(x.pos) : -1 }))

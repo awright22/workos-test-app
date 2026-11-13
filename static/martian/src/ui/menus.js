@@ -417,7 +417,9 @@ export function showSleepSummary(d, onDone) {
   const today = todo ? todo.o.text() : '';
   box.querySelector('.sum').innerHTML =
     `<div class="solbig"><span>${d.turned === false ? 'Still sol' : 'Dawn · Sol'}</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
-    `<div class="notes">${d.notes.map((n) => `<div>${chem(esc(n))}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${chem(esc(today))}</div>` : ''}` +
+    // (the notes are the part that gives way when there is much to say on a small phone: they scroll, and the
+    //  heading, the five figures and the button keep their places)
+    `<div class="notes mg-scroll">${d.notes.map((n) => `<div>${chem(esc(n))}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${chem(esc(today))}</div>` : ''}` +
     `${d.later ? `<div class="today later"><b>Later</b> ${chem(esc(d.later))}</div>` : ''}</div>` +
     (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
   box.classList.add('done');

@@ -3,7 +3,7 @@ import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
 import { BAL, S, roverPowerCap, suitCap } from './state.js';
-import { flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
+import { clearLog, flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
 import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
@@ -176,6 +176,7 @@ addI({
     // One thing at a time. The moment itself is the flash, the dial filling and the next thing to do, alone. The
     // Hab's line comes when that has been read, and his own log entry when the Hab's has. (All of it used to land
     // within a second, on top of the old prompt and the old task struck through.)
+    clearLog();                                          // (a line from the run to the door is not left to surface now)
     setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 2800);
     setTimeout(() => log(SOL_LOGS[1]), 9000);
   },
@@ -219,7 +220,7 @@ addI({
   enabled: () => World._activePanel && World._activePanel.dust > 0.06 ? true : statusText('This panel is clean'),
   // (what wiping it is worth, in the prompt: nothing else on screen said whether it was)
   label: () => 'Wipe this solar panel',
-  sub: () => `Its output: ${Math.round((1 - (World._activePanel ? World._activePanel.dust : 0)) * 100)}% → 100%`,
+  sub: () => (World._activePanel && World._activePanel.dust > 0.06 ? `Its output: ${Math.round((1 - World._activePanel.dust) * 100)}% → 100%` : ''),
   use: () => {
     const p = World._activePanel;
     if (!p) return;
@@ -265,7 +266,7 @@ addI({
   label: () => `Burn hydrazine: +${BAL.hydrazineWater} L of water`,
   // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
   //  gone, nothing said whether the second would cost air again.)
-  sub: () => `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'done carefully now: no air lost' : 'untried indoors: may cost Hab air'),
+  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'done carefully now: no air lost' : 'untried indoors: may cost Hab air') : ''),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);

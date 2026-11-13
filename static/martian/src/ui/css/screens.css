@@ -381,22 +381,23 @@
    a card's button used to stand at the fold on the small phone. */
 .mg-compact .col-bar:not(.off) { display: none; }
 
-/* The way home: three steps across the journal's task page, the one he is on marked. */
-.way { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-bottom: .5rem; }
-.way li { display: grid; align-content: start; gap: .1875rem; padding: .625rem .75rem .6875rem; background: rgba(245, 240, 232, .03); border: 1px solid var(--line-2); border-top: 2px solid var(--ink-4); border-radius: .1875rem; }
-.way li.now { border-top-color: var(--ink-2); }
-.way li.next { border-top-color: var(--accent); }
-.way li.done { border-top-color: var(--ok); }
-.way b { font: 600 .8125rem/1.1 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+/* The way home: a strip of three steps at the head of the journal's task page. Each is when, what, and one line. */
+.way { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-bottom: .25rem; }
+.way li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: .5rem; row-gap: .125rem; padding: .4375rem .625rem .5rem; background: rgba(245, 240, 232, .03);
+  border: 1px solid var(--line-2); border-left: 2px solid var(--ink-4); border-radius: .1875rem; }
+.way li.now { border-left-color: var(--ink-2); }
+.way li.next { border-left-color: var(--accent); }
+.way li.done { border-left-color: var(--ok); }
+.way b { font: 600 .8125rem/1.2 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
 .way li.next b { color: var(--accent); }
 .way li.done b { color: var(--ok); }
-.way strong { font: 600 1.0625rem/1.15 var(--f-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
-.way span { font-size: .875rem; line-height: 1.38; color: var(--ink-2); text-wrap: pretty; }
+.way strong { font: 600 1rem/1.2 var(--f-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.way span { grid-column: 1 / -1; font-size: .8125rem; line-height: 1.35; color: var(--ink-2); text-wrap: pretty; }
 .mg-compact .way { gap: .375rem; }
-.mg-compact .way li { padding: .4375rem .5625rem .5rem; }
-.mg-compact .way b { font-size: var(--t13); letter-spacing: .1em; }
-.mg-compact .way strong { font-size: .9375rem; }
-.mg-compact .way span { font-size: var(--t12); line-height: 1.32; }
+.mg-compact .way li { padding: .3125rem .5rem .375rem; column-gap: .375rem; }
+.mg-compact .way b { font-size: var(--t13); letter-spacing: .06em; color: var(--ink-2); }
+.mg-compact .way strong { font-size: max(.875rem, 13px); }
+.mg-compact .way span { font-size: var(--t12); line-height: 1.3; }
 
 /* The map. The hint stands at the head of the map, where there are no names and no longitudes to cover; names keep
    clear of it. A card's close mark is a button the size of a thumb, drawn as one. The scale is given as a map gives

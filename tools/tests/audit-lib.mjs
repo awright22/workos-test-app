@@ -173,6 +173,12 @@ export function auditInPage(safe) {
     if ((clipsX && n.scrollWidth > n.clientWidth + 1) || (clamps && n.scrollHeight > n.clientHeight + 2)) out.cut.push(`${name(n)}  “${n.textContent.trim().slice(0, 40)}”`);
   }
 
+  // ---- a card's note or a line of the log that the game itself cut short, in the middle of a sentence, to make it
+  //      fit ("Your stores, the fabricator and…"): what is said on the HUD is a whole sentence or it is rewritten
+  for (const n of root.querySelectorAll('.toast .t3, .toast .t2, #mg-log .mg-line .tx')) {
+    if (shown(n) && /…\s*$/.test(n.textContent)) out.cut.push(`cut short by the game: ${name(n)}  “${n.textContent.trim().slice(-40)}”`);
+  }
+
   // ---- every line of text on the screen, as the box it is drawn in (the part its scrolling regions leave showing)
   /** The layer a thing is drawn in: text in one layer is laid out against the rest of that layer. The HUD, the toasts and the touch controls are one. */
   const layerOf = (n) => { let a = n; while (a.parentElement && a.parentElement !== root) a = a.parentElement; return /^mg-(hud|toast|touch)$/.test(a.id) ? 'play' : (a.id || a.className); };
