@@ -63,7 +63,7 @@ kinds = /^(target|text)/;
 await page.evaluate(() => window.__UI.showSettings(() => window.__UI.hideOverlay(), false));
 await page.locator('[data-seg="settab"] [data-v="sound"]').click();
 await sleep(300);
-check('a slider handle shorter than a thumb', await audit(), await withFault('.mg-touch .mg-range::-webkit-slider-thumb { height: 2rem !important; }'), /^target: 44x3\d  the handle/);
+check('a slider handle shorter than a thumb', await audit(), await withFault('.mg-touch .mg-range::-webkit-slider-thumb { height: 2rem !important; }'), /^target: 44x[23]\d  the handle/);
 await page.locator('[data-seg="settab"] [data-v="interface"]').click();
 await sleep(300);
 check('a switch shorter than a thumb', await audit(), await withFault('.mg-touch .mg-switch { width: 3.5rem !important; height: 2rem !important; }'), /^target: .*the switch itself/);

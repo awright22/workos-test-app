@@ -3,7 +3,7 @@ import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
 import { BAL, S, roverPowerCap, suitCap } from './state.js';
-import { clearLog, flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
+import { after, clearLog, flashScreen, log, showOverlay, statusText, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent, startLaunch } from './story.js';
 import { _fe, _fn, _v1, _v2, _v3 } from '../core/scratch.js';
@@ -142,7 +142,7 @@ addI({
         Snd.play('harvest'); Snd.jingle();
         if (crop === 'potato') { if (first) log('First harvest. I am the greatest botanist on this planet. Fear me.'); }
         else {
-          toast('HARVEST', `${n} ${CROPS[crop].name.toLowerCase()}`, 'In the pantry: on the plate at breakfast, or cook a dinner at the food shelf');
+          toast('HARVEST', `${n} ${CROPS[crop].name.toLowerCase()}`, 'In the pantry. Eat it at breakfast, or cook a dinner.');
           if (first) log('Something that is not a potato. I may cry. I am not going to cry. I am going to eat it.');
         }
         checkAchievements();
@@ -177,8 +177,8 @@ addI({
     // Hab's line comes when that has been read, and his own log entry when the Hab's has. (All of it used to land
     // within a second, on top of the old prompt and the old task struck through.)
     clearLog();                                          // (a line from the run to the door is not left to surface now)
-    setTimeout(() => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'), 2800);
-    setTimeout(() => log(SOL_LOGS[1]), 9000);
+    after(2.8, () => log('Suit resealed. O2 refilling. Ow. OW. Okay. Inventory time.', 'sys'));
+    after(9, () => log(SOL_LOGS[1]));
   },
 });
 export function addInspect(id, lx, lz, name, doneLine, found) {
@@ -357,7 +357,7 @@ addI({
         'The Hab has six farm beds: fill them with regolith from the heaps outside the airlock, plant, water, and eat what grows. <b>A potato bed takes one ration to plant and gives back four potatoes.</b>',
       // (and where it is all going, once, in his own voice, when the card and the journal's arrival have been read:
       //  after ten minutes of play nothing had said that the rescue is a rocket a long drive away)
-      buttons: [{ label: 'Get to work', fn: () => setTimeout(() => log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the only rocket on Mars, in Schiaparelli, by Sol ${S.rescueSol}.`), 7500) }],
+      buttons: [{ label: 'Get to work', fn: () => after(7.5, () => log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the only rocket on Mars, in Schiaparelli, by Sol ${S.rescueSol}.`)) }],
     });
   },
 });

@@ -354,19 +354,21 @@ function nextToast() {
     `<div class="ti">${icon(kind === 'ach' ? 'trophy' : kind === 'disc' ? 'pin' : 'info')}</div>` +
     `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${chem(esc(t.title))}</div>${t.note ? `<div class="t3">${chem(esc(t.note))}</div>` : ''}</div>`);
   root.classList.add('has-toast');
-  // On a phone the card stands between the gauges and the stick. One that would reach the stick keeps one line of its
-  // note (whole sentences of it), or none: it never lies over the thing his thumb is on.
-  if (layout.compact && layout.touch && t.note) {
-    const joy = UI.joy.getBoundingClientRect(), t3 = node.querySelector('.t3');
+  // On a phone the card stands between the gauges and the stick, and its note is whole sentences: as many as its two
+  // lines hold (measured, not counted). A card that would reach the stick is set closer; one that still would keeps
+  // one line of note, or none: it never lies over the thing his thumb is on. (The smallest phone's cards were all cut
+  // to one line, "Spend 60 seconds outside in a…", where closer setting has room for two.)
+  const t3 = node.querySelector('.t3');
+  if (layout.compact && t3) {
+    const joy = UI.joy.getBoundingClientRect();
     // (8 px clear of it, as everything on the HUD is of its neighbour. The card is measured where it will stand, not
-    //  where it is now: it arrives by sliding down, so its own box at this moment is 8 px too high, and cards that
-    //  passed this test came to rest 3 px from the stick.)
-    const reaches = () => joy.height > 2 && UI.toasts.getBoundingClientRect().top + node.offsetHeight > joy.top - 8;
-    if (t3 && reaches()) {
-      node.classList.add('tight');
-      t3.innerHTML = chem(esc(fitSentences(t3, t.note)));
-      if (reaches()) t3.remove();
-    }
+    //  where it is now: it arrives by sliding down, so its own box at this moment is 8 px too high.)
+    const reaches = () => layout.touch && joy.height > 2 && UI.toasts.getBoundingClientRect().top + node.offsetHeight > joy.top - 8;
+    const fit = () => { t3.innerHTML = chem(esc(fitSentences(t3, t.note, 8))); };
+    fit();
+    if (reaches()) { node.classList.add('tight'); fit(); }
+    if (reaches()) { node.classList.add('one'); fit(); }
+    if (reaches()) t3.remove();
   }
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
@@ -383,13 +385,6 @@ export function dropPointer() { if (toastNow && toastNow.point) closeToast(toast
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
   if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
-  // a phone's card holds two short lines of note: give it whole sentences that fit, not a line cut mid-word
-  // (how much two lines hold depends on the card's width: fewer letters on the narrowest phones)
-  const room = window.innerWidth <= 760 ? 62 : 76;
-  if (layout.compact && note && note.length > room) {
-    const cut = note.slice(0, room + 1), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-    note = end > 20 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(' ')) + '…';
-  }
   toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0 });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
@@ -420,7 +415,7 @@ export function restoreLog(lines) {
  * letters, an entry that ran a few letters over was cut by the clamp in the middle of a sentence; and "I'm just..."
  * was taken for the end of one.)
  */
-function fitSentences(tx, full) {
+function fitSentences(tx, full, least = 24) {
   tx.textContent = full;
   // (a log that is not on the screen just now, behind a toast or in the first minute, cannot be measured: count letters)
   const measured = tx.clientHeight > 0, room = window.innerWidth <= 760 ? 95 : 105;
@@ -428,7 +423,7 @@ function fitSentences(tx, full) {
   if (!over()) return full;
   const ends = [];
   const re = /[.!?]["')\]]?(?=\s)/g;
-  for (let m = re.exec(full); m; m = re.exec(full)) if (full[m.index - 1] !== '.' && m.index > 24) ends.push(m.index + m[0].length);      // (an ellipsis runs on)
+  for (let m = re.exec(full); m; m = re.exec(full)) if (full[m.index - 1] !== '.' && m.index > least) ends.push(m.index + m[0].length);      // (an ellipsis runs on)
   let text = full;
   for (let k = ends.length - 1; k >= 0 && over(); k--) { text = full.slice(0, ends[k]); tx.textContent = text; }
   if (over()) {
@@ -472,6 +467,22 @@ export function log(full, cls, o) {
   while (UI.log.children.length > 4) UI.log.firstChild.remove();
 }
 
+/*
+ * Things said a little later are said a number of seconds of play later: by the game's clock, which stops under a menu
+ * and runs at the game's pace, not by the wall's. (By the wall's clock, lines timed to follow one another arrived
+ * together after a pause, and on a slow machine before the thing they were meant to follow had been drawn.) The HUD
+ * runs the clock, every frame of play (ui/hud.js).
+ */
+const pending = [];
+/** Do `fn` after `seconds` of play. */
+export function after(seconds, fn) { pending.push({ t: seconds, fn }); }
+/** `dt` seconds of play have passed: do what has come due, the earliest first. */
+export function runAfter(dt) {
+  if (!pending.length || !(dt > 0)) return;
+  for (const p of pending) p.t -= dt;
+  pending.sort((a, b) => a.t - b.t);
+  while (pending.length && pending[0].t <= 0) pending.shift().fn();
+}
 /** Take what is showing off the HUD's log (the journal keeps it): for a moment that is about one thing. */
 export function clearLog() { UI.log.textContent = ''; }
 

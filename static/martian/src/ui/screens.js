@@ -350,6 +350,16 @@ function wayHomeHtml() {
   return '<div class="pane-hd">The way home</div><ol class="way">' +
     steps.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';
 }
+/** The places with a note in the journal: what the Discoveries page lists as places. */
+const journalPlaces = () => FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
+/**
+ * How many discoveries he has made: the landers found, the places visited and the sights seen, which is what the
+ * journal's Discoveries page lists. The tab, the statistics and the rescue screen all give this one number. (The tab
+ * gave one count and the statistics tile under the same word another.)
+ */
+export function discoveriesFound() {
+  return World.landers.filter((r) => S.discovered[r.data.name]).length + journalPlaces().filter((f) => S.discovered[f.name]).length + sightList().filter((x) => x.sol).length;
+}
 function tasksHtml() {
   let h = wayHomeHtml() + '<div class="pane-hd">Mission</div><div class="obj-list">';
   let primary = false, open = '', closed = '', nDone = 0;
@@ -402,7 +412,7 @@ function discoveriesHtml() {
       `<p>${esc(rec.data.note)}</p></article>`;
   }
   h += more(landers.length - found.length, 'lander', 'landers', S.flags.mapRevealed ? 'Their signals are on the map. Go and find them.' : 'Every machine sent to Mars is still where it stopped. Find them out there.');
-  const places = FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note);
+  const places = journalPlaces();
   const seen = places.filter((f) => S.discovered[f.name]);
   h += `</div><div class="pane-hd">Places <span>${seen.length} of ${places.length} visited</span></div><div class="jr-grid">`;
   for (const f of seen) {
@@ -440,7 +450,7 @@ function statsHtml() {
     tile(S.sol, '', 'Sols survived') + tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue') +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes + (st.produce || 0), '', 'Food grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
-    tile(st.mined, '', 'Ice chunks mined') + tile(st.discoveries, '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
+    tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
     tile(World.builtMeshes.length, '', World.builtMeshes.length === 1 ? 'Structure deployed' : 'Structures deployed') + tile(st.booms, '', 'Hydrazine burns') + tile(st.closeCalls, '', 'Close calls') +
     tile(Math.round(st.stormOut), 's', 'Out in storms') + (st.discoTime >= 1 ? tile(Math.round(st.discoTime), 's', 'Disco endured') : '') +
     '</div>';
@@ -483,7 +493,7 @@ export function renderJournal() {
   // earned. ("Tasks 6" stood over three mission tasks: it counted NASA's alone. And Samples had no count.)
   const counts = {
     tasks: missionList().filter((e) => !e.done).length + QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length || '',
-    disc: World.landers.filter((r) => S.discovered[r.data.name]).length + FEATURES.filter((f) => f.type !== 'bulge' && f.type !== 'albedo' && f.note && S.discovered[f.name]).length + sightList().filter((x) => x.sol).length || '',
+    disc: discoveriesFound() || '',
     ach: ACHIEVEMENTS.filter((a) => S.achieved[a.id]).length || '', samples: scienceSummary().kinds || '',
   };
   const cur = JOURNAL_TABS.find((t) => t[0] === journalTab) || JOURNAL_TABS[0];

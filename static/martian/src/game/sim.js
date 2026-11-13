@@ -449,7 +449,7 @@ export function sleepToDawn(inRover) {
       { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
       { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
       { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: '', whole: true },
-      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', whole: true },
+      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '%', whole: true },
     ],
   };
   // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,

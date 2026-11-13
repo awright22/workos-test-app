@@ -367,6 +367,8 @@
   background: rgba(10, 9, 8, .88); border: 1px solid var(--line-2); color: var(--ink); font: 500 max(.75rem, 12px)/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase;
   pointer-events: none; transition: opacity .3s; }
 .map-hint.gone { opacity: 0; visibility: hidden; }
+.map-hint.low { top: auto; bottom: calc(2.5rem + 1.75rem); }
+.mg-touch.mg-compact .map-hint.low { bottom: calc(max(2.75rem, 44px) + 1.75rem); }
 .mg-compact .map-scale span { font-size: var(--t13); letter-spacing: .06em; color: var(--ink); }
 
 /* Statistics on a phone: four tiles to a row, and a last row that is not full is shared out among its tiles (one tile

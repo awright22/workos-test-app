@@ -10,7 +10,7 @@ import { camLookAt, player } from './player.js';
 import { _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { FEATURES } from '../planet/features.js';
 import { R } from '../planet/constants.js';
-import { closeScreens } from '../ui/screens.js';
+import { closeScreens, discoveriesFound } from '../ui/screens.js';
 import { surfaceAt } from '../planet/surface.js';
 import { model } from '../world/models.js';
 import { ctx } from './ctx.js';
@@ -293,7 +293,7 @@ export function winGame() {
       ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
       // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
       //  and "3.4 / Km walked" here were the same number written two ways)
-      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', st.discoveries],
+      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', discoveriesFound()],
       ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,

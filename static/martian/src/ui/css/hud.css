@@ -285,8 +285,10 @@
 .mg-compact.is-critical #mg-log { display: none; }
 /* phones have no free band across the top: a toast takes the log's place, under the gauges, and the log waits */
 .mg-compact #mg-toast { left: calc(var(--sal) + var(--m)); transform: none; top: calc(var(--vit-b, calc(var(--sat) + var(--m) + var(--vit))) + .5rem); }
-/* (a card that would reach the stick gives up its second line of note: ui/dom.js measures it) */
-.mg-compact .toast.tight .t3 { -webkit-line-clamp: 1; }
+/* (a card that would reach the stick is set closer, and then gives up its second line of note: ui/dom.js measures it) */
+.mg-compact .toast.tight { padding: .25rem .5rem .3125rem; }
+.mg-compact .toast.tight .t2, .mg-compact .toast.tight .t3 { margin-top: .125rem; }
+.mg-compact .toast.tight.one .t3 { -webkit-line-clamp: 1; }
 .mg-compact.has-toast #mg-log { visibility: hidden; }
 .mg-compact .toast { min-width: 0; max-width: none; width: min(15rem, calc(50vw - var(--sal) - 6.5rem)); padding: .4375rem .625rem .5rem; }
 .mg-compact .toast .ti { display: none; }

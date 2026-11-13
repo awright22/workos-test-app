@@ -582,6 +582,14 @@ export function openMap() {
   selected = null;
   if (info) info.hidden = true;
   draw();
+  // The hint stands at the head of the map, where there are no longitudes and few names. If a marker is under it
+  // there (a lander in the far north), it stands at the foot instead: a marker is never behind it.
+  touchHint.classList.remove('low');
+  if (!touchHint.classList.contains('gone')) {
+    const hr = touchHint.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), pad = 14 * U;
+    const under = markers.some((m) => !m.under && m.x > hr.left - wr.left - pad && m.x < hr.right - wr.left + pad && m.y > hr.top - wr.top - pad && m.y < hr.bottom - wr.top + pad);
+    if (under) { touchHint.classList.add('low'); draw(); }
+  }
 }
 /** Redraw the map now (the game calls this while the screen is open). */
 export function renderMap() { if (!cv) return; if (!W) resize(); draw(); }

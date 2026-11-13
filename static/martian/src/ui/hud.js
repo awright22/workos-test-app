@@ -8,7 +8,7 @@ import { HAB_R, World, siteLocalToWorld } from '../world/build.js';
 import { clamp, perf } from '../core/math.js';
 import { Snd } from '../audio/sound.js';
 import { QUEST_DEFS, questTargetPos } from '../game/story.js';
-import { UI, chem, el, esc, root, syncFlags, toast } from './dom.js';
+import { UI, chem, el, esc, root, runAfter, syncFlags, toast } from './dom.js';
 import { _pe, _pn, _v1, _v2, _v3 } from '../core/scratch.js';
 import { roverF } from '../game/rover.js';
 import { regionName } from '../planet/features.js';
@@ -689,6 +689,7 @@ export function updateHud() {
   let dt = 0;
   if (hud.tod !== null) { let d = S.tod - hud.tod; if (d < -0.5) d += 1; dt = d * BAL.solLen; }
   hud.tod = S.tod;
+  runAfter(dt);                       // (what was to be said so many seconds of play from when it was asked)
   const sunEl = localSunEl();
   const t = localTempC(_v1.copy(player.pos).normalize(), sunEl);
   const safeAir = S.inside && S.o2 > 3;
