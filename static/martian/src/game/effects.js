@@ -68,9 +68,12 @@ export function updateEffects(dt) {
       plumeT += dt * Math.min(40, 6 + v * 1.2);
       while (plumeT > 1) {
         plumeT -= 1;
-        const side = Math.random() < 0.5 ? -1.22 : 1.22;
-        _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -2.2 * Math.sign(roverF.speed));
-        ctx.vfx.puff(onGround(_p), { count: 1, speed: 0.6 + v * 0.04, up: 0.5 + v * 0.03, spread: 0.3, size: 0.6 + v * 0.03, life: 2.2 + v * 0.03, dir: _d.copy(_f).multiplyScalar(-v * 0.18 * Math.sign(roverF.speed)) });
+        // (both rear wheels throw it, in a tail that hangs behind: from the driving camera one thin puff a side was
+        // nothing, and a rover at speed looked parked)
+        for (const side of [-1.22, 1.22]) {
+          _p.copy(G.position).addScaledVector(_r, side).addScaledVector(_f, -2.2 * Math.sign(roverF.speed));
+          ctx.vfx.puff(onGround(_p), { count: 1, speed: 0.7 + v * 0.05, up: 0.6 + v * 0.05, spread: 0.35, size: 0.9 + v * 0.07, life: 2.8 + v * 0.06, dir: _d.copy(_f).multiplyScalar(-v * 0.22 * Math.sign(roverF.speed)) });
+        }
       }
     }
   }

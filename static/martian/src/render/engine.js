@@ -399,7 +399,11 @@ function airHaze() {
   C.fog_fragment = `#ifdef USE_FOG
     float fogHigh = length(cameraPosition) - 12000.0;
     float fogAir = 0.5 * (exp(-clamp(fogHigh, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
-    float fogThick = fogNear * fogAir * vFogDepth;
+    // Looking down into a deep, there is more air in the way than the distance says: the dust hangs lowest in the
+    // lowest ground. So what lies well below the eye is hazier than what is level with it, and a canyon seen from its
+    // rim has a far floor, not a pit with its bottom as sharp as its lip. (Not from the air: from there all is below.)
+    float fogDeep = 1.0 + 1.3 * smoothstep(18.0, 120.0, fogHigh - vFogAlt) * (1.0 - smoothstep(500.0, 2000.0, fogHigh));
+    float fogThick = fogNear * fogAir * fogDeep * vFogDepth;
     float fogFactor = 1.0 - exp(-fogThick * fogThick);
     // (from sixty metres: on a plain that swells a little the skyline is a crest a hundred metres off, nearer than
     // the true horizon, and it stayed a ruler's edge with stones standing on it)

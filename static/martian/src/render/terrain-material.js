@@ -194,6 +194,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           float ripples = (1.0 - ice * 0.78) * (1.0 - lava * 0.7) * (1.0 - worn * 0.9) * (1.0 - smoothstep(0.07, 0.17, slope)) * mix(0.55, 1.35, sandy);
           flatSlope += (fld.rg - 0.5) * (4.0 * fField * ripples);
           tone += (fld.b - 0.56) * 1.5 * fField * (1.0 - ice * 0.6) * (0.35 + 0.65 * ripples);
+          // The same field four times the size, from a stone's throw out to where the fine one has long gone: ripples
+          // a pace apart and swells the size of a house. Sand seen from a height (a canyon floor from its rim, a plain
+          // from a hill) is worked by the wind into lines; without them it was one smooth tone with soft blots in it.
+          float fMega = smoothstep(24.0, 80.0, viewDist) * (1.0 - smoothstep(320.0, 800.0, viewDist)) * level;
+          vec4 fld4 = texture2D(uField, uv / 64.0 + vec2(0.31, 0.17));
+          flatSlope += (fld4.rg - 0.5) * (3.4 * fMega * ripples);
+          tone += (fld4.b - 0.56) * 1.3 * fMega * (1.0 - ice * 0.6) * (0.35 + 0.65 * ripples);
           gravelHere = min(1.0, fld.a * (1.0 - ice) * mix(0.7, 1.25, sandy) + lava * 0.3 + basalt * (1.0 - pond) * 0.55);      // clinker lies all over a flow
           // patterned ground: polygons cracked by frost, from the mid-latitudes to the poles, and on all ice
           // (and lava that froze level cracked into columns as it cooled: the same pattern, larger meaning)
@@ -233,18 +240,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (a flow's edge is bare lava at a slope where a hillside would still hold its dust)
         // Near, the mesh's own slope says where: a ledge's riser is rock and its bench is dust. Far off, the land's
         // slope does, which every level of detail agrees on, so no edge shows where a fine mesh meets a coarse one.
-        float rockSlope = mix(slope, max(landSlope, slope * 0.5), smoothstep(90.0, 320.0, viewDist));
-        // Cliff and talus. A canyon wall is not one banded surface. Hard beds stand as dark cliffs; between and below
-        // them lies what has fallen off them, at the angle loose rock rests at (a little over thirty degrees): smooth
-        // and pale, with the beds buried under it. So bare rock starts where scree will no longer lie, and from
-        // where dust slides to there the ground is scree. (On lava a flow's edge is bare from a gentler slope, as before.)
-        float rs = rockSlope * (1.0 + lava * 0.7) + hMid * 0.10 * fMid + hFar * 0.06;
-        float rock = mix(smoothstep(0.165, 0.30, rs), smoothstep(0.12, 0.30, rs), lava);
-        float scree = smoothstep(0.07, 0.125, rs) * (1.0 - rock) * (1.0 - lava) * (1.0 - ice);
-        // and along each flow's edge lies the rubble it shed: a dark band, broken up by the noise so it does not follow the mesh
-        float rubble = smoothstep(0.30, 0.66, vGeo.z + hMid * 0.5 * fMid + hFar * 0.3 + hLump * 0.4 * fLump);
-        rock = max(rock, rubble * 0.9);
-        grad += (nLump.rgb - 0.5) * (0.8 * (1.0 - smoothstep(24.0, 110.0, viewDist)) * rubble * level);
         // beds of uneven thickness with thin partings in them, undulating; far away they merge into one tone
         // (beds are not evenly thick: the height is stretched and squeezed before the layers are looked up, or a
         // wall shows the texture's period as pinstripes)
@@ -255,8 +250,30 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float wob = hMid * 0.6 + (nLump.a - 0.5) * 0.3 * fLump;      // (the finest wobble only near: far off it would alias into hatching)
         // (the broad sway is kept small: beds that wander like wood grain are not rock)
         vec4 band = texture(uGrain, vec3(alt * 0.13 + hFar * 0.3 + wob * 0.55, 0.37, 0.71));
-        float beds = texture(uGrain, vec3(alt * 0.029 + hFar * 0.15 + wob * 0.2, 0.83, 0.21)).a;
+        vec4 bedsAt = texture(uGrain, vec3(alt * 0.029 + hFar * 0.15 + wob * 0.2, 0.83, 0.21));
+        float beds = bedsAt.a;
+        // how fast the beds change going up the wall (the texture carries its own slope): where a hard bed begins
+        // and ends. It is what lets a bed stand out of the wall as a ledge, further down.
+        float bedRise = (bedsAt.r - 0.5) + (band.r - 0.5) * 0.6;
         float bedTone = mix(0.5, smoothstep(0.30, 0.70, beds * 0.68 + band.a * 0.32), 1.0 - smoothstep(260.0, 1200.0, viewDist));
+        float rockSlope = mix(slope, max(landSlope, slope * 0.5), smoothstep(90.0, 320.0, viewDist));
+        // Cliff and talus. A canyon wall is not one banded surface. Hard beds stand as dark cliffs; between and below
+        // them lies what has fallen off them, at the angle loose rock rests at (a little over thirty degrees): smooth
+        // and pale, with the beds buried under it. So bare rock starts where scree will no longer lie, and from
+        // where dust slides to there the ground is scree. (On lava a flow's edge is bare from a gentler slope, as before.)
+        // Far off, where the mesh no longer says which part of a wall is riser and which bench, the hard beds stand as
+        // cliff and the soft ones lie back under scree: bands along the wall, as a layered wall has. (It was the land's
+        // slope and a soft noise: cliff and scree in blotches like a watercolour wash.) On gentle ground a finer noise
+        // breaks the line between dust and scree, which otherwise rings every hollow like a contour on a map.
+        float farW = smoothstep(90.0, 320.0, viewDist), steepish = smoothstep(0.10, 0.22, rockSlope);
+        float rs = rockSlope * (1.0 + lava * 0.7) + hMid * 0.10 * fMid * (1.0 - 0.6 * farW) + hFar * 0.06 * (1.0 - 0.7 * farW)
+          + (beds - 0.5) * 0.16 * farW * steepish * (1.0 - lava) + (nFar.r - 0.5) * 0.07 * (1.0 - steepish);
+        float rock = mix(smoothstep(0.165, 0.30, rs), smoothstep(0.12, 0.30, rs), lava);
+        float scree = smoothstep(0.07, 0.125, rs) * (1.0 - rock) * (1.0 - lava) * (1.0 - ice);
+        // and along each flow's edge lies the rubble it shed: a dark band, broken up by the noise so it does not follow the mesh
+        float rubble = smoothstep(0.30, 0.66, vGeo.z + hMid * 0.5 * fMid + hFar * 0.3 + hLump * 0.4 * fLump);
+        rock = max(rock, rubble * 0.9);
+        grad += (nLump.rgb - 0.5) * (0.8 * (1.0 - smoothstep(24.0, 110.0, viewDist)) * rubble * level);
         // (the beds a little closer in tone to one another: the wall's shape is its spurs and gullies, not its stripes)
         vec3 rockCol = alb * mix(vec3(0.48, 0.435, 0.44), vec3(0.82, 0.735, 0.675), bedTone);
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
@@ -276,9 +293,24 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // field from the air was a smooth hump. The grain volume again at twelve metres a period, strong, on bare rock
         // and on the tops of flows, from sixty metres out to a kilometre and a half (nearer, the lumps take over).
         float fCrag = smoothstep(40.0, 140.0, viewDist) * (1.0 - smoothstep(700.0, 1500.0, viewDist));
-        float craggy = max(rock, basalt * (1.0 - pond)) * fCrag;
+        float craggy = max(rock * lava, basalt * (1.0 - pond)) * fCrag;
         grad += (nCrag.rgb - 0.5) * (1.25 * craggy);
         float cragTone = (nCrag.a - 0.5) * craggy;
+        // ... but a layered wall is not lumpy the same in every direction: its relief is its beds, some standing
+        // proud and some cut back, in lenses many times longer than they are thick. The grain volume squeezed
+        // three and a half times up and down. (Round twelve-metre lumps of tone made a far wall a cloudy wash.)
+        float bedRock = rock * (1.0 - lava) * fCrag;
+        vec3 upT = pDir * DETAIL_T;
+        vec4 nBed = texture(uGrain, upT * (${F(R)} / 14.0 + (length(vPlanetPos) - ${F(R)}) / 4.0) + vec3(0.13, 0.71, 0.29));
+        vec3 gBed = nBed.rgb - 0.5;
+        gBed += upT * (dot(gBed, upT) * 2.5);
+        grad += gBed * (1.0 * bedRock);
+        cragTone += (nBed.a - 0.5) * bedRock * 1.1;
+        // And the beds themselves stand in relief: a hard bed proud of the wall, lit along its top and dark under its
+        // lip, a soft one cut back. Their colour alone made a hillside painted in stripes; a wall is a stair of ledges.
+        float bedCut = rock * (1.0 - lava) * (1.0 - smoothstep(500.0, 1400.0, viewDist)) * smoothstep(0.10, 0.25, slope);
+        grad += upT * (bedRise * 3.0 * bedCut);
+        cragTone -= smoothstep(0.10, 0.34, bedRise) * 0.45 * bedCut;
         // Flutes. A wall's spurs and chutes are in the mesh only near to: from a hundred metres its triangles are
         // too coarse to carry anything finer than the great buttresses, and a wall seen face-on in a high sun was a
         // smooth banded sheet. The grain volume once more, stretched eight times up and down (columns of it stand
@@ -362,6 +394,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain34' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain35' + (o.fine !== false ? 'F' : '');
   return mat;
 }
