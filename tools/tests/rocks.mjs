@@ -28,9 +28,10 @@ console.log('the shapes');
       if (h >= 0 && h < H) reach[b * H + h] = Math.max(reach[b * H + h], r * Math.hypot(x, z));
     }
     const area = (h) => { let a = 0; for (let b = 0; b < B; b++) { let m = 0; for (let q = h; q < H; q++) m = Math.max(m, reach[b * H + q]); a += m * m; } return a; };
-    // a pyramid, a cone or a tooth: four fifths of the way up there is almost nothing left of it
-    const upper = area(Math.floor(H * 0.8)) / area(0);
-    if (upper < 0.1) pointed.push(`${k} (${(upper * 100).toFixed(0)}%)`);
+    // a pyramid, a cone, a tooth or a roof: most of the way up there is almost nothing left of it (a pyramid keeps
+    // a sixth of its footprint three fifths of the way up and a hundredth at nine tenths; a flat-topped block keeps most)
+    const mid = area(Math.floor(H * 0.6)) / area(0), upper = area(Math.floor(H * 0.9)) / area(0);
+    if (mid < 0.45 || upper < 0.1) pointed.push(`${k} (${(mid * 100).toFixed(0)}% and ${(upper * 100).toFixed(0)}%)`);
     // set down on a table: it reaches further out above its foot than at it
     let over = 0;
     for (let b = 0; b < B; b++) { let m = 0; for (let q = 2; q < H; q++) m = Math.max(m, reach[b * H + q]); over += Math.max(0, m - Math.max(reach[b * H], reach[b * H + 1])); }
@@ -46,7 +47,7 @@ console.log('the shapes');
     }
     if (edges / shown < 0.2) smooth.push(`${k} (${(edges / shown * 100).toFixed(1)}%)`);
   }
-  check(pointed.length === 0, `none comes to a point (four fifths of the way up, each still has a tenth of its footprint)${pointed.length ? ': ' + pointed.join(', ') : ''}`);
+  check(pointed.length === 0, `none comes to a point or a ridge (three fifths of the way up each still has 45% of its footprint, and at nine tenths 10%)${pointed.length ? ': ' + pointed.join(', ') : ''}`);
   check(hanging.length === 0, `none overhangs its foot by more than a tenth of its radius${hanging.length ? ': ' + hanging.join(', ') : ''}`);
   check(smooth.length === 0, `each has arrises: none is a smooth lump${smooth.length ? ': ' + smooth.join(', ') : ''}`);
 }
@@ -135,7 +136,7 @@ const survey = (reach) => g.eval((G, reach) => {
   const f = rocks.uniforms.uFeet.value, a = rocks.anchor;
   out.feetOff = Math.hypot(f.x + a.x - cam.x, f.y + a.y - cam.y, f.z + a.z - cam.z);
   out.onFoot = f.w;
-  out.limits = { solid: 0.4, stone: 0.22 };
+  out.limits = rocks.limits;
   return out;
 }, reach);
 const onFoot = (s, where) => {

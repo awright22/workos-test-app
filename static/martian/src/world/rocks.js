@@ -36,12 +36,12 @@ import { ballMesh, ballSnap } from './rock-ball.js';
 export const rockColliders = [];
 /** A rock that stands this high (metres) or more out of the ground is in the way; the rover's wheels and a man's
  *  boots go over anything lower. */
-export const ROCK_SOLID = 0.4;
+const ROCK_SOLID = 0.4;
 /** No stone that can be walked through stands higher than this: one that would is seated deeper. */
-export const STONE_HIGH = 0.22;
+const STONE_HIGH = 0.22;
 /** A rock as wide as a boulder but too low to block anybody shows about this much of itself: a plate flush with the
  *  ground, which a boot standing on it does not visibly sink into. */
-export const PLATE_HIGH = 0.03;
+const PLATE_HIGH = 0.03;
 
 /** A ball of 20 n^2 triangles for a shape map `mapSize` texels across (see rock-ball.js). Each vertex also carries how
  *  far this ball may move it to bring it onto an arris of the rock. */
@@ -118,6 +118,12 @@ const GLSL_ROCK_GROUND = /* glsl */`
  */
 function rockMaterial(uniforms, atlas, detail) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0 });
+  // A rock is drawn into the shadow maps by the faces the sun sees. (three.js draws a one-sided thing by its far
+  // faces, to keep its own shadow off its lit side. But a rock's far faces go down into the ground, and where the
+  // ground rises a little round its foot the shadow began behind that rise: a lit strip of sand between a boulder and
+  // its own shadow, which at a few pixels wide is a pale hairline along its base, and under a big one a pale wedge
+  // that made it look undercut. The shadow's slope bias keeps the lit faces clean.)
+  mat.shadowSide = THREE.FrontSide;
   mat.defines.ROCK_DETAIL = detail;
   mat.userData.uniforms = uniforms;
   mat.onBeforeCompile = (shader) => {
@@ -187,6 +193,14 @@ function rockMaterial(uniforms, atlas, detail) {
         // the normal: the shape's own (a stretched rock's normals lean the other way), then the grain (little of the
         // broadest grain: a face that rolls is clay, not stone)
         vec3 rockN = normalize((rockA.xyz * 2.0 - 1.0) / vRockS);
+        // Layered rock: beds a hand or two thick, each its own tone, with a thin dark parting between; the upper edge
+        // of a bed is turned to the sky and the lower away from it, so that each stands out a little. Drawn here and
+        // not in the shape's picture, whose texels are as large as the beds: there they came out as a row of teeth.
+        // (Not where a bed would be finer than a pixel or two.)
+        float bedAt = vRockPos.y / vRockS.y * 8.0 + rg1.a * 1.5 + rgm.a * 0.5 + vRockI.z * 9.0;
+        float bedded = rockB.a * (1.0 - smoothstep(0.25, 0.6, fwidth(bedAt)));
+        float bedF = fract(bedAt), bedTone = fract(sin(floor(bedAt) * 12.9898 + vRockI.x * 3.1) * 43758.5453);
+        rockN = normalize(rockN + vec3(0.0, (smoothstep(0.78, 1.0, bedF) - (1.0 - smoothstep(0.0, 0.22, bedF))) * 0.5 * bedded, 0.0));
         vec3 rockG = (rg1.rgb - 0.5) * 0.5 + (rgm.rgb - 0.5) * 1.4 + (rg2.rgb - 0.5) * (1.0 + 1.4 * rockPits);
         rockN = normalize(rockN - (rockG - rockN * dot(rockG, rockN)));
         vec3 rockUp = normalize((mat3(viewMatrix) * uHere) * vRockRot);    // the sky, in the rock's frame
@@ -202,25 +216,29 @@ function rockMaterial(uniforms, atlas, detail) {
         // Bare stone under whatever rind and film of dust it wears: the thinner, the darker and greyer. Each face has
         // its own, each bed of a layered rock, a fresh break least; and it comes and goes in stains.
         float film = clamp(rockTone * (1.0 + (rockB.g - 0.5) * 0.7) + (rockB.g - 0.5) * 0.3 - rockB.b * 0.16 + (rockStain - 0.5) * 0.36, 0.0, 1.0);
-        vec3 stone = mix(vec3(gl), rockDust, 0.46) * mix(0.50, 0.80, film);
+        // (from dark grey-brown where it is clean to nearly the dust's own colour under a thick rind: neighbours differ,
+        // which is what makes a field of them read as many rocks and not as one rock many times)
+        vec3 stone = mix(vec3(gl), rockDust, mix(0.34, 0.76, film)) * mix(0.46, 0.90, film);
         // (on a lava field it is the flow's own rock: clinker and blocks of it, a shade paler than the flow's back)
         stone = mix(stone, mix(rockDust * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.064, 0.062), 0.86) * mix(1.0, 1.7, film), basalt);
         stone = mix(stone, vec3(0.20, 0.19, 0.20), rockIcy * 0.8) * (1.0 - 0.3 * rockPits);
-        // a layered rock shows its partings: thin dark lines along the beds (not where they would be finer than a pixel)
-        float bedAt = vRockPos.y / vRockS.y * 31.0 + rg1.a * 2.2 + rgm.a * 0.8;
-        stone *= 1.0 - 0.3 * rockB.a * smoothstep(0.66, 0.9, abs(fract(bedAt) * 2.0 - 1.0)) * (1.0 - smoothstep(0.3, 0.7, fwidth(bedAt)));
+        stone *= mix(1.0, (0.76 + 0.48 * bedTone) * (1.0 - 0.34 * smoothstep(0.8, 0.96, abs(bedF * 2.0 - 1.0))), bedded);
         // Dust lies thick on whatever faces the sky and gathers in the hollows; edges and fresh breaks are swept clean.
         // Where the land is bright the dust is deep and the rocks wear more of it; on dark sand the wind keeps them
         // barer, and on bare lava there is little to settle.
         float dusty = mix(-0.08, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - max(lava, basalt * 0.5) * 0.3 + (rockTone - 0.45) * 0.3;
         // (It lies on what is nearly level, not on every slope that sees the sky: a boulder dusted all over its back is
         // a mound of sand. And one face holds it where the next does not, which is what shows the faces.)
-        float dust = 0.94 * smoothstep(0.42, 0.80, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rockB.g - 0.5) * 0.34 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
+        // (And thick only on what is large: blown sand scours a stone a hand high clean, and a stone under a full cap
+        // of dust, seen from above, is a chip of the sand's own colour.)
+        float dust = mix(0.5, 0.94, smoothstep(0.1, 0.7, max(vRockS.x, vRockS.z))) * smoothstep(0.42, 0.80, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rockB.g - 0.5) * 0.34 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
         // and it is banked against the foot of the rock, in the colour of the ground there, so that rock and ground meet without a line
         float skirt = 1.0 - smoothstep(0.0, 0.05 + 0.1 * fract(vRockI.z * 7.9), rockHigh + (rg1.a - 0.5) * 0.08);
         // (what settles on a rock on bare lava is the flow's own dark grit with a little of the country's dust in it: the
         // country's dust alone made every rock on a volcano an orange rock on black ground)
-        vec3 rockLies = mix(mix(rockDust, rockGround * 1.25, lava * 0.94), rockGround, skirt);
+        // (and a shade darker than the open ground, for it lies thin: a rock's dusted top, turned to the sun, is otherwise
+        // the brightest thing on a far slope, and reads as a pale box set on the skyline)
+        vec3 rockLies = mix(mix(rockDust, rockGround * 1.25, lava * 0.94) * 0.9, rockGround, skirt);
         dust = max(dust, skirt * 0.9);
         vec3 rockCol = mix(stone, rockLies, dust) * (1.0 + (rg1.a - 0.5) * 0.24 + (rgm.a - 0.5) * 0.3 + (rg2.a - 0.5) * 0.3);
         // creases are shaded by what stands round them, and the foot of the rock by the ground
@@ -575,6 +593,7 @@ export class RockField {
   constructor(parent, terrain, o = {}) {
     this.terrain = terrain;
     this.stride = ROCK_STRIDE;                     // (numbers a rock in a chunk's list: the tests read the lists)
+    this.limits = { solid: ROCK_SOLID, stone: STONE_HIGH, plate: PLATE_HIGH };
     this.density = o.density === undefined ? 1 : o.density;
     this.sets = new Map();                         // node -> { kind, data, origin } and, once wanted, what _prepare adds
     this.dirty = true;
