@@ -376,7 +376,8 @@ function nextToast() {
     fit();
     if (reaches()) { node.classList.add('tight'); fit(); }
     if (reaches()) { node.classList.add('one'); fit(); }
-    if (reaches()) t3.remove();
+    // (a note is whole sentences or it is not there: one line that ends "outside in a…" says less than the title alone)
+    if (reaches() || /…\s*$/.test(t3.textContent)) t3.remove();
   }
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
