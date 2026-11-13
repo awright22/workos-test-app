@@ -21,7 +21,8 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   where they really are. See `CREDITS.md`. Below about 40 m the ground is generated to suit the
   place: craters, ripple fields, frost polygons toward the poles; on steep ground, spurs and
   gullies running down the fall line with ledges of layered rock cropping out across them (the
-  walls of Valles Marineris); on the seven shield volcanoes, tongues of dark lava with rubble at
+  walls of Valles Marineris), scree in the gullies and on the gentler slopes, and at a wall's
+  foot the blocks that have fallen from it, some bigger than a man; on the seven shield volcanoes, tongues of dark lava with rubble at
   their edges and leveed channels, and at five summits the caldera itself: a level floor of
   frozen lava inside a cliff, where the elevation data has it.
 - **Dust hangs low.** The haze thickens toward low ground and thins with height: thick looking
