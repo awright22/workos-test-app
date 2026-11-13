@@ -79,7 +79,9 @@ kinds = /^(over|clipped|outside)/;
 await page.keyboard.press('c');
 await page.locator('.colony [data-tab="inv"]').click();
 await sleep(400);
-check('inventory rows that run into each other', await audit(), await withFault('.pane.on, .mg-compact .pane.on { grid-auto-rows: auto !important; }'), /^over: /);
+// (the rows' notes are shorter than they were when this fault was found, so with it back a note now hangs out of its
+//  row's foot without reaching the next row's text: the audit names that as text outside its row)
+check('inventory rows that do not grow with their text', await audit(), await withFault('.pane.on, .mg-compact .pane.on { grid-auto-rows: auto !important; }'), /^(over: |clipped: outside its .*inv-row)/);
 await page.keyboard.press('Escape');
 
 // a lander's card: badges that do not give way to the name
