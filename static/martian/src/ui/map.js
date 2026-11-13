@@ -24,7 +24,7 @@ const R2D = 180 / Math.PI;
 const view = { lon: 180, lat: 0, ppd: 0 };      // centre and scale (CSS pixels per degree)
 let goal = null;                                 // the view being eased to, or null
 let cv = null, c = null, wrap = null, legend = null, info = null, statusPos = null, statusHint = null, scaleEl = null, scaleLbl = null;
-let W = 0, H = 0, dpr = 1, raf = 0, opened = false;
+let W = 0, H = 0, dpr = 1, raf = 0, opened = false, statusBar = null, hintShown = 0, hintTimer = 0;
 let U = 1;                                       // the interface scale: 1 at a 16 px root; everything drawn on the canvas follows it
 let markers = [], selected = null, hover = null;
 const col = {};
@@ -51,7 +51,8 @@ function resize() {
   if (!cv) return;
   const r = wrap.getBoundingClientRect();
   if (!r.width || !r.height) return;
-  W = r.width; H = r.height - layout.rem * (layout.compact ? 2 : 2.5);          // the status bar covers the bottom strip
+  // the status bar covers the bottom strip (measured: on a phone it is as tall as the buttons it carries)
+  W = r.width; H = r.height - ((statusBar && statusBar.offsetHeight) || layout.rem * (layout.compact ? 2 : 2.5));
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   U = layout.rem / 16;
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
@@ -152,14 +153,20 @@ function placeLabels(you, storms) {
   for (const m of byPri) {
     if (m.under || (!m.label && m !== selected && !m.group)) continue;
     if (m.x < -40 || m.x > W + 40 || m.y < -20 || m.y > H + 20) continue;
-    const text = ((m.label || (m === selected ? m.title : '')) + (m.group ? ' +' + (m.group.length - 1) : '')).trim().toUpperCase();
+    // (several things in one spot: "Hab & 6 more", in words. "HAB +6" explained nothing until it was tapped.)
+    const base = (m.label || (m === selected ? m.title : '')).trim(), extra = m.group ? m.group.length - 1 : 0;
+    const text = (base ? base + (extra ? ` & ${extra} more` : '') : `${extra + 1} here`).toUpperCase();
     const w = c.measureText(text).width + (text.length * 0.9 + 6) * U, h = 15 * U;
+    // how far a marker's centre is from a label's box
+    const gap = (o, x, y) => Math.hypot(Math.max(x - o.x, 0, o.x - (x + w)), Math.max(y - o.y, 0, o.y - (y + h)));
+    // (a label belongs to the marker it is nearest: "OPPORTUNITY +1" sat over the ascent vehicle's marker and read as its name)
+    const owned = (x, y) => { const own = gap(m, x, y) + 4 * U; for (const o of markers) if (o !== m && !o.under && gap(o, x, y) < own) return false; return true; };
     // (beside it, under it, over it, and then off each corner: on a small map a lander between two others went unnamed)
     const spots = [[m.x + r + 3 * U, m.y - h / 2], [m.x - r - 3 * U - w, m.y - h / 2], [m.x - w / 2, m.y + r + 2 * U], [m.x - w / 2, m.y - r - 2 * U - h],
       [m.x + r * 0.6, m.y - r - h - U], [m.x + r * 0.6, m.y + r + U], [m.x - r * 0.6 - w, m.y - r - h - U], [m.x - r * 0.6 - w, m.y + r + U]];
     for (const [x, y] of spots) {
       // (a label keeps inside the map: at an edge it goes to the marker's other side)
-      if ((x >= 2 && x + w <= W - 2 && free(x, y, w, h)) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
+      if ((x >= 2 && x + w <= W - 2 && free(x, y, w, h) && owned(x, y)) || (m.pri <= 2 && spots[0][0] === x)) { boxes.push([x, y, w, h]); out.push({ text, x: x + 3 * U, y: y + h / 2, color: m.color, size: 12 * U, bold: true }); break; }
     }
   }
   // storm cells are named where there is room
@@ -434,10 +441,9 @@ export function initMap(body) {
   info.setAttribute('role', 'status');
   const status = el('div', null, 'map-status', wrap,
     '<span class="pos"></span><span class="sp"></span><span class="hint"></span><span class="map-scale"><i></i><span></span></span>');
+  statusBar = status;
   statusPos = status.querySelector('.pos'); statusHint = status.querySelector('.hint');
   scaleEl = status.querySelector('.map-scale i'); scaleLbl = status.querySelector('.map-scale span');
-  // (short enough to show whole beside the position on the narrowest phone, where it ended "tap for…")
-  statusHint.textContent = layout.touch ? 'Pinch to zoom · tap for details' : 'Drag to pan · wheel to zoom · click for details';
   const setLegend = (on) => { legend.hidden = !on; tools.querySelector('[data-a="legend"]').setAttribute('aria-pressed', on); };
   setLegend(false);                     // (closed until asked for: open, it covered a corner of the map)
 
@@ -461,6 +467,7 @@ export function initMap(body) {
     pts.set(ev.pointerId, local(ev));
     if (pts.size === 1) { moved = 0; downAt = performance.now(); }
     if (layout.compact && !legend.hidden) setLegend(false);       // (on a phone the key covers a third of the map)
+    if (layout.touch) statusHint.classList.add('gone');           // (the hint has been read once the map is touched)
     if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); moved = 99; }
     goal = null;
   });
@@ -513,6 +520,13 @@ export function initMap(body) {
 /** Called when the map screen opens: the whole planet, centred on you (your zoom is kept after that). */
 export function openMap() {
   readColours();
+  // How the map is worked. With a mouse it stays in the status bar. On a phone the bar carries the map's buttons, so the
+  // hint is a chip over the map the first couple of times it is opened, and goes when the map is touched. (In the bar
+  // it was cut to "tap for det…" on the small phone.)
+  statusHint.textContent = layout.touch ? 'Pinch to zoom · tap anything for details' : 'Drag to pan · wheel to zoom · click for details';
+  clearTimeout(hintTimer);
+  statusHint.classList.toggle('gone', layout.touch && hintShown >= 2);
+  if (layout.touch && hintShown < 2) { hintShown++; hintTimer = setTimeout(() => statusHint.classList.add('gone'), 8000); }
   resize();
   if (!opened && W) {
     opened = true;

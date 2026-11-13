@@ -278,7 +278,9 @@ export function winGame() {
     // (each statistic has one name, here, in the journal and on the death screen)
     stats: [
       ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
-      ['Km driven', (st.driven / 1000).toFixed(1)], ['Km walked', (st.walked / 1000).toFixed(1)], ['Discoveries', st.discoveries],
+      // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
+      //  and "3.4 / Km walked" here were the same number written two ways)
+      ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', st.discoveries],
       ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}/${ACHIEVEMENTS.length}`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,

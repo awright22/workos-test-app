@@ -492,7 +492,7 @@ export function updateCompass() {
       seen.add(m.id);
       m.bearing = absBearing(pp, m.pos) * R2D;
       let n = cp.nodes[m.id];
-      if (!n) n = cp.nodes[m.id] = { el: el('div', null, 'mk', UI.compassMarks, icon(m.icon)), cls: null, lab: el('span', null, null, UI.compassDists, '<i></i><b class="t-num"></b>'), text: null, shown: null, w: 0 };
+      if (!n) n = cp.nodes[m.id] = { el: el('div', null, 'mk', UI.compassMarks, icon(m.icon)), cls: null, lab: el('span', null, null, UI.compassDists, '<i></i> <b class="t-num"></b>'), text: null, shown: null, w: 0 };
       m.node = n;
       const cls = m.cls;
       if (n.cls !== cls) { n.el.className = 'mk' + (cls ? ' ' + cls : ''); n.cls = cls; n.state = null; }

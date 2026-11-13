@@ -340,7 +340,7 @@ function nextToast() {
   const kind = /ACHIEVEMENT/i.test(t.kicker) ? 'ach' : /DISCOVER/i.test(t.kicker) ? 'disc' : 'sys';
   const node = el('div', null, 'toast ' + kind + (t.point ? ' point' : ''), UI.toasts,
     `<div class="ti">${icon(kind === 'ach' ? 'trophy' : kind === 'disc' ? 'pin' : 'info')}</div>` +
-    `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${esc(t.title)}</div>${t.note ? `<div class="t3">${esc(t.note)}</div>` : ''}</div>`);
+    `<div class="tt"><div class="t1">${esc(t.kicker)}</div><div class="t2">${chem(esc(t.title))}</div>${t.note ? `<div class="t3">${chem(esc(t.note))}</div>` : ''}</div>`);
   root.classList.add('has-toast');
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
   const cur = toastNow = { node, yields: !!t.yields, timer: 0 };
@@ -396,7 +396,7 @@ export function log(full, cls, o) {
   if (o && o.quiet) return;
   // A phone's log has the room between the bars and the stick: six short lines. A longer entry shows as many whole
   // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
-  const text = layout.compact ? wholeSentences(full, window.innerWidth <= 760 ? 150 : 170) : full;
+  const text = layout.compact ? wholeSentences(full, window.innerWidth <= 760 ? 120 : 150) : full;
   const line = el('div', null, 'mg-line ' + voice, UI.log, `<span class="who">${VOICES[voice]}</span><span class="tx" aria-hidden="true"></span><span class="sr"></span>`);
   const tx = line.querySelector('.tx');
   line.querySelector('.sr').textContent = full;

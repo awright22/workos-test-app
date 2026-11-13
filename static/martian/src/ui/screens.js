@@ -3,7 +3,7 @@ import { syncAllVisuals } from '../game/visuals.js';
 import { catalogue, scienceSummary } from '../game/science.js';
 import { MACHINES, serviceCost } from '../game/machines.js';
 import { CROPS, MORALE_WORD, PRODUCE, farm, moraleBand } from '../game/farm.js';
-import { UI, log, logHistory, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
+import { UI, VOICES, log, logHistory, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
 import { Snd } from '../audio/sound.js';
 import { fmtDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
@@ -93,26 +93,33 @@ let colonyTab = 'craft';
  * Cost as chips: how many of a thing it takes, then how many you have; the missing ones stand out.
  * (It was "Scrap Metal 9/2", have over need, which read as nine of two.)
  */
-function costChips(cost) {
+/** The badges of a card, as one group: beside the name where there is room, under it where there is not. */
+const tags = (h) => (h ? `<span class="tags">${h}</span>` : '');
+function costChips(cost, plain) {
   const keys = Object.keys(cost);
   if (!keys.length) return '<span class="chip ok">No materials needed</span>';
   return keys.map((k) => {
     const have = S.inv[k] || 0, ok = have >= cost[k];
+    // (a card locked for another reason says what it will take and no more: "Locked", a red "have 9" and a blueprint
+    //  note together were three reasons where there is one)
+    if (plain) return `<span class="chip"><b class="t-num">${cost[k]}</b> ${chem(esc(itemName(k)))}</span>`;
     return `<span class="chip ${ok ? 'ok' : 'miss'}"><b class="t-num">${cost[k]}</b> ${chem(esc(itemName(k)))} <i class="t-num">have ${have}</i></span>`;
   }).join('');
 }
 /** Where each material comes from, for the line that says one is missing. */
 const SOURCE = {
   scrap: 'salvage debris and old landers', circuit: 'salvage old landers', regolith: 'dig it outside',
-  ice: 'mine ice deposits with the ice drill', candle: 'fabricate one, or open supply pods',
+  ice: 'mine ice deposits', candle: 'fabricate one, or open supply pods',
 };
+/** (ice names how the drill is come by, until he has it: "with the ice drill" named a thing he had never seen) */
+const sourceOf = (k) => (k === 'ice' && !S.upgrades.drill ? 'mine ice deposits, once the Ice Drill is installed (Upgrades)' : SOURCE[k]);
 function missingText(cost) {
   const parts = [], from = [];
   for (const k in cost) {
     const need = cost[k] - (S.inv[k] || 0);
     if (need <= 0) continue;
     parts.push(`${need} ${itemName(k)}`);
-    if (SOURCE[k] && !from.includes(SOURCE[k])) from.push(SOURCE[k]);
+    if (sourceOf(k) && !from.includes(sourceOf(k))) from.push(sourceOf(k));
   }
   return parts.length ? `Missing ${parts.join(', ')}${from.length ? ': ' + from.join('; ') : ''}` : '';
 }
@@ -188,14 +195,17 @@ export function renderColony() {
     if (ok) ready++;
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
     craft += `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
-      (ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '') + '</div>' +
+      tags((ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '')) + '</div>' +
       `<p class="ds">${chem(esc(r.desc + (r.how ? ': ' + r.how[layout.touch ? 1 : 0] : '')))}</p><div class="cost">${costChips(r.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
       // a kit he is carrying can be set down from here too, without a trip to the Inventory tab
       (/^kit/.test(r.id) && have > 0 ? `<button type="button" class="mg-btn small" data-deploy="${r.id.slice(3).toLowerCase()}">Deploy</button>` : '') +
       `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
   }
-  craft = `<div class="pane-hd">Fabricator <span>${atHome ? `${ready} ready to build` : 'Out of range'}</span></div>` + craft;
+  // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
+  //  where its materials come from instead)
+  craft = `<div class="pane-hd">Fabricator <span>${!atHome ? 'Out of range' : ready ? `${ready} ready to build` : 'Needs materials'}</span></div>` +
+    (atHome && !ready ? '<p class="pane-note">Nothing to build yet. The fabricator works in scrap metal and circuit boards: salvage the debris lying around the Hab, and the old landers further out.</p>' : '') + craft;
 
   // --- upgrades: what can still be installed first; what is in, under its own heading (among the others an installed
   //     card was as tall as its neighbours and half empty) ---
@@ -208,11 +218,13 @@ export function renderColony() {
     }
     const gate = upgradeGate(u), can = hasCost(u.cost), ok = atHome && !gate && can;
     if (ok) upReady++;
+    // (a locked card: the one reason it is locked, what it will take, and no button to press in vain)
     up += `<article class="rcp ${ok ? 'ready' : gate ? 'locked' : ''}" data-card="${u.id}"><div class="rcp-hd"><h4>${chem(esc(u.name))}</h4>` +
-      (ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
-      `<p class="ds">${chem(esc(u.desc))}</p><div class="cost">${costChips(u.cost)}</div>` +
-      `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
-      `<span class="why${gate || !can ? ' bad' : ''}">${gate ? esc(gate) : !can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
+      tags(ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
+      `<p class="ds">${chem(esc(u.desc))}</p><div class="cost">${costChips(u.cost, !!gate)}</div>` +
+      (gate ? `<div class="rcp-ft"><span class="why gate">${esc(gate)}</span></div></article>`
+        : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
+          `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`);
   }
   up = `<div class="pane-hd">Upgrades <span>${installed} of ${UPGRADES.length} installed</span></div>` + up +
     (upDone ? `<div class="pane-hd">Installed <span>${installed}</span></div>${upDone}` : '');
@@ -224,12 +236,13 @@ export function renderColony() {
     const made = !!comforts()[c.id], block = made ? null : comfortBlock(c.id, World), locked = !made && !!(c.needs && !c.needs(World));
     const ok = !made && !block && atHome;
     if (ok) homeReady++;
-    const costHtml = Object.keys(c.cost).length ? costChips(c.cost) : '<span class="chip ok">Nothing but time</span>';
+    const costHtml = Object.keys(c.cost).length ? costChips(c.cost, locked) : '<span class="chip ok">Nothing but time</span>';
     const card = `<article class="rcp ${made ? 'done' : ok ? 'ready' : locked ? 'locked' : ''}" data-card="${c.id}"><div class="rcp-hd"><h4>${esc(c.name)}</h4>` +
-      (made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') +
-      `<span class="badge mood">${icon('mood')}+${c.cheer} a sol</span></div><p class="ds">${esc(c.desc)}</p>` +
-      (made ? '' : `<div class="cost">${costHtml}</div><div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
-        `<span class="why${block && !locked && block !== 'Made' ? ' bad' : ''}">${locked ? esc(c.why) : block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`) +
+      tags((made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') +
+        `<span class="badge mood">${icon('mood')}+${c.cheer} a sol</span>`) + `</div><p class="ds">${esc(c.desc)}</p>` +
+      (made ? '' : `<div class="cost">${costHtml}</div>` + (locked ? `<div class="rcp-ft"><span class="why gate">${esc(c.why)}</span></div>`
+        : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
+          `<span class="why${block && block !== 'Made' ? ' bad' : ''}">${block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`)) +
       '</article>';
     if (made) homeDone += card; else home += card;
   }
@@ -237,8 +250,10 @@ export function renderColony() {
     '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');
 
-  // (the number is how many things on that tab can be made now, and says so: bare, it read as a total and disagreed with the tab's own heading)
-  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}>${icon(ic)}${label}${n ? `<em>${n}<i> ready</i></em>` : ''}</button>`;
+  // (the number is how many things on that tab can be made now. The open tab says so in a word, and its own heading says
+  //  it again; the others carry the number alone, since three "ready" badges side by side were all anyone saw)
+  const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}` +
+    `${n ? ` aria-label="${label}: ${n} ready"` : ''}>${icon(ic)}${label}${n ? `<em>${n}${colonyTab === id ? '<i> ready</i>' : ''}</em>` : ''}</button>`;
   body.innerHTML = '<div class="colony">' +
     `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
     `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +
@@ -339,7 +354,7 @@ function tasksHtml() {
     const loot = Object.keys(q.loot || {}).map((k) => `<span class="chip"><b class="t-num">${q.loot[k]}</b> ${chem(esc(itemName(k, q.loot[k])))}</span>`).join('');
     const bp = q.bp ? `<span class="chip bp">${icon('blueprint')}${chem(esc((UPGRADES.find((u) => u.bp === q.bp) || { name: q.bp }).name))} blueprint</span>` : '';
     const reveal = q.reveal ? `<span class="chip bp">${icon('map')}Full survey map</span>` : '';
-    h += `<article class="card quest${isDone ? ' done' : ''}"><div class="card-hd">${icon(isDone ? 'check' : 'target')}<h4>${esc(q.name)}${q.target ? `<small>${esc(q.target)}</small>` : ''}</h4>` +
+    h += `<article class="card quest${isDone ? ' done' : ''}"><div class="card-hd">${icon(isDone ? 'check' : 'target')}<h4><span class="nm">${esc(q.name)}</span>${q.target ? ` <small>${esc(q.target)}</small>` : ''}</h4>` +
       (isDone ? '<span class="badge done">Complete</span>' : d >= 0 ? `<span class="dist t-num">${fmtDist(d)}</span>` : '<span class="badge active">Active</span>') + '</div>' +
       `<p>${chem(esc(q.desc))}</p><div class="meta">${loot}${bp}${reveal}</div></article>`;
   }
@@ -352,10 +367,12 @@ function discoveriesHtml() {
   const album = S.album || {}, shot = found.filter((r) => album[r.data.name]).length;
   // (what NASA wants of them is said once, under the heading; each card then carries a mark. The same sentence was on every card.)
   let h = `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found · ${shot} photographed</span></div>` +
-    (found.length > shot ? `<p class="pane-note">NASA would like a photograph of each: stand near one and open photo mode${layout.touch ? ', in the pause menu' : ' (P)'}.</p>` : '') + '<div class="jr-grid">';
+    (found.length > shot ? `<p class="pane-note">NASA would like a photograph of each: stand near one and choose ${layout.touch ? 'Photo mode from MENU' : 'Photo mode (P)'}.</p>` : '') + '<div class="jr-grid">';
   for (const rec of found.sort((x, y) => x.data.year - y.data.year)) {
-    h += `<article class="card got"><div class="card-hd">${icon('lander')}<h4>${esc(rec.data.name)}<small>${rec.data.year}</small></h4>` +
-      `${album[rec.data.name] ? `<span class="badge done">${icon('camera')}Photographed</span>` : `<span class="badge">${icon('camera')}No photo yet</span>`}${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}</div>` +
+    // (the name is one piece and the year follows it or goes under it; the badges take the line below where the card
+    //  is narrow. On the small phone the badge and the year were printed over the name.)
+    h += `<article class="card got"><div class="card-hd">${icon('lander')}<h4><span class="nm">${esc(rec.data.name)}</span> <small>${rec.data.year}</small></h4>` +
+      tags(`${album[rec.data.name] ? `<span class="badge done">${icon('camera')}Photographed</span>` : `<span class="badge">${icon('camera')}No photo yet</span>`}${S.salvaged[rec.data.name] ? '<span class="badge done">Salvaged</span>' : ''}`) + '</div>' +
       `<p>${esc(rec.data.note)}</p></article>`;
   }
   h += more(landers.length - found.length, 'lander', 'landers', S.flags.mapRevealed ? 'Their signals are on the map. Go and find them.' : 'Every machine sent to Mars is still where it stopped. Find them out there.');
@@ -363,7 +380,7 @@ function discoveriesHtml() {
   const seen = places.filter((f) => S.discovered[f.name]);
   h += `</div><div class="pane-hd">Places <span>${seen.length} of ${places.length} visited</span></div><div class="jr-grid">`;
   for (const f of seen) {
-    h += `<article class="card got"><div class="card-hd">${icon('pin')}<h4>${esc(f.name)}<small>${FEATURE_KIND[f.type] || ''}</small></h4></div><p>${esc(f.note)}</p></article>`;
+    h += `<article class="card got"><div class="card-hd">${icon('pin')}<h4><span class="nm">${esc(f.name)}</span> <small>${FEATURE_KIND[f.type] || ''}</small></h4></div><p>${esc(f.note)}</p></article>`;
   }
   h += more(places.length - seen.length, 'place', 'places', 'Volcanoes, canyons, basins and craters you have not stood in yet. Their names are on the map.');
   // sights: each one not yet seen keeps its own card, because each has its own hint
@@ -371,7 +388,7 @@ function discoveriesHtml() {
   h += `</div><div class="pane-hd">Sights <span>${sl.filter((x) => x.sol).length} of ${sl.length} seen</span></div><div class="jr-grid">`;
   for (const x of sl.slice().sort((p, q) => !!q.sol - !!p.sol)) {
     h += x.sol
-      ? `<article class="card got"><div class="card-hd">${icon('eye')}<h4>${esc(x.name)}<small>Sol ${x.sol}</small></h4></div><p>${esc(x.text)}</p></article>`
+      ? `<article class="card got"><div class="card-hd">${icon('eye')}<h4><span class="nm">${esc(x.name)}</span> <small>Sol ${x.sol}</small></h4></div><p>${esc(x.text)}</p></article>`
       : `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>${esc(x.name)}</h4></div><p>${esc(x.text)}</p></article>`;
   }
   return h + '</div>';
@@ -386,7 +403,7 @@ function achievementsHtml() {
       const [v, max, unit] = ACH_PROGRESS[a.id]();
       prog = `<div class="prog"><i style="--p:${Math.min(100, v / max * 100).toFixed(0)}%"></i><span class="t-num">${num(Math.min(v, max))} / ${num(max)}${unit}</span></div>`;
     }
-    h += `<article class="card ${g ? 'got' : 'locked'}"><div class="card-hd">${icon(g ? 'trophy' : 'lock')}<h4>${esc(a.name)}</h4>${g ? '<span class="badge done">Earned</span>' : ''}</div><p>${esc(a.desc)}</p>${prog}</article>`;
+    h += `<article class="card ${g ? 'got' : 'locked'}"><div class="card-hd">${icon(g ? 'trophy' : 'lock')}<h4>${esc(a.name)}</h4>${tags(g ? '<span class="badge done">Earned</span>' : '')}</div><p>${esc(a.desc)}</p>${prog}</article>`;
   }
   return h + '</div>';
 }
@@ -404,22 +421,22 @@ function statsHtml() {
 }
 function logHtml() {
   if (!logHistory.length) return `<div class="empty">${icon('journal')}<b>Nothing logged yet</b>What you, the Hab and NASA say is kept here.</div>`;
-  const NAMES = { nasa: 'NASA', sys: 'HAB', disc: 'SURVEY', log: 'LOG' };
   let h = `<div class="pane-hd">Log <span>The last ${logHistory.length === 1 ? 'entry' : logHistory.length + ' entries'}, newest first</span></div><div class="jlog">`;
   for (let i = logHistory.length - 1; i >= 0; i--) {
     const l = logHistory[i];
-    h += `<div class="mg-line ${l.voice}"><span class="who">${NAMES[l.voice]}<small>SOL ${l.sol}</small></span><span class="tx">${chem(esc(l.text))}</span></div>`;
+    h += `<div class="mg-line ${l.voice}"><span class="who">${VOICES[l.voice] || VOICES.sys}<small>SOL ${l.sol}</small></span><span class="tx">${chem(esc(l.text))}</span></div>`;
   }
   return h + '</div>';
 }
 function samplesHtml() {
   const s = scienceSummary(), list = catalogue();
-  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science${s.nextGrant ? (s.points >= s.nextGrant ? ' · a NASA grant is waiting on the next analysis' : ` · next NASA grant at ${s.nextGrant}`) : ''}</span></div>`;
+  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science</span></div>` +
+    (s.nextGrant ? `<p class="pane-note">${s.points >= s.nextGrant ? 'A NASA grant is waiting on the next analysis.' : `NASA sends a grant at ${s.nextGrant} science.`}</p>` : '');
   if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder, or bag soil where you dig. The analyser on the Hab work table says what it is. What you find depends on where on Mars you are standing.</div>`;
   else if (s.bagged) h += `<p class="jr-note">${s.bagged} of ${s.limit} sample bags are full and waiting for the analyser in the Hab.</p>`;
   h += '<div class="jr-grid">';
   for (const m of list.filter((x) => x.count).sort((a, b) => b.value - a.value)) {
-    h += `<article class="card got"><div class="card-hd">${icon('layers')}<h4>${esc(m.name)}<small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4><span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span></div><p>${chem(esc(m.text))}</p></article>`;
+    h += `<article class="card got"><div class="card-hd">${icon('layers')}<h4><span class="nm">${esc(m.name)}</span> <small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4>${tags(`<span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span>`)}</div><p>${chem(esc(m.text))}</p></article>`;
   }
   h += '</div>';
   // what is still to find: one list of leads (a card apiece was a wall of identical question marks)

@@ -34,7 +34,7 @@ export function die(cause) {
     kind: 'death',
     kicker: `Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}` + (iron ? ' · save deleted' : ''),
     title: 'You died on Mars',
-    stats: [['Sols survived', S.sol], ['Km driven', (S.stats.driven / 1000).toFixed(1)], ['Food grown', S.stats.potatoes + (S.stats.produce || 0)]],
+    stats: [['Sols survived', S.sol], ['Driven', `${(S.stats.driven / 1000).toFixed(1)}<small>km</small>`], ['Food grown', S.stats.potatoes + (S.stats.produce || 0)]],
     body: cause + (iron ? '\n\nYou knew the deal.' : '\n\nNobody plants the flag on the first try.'),
     buttons,
   });
