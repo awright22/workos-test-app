@@ -262,7 +262,8 @@ const _m = new Float64Array(10), _q = new Float64Array(10), _rim = new Float64Ar
  * numbers per rock: where it meets the ground, relative to the chunk origin (3); the ground's
  * normal there (3); its radius at the ground in metres; what kind it is (the whole part: angular,
  * rounded, slab, cobble) plus a random 0..1 for shape and colour; how far to sink it so that
- * uneven ground leaves no gap under it; and how much of the ground it lies on is bare lava.
+ * uneven ground leaves no gap under it; and whether it lies on a volcano's lava field (twice the thirds of the
+ * way in, as a whole number) and how much of the ground under it is bare lava (the fraction).
  * @param {'big'|'small'} kind
  * @param {{T:number, unit:number, at:Function}} grid  the mesh it rests on (see meshPoint)
  */
@@ -333,8 +334,9 @@ export function scatterRocks(planet, face, level, ix, iy, kind, ox, oy, oz, grid
     // cliffs are; the mesh's says where a ledge's riser or a crater's wall is, which the land's slope cannot.
     const steep = _m[6];
     if (steep > 0.8 || (steep > 0.5 && keep < (steep - 0.5) / 0.3)) continue;
-    // (on a lava field: is this the back of a flow, or a lava lake's floor, or the dust between?)
-    const bare = lavaField > 0 ? lavaField * bareLava(steep, _m[8]) : 0;
+    // (on a lava field: is this the back of a flow, or a lava lake's floor, or the dust between? The whole part
+    // says how far into the field the chunk lies, in thirds; the fraction how much of the ground here is bare lava.)
+    const bare = lavaField > 0 ? Math.round(lavaField * 3) * 2 + Math.min(0.999, lavaField * bareLava(steep, _m[8])) : 0;
     // (the extra stones of a wall lie on the wall's own ground and within a stone's roll of its foot, not out on the
     // level beyond: the land is looked at sixteen metres off each way for something steep)
     if (more > 1) {

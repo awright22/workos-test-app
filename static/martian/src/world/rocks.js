@@ -39,8 +39,9 @@ export const rockColliders = [];
 export const ROCK_SOLID = 0.4;
 /** No stone that can be walked through stands higher than this: one that would is seated deeper. */
 export const STONE_HIGH = 0.22;
-/** A rock as wide as a boulder but too low to block anybody shows this much of itself: a plate flush with the ground. */
-export const PLATE_HIGH = 0.07;
+/** A rock as wide as a boulder but too low to block anybody shows about this much of itself: a plate flush with the
+ *  ground, which a boot standing on it does not visibly sink into. */
+export const PLATE_HIGH = 0.03;
 
 /** A ball of 20 n^2 triangles for a shape map `mapSize` texels across (see rock-ball.js). Each vertex also carries how
  *  far this ball may move it to bring it onto an arris of the rock. */
@@ -62,7 +63,7 @@ const GLSL_SHAPE_UV = /* glsl */`
  * stone is trodden in, 1 where the astronaut's boots are.
  */
 const vertexHead = (atlas) => /* glsl */`
-  attribute vec4 aRock;                        // atlas layer; height of the ground in the rock's frame (m); seed (below zero: it is never trodden in); tone, and in its whole part how much of the ground under it is bare lava
+  attribute vec4 aRock;                        // atlas layer; height of the ground in the rock's frame (m); seed (below zero: it is never trodden in); tone, and in its whole part how much of the ground under it is bare lava (fifteenths) and how far into a lava field it lies (thirds, times sixteen)
   attribute float aSnap;
   uniform highp sampler2DArray uShapes;
   uniform highp sampler2DArray uArris;
@@ -128,6 +129,7 @@ function rockMaterial(uniforms, atlas, detail) {
         varying vec3 vRockS;
         varying vec4 vRockI;
         varying vec4 vRockLies;
+        varying float vRockField;
         varying mat3 vRockRot;`)
       .replace('#include <begin_vertex>', `
         vec3 transformed = rockSurface(position);
@@ -143,7 +145,8 @@ function rockMaterial(uniforms, atlas, detail) {
         vRockI = vec4(aRock.xy, abs(aRock.z), fract(aRock.w) * 1.0204);
         vRockRot = mat3(viewMatrix) * mat3(rockM[0] / rockS.x, rockM[1] / rockS.y, rockM[2] / rockS.z);
         // where on the planet it lies (the same for every vertex of a rock), and how much of that ground is bare lava
-        vRockLies = vec4(normalize(rockT[3].xyz), floor(aRock.w) / 15.0);
+        vRockLies = vec4(normalize(rockT[3].xyz), mod(floor(aRock.w), 16.0) / 15.0);
+        vRockField = floor(aRock.w / 16.0) / 3.0;
         #ifdef USE_INSTANCING
           transformed.y -= rockTrodden(instanceMatrix) * 2.4;   // (a stone under his boot goes into the dust)
         #endif`);
@@ -157,6 +160,7 @@ function rockMaterial(uniforms, atlas, detail) {
         varying vec3 vRockS;
         varying vec4 vRockI;
         varying vec4 vRockLies;
+        varying float vRockField;
         varying mat3 vRockRot;
         ${GLSL_SHAPE_UV}
         ${GLSL_GROUND_GRADE}
@@ -189,7 +193,9 @@ function rockMaterial(uniforms, atlas, detail) {
         float rockSky = dot(rockN, rockUp);
         float rockHollow = rockB.r - 0.5;
         float rockHigh = (vRockPos.y - vRockI.y) / vRockS.y;                // above the ground, in rock radii
-        float rockTone = vRockI.w, lava = vRockLies.a;
+        // (lava: how much of the ground under it is bare lava; basalt: how surely the rock itself is a piece of a flow,
+        // which on a volcano it is whether it lies on a flow's back or in the dust between two)
+        float rockTone = vRockI.w, lava = vRockLies.a, basalt = max(lava, vRockField * 0.85);
 
         rockLand(uAlbedo, vRockLies, uHere);
         float gl = dot(rockDust, vec3(0.3, 0.55, 0.15));
@@ -198,7 +204,7 @@ function rockMaterial(uniforms, atlas, detail) {
         float film = clamp(rockTone * (1.0 + (rockB.g - 0.5) * 0.7) + (rockB.g - 0.5) * 0.3 - rockB.b * 0.16 + (rockStain - 0.5) * 0.36, 0.0, 1.0);
         vec3 stone = mix(vec3(gl), rockDust, 0.46) * mix(0.50, 0.80, film);
         // (on a lava field it is the flow's own rock: clinker and blocks of it, a shade paler than the flow's back)
-        stone = mix(stone, mix(rockDust * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.062, 0.060), 0.72) * mix(0.95, 1.6, film), lava);
+        stone = mix(stone, mix(rockDust * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.064, 0.062), 0.86) * mix(1.0, 1.7, film), basalt);
         stone = mix(stone, vec3(0.20, 0.19, 0.20), rockIcy * 0.8) * (1.0 - 0.3 * rockPits);
         // a layered rock shows its partings: thin dark lines along the beds (not where they would be finer than a pixel)
         float bedAt = vRockPos.y / vRockS.y * 31.0 + rg1.a * 2.2 + rgm.a * 0.8;
@@ -206,21 +212,23 @@ function rockMaterial(uniforms, atlas, detail) {
         // Dust lies thick on whatever faces the sky and gathers in the hollows; edges and fresh breaks are swept clean.
         // Where the land is bright the dust is deep and the rocks wear more of it; on dark sand the wind keeps them
         // barer, and on bare lava there is little to settle.
-        float dusty = mix(-0.08, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - lava * 0.22 + (rockTone - 0.45) * 0.3;
-        float dust = smoothstep(0.30, 0.68, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
+        float dusty = mix(-0.08, 0.08, smoothstep(0.10, 0.30, rockRawLum)) - max(lava, basalt * 0.5) * 0.3 + (rockTone - 0.45) * 0.3;
+        // (It lies on what is nearly level, not on every slope that sees the sky: a boulder dusted all over its back is
+        // a mound of sand. And one face holds it where the next does not, which is what shows the faces.)
+        float dust = 0.94 * smoothstep(0.42, 0.80, rockSky * 0.9 + 0.1 - rockHollow * 0.8 - rockB.b * 0.15 + (rockB.g - 0.5) * 0.34 + (rg1.a - 0.5) * 0.22 + (rgm.a - 0.5) * 0.22 + (rg2.a - 0.5) * 0.12 + dusty);
         // and it is banked against the foot of the rock, in the colour of the ground there, so that rock and ground meet without a line
         float skirt = 1.0 - smoothstep(0.0, 0.05 + 0.1 * fract(vRockI.z * 7.9), rockHigh + (rg1.a - 0.5) * 0.08);
-        vec3 rockLies = mix(mix(rockDust, rockGround, lava * 0.7), rockGround, skirt);
+        // (what settles on a rock on bare lava is the flow's own dark grit with a little of the country's dust in it: the
+        // country's dust alone made every rock on a volcano an orange rock on black ground)
+        vec3 rockLies = mix(mix(rockDust, rockGround * 1.25, lava * 0.94), rockGround, skirt);
         dust = max(dust, skirt * 0.9);
         vec3 rockCol = mix(stone, rockLies, dust) * (1.0 + (rg1.a - 0.5) * 0.24 + (rgm.a - 0.5) * 0.3 + (rg2.a - 0.5) * 0.3);
         // creases are shaded by what stands round them, and the foot of the rock by the ground
         float rockAo = mix(0.6, 1.0, smoothstep(0.12, 0.46, rockB.r)) * mix(0.72, 1.0, smoothstep(-0.02, 0.2, rockHigh));
         diffuseColor.rgb = rockCol * rockAo;`)
-      // Dusty stone scatters light: it has no sheen. (With a quarter of a smooth surface's left to it, every rock
-      // mirrored the sky along its outline, where it is seen edge-on: a pale hairline round a boulder's foot against
-      // its own shadow, and a pale edge to every rock on a skyline.)
+      // stone scatters light; it has no more sheen at grazing angles than the ground has
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
-        material.specularColor *= 0.03; material.specularColorBlended *= 0.03; material.specularF90 *= 0.03;`)
+        material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16;`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         normal = normalize(vRockRot * rockN);`);
   };
@@ -504,7 +512,7 @@ class RockDrift {
           vec3 objectNormal = normalize(vec3(cs.x * fall, 1.0, cs.y * fall));
           vDriftAt = vec3(ring < 0.5 ? -0.5 : ring < 1.5 ? 0.0 : ring < 2.5 ? 0.46 : 1.0, amount, tail);
           vDriftPos = driftPos * rockS;
-          vDriftLies = vec4(normalize((modelMatrix * instanceMatrix)[3].xyz), floor(aRock.w) / 15.0);`)
+          vDriftLies = vec4(normalize((modelMatrix * instanceMatrix)[3].xyz), mod(floor(aRock.w), 16.0) / 15.0);`)
         .replace('#include <begin_vertex>', 'vec3 transformed = driftPos;');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
@@ -524,7 +532,7 @@ class RockDrift {
           diffuseColor.rgb = rockGround * (1.0 + (dg.a - 0.5) * 0.14) * (1.0 - 0.28 * inBy);
           diffuseColor.a = (1.0 - smoothstep(0.28, 0.94, vDriftAt.x + (dg.a - 0.5) * 0.24)) * smoothstep(0.02, 0.2, vDriftAt.y);`)
         .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
-          material.specularColor *= 0.03; material.specularColorBlended *= 0.03; material.specularF90 *= 0.03;`)
+          material.specularColor *= 0.16; material.specularColorBlended *= 0.16; material.specularF90 *= 0.16;`)
         .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
           normal = normalize(normal + mat3(viewMatrix) * ((dg.rgb - 0.5) * 0.3));`);
     };
@@ -662,10 +670,10 @@ export class RockField {
     // backing and veering a little from region to region.
     const ol = 1 / Math.hypot(o[0], o[1], o[2]), ux = o[0] * ol, uy = o[1] * ol, uz = o[2] * ol;
     const veer = gnoise3(ux * 2.3 + 4.1, uy * 2.3, uz * 2.3 - 1.7) * 1.1 + 0.25;
-    const el = Math.hypot(uz, ux) || 1, ex = -uz / el, ez = ux / el, nx = -uy * ez, ny = uz * ex - ux * ez, nz = uy * ex;      // east and north here
+    const el = Math.hypot(uz, ux) || 1, ex = -uz / el, ez = ux / el, nx = uy * ez, ny = uz * ex - ux * ez, nz = -uy * ex;      // east and north here
     _w.set(ex * Math.cos(veer) + nx * Math.sin(veer), ny * Math.sin(veer), ez * Math.cos(veer) + nz * Math.sin(veer));
     for (let i = 0, j = 0, a = 0; i < d.length; i += ROCK_STRIDE, j += INST, a += AUX) {
-      const size = d[i + 6], cls = Math.floor(d[i + 7]), rnd = d[i + 7] - cls, lava = d[i + 9];
+      const size = d[i + 6], cls = Math.floor(d[i + 7]), rnd = d[i + 7] - cls, field = Math.floor(d[i + 9] / 2), lava = d[i + 9] - field * 2;
       const list = classes[cls];
       const shape = list[Math.floor(fr(rnd * 61.7) * list.length)], sh = shapes[shape];
       // its own proportions
@@ -677,7 +685,7 @@ export class RockField {
       let stands = sh.top * sy - ground;
       // (and by what it is to a man on foot: see the top of this file)
       const solid = big && stands > ROCK_SOLID;
-      const most = solid ? Infinity : big ? PLATE_HIGH * (0.6 + 0.8 * fr(rnd * 47)) : STONE_HIGH;
+      const most = solid ? Infinity : big ? PLATE_HIGH * (0.5 + fr(rnd * 47)) : STONE_HIGH;
       if (stands > most) { ground += stands - most; stands = most; }
       _up.set(d[i + 3], d[i + 4], d[i + 5]);
       _q.setFromUnitVectors(_y, _up);
@@ -695,7 +703,7 @@ export class RockField {
       const bare = fr(rnd * 11.3) < (cls === ROCK_ANGULAR ? 0.26 : cls === ROCK_SLAB ? 0.1 : 0.16);
       const tone = bare ? 0.03 + 0.3 * fr(rnd * 3.7) : 0.38 + 0.62 * fr(rnd * 3.7);
       // (below zero, the seed says the rock is never trodden in: a boulder, or a plate in the ground)
-      inst[j + 12] = shape * 2; inst[j + 13] = ground; inst[j + 14] = big ? -Math.max(rnd, 1e-4) : rnd; inst[j + 15] = Math.round(lava * 15) + tone * 0.98;
+      inst[j + 12] = shape * 2; inst[j + 13] = ground; inst[j + 14] = big ? -Math.max(rnd, 1e-4) : rnd; inst[j + 15] = field * 16 + Math.round(lava * 15) + tone * 0.98;
       const radius = (_s.x + _s.z) * 0.5;
       aux[a] = radius; aux[a + 1] = stands; aux[a + 2] = shape;
       // the lee, in the rock's own frame (its x and z axes are the first and third columns of its matrix)
@@ -770,9 +778,9 @@ export class RockField {
         for (const c of set.colliders) if (Math.hypot(c.x - ax, c.y - ay, c.z - az) < 140) rockColliders.push(c);
       } else nSmall += drawn;
     }
-    // the pebbles round the camera: those at his feet with the stones (a ball of eighty triangles, the whole
-    // material, a shadow), the rest as specks of twenty
-    this.gravel.fill(camPos, this.anchor, lods[1].lod, shadowRange > 0);
+    // the pebbles round the camera: those at his feet with the stones (a ball of eighty triangles and the whole
+    // material), the rest as specks of twenty
+    this.gravel.fill(camPos, this.anchor, lods[1].lod);
     for (const l of lods) l.lod.end();
     shade.end(); drift.end();
     this.counts = { big: nBig, near: lods[3].lod.n + (lods[4] ? lods[4].lod.n : 0), small: nSmall, colliders: rockColliders.length, lods: lods.map((l) => l.lod.n), casters: lods.map((l) => l.lod.casters),
@@ -835,7 +843,7 @@ class GravelField {
       out[k++] = _mp[3]; out[k++] = _mp[4]; out[k++] = _mp[5];
       out[k++] = 0.016 + 0.07 * u * u * u;                                       // 3 to 17 cm across, most of them small
       out[k++] = v;
-      out[k++] = lavaField * bareLava(_mp[6], _mp[8]);
+      out[k++] = Math.round(lavaField * 3) * 16 + Math.round(lavaField * bareLava(_mp[6], _mp[8]) * 15);      // (as a rock's: the field, and the bare lava under it)
     }
     return k === out.length ? out : out.subarray(0, k);
   }
@@ -844,10 +852,10 @@ class GravelField {
    * Draw the pebbles round the camera. Called whenever the rocks' own lists are refilled.
    * @param anchor  the point the rocks' meshes are drawn from; the pebbles are drawn from it too, so that one
    *   place for his boots serves them all
-   * @param {RockLod} near  the mesh the pebbles nearest the camera go into (the rest go into the gravel's own)
-   * @param {boolean} cast  whether those near ones cast shadows
+   * @param {RockLod} near  the mesh the pebbles nearest the camera go into (the rest go into the gravel's own). They
+   *   cast no shadows there either: a pebble's shadow is a few pixels, and the shadow maps have none to spare.
    */
-  fill(camPos, anchor, near, cast) {
+  fill(camPos, anchor, near) {
     const len = camPos.length(), lod = this.lod;
     lod.mesh.position.copy(anchor);
     lod.begin();
@@ -885,8 +893,8 @@ class GravelField {
         _q2.multiply(_q.setFromAxisAngle(_ax, (fr(rnd * 3.3) - 0.5) * 0.5));
         _m.compose(_p.set(d[i] - anchor.x - _up.x * ground, d[i + 1] - anchor.y - _up.y * ground, d[i + 2] - anchor.z - _up.z * ground), _q2, _s);
         // (pebbles are darker than the sand they lie on: what is pale and fine has blown away from them)
-        const tone = Math.round(d[i + 8] * 15) + (0.05 + fr(rnd * 3.7) * 0.6) * 0.98;
-        if (isNear) { near.add(shape * 2, ground, rnd, tone, cast); close++; } else lod.add(shape * 2, ground, rnd, tone, false);
+        const tone = d[i + 8] + (0.05 + fr(rnd * 3.7) * 0.6) * 0.98;
+        if (isNear) { near.add(shape * 2, ground, rnd, tone, false); close++; } else lod.add(shape * 2, ground, rnd, tone, false);
       }
     }
     this.close = close;

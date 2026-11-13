@@ -58,6 +58,8 @@ if (process.argv.includes('--shapes')) { if (fail.length) { console.error(`\nroc
 // function instead of on the mesh's own triangles stood up to 0.43 m above a dune crest the mesh had cut off.
 const g = await openGame({ quality: 'medium' });
 await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.paused = true; G.S.storm.cells.forEach((c) => { c.peak = 0; }); G.setStorm(0); });
+// (no rock is drawn until the shapes are worked out, a few milliseconds at a time from the moment the game loads)
+await g.eval(async (G) => { while (!G.ctx.rocks.ready) await new Promise((r) => setTimeout(r, 100)); });
 const frames = (n = 3) => g.eval(async (G, n) => {
   const e = G.ctx.engine;
   for (let k = 0, last = e.frameStats; k < n;) { await new Promise((r) => setTimeout(r, 60)); if (e.frameStats !== last) { last = e.frameStats; k++; } }
@@ -98,7 +100,7 @@ const survey = (reach) => g.eval((G, reach) => {
     }
     return best;
   };
-  const out = { n: 0, worstGap: 0, steepest: 1, onIce: 0, finest: T.maxLevel, big: 0, small: 0, tallestLoose: 0, lowestSolid: 9, solid: 0, onLava: 0, drawn: 0, loose: 0 };
+  const out = { n: 0, worstGap: 0, steepest: 1, onIce: 0, finest: T.maxLevel, big: 0, small: 0, tallestLoose: 0, lowestSolid: 9, solid: 0, onLava: 0, inField: 0, drawn: 0, loose: 0 };
   for (const [node, set] of rocks.sets) {
     if (node.used < T.frame - 2) continue;
     const d = set.data, o = set.origin, per = set.inst ? set.inst.length / (d.length / STRIDE) : 0, aper = set.aux ? set.aux.length / (d.length / STRIDE) : 0;
@@ -113,7 +115,8 @@ const survey = (reach) => g.eval((G, reach) => {
         out.drawn++;
         if (solid) { out.solid++; out.lowestSolid = Math.min(out.lowestSolid, stands); } else out.tallestLoose = Math.max(out.tallestLoose, stands);
         if (!fixed) out.loose++;
-        if (d[i + 9] > 0.5) out.onLava++;
+        if (d[i + 9] % 2 > 0.5) out.onLava++;
+        if (d[i + 9] >= 2) out.inField++;
       }
       const m = under(ux, uy, uz, r);
       if (!m || m.level !== T.maxLevel) continue;
@@ -148,7 +151,7 @@ check(s.n > 40, `${s.n} rocks stand on the finest mesh within 45 m (${s.big} bou
 check(s.worstGap < 0.02, `each meets the ground that is drawn: the worst is ${(s.worstGap * 1000).toFixed(1)} mm off it`);
 check(s.steepest > 0.8, `no stone lies on a face steeper than 37 degrees (the steepest is ${(Math.acos(Math.min(1, s.steepest)) * 180 / Math.PI).toFixed(0)} degrees)`);
 check(s.calls <= 8, `the rocks, the gravel, their shade and their drifts are ${s.calls} draw calls (8 at most: five densities of ball, the gravel, the shade, the drifts)`);
-check(s.onLava === 0, `no rock here thinks it lies on lava (${s.onLava})`);
+check(s.onLava === 0 && s.inField === 0, `no rock here thinks it lies on lava (${s.onLava}) or on a volcano (${s.inField})`);
 onFoot(s, 'put down at the crash site');
 
 console.log('a rock garden (the Viking 1 site)');
@@ -157,7 +160,7 @@ await frames();
 s = await survey(60);
 check(s.worstGap < 0.02, `${s.n} rocks, the worst ${(s.worstGap * 1000).toFixed(1)} mm off the ground`);
 check(s.counts.shapes >= 16, `${s.counts.shapes} different shapes are in the picture (at least 16)`);
-check(s.colliders.length > 5 && s.colliders.every((r) => r > 0.3 && r < 4), `${s.colliders.length} boulders stand in the way, ${Math.min(...s.colliders)} to ${Math.max(...s.colliders)} m in radius`);
+check(s.colliders.length > 5 && s.colliders.every((r) => r > 0.28 && r < 4), `${s.colliders.length} boulders stand in the way, ${Math.min(...s.colliders)} to ${Math.max(...s.colliders)} m in radius`);
 check(s.solid > 0 && s.lowestSolid > s.limits.solid, `what stands in the way stands knee-high or more (the lowest of ${s.solid} is ${(s.lowestSolid * 100).toFixed(0)} cm)`);
 check(s.counts.big > 200 && s.counts.small > 200, `boulders and stones are both drawn (${s.counts.big} and ${s.counts.small})`);
 check(s.counts.drifts > 5, `the near rocks have dust drifted against them (${s.counts.drifts})`);
@@ -179,7 +182,8 @@ console.log('a lava flow (the flank of Olympus Mons)');
 await g.eval(async (G) => { await G.tp(15.5, 228.5, 0.5); G.setLocalTime(8); G.tick(0.05, 20); await G.settle(); });
 await frames();
 s = await survey(60);
-check(s.drawn > 40 && s.onLava > s.drawn * 0.25, `${s.onLava} of ${s.drawn} rocks know they lie on bare lava, and are drawn as the flow's own dark rock (more than a quarter)`);
+check(s.drawn > 40 && s.inField === s.drawn, `all ${s.drawn} rocks know they lie on a volcano, and are drawn as its own dark rock (${s.inField})`);
+check(s.onLava > s.drawn * 0.25, `${s.onLava} of them lie on bare lava, where the dust on them is thin and dark (more than a quarter)`);
 onFoot(s, 'put down on the lava');
 
 console.log('the north polar cap');

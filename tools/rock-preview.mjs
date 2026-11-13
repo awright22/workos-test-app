@@ -115,11 +115,11 @@ function draw(img, W, x0, y0, cw, ch, shape, az, el, ppu, cuts, bare) {
       const hollow = B[0] - 0.5, high = y + cy;
       // (as the rock shader: dark stone, each face its own tone, a fresh break darker; dust on what faces the sky and
       // in the hollows, banked against the foot)
-      const film = (bare ? 0.2 : 0.62) * (1 + (B[1] - 0.5) * 0.5) - B[2] * 0.12 + (stain - 0.5) * 0.24;
+      const film = (bare ? 0.2 : 0.62) * (1 + (B[1] - 0.5) * 0.7) + (B[1] - 0.5) * 0.3 - B[2] * 0.16 + (stain - 0.5) * 0.36;
       const lum = SOIL[0] * 0.3 + SOIL[1] * 0.55 + SOIL[2] * 0.15;
-      const k0 = 0.40 + 0.34 * Math.min(1, Math.max(0, film));
+      const k0 = 0.50 + 0.30 * Math.min(1, Math.max(0, film));
       const stone = SOIL.map((c) => (lum * 0.5 + c * 0.5) * k0);
-      let dust = sstep(0.30, 0.74, ny * 0.9 + 0.1 - hollow * 1.5 - B[2] * 0.15 + (g1 - 0.5) * 0.3 + (g2 - 0.5) * 0.2 + (bare ? -0.1 : 0.06));
+      let dust = sstep(0.30, 0.68, ny * 0.9 + 0.1 - hollow * 0.8 - B[2] * 0.15 + (g1 - 0.5) * 0.22 + (g2 - 0.5) * 0.2 + (bare ? -0.1 : 0.06));
       const skirt = 1 - sstep(0.0, 0.1, high + (g1 - 0.5) * 0.08);
       dust = Math.max(dust, skirt * 0.85);
       const ao = (0.6 + 0.4 * sstep(0.12, 0.46, B[0])) * (0.7 + 0.3 * sstep(-0.02, 0.16, high));
