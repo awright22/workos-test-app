@@ -384,6 +384,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (a crack shows the ice's depth: darker and bluer than its face, not a pale scar)
         iceCol = mix(iceCol, vec3(0.09, 0.22, 0.48), clamp(crack * 0.9, 0.0, 1.0) * (1.0 - dusty));
         iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.12, 0.36, hMid * fMid + hFar * 0.5) * 0.3 * (1.0 - crack));
+        // (by night the ice is grey under the stars, not blue: blue ice under the night's blue light was a cobalt floor)
+        iceCol = mix(vec3(dot(iceCol, vec3(0.3, 0.5, 0.2))) * vec3(0.96, 1.0, 1.05), iceCol, 0.35 + 0.65 * uDay);
         col = mix(col, iceCol, ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
@@ -430,6 +432,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain39' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain40' + (o.fine !== false ? 'F' : '');
   return mat;
 }
