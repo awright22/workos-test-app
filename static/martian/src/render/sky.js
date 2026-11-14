@@ -47,6 +47,16 @@ const GLSL_SKY = /* glsl */`
     // the dust is not even: slow broad bands of thicker and thinner haze
     float band = vnoise(v * vec3(2.2, 7.0, 2.2) + vec3(uTime * 0.004, 0.0, uTime * 0.002)) - 0.5;
     col *= (1.0 + band * 0.16 * (1.0 - uDust)) * (0.90 * day);
+    // High cloud: thin ice haze drawn out along the wind, a shade paler than the sky it lies on. Faint and slow, thinning
+    // toward the horizon (where the dust hides it) and gone in a storm. (Half of every day picture was an empty gradient.)
+    if (day > 0.01 && mu > 0.02) {
+      vec3 wAx = normalize(cross(uUp, vec3(0.31, 0.77, 0.55)));
+      vec3 q = (v - uUp * mu) / (mu + 0.16);
+      vec3 c = (q - wAx * (dot(q, wAx) * 0.74)) * 2.6 + vec3(uTime * 0.0016, 0.0, uTime * 0.0011);
+      float wn = vnoise(c) * 0.62 + vnoise(c * 2.4 + 5.1) * 0.38;
+      float wisp = smoothstep(0.50, 0.80, wn) * smoothstep(0.02, 0.34, mu) * (1.0 - uDust) * day;
+      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * 1.30, 0.34 * wisp) * (1.0 + 0.10 * wisp);
+    }
     // night: the faint cool light of a dusty sky under the stars, a little brighter at the horizon
     col += mix(vec3(0.0110, 0.0140, 0.0235), vec3(0.0260, 0.0290, 0.0400), h) * (1.0 - day);
     // dust aureole around the sun: warm white by day, blue when the sun is low
