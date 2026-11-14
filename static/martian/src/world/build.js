@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createFloorShade } from './floor-shade.js';
 import { _pv, _q1 } from '../core/scratch.js';
 import { angDist, frameQuat, llToVec } from '../planet/geo.js';
 import { slopeAt, surfaceAt } from '../planet/surface.js';
@@ -308,6 +309,8 @@ export function buildHabColony(spawn) {
   }
   // (and the floor falls away toward the wall, as a room lit from its middle does)
   groundStain(hab.root, HAB_R, 0x000000, 0.46, HAB_FLOOR + 0.008, 'rim');
+  // what stands in the room shades the floor under and round it (see floor-shade.js; drawn from main.js's frame)
+  World.floorShade = createFloorShade(hab.root, HAB_R - 0.15, HAB_FLOOR);
   // the grow lights over the farm: two pink pools, one for each pair of trays
   for (const [x, z] of [[-4.2, -2.0], [-4.2, 1.0]]) addLamp(hab.root, { offset: new THREE.Vector3(x, 1.7, z), color: 0xff6cc4, power: 4.2, range: 5, level: powered, room: true });
   for (const [n, power, range] of [['lamp_bench', 3.5, 6], ['lamp_bunk', 2.5, 5]]) {
@@ -438,6 +441,7 @@ export function updateDoors(dt) {
   const showRoom = dist < HAB_R + 0.5 || lookingIn;
   if (World.habInterior) World.habInterior.visible = showRoom;
   if (World.habFurnishings) World.habFurnishings.visible = showRoom;
+  if (World.floorShade) World.floorShade.mesh.visible = showRoom;
   // sealed in: inside the room with every door shut, so nothing outside can be seen
   World.sealedInside = S.mode === 'walk' && dist < HAB_R - 0.3 && World.doors.every((d) => d.k < 0.01);
   if (World.sealedInside !== World.roomCasts) {
@@ -631,7 +635,7 @@ export function buildStorySites() {
     const blocks = [];
     for (let i = 0; i < 6; i++) {
       const b = m.part('block_' + i);
-      if (b) blocks.push({ node: b, col: siteCollider(g, b.position.x, b.position.z, 0.95) });
+      if (b) blocks.push({ node: b, col: siteCollider(g, b.position.x, b.position.z, 0.6) });     // (a block is a pace across; the ledge behind has circles of its own)
     }
     World.iceSites.push({ group: g, left: 6, korolev: la > 70, blocks });
   }

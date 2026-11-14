@@ -385,7 +385,9 @@ export function discoveriesFound() {
 function tasksHtml() {
   // (the tab's figure is this one: the mission's tasks still to do)
   const toDo = missionList().filter((e) => !e.done).length;
-  let h = wayHomeHtml() + `<div class="pane-hd">Mission <span>${toDo} to do</span></div><div class="obj-list">`;
+  // (On a phone the list of what to do leads, and the three steps of the way home follow it: with the steps first,
+  //  a phone 375 px high showed one task and cut the second through its text.)
+  let h = (layout.compact ? '' : wayHomeHtml()) + `<div class="pane-hd">Mission <span>${toDo} to do</span></div><div class="obj-list">`;
   let primary = false, open = '', closed = '', nDone = 0;
   // as on the HUD (the same list, the same distances): the most pressing first, each with its reason and how far
   for (const { o, done: d } of missionList()) {
@@ -396,7 +398,7 @@ function tasksHtml() {
     const row = `<div class="obj ${cls}"><i class="mk"></i><span class="tx">${chem(esc(o.text()))}</span><span class="ds t-num">${d ? '' : objectiveDist(o)}</span>${why ? `<span class="why">${chem(esc(why))}</span>` : ''}</div>`;
     if (d) { closed += row; nDone++; } else open += row;
   }
-  h += (open || '<div class="obj"><i class="mk"></i><span class="tx">Stay alive.</span></div>') + '</div>';
+  h += (open || '<div class="obj"><i class="mk"></i><span class="tx">Stay alive.</span></div>') + '</div>' + (layout.compact ? wayHomeHtml() : '');
   const doneHtml = closed ? `<div class="pane-hd">Done <span>${nDone}</span></div><div class="obj-list done-list">${closed}</div>` : '';
   const active = QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length;
   const done = QUEST_DEFS.filter((q) => S.quests[q.id] === 'done').length;

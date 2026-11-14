@@ -150,6 +150,7 @@ const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, b
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
 const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
 
+const _padA = new THREE.Vector3(), _padB = new THREE.Vector3();
 export function buildAstronaut() {
   const m = model('astronaut', { face: true });
   astro = m.root;
@@ -167,6 +168,16 @@ export function buildAstronaut() {
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     anim.blob.position.y = 0.02; anim.blob.renderOrder = 2; anim.blob.visible = false;
     astro.add(anim.blob);
+    // (One patch under the whole of him was a disc he stood on. Each boot has a small dark pad of its own, which
+    //  follows the boot and thins as it lifts; the broad patch stays, but faint: his body's shade on the floor.)
+    const padGeo = new THREE.PlaneGeometry(0.30, 0.48); padGeo.rotateX(-Math.PI / 2);
+    anim.pads = ['L', 'R'].map((side) => {
+      const pad = new THREE.Mesh(padGeo, anim.blob.material.clone());
+      pad.position.y = 0.024; pad.renderOrder = 3; pad.visible = false;
+      astro.add(pad);
+      return { mesh: pad, foot: m.part('foot_' + side), toe: m.part('toe_' + side), rest: 0 };
+    }).filter((pd) => pd.foot && pd.toe);
+    for (const pd of anim.pads) { pd.foot.getWorldPosition(_padA); pd.toe.getWorldPosition(_padB); pd.rest = astro.worldToLocal(_padA.lerp(_padB, 0.5)).y; }
   }
   anim.mixer = new THREE.AnimationMixer(m.inner);
   for (const clip of m.clips) {
@@ -310,9 +321,20 @@ export function updateAstronaut(dt) {
   }
   // his shadow on a floor (see buildAstronaut): there under a roof, gone in the rover and out of doors
   if (anim.blob) {
-    const want = (S.inside || S.inAirlock) && !driving ? 0.38 : 0;
-    anim.blob.material.opacity = lerp(anim.blob.material.opacity, want, damp(0.2, dt));
-    anim.blob.visible = anim.blob.material.opacity > 0.01;
+    const want = (S.inside || S.inAirlock) && !driving ? 1 : 0;
+    anim.shade = lerp(anim.shade || 0, want, damp(0.2, dt));
+    anim.blob.material.opacity = 0.17 * anim.shade;
+    anim.blob.visible = anim.shade > 0.02;
+    for (const pd of anim.pads || []) {
+      pd.mesh.visible = anim.blob.visible;
+      if (!pd.mesh.visible) continue;
+      astro.worldToLocal(pd.foot.getWorldPosition(_padA)); astro.worldToLocal(pd.toe.getWorldPosition(_padB));
+      const lift = clamp(((_padA.y + _padB.y) / 2 - pd.rest - 0.015) / 0.15, 0, 1);
+      pd.mesh.rotation.y = Math.atan2(_padB.x - _padA.x, _padB.z - _padA.z);
+      pd.mesh.position.set((_padA.x + _padB.x) / 2, 0.024, (_padA.z + _padB.z) / 2);
+      pd.mesh.scale.setScalar(1 + 0.6 * lift);
+      pd.mesh.material.opacity = 0.44 * anim.shade * (1 - 0.8 * lift);
+    }
   }
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);

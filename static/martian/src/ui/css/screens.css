@@ -437,6 +437,18 @@
 @media (max-width: 760px) {
   .mg-compact .journal .tabs button { letter-spacing: .02em; }
   .mg-compact .scr-nav button { letter-spacing: .04em; }
+  /* The smallest phone has 225 px for a page under its two bars: a card with its button on a line of its own was
+     170 px tall, so one row of cards showed and the mark at the foot ran through the next. The button stands beside
+     what the thing costs (unless the card has to say what is missing, which takes the line), and a heading keeps
+     closer to its list. */
+  .mg-compact .rcp { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .5rem; align-items: end; align-content: start; }
+  .mg-compact .rcp > * { grid-column: 1 / -1; }
+  .mg-compact .rcp > .cost { grid-column: 1; align-self: center; }
+  .mg-compact .rcp > .rcp-ft { grid-column: 2; margin-top: .375rem; }
+  .mg-compact .rcp > .rcp-ft:has(.why:not(:empty)), .mg-compact .rcp > .rcp-ft:has(button + button) { grid-column: 1 / -1; }
+  .mg-compact .rcp-ft .why:empty { display: none; }
+  .mg-compact .pane-hd { padding-bottom: .3125rem; margin-bottom: .4375rem; }
+  .mg-compact .pane-hd:not(:first-child) { margin-top: .625rem; }
 }
 
 /* ================================================================ sixth review */

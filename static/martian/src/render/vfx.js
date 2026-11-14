@@ -233,7 +233,8 @@ export class Vfx {
           gl_Position = projectionMatrix * mv;
           vUv = position.xy * 0.5 + 0.5;
           float d = length(centre);
-          vA = smoothstep(0.32, 0.75, uStorm) * 0.42 * smoothstep(2.5, 9.0, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
+          // (some pass between the eye and him: with none nearer than nine metres he stood in clear air in a storm)
+          vA = smoothstep(0.32, 0.75, uStorm) * 0.42 * smoothstep(1.4, 5.5, d) * (1.0 - smoothstep(BOX * 0.30, BOX * 0.48, length(rel)))
              * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.8, 1.0, h));
         }`,
       fragmentShader: /* glsl */`
@@ -251,7 +252,8 @@ export class Vfx {
           // edges. (A plain soft shape made each veil a smooth ribbon with a clean edge, like silk in water.)
           vec2 q = vec2(vUv.x * 4.0 - uTime * (1.1 + vSeed * 0.9), vUv.y * 17.0 + vSeed * 31.0);
           float thread = vn(q) * 0.55 + vn(q * vec2(2.7, 3.3) + 7.1) * 0.30 + vn(q * vec2(7.0, 9.0) + 3.7) * 0.15;
-          float a = fall * vA * smoothstep(0.26, 0.70, thread + fall * 0.30) * 1.55;
+          // (torn, but with no drawn edge: a veil with an outline was a brush stroke)
+          float a = fall * vA * smoothstep(0.18, 0.88, thread + fall * 0.30) * 1.7;
           if (a < 0.003) discard;
           gl_FragColor = vec4(uLight, a);
         }`,
@@ -445,7 +447,9 @@ export class Vfx {
     this.sheets.visible = this.air.visible && p.storm > 0.32;
     sh.uCam.value.copy(camera.position); sh.uUp.value.copy(up); sh.uStorm.value = p.storm; sh.uTime.value = this.time;
     sh.uCamH.value = Math.min(40, Math.max(0.5, p.camHeight === undefined ? 2 : p.camHeight));
-    sh.uLight.value.copy(a.uLight.value);
+    // A veil is air with more dust in it, so it is the colour the air's own haze is: paler than the ground behind
+    // it. (Lit as the motes are, in a storm's dim sun the veils were darker than the ground: shadows of streaks.)
+    if (this.scene.fog) sh.uLight.value.copy(this.scene.fog.color).multiplyScalar(1.04); else sh.uLight.value.copy(a.uLight.value);
     const u = this.puffU;
     u.uTime.value = this.time; u.uUp.value.copy(up); u.uPx.value = px;
     u.uLight.value.setRGB(lit * 0.75 + p.ambient.r * 0.8, lit * 0.72 + p.ambient.g * 0.8, lit * 0.7 + p.ambient.b * 0.8);

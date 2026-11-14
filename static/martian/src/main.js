@@ -197,6 +197,7 @@ function draw(dt, focus) {
   // under it (the haze that lies along it is in the fog shader: see airHaze in the engine)
   e.scene.fog.far = -Math.sqrt(2 * clamp(e.camera.position.length() - surfaceAt(e.camera.position), 0.5, 400) / e.camera.position.length());
   ctx.lamps.update(e.camera.position, !!(World.habInterior && World.habInterior.visible), dt);
+  if (World.floorShade && World.habInterior && World.habInterior.visible) World.floorShade.update(e.renderer, e.scene, [World.habInterior, World.habFurnishings], dt);
   e.final.uniforms.uDanger.value = World.danger || 0;
   e.final.uniforms.uCold.value = World.cold || 0;
   e.render();

@@ -211,10 +211,12 @@ export class Sky {
           float ang = acos(clamp(cosT, -1.0, 1.0));
           float disc = smoothstep(0.0052, 0.0036, ang);
           float halo = exp(-ang * 70.0) * 0.5 + exp(-ang * 16.0) * 0.03;
+          // (in a storm the dust between scatters the sun's light wide: a pale patch with a dim disc in it, not a white bead)
+          halo += uDust * (exp(-ang * 26.0) * 0.9 + exp(-ang * 7.0) * 0.35);
           float lowDim = mix(1.0, 0.16, smoothstep(0.40, 0.02, sunE));        // through a long path of dust the sun is a pale disc
           float through = (1.0 - uDust * 0.90) * smoothstep(-0.03, 0.03, sunE);
           vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
-          col += sunCol * (disc * 70.0 * lowDim * uSunDisc + halo * 5.0 * lowDim * uSunDisc) * through;
+          col += sunCol * (disc * 70.0 * lowDim * uSunDisc * mix(1.0, 0.16, uDust) + halo * 5.0 * lowDim * uSunDisc) * through;
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>

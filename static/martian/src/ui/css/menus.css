@@ -123,7 +123,8 @@
 .diff.rec .dx em { border-color: var(--accent); color: var(--accent); }
 .diff.hard .dx em { border-color: var(--danger); color: var(--danger); }
 .diff .dn { font: 600 1.75rem/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; margin-top: .875rem; }
-.diff .dp { display: flex; gap: .25rem; margin-top: .625rem; }
+.diff .dp { display: flex; align-items: center; gap: .25rem; margin-top: .625rem; }
+.diff .dp span { margin-left: .375rem; font: 600 var(--tcap, .8125rem)/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .diff .dp i { width: 1.5rem; height: .1875rem; background: var(--line); }
 .diff .dp i.on { background: var(--accent); }
 .diff.hard .dp i.on { background: var(--danger); }
@@ -276,6 +277,9 @@
 .mg-compact .diff { padding: .625rem .75rem .5625rem; }
 .mg-compact .diff .dn { font-size: 1.25rem; margin-top: .4375rem; }
 .mg-compact .diff .dp { margin-top: .375rem; }
+/* (on a phone the word stands beside the bars without adding to their line's height: the sheet has no 10 px to spare) */
+.mg-compact .diff .dp { position: relative; }
+.mg-compact .diff .dp span { position: absolute; left: calc(4.5rem + .875rem); top: 50%; transform: translateY(-50%); margin-left: 0; white-space: nowrap; }
 .mg-compact .diff dl { margin-top: .5rem; padding: .375rem 0; gap: .1875rem 1rem; }
 .mg-compact .diff dt { font-size: .625rem; }
 .mg-compact .diff dd { font-size: .8125rem; }
@@ -611,6 +615,9 @@
 .choice .ch-go .ic { width: 1.125rem; height: 1.125rem; }
 .choice:hover .ch-go, .choice:focus-visible .ch-go, .choice:active .ch-go { color: var(--accent); }
 .mg-compact .choice { padding-right: 2rem; }
+/* (the smallest phone: five crops on one sheet with none cut. The staple keeps its note; the others say what they
+   are planted from in their count, "seed for 4 beds") */
+@media (max-width: 760px) { .mg-compact .choices.n5 .choice:not(:first-child) .ch-t, .mg-compact .choices.n4 .choice .ch-t { display: none; } }
 .mg-compact .choice .ch-go { right: .5rem; }
 
 /* The rescue screen. Whose words the last entry is comes first, on its own line; and a tile's label stands on one
@@ -641,6 +648,8 @@
 .mg-compact .dlg-later b, .mg-compact .sleep .notes dt, .mg-compact .sleep .solbig span, .mg-compact .diff .go { font-size: var(--tcap); }
 .mg-compact .stat b small { font-size: var(--t13); }
 .range-end { font: 500 .8125rem/1 var(--f-cond); letter-spacing: .02em; color: var(--ink-3); }
+.range-end.lo { min-width: 2.25rem; text-align: right; }
+.range-end.hi { min-width: 2.5rem; text-align: left; }
 .mg-compact .range-end { font-size: var(--t13); color: var(--ink-2); }
 .set-row .ctl .range-end + .mg-rangewrap, .set-row .ctl .mg-rangewrap + .range-end { margin-left: -.25rem; }
 .mg-compact .set-row .ctl .range-end ~ output { min-width: 3rem; font-size: var(--t14); color: var(--ink); }
@@ -652,3 +661,15 @@
 .mg-compact .dlg.wide .dlg-bd { padding-top: .75rem; }
 .mg-compact .dlg.wide .stats { margin-top: .5rem; }
 .mg-compact .dlg.wide .btns { padding-top: .5rem; padding-bottom: .625rem; }
+
+/* The rescue sheet on the smallest phone. Its nine figures stood in tiles 82 px wide, where "Sols survived",
+   "Dinners cooked" and "Landers salvaged" each broke in two. There they are a list: the name, then the figure, a
+   line each, beside the list of what was done and when. */
+@media (max-width: 760px) {
+  .mg-compact #mg-overlay.k-win .stats { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 0; background: none; box-shadow: none; }
+  .mg-compact #mg-overlay.k-win .stat { flex-direction: row-reverse; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .25rem 0; background: none; box-shadow: none;
+    border-bottom: 1px solid var(--line-2); }
+  .mg-compact #mg-overlay.k-win .stat:last-child { border-bottom: 0; }
+  .mg-compact #mg-overlay.k-win .stat b { font-size: 1rem; white-space: nowrap; }
+  .mg-compact #mg-overlay.k-win .stat span { white-space: nowrap; letter-spacing: .06em; }
+}

@@ -94,6 +94,8 @@ export function showTitle(o) {
 // ------------------------------------------------------------------------------------------
 const DIFF_ORDER = ['story', 'survival', 'iron'];
 const DIFF_TAG = { story: 'Gentle', survival: 'Recommended', iron: 'One life' };
+// (what the three bars under a name count: they stood there with no word, and nothing said a longer wait is the harder game)
+const DIFF_LEVEL = { story: 'Easiest', survival: 'Harder', iron: 'Hardest' };
 export function showNewGame(o, back) {
   const cards = DIFF_ORDER.map((k, i) => {
     const d = DIFFICULTIES[k];
@@ -103,7 +105,7 @@ export function showNewGame(o, back) {
     const drain = d.drain < 0.995 ? `Drain ${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `Drain ${Math.round((d.drain - 1) * 100)}% faster` : 'Normal drain';
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
-      `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
+      `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}<span>${DIFF_LEVEL[k]}</span></div>` +
       // ("Rescue on Sol 35" did not say that a later rescue is the harder game, nor "Wake at dawn" what it costs; and
       //  "To last: 35 sols" did not say what lasts, him or his supplies. It is how long he must hold out.)
       `<dl><dt>Hold out</dt><dd>${d.rescueSol} sols to rescue</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Start that sol again'}</dd></dl>` +
@@ -237,10 +239,12 @@ function seg(id, label, options, value) {
  * neither, a handle standing at "100%" a third of the way along looked like a handle out of place.)
  */
 function range(id, label, min, max, step, value, fmt, mark) {
-  const at = (v) => ((v - min) / (max - min) * 100).toFixed(1), ends = mark !== undefined;
-  return (ends ? `<span class="range-end">${fmt(min)}</span>` : '') +
-    `<span class="mg-rangewrap"${ends ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
-    `style="--fill:${at(value)}%;--f:${((value - min) / (max - min)).toFixed(3)}"></span>` + (ends ? `<span class="range-end">${fmt(max)}</span>` : '') + `<output for="set-${id}">${fmt(value)}</output>`;
+  // (Every slider says where it starts and stops, in a column of its own, so that every track begins and ends on the
+  //  same two lines: with the ends given on two sliders of five, the tracks began at three places down one sheet.)
+  const at = (v) => ((v - min) / (max - min) * 100).toFixed(1), marked = mark !== undefined;
+  return `<span class="range-end lo">${fmt(min)}</span>` +
+    `<span class="mg-rangewrap"${marked ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
+    `style="--fill:${at(value)}%;--f:${((value - min) / (max - min)).toFixed(3)}"></span><span class="range-end hi">${fmt(max)}</span><output for="set-${id}">${fmt(value)}</output>`;
 }
 function sw(id, label, onNow) {
   return `<button type="button" class="mg-switch" role="switch" aria-checked="${!!onNow}" aria-label="${label}" data-switch="${id}"></button>`;

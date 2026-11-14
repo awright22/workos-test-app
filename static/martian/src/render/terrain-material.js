@@ -476,16 +476,20 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // Two surfaces. Most of a cap is wind-packed snow: white, matt, cut into drifts. In broad windows the wind
         // has scoured it to the old ice: blue, hard, glassy enough to throw the sun back, and cracked. (One pale blue
         // surface with soft dark lines on it was a lilac snowfield drawn on with a marker.)
-        float open = smoothstep(-0.03, 0.07, hFar * 0.7 + hMid * 0.35 * fMid + (nAir.a - 0.5) * 0.5);
+        // (Where: by the kilometre, so that one stretch is a snowfield and the next mostly bare, ragged at the edge by
+        // the smaller layers. Windows all of one size, evenly spread, were a carpet of lily pads.)
+        float open = smoothstep(-0.06, 0.10, hFar * 0.5 + hMid * 0.3 * fMid + (nAir.a - 0.5) * 1.3 + (nAir.r - 0.5) * 0.6 - 0.03);
         float firn = max(snowLie, 1.0 - 0.92 * open);
-        vec3 bare = mix(vec3(0.15, 0.31, 0.58), vec3(0.42, 0.36, 0.30), dusty * 0.55) * (1.0 + tone * 0.30 + coarse * 0.08);
+        // (toward cyan: under a butterscotch sky a violet-blue came out lilac, and read as shadows with nothing to cast them)
+        vec3 bare = mix(vec3(0.10, 0.33, 0.58), vec3(0.42, 0.36, 0.30), dusty * 0.55) * (1.0 + tone * 0.30 + coarse * 0.08);
         // (a crack shows the ice's depth: darker and bluer than its face, a thin line, and the snow covers it)
         float crk = smoothstep(0.42, 0.80, crack) * (1.0 - dusty) * (1.0 - 0.9 * firn);
         bare = mix(bare, vec3(0.05, 0.15, 0.40), crk);
         vec3 packed = mix(vec3(0.70, 0.77, 0.88), vec3(0.62, 0.57, 0.52), dusty * 0.8) * (1.0 + snowTone * 1.3 + tone * 0.16);
         vec3 iceCol = mix(bare, packed, firn);
         // (by night the ice is grey under the stars, not blue: blue ice under the night's blue light was a cobalt floor)
-        iceCol = mix(vec3(dot(iceCol, vec3(0.3, 0.5, 0.2))) * vec3(0.96, 1.0, 1.05), iceCol, 0.35 + 0.65 * uDay);
+        // (and darker than its whiteness would make it: snow three times as bright as the ground lit the polar night like a floodlit rink)
+        iceCol = mix(vec3(dot(iceCol, vec3(0.3, 0.5, 0.2))) * vec3(0.96, 1.0, 1.05), iceCol, 0.35 + 0.65 * uDay) * mix(0.55, 1.0, uDay);
         col = mix(col, iceCol, ice);
         // a storm lays pale dust over everything
         col = mix(col, vec3(dot(col, vec3(0.33)) * 1.1) * vec3(1.15, 0.93, 0.72), uDust * 0.5);
@@ -514,6 +518,10 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
       // regolith scatters light back toward the sun; it has no sheen at grazing angles. Ice keeps its glint.
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
         { float sheen = mix(0.16, 1.0, ice); material.specularColor *= sheen; material.specularColorBlended *= sheen; material.specularF90 *= sheen; }`)
+      // Snow in shade is blue: what lights it there is the sky and the light the snow itself passes on, and snow
+      // passes blue. (Lit by this sky's tan alone, his shadow on the ice was a brown line.)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        reflectedLight.indirectDiffuse *= mix(vec3(1.0), vec3(0.62, 0.88, 1.30), ice * uDay);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         {
           // the 3D layers tilt the normal in world space
@@ -532,6 +540,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain51' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain52' + (o.fine !== false ? 'F' : '');
   return mat;
 }

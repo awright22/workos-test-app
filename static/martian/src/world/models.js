@@ -202,6 +202,7 @@ function setUpPlain(plain, ground) {
         ${GLSL_GROUND_GRADE}
         float dustAmount;
         float surfGrain;
+        float groundIcy = 0.0;
         ${ground ? 'varying float vHem;' : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
@@ -214,8 +215,13 @@ function setUpPlain(plain, ground) {
           if (vPbr.z > 1.5) {
             // soil that belongs to the ground (a heap, a berm, a scorched patch): the ground's own colour here,
             // darkened by the model's tint, which returns to 1 at the hem so the edge cannot be seen
+            // (On an ice field the ground is snow, and what is banked against a thing there is snow too: the soil's
+            // brown tint on the cap's blue-grey drew a tan ring round the ice outcrop.)
+            float icy = groundIce(textureCube(uDustAlbedo, uDustHere).rgb, uDustHere);
+            groundIcy = icy;
             dustAmount = 0.0;
-            diffuseColor.rgb *= dust * (0.86 + 0.28 * fine);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5 + 0.5 * dot(diffuseColor.rgb, vec3(0.34))), icy);
+            diffuseColor.rgb *= mix(dust, vec3(0.72, 0.79, 0.90), icy) * (0.86 + 0.28 * fine);
           } else {
             // (laid unevenly: drifts and clean patches, heavy on what faces up, a skirt of it thrown up near the ground)
             float low2 = 1.0 - smoothstep(0.1, 1.5, vObjPos.y);
@@ -257,6 +263,8 @@ function setUpPlain(plain, ground) {
         // the soft edge that lifts a figure off the ground behind it, by night as by day. (By night, lit by nothing but
         // the sky, he was a black cut-out.)
         fillTint *= 1.0 + 0.9 * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.2);
+        // (snow in shade is blue, as the cap's own is: see the terrain's shader)
+        fillTint *= mix(vec3(1.0), vec3(0.62, 0.88, 1.30), groundIcy);
         irradiance *= fillTint;
         #include <lights_fragment_maps>
         iblIrradiance *= fillTint; radiance *= fillTint;`)
@@ -277,7 +285,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust14' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust16' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -494,8 +502,15 @@ function prepare(gltf, name) {
         // water ice: cold, with a soft sheen, and never quite as dark as rock in shadow
         // (blue enough to read as ice under a butterscotch sky, which turns anything white to cream; and not a
         // mirror: old ice on Mars is frosted by its own wasting, and polished it was cut glass)
-        m.color.setRGB(0.80, 0.90, 1.0); m.roughness = 0.42; m.metalness = 0; m.envMapIntensity = 1.1;
+        m.color.setRGB(0.80, 0.90, 1.0); m.roughness = 0.36; m.metalness = 0; m.envMapIntensity = 1.1;
         m.emissive.setRGB(0.012, 0.03, 0.06); m.emissiveIntensity = 1;
+        // What lights a block's shaded side is the sky and the light the ice itself passes on, and ice passes blue.
+        // (Under this sky's tan alone the shaded faces were mauve and brown: painted stone, where ice in shade is blue.)
+        m.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+            reflectedLight.indirectDiffuse *= vec3(0.56, 0.86, 1.36); reflectedLight.indirectSpecular *= vec3(0.78, 0.93, 1.18);`);
+        };
+        m.customProgramCacheKey = () => 'ice-shade1';
       } else if (name.startsWith('visor')) {
         // the gold visor is a mirror: it shows the sky, the horizon and the sun
         m.color.setRGB(0.80, 0.50, 0.14); m.metalness = 1; m.roughness = 0.07; m.envMapIntensity = 1.9;
