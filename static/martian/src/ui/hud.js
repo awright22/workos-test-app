@@ -421,6 +421,7 @@ export function updateObjectivesHud() {
   // (and its own words are part of what leads: "0 of 2" stood under a place that had already moved on to the second machine)
   const lead = leadTask(), lk = lead ? `${lead.o.id}|${lead.o.text()}` : '';
   if (lk !== objLead || now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objLead = lk; objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
+  let refit = false;
   for (const n of objNodes.values()) {
     let dist = '', place = n.place || '';
     let then = '';
@@ -436,11 +437,14 @@ export function updateObjectivesHud() {
     }
     if (n.place !== place) { n.place = place; n.pl.textContent = place; }
     if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; }
-    if (n.then !== then) { n.then = then; n.nx.innerHTML = then; }
+    if (n.then !== then) { n.then = then; n.nx.innerHTML = then; refit = true; }
     const show = dist || place ? '' : 'none';
-    if (n.at.style.display !== show) n.at.style.display = show;
+    if (n.at.style.display !== show) { n.at.style.display = show; refit = true; }
   }
-  if (now - fitAt > 1) fitObjectives(now);
+  // (a line that gains or loses its place and distance, or its "then", changes the block's height here, between two
+  //  rebuilds: the block is fitted again at once and not at the next second. Left to the clock, the small phone
+  //  showed a second line cut through by the buttons under it for up to a second, and the audit caught it twice.)
+  if (refit || now - fitAt > 1) fitObjectives(now);
 }
 function rebuildObjectives(now) {
   if (!objHead) objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span><b></b>');
