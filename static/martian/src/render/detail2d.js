@@ -9,6 +9,7 @@
  *   field  16 m across, 3 cm a texel: lumps and hollows, wind ripples in places, and where the
  *          gravel lies
  *   crust  12.8 m across: the polygons of patterned ground, laid only at high latitudes and on ice
+ *   clinker  8 m across: the broken top of a lava flow, laid only on the volcanoes' bare lava
  *
  * Each stores the surface's slope in RG (for the shading normal), a brightness in B, and a mask
  * in A (sand: stone, as opposed to dust; field: gravel patches).
@@ -155,9 +156,57 @@ function crustTexture(size, anisotropy) {
   return pack(size, h, bright, mask, 1, SPAN, anisotropy);
 }
 
+/** Clinker: the broken top of a lava flow. Blocks a pace across, jumbled and tilted, with fist-sized rubble
+ *  on and between them, and dust lying in the gaps and over the lowest blocks. A is where the dust lies.
+ *  (Laid at 8, 32 and 64 m a tile, each with its relief scaled alike: rubble near, plates from the air.) */
+function clinkerTexture(size, anisotropy) {
+  const SPAN = 8;
+  const N = size * size;
+  const grain = fbm(size, 40, 3, 211, 0.6), swell = fbm(size, 3, 3, 223), drift = fbm(size, 5, 3, 227, 0.55), wa = fbm(size, 9, 2, 229), wb = fbm(size, 9, 2, 233);
+  const la = fbm(size, 2, 2, 239), lb = fbm(size, 2, 2, 241);      // (a broad push, so the blocks are not all of a size)
+  const h = new Float32Array(N), bright = new Float32Array(N), mask = new Float32Array(N);
+  // each cell: its point, how tall the block stands, which way its top tilts, its tone
+  const cells = (C, seed) => {
+    const rnd = rng(seed), p = new Float32Array(C * C * 6);
+    for (let i = 0; i < C * C; i++) { p[i * 6] = 0.12 + rnd() * 0.76; p[i * 6 + 1] = 0.12 + rnd() * 0.76; p[i * 6 + 2] = rnd(); p[i * 6 + 3] = rnd() * 2 - 1; p[i * 6 + 4] = rnd() * 2 - 1; p[i * 6 + 5] = rnd(); }
+    return p;
+  };
+  const CA = 13, CB = 41, A = cells(CA, 311), B = cells(CB, 313);
+  let q0 = 0, e0 = 0, tx = 0, ty = 0;
+  const look = (P, C, gx, gy) => {
+    const cx = Math.floor(gx), cy = Math.floor(gy);
+    let d1 = 9, d2 = 9;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+      const qx = ((cx + a) % C + C) % C, qy = ((cy + b) % C + C) % C, q = (qy * C + qx) * 6;
+      const dx = cx + a + P[q] - gx, dy = cy + b + P[q + 1] - gy, d = dx * dx + dy * dy;
+      if (d < d1) { d2 = d1; d1 = d; q0 = q; tx = -dx; ty = -dy; } else if (d < d2) d2 = d;
+    }
+    e0 = Math.sqrt(d2) - Math.sqrt(d1);                                    // 0 on a block's edge
+  };
+  const ease = (x) => { x = x <= 0 ? 0 : x >= 1 ? 1 : x; return x * x * (3 - 2 * x); };
+  for (let j = 0, k = 0; j < size; j++) for (let i = 0; i < size; i++, k++) {
+    const u = i / size, v = j / size;
+    look(A, CA, u * CA + wa[k] * 0.3 + la[k] * 1.5, v * CA + wb[k] * 0.3 + lb[k] * 1.5);
+    const inA = ease(e0 / 0.2), tallA = A[q0 + 2] * A[q0 + 2], toneA = A[q0 + 5];
+    const hA = inA * (0.04 + 0.24 * tallA + 0.17 * (tx * A[q0 + 3] + ty * A[q0 + 4]));      // metres: a block 60 cm across stands a hand to a foot high
+    look(B, CB, u * CB + wb[k] * 0.5 + lb[k] * 2.5, v * CB - wa[k] * 0.5 - la[k] * 2.5);
+    const inB = ease(e0 / 0.24), toneB = B[q0 + 5];
+    const hB = inB * (0.012 + 0.06 * B[q0 + 2] + 0.05 * (tx * B[q0 + 3] + ty * B[q0 + 4]));
+    const rock = hA + hB * (1 - 0.55 * inA * tallA) + grain[k] * 0.006;
+    // dust: level, deeper in some places than others; whatever stands lower than it is buried
+    const top = 0.035 + drift[k] * 0.17;
+    const d = ease((top - rock) / 0.035 + 0.5);
+    h[k] = swell[k] * 0.07 + rock + (top + grain[k] * 0.002 - rock) * d;
+    const stone = 0.5 + (toneA - 0.5) * 0.5 * inA + (toneB - 0.5) * 0.22 + grain[k] * 0.07 - (1 - inA) * 0.15 - (1 - inB) * 0.10 * inA;
+    bright[k] = stone + (0.56 + grain[k] * 0.03 - stone) * d;
+    mask[k] = d;
+  }
+  return pack(size, h, bright, mask, 1, SPAN, anisotropy);
+}
+
 let cache = null;
 /** @param {number} anisotropy  the renderer's limit, capped by the quality preset */
 export function groundTextures(anisotropy = 8) {
-  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy), crust: crustTexture(512, anisotropy) };
+  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy), crust: crustTexture(512, anisotropy), clinker: clinkerTexture(512, anisotropy) };
   return cache;
 }

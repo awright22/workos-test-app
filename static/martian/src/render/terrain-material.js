@@ -79,6 +79,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     uGrain: { value: tex.grain },
     uSand: { value: flat.sand },
     uCrust: { value: flat.crust },
+    uClinker: { value: flat.clinker },
     uField: { value: flat.field },
     uDust: { value: 0 },                       // storm dusting 0..1 (brightens and flattens)
     uDay: { value: 1 },                        // 0 at night .. 1 by day (what glows by daylight must not glow in the dark)
@@ -125,6 +126,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform highp sampler3D uGrain;
         uniform sampler2D uSand;
         uniform sampler2D uCrust;
+        uniform sampler2D uClinker;
         uniform sampler2D uField;
         uniform float uDust;
         uniform float uDay;
@@ -197,6 +199,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // ---- 2D layers on level ground: slope of the surface in the texture's own axes ----
         vec2 flatSlope = vec2(0.0);
         float stone = 0.0, gravelHere = 0.0, crack = 0.0;
+        float clinkTone = 0.0, clinkDust = 0.0;
+        // (for the clinker layer, read inside a branch: there a texture has no mip level of its own, so it is handed these)
+        vec2 uvDx = dFdx(vUv3.xy), uvDy = dFdy(vUv3.xy);
         float iceGlow = 0.0;
         {
           vec2 uv = vUv3.xy;
@@ -229,6 +234,23 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           flatSlope += (cr.rg - 0.5) * (2.6 * fField * frosty * (1.0 - ice));
           tone += (cr.b - 0.56) * 0.95 * fField * frosty * (1.0 - ice * 0.85);
           crack = cr.a * fField * frosty * (1.0 - 0.35 * pond);
+          // Clinker. The top of a flow is not a skin: it broke as it moved, into blocks and rubble tipped at all
+          // angles, and dust has since settled in the gaps. One texture of such blocks, laid at three sizes: blocks
+          // a pace across from a stone's throw, plates of a couple of metres from a hill, and of five from the air.
+          // (Under his feet it is left out: painted blocks a foot high are flat discs from beside them, and the
+          // stones there are real.) Without it bare lava had only soft lumps to shade it, and was dough.
+          float clinkW = basalt * (1.0 - pond) * level;
+          if (clinkW > 0.004) {
+            float f1 = smoothstep(7.0, 22.0, viewDist) * (1.0 - smoothstep(45.0, 110.0, viewDist));
+            float f2 = smoothstep(28.0, 80.0, viewDist) * (1.0 - smoothstep(220.0, 480.0, viewDist));
+            float f3 = smoothstep(110.0, 300.0, viewDist) * (1.0 - smoothstep(800.0, 1500.0, viewDist));
+            vec4 c1 = textureGrad(uClinker, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
+            vec4 c2 = textureGrad(uClinker, vec2(uv.y, -uv.x) / 32.0 + vec2(0.37, 0.61), vec2(uvDx.y, -uvDx.x) / 32.0, vec2(uvDy.y, -uvDy.x) / 32.0);
+            vec4 c3 = textureGrad(uClinker, uv / 64.0 + vec2(0.13, 0.29), uvDx / 64.0, uvDy / 64.0);
+            flatSlope += ((c1.rg - 0.5) * f1 + vec2(-(c2.g - 0.5), c2.r - 0.5) * f2 + (c3.rg - 0.5) * f3) * (4.0 * clinkW);
+            clinkTone = ((c1.b - 0.5) * f1 + (c2.b - 0.5) * f2 + (c3.b - 0.5) * f3) * clinkW;
+            clinkDust = max(max(c1.a * f1, c2.a * f2), c3.a * f3) * clinkW;
+          }
           #ifdef TERRAIN_FINE
             // (pebbles do not survive being stretched down a steep face: there the field layer and the rock carry it)
             float fSand = (1.0 - smoothstep(10.0, 34.0, viewDist)) * level * (1.0 - smoothstep(0.16, 0.30, slope));
@@ -325,7 +347,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           grad += (fall * DETAIL_T) * ((cos(w1) * 1.3 * fine + cos(w2) * 1.5) * ropy * broken);
           basaltCol *= 1.0 + (sin(w1) * 0.26 * fine + sin(w2) * 0.30) * ropy * broken;
         }
-        col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift));
+        basaltCol *= 1.0 + 1.5 * clinkTone;
+        col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift) * (1.0 - 0.5 * clinkDust));
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
         col = mix(col, col * vec3(0.80, 0.78, 0.78) * (1.0 + clamp(tone, -0.4, 0.4) * 0.35), worn * 0.75);
@@ -436,6 +459,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain41' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain43' + (o.fine !== false ? 'F' : '');
   return mat;
 }
