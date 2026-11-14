@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CROPS, foodTotal } from '../game/farm.js';
 import { BAL, S, isBase, suitCap, roverPowerCap } from '../game/state.js';
+import { baseState } from '../game/base.js';
 import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
 import { player } from '../game/player.js';
@@ -127,6 +128,10 @@ export const OBJECTIVES = [
     shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'greenhouse'), done: () => foodTotal() >= 40 },
   { id: 'b-ice', text: () => `Mine ice for the tank (${Math.min(S.stats.mined, 6)} of 6)`, why: 'The hydrazine runs out. An ice drill and an outcrop do not.',
     shown: () => isBase() && S.pf.connected, done: () => S.stats.mined >= 6 },
+  { id: 'b-stone', text: () => `Break basalt off boulders (${Math.min(S.inv.stone || 0, 10)} of 10)`, why: 'Building stone. Any boulder will do, once the ground by it has given its sample.',
+    shown: () => isBase() && S.sol >= 2 && S.flags.didMath, done: () => (S.stats.quarried || 0) >= 10 },
+  { id: 'b-prospect', text: () => 'Find a mineral deposit', why: 'Iron, glass, brick and cement are lying about the planet. The map marks where orbiters saw them.',
+    shown: () => isBase() && S.pf.connected, done: () => Object.keys(baseState().found).length > 0 },
   { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on Mars.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];

@@ -1,4 +1,5 @@
 import { HAB_R, World, buildDeployable, plotPlants, setSiteShown, siteLocalToWorld } from '../world/build.js';
+import { syncDeposit } from '../world/base-sites.js';
 import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
@@ -567,6 +568,29 @@ addI({
     site.left--; S.inv.ice++; S.stats.mined++;
     syncIce(site);
     Snd.play('drill');
+    checkAchievements();
+  },
+});
+// a base's mineral deposits (dynamic)
+addI({
+  pos: () => {
+    if (!World.deposits) return null;
+    const site = nearestOf(World.deposits, (s) => s.group.position, 6.5, (s) => s.left > 0);
+    return site ? (World._activeDeposit = site).group.position : null;
+  },
+  r: 6.5, hold: 2.0, mode: 'walk',
+  visible: () => isBase() && !S.flags.coldOpen,
+  label: () => (World._activeDeposit ? World._activeDeposit.dep.verb : 'Quarry'),
+  sub: () => { const s = World._activeDeposit; return s ? `+${s.dep.per} ${ITEM_NAMES[s.dep.gives].toLowerCase()} · ${s.left} loads left here` : ''; },
+  use: () => {
+    const site = World._activeDeposit;
+    if (!site || site.left <= 0) return;
+    site.left = site.left - 1;
+    S.inv[site.dep.gives] = (S.inv[site.dep.gives] || 0) + site.dep.per;
+    S.stats.quarried = (S.stats.quarried || 0) + site.dep.per;
+    syncDeposit(site);
+    Snd.play('dig');
+    if (site.left === 0) log(`${site.dep.name} worked out. There are others in ${site.field.name}.`, 'sys');
     checkAchievements();
   },
 });

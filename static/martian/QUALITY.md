@@ -836,10 +836,28 @@ preview before the next.
 
 | Part | What | State |
 | --- | --- | --- |
-| A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built; `tools/tests/base.mjs` (14 checks) |
-| B | **Materials.** Basalt, iron ore, silica, clay, sulfate and perchlorate beside the scrap, ice and soil the story has; deposits placed by real region and shown on the map once found; a way to break and carry them. | next |
+| A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built, tested and on the preview (`tools/tests/base.mjs`) |
+| B | **Materials.** Basalt off any boulder (once the ground by it has given its sample), and five minerals quarried at deposits that stand where each was really found: 47 of them, in 23 fields (hematite pavements, silica beds, clay banks, sulfate ledges, salt pans; `game/base.js`). The map shows from the first sol where each was seen from orbit; a deposit is marked when he has stood at it. Each is a Blender model (`tools/assets/deposits.py`) on level, untrodden ground, with six loose pieces that go as it is worked. The inventory lists them and says where the ones he lacks lie. | built; `base.mjs` covers it; its pictures (`node tests/base-shots.mjs`) have had one look of my own and wait for a reviewer |
 | C | **Stations.** A kiln (bricks from clay and soil), a smelter (iron), a glassworks (panes from silica), an electrolyser and a Sabatier reactor (oxygen and methane from water and the air). Each a Blender model, each with a recipe sheet on the Colony screen. | not started |
 | D | **Buildings and milestones.** A solar field, a battery bank, a water tank, a large greenhouse, a second living module, a garage, a comms tower, a landing pad; set down where the player chooses. Milestones in the journal in place of the story's steps (a larder that lasts a season, water that closes its own loop, power through a dust storm). | not started |
+
+**What is made of what** (the plan for parts C and D; numbers are first guesses, to be tuned by play):
+
+| Material | Comes from | Goes into |
+| --- | --- | --- |
+| Basalt | any boulder (part B) | the kiln and smelter themselves, foundations, the landing pad |
+| Regolith | dug anywhere (story) | bricks, and low-grade iron and dark glass where there is nothing better |
+| Iron ore | hematite pavements: Meridiani, Aram Chaos, Candor | iron, at twice the yield and a quarter the soil |
+| Silica | silica beds: Gusev, Nili Patera, the plains above Ius | clear glass (a big greenhouse wants clear glass) |
+| Clay | clay banks: Mawrth, Nili Fossae, Gale, Oxia, Eridania | brick at three times the yield of bare soil |
+| Gypsum | sulfate ledges: Candor, Melas, Juventae, Meridiani, Olympia Undae | cement and plaster (the living module, the pad) |
+| Salt | salt pans: the northern plains, Terra Sirenum, Cimmeria, Noachis | oxygen candles, batteries, flux |
+| Ice | ice outcrops (story) | water; and through the fuel plant, oxygen and methane |
+
+A station is set down outside like a kit, and works by itself once given a job: so many batches, each taking
+time and Hab power, the product going to the stores. Running three of them is what the solar field is for. A base
+anywhere can make everything slowly from soil and basalt; each deposit he reaches makes one thing fast. That is the
+reason to cross the planet.
 
 **While it is being built it is not on the title.** New Game goes straight to the story unless the
 address ends in `?base` (or a base has already been saved in that browser). The card for it says

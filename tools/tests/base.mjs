@@ -86,9 +86,83 @@ s = await g.eval(async (G) => { await G.settle(); return { kind: G.S.kind, sol: 
 check('continued as a base', s.kind === 'base' && s.sol === 9 && s.rescue > 1e6, s);
 await g.close();
 
+// ---- what a base is built of: mineral deposits at their real places, and basalt off any boulder
+g = await openGame({ quality: 'low', query: 'base' });
+await g.eval(async (G) => { await G.start(-1.9, 354.5, 'survival', 'base'); G.skipIntro(); await G.settle(); G.paused = true; });     // Meridiani Planum: hematite country
+const field = await g.eval((G) => {
+  const D = G.World.deposits, kinds = {};
+  let steep = 0, worst = 0;
+  for (const d of D) {
+    kinds[d.dep.id] = (kinds[d.dep.id] || 0) + 1;
+    // level ground under each: the land 3 m out on four sides is within a hand of the land at its middle
+    const c = d.group.position, r0 = c.length();
+    for (const [x, z] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
+      const p = c.clone().add(new c.constructor(x, 0, z).applyQuaternion(d.group.quaternion));
+      const dz = Math.abs(G.surfaceAt(p) - r0);
+      worst = Math.max(worst, dz); if (dz > 0.12) steep++;
+    }
+  }
+  const near = D.filter((d) => d.dep.id === 'hematite').map((d) => d.group.position.distanceTo(G.World.hab.position)).sort((a, b) => a - b)[0];
+  return { n: D.length, kinds, steep, worst: +worst.toFixed(3), nearHematite: Math.round(near), found: Object.keys(G.S.base ? G.S.base.found : {}).length };
+});
+check('deposits stand on the planet: five kinds, 47 in all, each on level ground', field.n === 47 && Object.keys(field.kinds).length === 5 && field.steep === 0, field);
+check('a base at Meridiani has hematite within a drive, and has found none yet', field.nearHematite < 2500 && field.found === 0, field);
+const dug = await g.eval(async (G) => {
+  const site = G.World.deposits.filter((d) => d.dep.id === 'hematite').sort((a, b) => a.group.position.distanceTo(G.player.pos) - b.group.position.distanceTo(G.player.pos))[0];
+  G.tpNear(site.group.position, 3.0); await G.settle(); G.tick(0.05, 40);
+  const found = !!G.S.base.found[site.key];
+  const prompt = (document.querySelector('#mg-prompt') || { innerText: '' }).innerText.replace(/\s+/g, ' ');
+  const shown = () => site.blocks.filter((b) => b.node.visible).length;
+  const before = shown();
+  for (let i = 0; i < 6; i++) { G.hold(2.3); G.tick(0.05, 2); }
+  return { key: site.key, found, prompt, ore: G.S.inv.ore, left: site.left, before, after: shown() };
+});
+check('standing at a deposit finds it, and the prompt offers its work', dug.found && /rake up hematite/i.test(dug.prompt) && /iron ore/i.test(dug.prompt), dug.prompt);
+check('six turns of work: twelve iron ore, six loads gone, and one of its heaps', dug.ore === 12 && dug.left === 24 && dug.before === 6 && dug.after === 5, dug);
+const stone = await g.eval(async (G) => {
+  // the nearest boulder: the first hold at it is the sample this ground owes, the next is stone
+  // (boulders near the camera become colliders when a frame is drawn: look round until one turns up)
+  const frames = (ms) => new Promise((r) => setTimeout(r, ms));
+  const from = G.player.pos.clone();
+  let c = null;
+  for (let tries = 0; tries < 12 && !c; tries++) {
+    G.paused = false; await frames(1800); G.paused = true;
+    const u = G.player.pos.clone().normalize();
+    c = G.rockColliders.slice().sort((a, b) => a.v.distanceTo(u) - b.v.distanceTo(u))[0] || null;
+    if (!c) { G.tpNear(from, 30 + tries * 60); await G.settle(); }
+  }
+  if (!c) return { none: true };
+  G.tpAround(c.v.clone().multiplyScalar(12000), c.r + 0.9, 0); G.tick(0.05, 30);
+  const prompt = () => (G.interaction.active ? G.interaction.active.label() : '');
+  const first = prompt();
+  G.hold(2.6); G.tick(0.05, 6);
+  const second = prompt();
+  G.hold(2.8); G.tick(0.05, 2);
+  return { first, second, stone: G.S.inv.stone || 0, bagged: G.S.science.bag.length };
+});
+check('a boulder gives its sample first, then basalt', !stone.none && /chip a rock sample/i.test(stone.first) && /break off basalt/i.test(stone.second) && stone.stone === 2 && stone.bagged === 1, stone);
+const kept = await g.eval((G, key) => {
+  G.saveGame();
+  const d = JSON.parse(localStorage.getItem('stranded2-save-base'));
+  G.S.base = null; G.S.inv = {};
+  G.applyState(d);
+  const site = G.World.deposits.find((x) => x.key === key);
+  return { saved: d.base, left: site && site.left, shown: site && site.blocks.filter((b) => b.node.visible).length, ore: G.S.inv.ore, stone: G.S.inv.stone, found: Object.keys(G.S.base.found).length };
+}, dug.key);
+check('the save keeps what was found, what was dug and what is left', kept.left === 24 && kept.shown === 5 && kept.ore === 12 && kept.stone === 2 && kept.found >= 1, kept);
+await g.eval((G) => { G.paused = false; G.tick(0.05, 4); });
+await g.page.keyboard.press('c');
+await g.page.locator('#mg-colony [data-tab="inv"]').click();
+const larder = (await g.page.locator('#mg-inv').innerText()).replace(/\s+/g, ' ');
+check('the inventory lists a base\'s minerals, and says where the ones he lacks lie', /minerals/i.test(larder) && /iron ore 12/i.test(larder) && /basalt 2/i.test(larder) && /gusev crater/i.test(larder), larder.slice(-420));
+await g.page.keyboard.press('Escape');
+const errsBase = g.errors.slice();
+await g.close();
+
 g = await openGame({ quality: 'low' });
-s = await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.saveGame(); return { kind: G.S.kind, rescue: G.S.rescueSol, key: !!localStorage.getItem('stranded2-save'), baseKey: !!localStorage.getItem('stranded2-save-base') }; });
-check('the story is as it was: a rescue on Sol 25, saved in the story\'s slot', s.kind === 'story' && s.rescue === 25 && s.key, s);
+s = await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.saveGame(); return { kind: G.S.kind, rescue: G.S.rescueSol, key: !!localStorage.getItem('stranded2-save'), baseKey: !!localStorage.getItem('stranded2-save-base'), deposits: G.World.deposits ? G.World.deposits.length : 0 }; });
+check('the story is as it was: a rescue on Sol 25, saved in the story\'s slot, and no deposits', s.kind === 'story' && s.rescue === 25 && s.key && s.deposits === 0, s);
+g.errors.push(...errsBase);
 
 console.log(`\n${fails.length ? 'FAILED: ' + fails.length : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));
 await g.close();

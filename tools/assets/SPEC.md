@@ -347,3 +347,17 @@ part nodes carry the bare name): `comfort_lights` (string lights over the galley
 `comfort_chair` (with the collider anchor `col_chair`), `comfort_rocks`, `comfort_flag`,
 `comfort_rug`, `comfort_greg`, `comfort_chess`. Positions are quoted from `hab.py` (table, truss,
 ribs, liner, wall modules): if those move, this script must follow.
+
+## Family G — mineral deposits of Base mode (`deposits.py`)
+
+`dep_hematite.glb`, `dep_silica.glb`, `dep_clay.glb`, `dep_sulfate.glb`, `dep_salt.glb` (≤ 20,000
+triangles each: most of each is one weathered surface): the places a base's materials are quarried, each three to five metres across,
+standing on ground the game has levelled. What each is, and why it looks as it does, is in the
+script's own header and in `static/martian/src/game/base.js` (which says where each lies on Mars).
+Each carries six loose pieces along its front, parts `block_0` .. `block_5` with their origins on
+the ground, which the game hides one by one as the deposit is worked; and collider anchors (`col_*`)
+where it stands high enough to walk into. There is no hem of drifted soil: the rock goes into the
+terrain at its own edge. The mineral
+is the material `mineral` (or `mineral_sheen` for the hematite beads): white in itself, its colour
+painted on the vertices. The script takes its helpers from `props.py`.
+The game loads these five only when a base is begun or continued (`BASE_MODELS` in `base.js`).

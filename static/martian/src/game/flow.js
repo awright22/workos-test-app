@@ -6,6 +6,9 @@ import { Save, applyState, checkpoint, loadSavedData, restoreCheckpoint, saveGam
 import { tryLock } from './input.js';
 import { initStorms, updateSunDir } from './sim.js';
 import { World, addSitePads, buildHabColony, buildStorySites, pickSpawn } from '../world/build.js';
+import { addDepositPads, buildBaseSites } from '../world/base-sites.js';
+import { preloadModels } from '../world/models.js';
+import { BASE_MODELS } from './base.js';
 import { frameMove, frameYaw, player, syncPlayerPos } from './player.js';
 import { R } from '../planet/constants.js';
 import { bearingTo, fmtClock } from '../ui/hud.js';
@@ -116,11 +119,15 @@ export let worldBuilt = false;
 export function buildWorldAtSpawn() {
   if (worldBuilt) return;
   worldBuilt = true;
+  if (isBase()) addDepositPads();                 // (before the pads are handed to the terrain, which addSitePads does)
   addSitePads(World.spawn);
   buildHabColony(World.spawn);
   initRoverAt(_v1.copy(World.rover.group.position).normalize(), 0.8);
   buildStorySites();
+  if (isBase()) buildBaseSites();
 }
+/** A base has models the story does not: they are fetched when a base is begun or continued, and not before. */
+export function ensureKind(kind) { return kind === 'base' ? preloadModels(BASE_MODELS) : Promise.resolve(); }
 
 export function showStart() {
   const saved = loadSavedData('story'), savedBase = loadSavedData('base');
@@ -132,7 +139,7 @@ export function showStart() {
     //  asks for it with "?base" on the address, or who already has a base saved.)
     base: baseOffered() || !!savedBase,
     unreadable: unreadableSaveExists(),
-    onContinue: (kind) => { audio(); continueGame(kind === 'base' ? savedBase : saved); },
-    onNewGame: (diffKey, kind) => { audio(); newGame(diffKey, kind); },
+    onContinue: (kind) => { audio(); return ensureKind(kind).then(() => continueGame(kind === 'base' ? savedBase : saved)); },
+    onNewGame: (diffKey, kind) => { audio(); return ensureKind(kind).then(() => newGame(diffKey, kind)); },
   });
 }

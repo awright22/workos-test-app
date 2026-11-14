@@ -16,6 +16,7 @@ import { QUEST_DEFS } from '../game/story.js';
 import { ctx as gctx } from '../game/ctx.js';
 import { absBearing, distTo, headingOf } from './hud.js';
 import { roverF } from '../game/rover.js';
+import { BULK_BY_ID, DEPOSITS, baseState } from '../game/base.js';
 
 const IMG_PPD = 8;                      // the atlas is 2880 x 1440: 8 pixels per degree
 const MAX_PPD = 72;
@@ -125,6 +126,25 @@ function buildMarkers() {
     add({ id: 'b:' + i, icon: icons[b.kind] || 'box', color: col.ok, pos: b.group.position, label: b.kind === 'beacon' ? 'Beacon' : '', pri: b.kind === 'beacon' ? 5 : 7,
       title: names[b.kind] || 'Structure', type: 'You built this', note: b.kind === 'cache' ? `${b.charges} suit refills left.` : '' });
   });
+  if (isBase() && World.deposits) {
+    const found = baseState().found;
+    for (const dep of DEPOSITS) {
+      for (const field of dep.fields) {
+        const here = World.deposits.filter((s) => s.dep === dep && s.field === field);
+        const unfound = here.filter((s) => !found[s.key]).length;
+        if (!unfound) continue;
+        // (the orbiters' word for it: a field is a few hundred metres across, and its deposits are somewhere in it)
+        add({ id: `f:${dep.id}:${field.name}`, icon: 'ore', color: col.place, pos: llToVec(field.lat, field.lon).multiplyScalar(R), label: BULK_BY_ID[dep.gives].name, pri: 8, small: true,
+          title: `${BULK_BY_ID[dep.gives].name}: ${field.name}`, type: 'Seen from orbit',
+          note: `${dep.seen} ${unfound === 1 ? 'A deposit lies' : `${unfound} deposits lie`} within ${fmtDist(Math.round(field.r * (field.wide ? field.wide / field.r : 1) * Math.PI * R / 180 / 50) * 50)} of here: look for ${/^[aeiou]/i.test(dep.name) ? 'an' : 'a'} ${dep.name.toLowerCase()}.` });
+      }
+    }
+    for (const s of World.deposits) {
+      if (!found[s.key]) continue;
+      add({ id: 'd:' + s.key, icon: 'ore', color: s.left > 0 ? col.ok : col.ink3, pos: s.group.position, label: BULK_BY_ID[s.dep.gives].name, pri: 6, dim: s.left <= 0,
+        title: s.dep.name, type: `Deposit · ${s.field.name}`, note: s.left > 0 ? `${s.left} loads left. ${s.dep.note}` : 'Worked out.' });
+    }
+  }
   World.pods.forEach((p, i) => {
     if (p.taken) return;
     add({ id: 'p:' + i, icon: 'cache', color: col.cold, pos: p.group.position, label: p.kind === 'pod' && !/debris/i.test(p.label) ? 'Cache' : '', pri: 7, small: /debris/i.test(p.label),

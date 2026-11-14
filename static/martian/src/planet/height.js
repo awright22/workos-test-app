@@ -195,9 +195,10 @@ export class Planet {
 
   /** Level the ground around a unit direction: flat within r metres, easing back to the
    *  natural surface over `blend` metres. Returns the pad (send planet.pads to the workers). */
-  addPad(x, y, z, r, blend) {
+  addPad(x, y, z, r, blend, wild = false) {
     const h = this.radius(x, y, z, 12);          // the site's own broad-scale height
-    const pad = { x, y, z, r, blend, h, cos: Math.cos((r + blend) / R) };
+    // (`wild`: level, but nobody has walked on it: a rock outcrop, not a camp. The shader is not told it is trodden.)
+    const pad = { x, y, z, r, blend, h, cos: Math.cos((r + blend) / R), wild };
     this.pads.push(pad);
     return pad;
   }
@@ -216,8 +217,8 @@ export class Planet {
       // out along a ragged edge well inside the level ground. (It was told the pad's own weight, so the whole level
       // disc was smooth dark soil with no ripples in it, and where it met the land a low sun drew a ruled line:
       // dark flat ground on one side, bright rippled sand on the other. Four review rounds had that line.)
-      let wear = w;
-      if (p.r >= 12) {
+      let wear = p.wild ? 0 : w;
+      if (p.r >= 12 && !p.wild) {
         const t = (d * (1 + 0.3 * gnoise3(x * R / 19 + 7.7, y * R / 19 - 2.1, z * R / 19 + 4.3)) - p.r * 0.34) / (p.r * 0.46);
         wear = t <= 0 ? 1 : t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
       }

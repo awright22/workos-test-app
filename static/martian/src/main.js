@@ -46,7 +46,7 @@ import { startLaunch } from './game/launch.js';
 import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
-import { showStart, newGame, continueGame } from './game/flow.js';
+import { showStart, newGame, continueGame, ensureKind } from './game/flow.js';
 import { syncAllVisuals } from './game/visuals.js';
 import { showLoading as loading } from './ui/menus.js';
 const _hero = new THREE.Vector3(), _heroCam = new THREE.Vector3();
@@ -320,6 +320,7 @@ function installDebug() {
     fixedResolution: new URLSearchParams(location.search).has('fixed'),
     /** Start a new game at a chosen crash site without the menus. */
     async start(lat, lon, diff = 'survival', kind = 'story') {
+      await ensureKind(kind);
       if (lat !== undefined) {
         const real = Math.random; const q = [(lat / 52 + 1) / 2, lon / 360];
         Math.random = () => (q.length ? q.shift() : real());

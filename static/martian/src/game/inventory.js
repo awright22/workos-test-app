@@ -7,11 +7,13 @@ import { player } from './player.js';
 import { screenOpen } from '../ui/screens.js';
 import { log } from '../ui/dom.js';
 import { CROPS, farm } from './farm.js';
+import { BULK } from './base.js';
 // Items, recipes, upgrades and loot.
 export const ITEM_NAMES = {
   scrap: 'Scrap Metal', circuit: 'Circuit Board', regolith: 'Regolith', ice: 'Ice Chunk',
   candle: 'O2 Candle', kitSolar: 'Solar Panel Kit', kitGreenhouse: 'Greenhouse Kit',
   kitBeacon: 'Nav Beacon Kit', kitCache: 'O2 Cache Kit',
+  ...Object.fromEntries(BULK.map((b) => [b.id, b.name])),          // a base's bulk materials (game/base.js)
 };
 // (One name and one unit for each thing, here as on the HUD. Suit oxygen is time, "of air", as under the dial; the
 // rover's reserve is its battery, in per cent, and "power" is the Hab's; the suit is the suit, not "EVA".)

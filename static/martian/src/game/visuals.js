@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { syncDeposit } from '../world/base-sites.js';
 import { World, setColliders, siteLocalToWorld, setSiteShown } from '../world/build.js';
 import { setGlow } from '../world/models.js';
 import { syncPlot } from './interactables.js';
@@ -59,6 +60,7 @@ export function syncAllVisuals() {
   for (const rec of World.pods) syncPod(rec);
   if (World.rtgSite) { setSiteShown(World.rtgSite.group, !World.rtgSite.taken); setColliders(World.rtgSite.cols, !World.rtgSite.taken); }
   for (const site of World.iceSites) syncIce(site);
+  for (const site of World.deposits || []) syncDeposit(site);
   for (const b of World.builtMeshes) if (b.tanks) b.tanks.forEach((t, i) => { if (t) t.visible = i < b.charges; });
   // pathfinder: exactly one home per state, collider follows (review finding: all 3 states)
   const pfG = World.pathfinder;

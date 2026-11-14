@@ -13,6 +13,7 @@ import { R } from '../planet/constants.js';
 import { discoveriesFound } from '../ui/screens.js';
 import { tryReload } from './flow.js';
 import { showComms } from '../ui/menus.js';
+import { baseState } from './base.js';
 // The story: Pathfinder and NASA, survey quests, discoveries, achievements, the launch.
 export function connectPathfinder() {
   S.pf.connected = true;
@@ -148,6 +149,16 @@ export function updateDiscoveries(dt) {
   discTimer += dt;
   if (discTimer < 1.5) return;
   discTimer = 0;
+  if (World.deposits) {
+    const found = baseState().found, at = S.mode === 'rover' ? World.rover.group.position : player.pos;
+    for (const site of World.deposits) {
+      if (found[site.key] || groundDist(at, site.group.position) > 70) continue;
+      found[site.key] = S.sol;
+      Snd.discovery();
+      toast('DEPOSIT FOUND', site.dep.name.toUpperCase(), site.dep.note);
+      log(`${site.dep.name}, ${site.field.name}. ${site.dep.note}`, 'disc');
+    }
+  }
   const pp = S.mode === 'rover' ? World.rover.group.position : player.pos;
   _v1.copy(pp).normalize();
   for (const rec of World.landers) {

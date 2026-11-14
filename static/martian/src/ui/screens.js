@@ -8,6 +8,7 @@ import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
 import { DIFFICULTIES, S, isBase } from '../game/state.js';
+import { BULK } from '../game/base.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
 import { startDeploy } from '../game/interactables.js';
@@ -112,6 +113,7 @@ function costChips(cost, plain) {
 const SOURCE = {
   scrap: 'salvage debris and old landers', circuit: 'salvage old landers', regolith: 'dig it outside',
   ice: 'mine ice deposits', candle: 'fabricate one, or open supply pods',
+  ...Object.fromEntries(BULK.map((b) => [b.id, b.from])),
 };
 /** (ice names how the drill is come by, until he has it: "with the ice drill" named a thing he had never seen) */
 const sourceOf = (k) => (k === 'ice' && !S.upgrades.drill ? 'mine ice deposits, once the Ice Drill is installed (Upgrades)' : SOURCE[k]);
@@ -180,6 +182,11 @@ export function renderColony() {
   inv += '<div class="pane-hd">Materials</div>';
   const MAT_ICON = { scrap: 'colony', circuit: 'sliders', regolith: 'layers', ice: 'cold', candle: 'suit' };
   for (const k of ['scrap', 'circuit', 'regolith', 'ice', 'candle']) inv += row(MAT_ICON[k], ITEM_NAMES[k], S.inv[k] || 0, '');
+  if (isBase()) {
+    // (what a base is built of: each says where it lies until he has some, since nothing else on this screen does)
+    inv += '<div class="pane-hd">Minerals <span>Quarried, for the base</span></div>';
+    for (const b of BULK) inv += row(b.icon, b.name, S.inv[b.id] || 0, '', (S.inv[b.id] || 0) > 0 ? '' : b.from[0].toUpperCase() + b.from.slice(1));
+  }
   inv += '<div class="pane-hd">Kits <span>Build, then place outside</span></div>';
   for (const k of ['kitSolar', 'kitGreenhouse', 'kitBeacon', 'kitCache']) {
     const n = S.inv[k] || 0;
@@ -369,7 +376,7 @@ function wayHomeHtml() {
     const stay = [
       ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
       [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
-      ['For good', 'Build a base', 'No ship can reach Mars for four years. Make this somewhere a man can live: food, water, air and power that need nothing from Earth.', S.pf.connected ? 'next' : ''],
+      ['For good', 'Build a base', 'No ship can reach Mars for four years. Make this somewhere a man can live, out of what the planet holds: basalt off any boulder, and the minerals the map marks.', S.pf.connected ? 'next' : ''],
     ];
     return '<div class="pane-hd">The long stay</div><ol class="way">' +
       stay.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';

@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { addI } from './interact.js';
-import { S } from './state.js';
+import { S, isBase } from './state.js';
 import { player } from './player.js';
 import { rockColliders } from '../world/rocks.js';
 import { World, dropSupplyPod, siteLocalToWorld } from '../world/build.js';
@@ -40,7 +40,8 @@ function hintOnce() {
 // a chip off a boulder
 addI({
   pos: boulderInReach, r: 99, hold: 2.2, mode: 'walk', priority: 5,
-  visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath,
+  // (in a base a boulder that has no sample to give is stone to break: see below)
+  visible: () => !S.flags.coldOpen && !S.inside && S.flags.didMath && !(isBase() && canSample(_rock, 'rock') !== true),
   enabled: () => canSample(_rock, 'rock'),
   label: () => 'Chip a rock sample',
   sub: bagged,
@@ -50,6 +51,24 @@ addI({
     Snd.play('dig');
     log(`Rock sample #${bag.n} bagged — ${bag.place}.`, 'sys');
     hintOnce();
+  },
+});
+
+// In a base, basalt is building stone, and any boulder is a quarry: once the ground round it has given its sample
+// (or the sample case is full), a boulder gives blocks instead. The boulder stays: there is more Mars than he can carry.
+addI({
+  pos: boulderInReach, r: 99, hold: 2.4, mode: 'walk', priority: 5,
+  visible: () => isBase() && !S.flags.coldOpen && !S.inside && S.flags.didMath && canSample(_rock, 'rock') !== true,
+  label: () => 'Break off basalt',
+  sub: () => `+2 basalt · ${S.inv.stone || 0} carried`,
+  use: () => {
+    S.inv.stone = (S.inv.stone || 0) + 2;
+    S.stats.quarried = (S.stats.quarried || 0) + 2;
+    Snd.play('dig');
+    if (!S.flags.stoneHint) {
+      S.flags.stoneHint = true;
+      setTimeout(() => log('Basalt. The planet is made of it, and so, soon, is my base. A geologist would weep. I have a hammer.'), 900);
+    }
   },
 });
 

@@ -136,6 +136,8 @@ const DUST = {
   pathfinder: 0.4, viking: 0.44, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
+  // (a base's mineral deposits: a breath of dust, no more: their colour is what tells one from another)
+  dep_hematite: 0.1, dep_silica: 0.06, dep_clay: 0.12, dep_sulfate: 0.1, dep_salt: 0.05,
   crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
 };
 /** Materials that are the ground itself: drawn in the local ground colour, tinted by their vertex colours. */
