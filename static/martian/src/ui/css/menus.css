@@ -279,7 +279,7 @@
 .mg-compact .diff .dp { margin-top: .375rem; }
 /* (on a phone the word stands beside the bars without adding to their line's height: the sheet has no 10 px to spare) */
 .mg-compact .diff .dp { position: relative; }
-.mg-compact .diff .dp span { position: absolute; left: calc(4.5rem + .875rem); top: 50%; transform: translateY(-50%); margin-left: 0; white-space: nowrap; }
+.mg-compact .diff .dp span { position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin-left: 0; white-space: nowrap; }
 .mg-compact .diff dl { margin-top: .5rem; padding: .375rem 0; gap: .1875rem 1rem; }
 .mg-compact .diff dt { font-size: .625rem; }
 .mg-compact .diff dd { font-size: .8125rem; }

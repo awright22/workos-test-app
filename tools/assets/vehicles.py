@@ -1849,22 +1849,36 @@ def build_hermes():
     hull = [(0.0, -29.72), (0.55, -29.72), (0.55, -30.0), (0.82, -30.0), (0.82, -29.4), (1.05, -29.2), (1.05, -28.3), (1.85, -27.75),
             (2.0, -27.5)] + wall(2.0, -27.4, -23.7, pad=0.2, step=2) + [(2.0, -23.6), (1.85, -23.35), (1.45, -23.1), (1.45, -22.75),
             (2.15, -22.35), (2.3, -22.1)] + wall(2.3, -22.0, -17.6, pad=0.2, step=2.5) + [(2.3, -17.5), (2.15, -17.25)]
-    lathe(white, hull, 24, AY)
-    lathe(foil, [(2.15, -17.25), (1.75, -16.7), (1.40, -16.2), (1.40, -15.35)], 24, AY)
+    # (forty-eight sides: at twenty-four, close in the last scene, every rim was a polygon)
+    lathe(white, hull, 48, AY)
+    lathe(foil, [(2.15, -17.25), (1.75, -16.7), (1.40, -16.2), (1.40, -15.35)], 48, AY)
     for y in (-27.45, -23.65, -22.05, -19.8, -17.55):
         r = 2.0 if y < -23 else 2.3
-        lathe(grey, [(r - 0.01, y - 0.10), (r + 0.05, y - 0.07), (r + 0.05, y + 0.07), (r - 0.01, y + 0.10)], 24, AY)
-    lathe(grey, [(0.82, -29.9), (0.92, -29.86), (0.92, -29.66), (0.82, -29.6)], 16, AY)
-    lathe(dark, [(0.0, -29.71), (0.50, -29.71)], 16, AY)
+        lathe(grey, [(r - 0.01, y - 0.10), (r + 0.05, y - 0.07), (r + 0.05, y + 0.07), (r - 0.01, y + 0.10)], 48, AY)
+    lathe(grey, [(0.82, -29.9), (0.92, -29.86), (0.92, -29.66), (0.82, -29.6)], 32, AY)
+    lathe(dark, [(0.0, -29.71), (0.50, -29.71)], 32, AY)
     # radial ports on the node (left, right, nadir) and a cupola on top
     for deg in (0, 180, 270):
         M = T(0, -25.5, 0) @ R('Y', -deg) @ AX['X']
-        lathe(white, [(0.85, 1.7), (0.85, 2.55), (0.70, 2.75)], 14, M)
-        lathe(grey, [(0.86, 2.30), (0.95, 2.33), (0.95, 2.47), (0.86, 2.50)], 14, M)
-        lathe(dark, [(0.70, 2.75), (0.0, 2.75)], 14, M)
+        lathe(white, [(0.85, 1.7), (0.85, 2.55), (0.70, 2.75)], 24, M)
+        lathe(grey, [(0.86, 2.30), (0.95, 2.33), (0.95, 2.47), (0.86, 2.50)], 24, M)
+        lathe(dark, [(0.70, 2.75), (0.0, 2.75)], 24, M)
     Mc = T(0, -25.5, 0) @ R('Y', -90) @ AX['X']
-    lathe(grey, [(0.80, 1.7), (0.80, 2.12), (0.74, 2.16)], 12, Mc)
-    lathe(glass, [(0.74, 2.16), (0.55, 2.50), (0.0, 2.62)], 12, Mc)
+    lathe(grey, [(0.80, 1.7), (0.80, 2.12), (0.74, 2.16)], 20, Mc)
+    lathe(glass, [(0.74, 2.16), (0.55, 2.50), (0.0, 2.62)], 20, Mc)
+    # The skin of the two forward modules, which the last scene sees from a few metres: seams where its panels meet,
+    # and handrails standing off it. (Bare, they were cream cylinders: nothing on them gave their size.)
+    for (r, ya, yb, n) in ((2.0, -27.25, -23.85, 12), (2.3, -21.85, -17.75, 12)):
+        for k in range(n):
+            a = rad(360.0 / n * (k + 0.5))
+            x, z = cos(a), sin(a)
+            tube(grey, [((r + 0.004) * x, ya, (r + 0.004) * z), ((r + 0.004) * x, yb, (r + 0.004) * z)], 0.022, 4, caps=False)
+            if k % 3 == 1:                                             # a handrail on every third panel, fore and aft
+                for (h0, h1) in ((ya + 0.35, ya + 1.25), (yb - 1.25, yb - 0.35)):
+                    a2 = a + rad(360.0 / n * 0.5)
+                    x2, z2 = cos(a2), sin(a2)
+                    tube(alu, [((r + 0.01) * x2, h0, (r + 0.01) * z2), ((r + 0.11) * x2, h0 + 0.05, (r + 0.11) * z2),
+                               ((r + 0.11) * x2, h1 - 0.05, (r + 0.11) * z2), ((r + 0.01) * x2, h1, (r + 0.01) * z2)], 0.018, 5)
     # windows round the command module, equipment pallets
     for k in range(10):
         if k in (2, 3):

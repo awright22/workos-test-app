@@ -143,7 +143,8 @@ class Smoke {
           // whole column is lit as one thing, its far side in the shade of its near side. Small puffs and many: the
           // balls make the billows of a cloud's edge, and the column's own light and shade make its shape.
           vec3 n = normalize(vec3(c.x, -c.y, sqrt(max(1.0 - r2, 0.0)) + 0.35));
-          float lit = smoothstep(-0.35, 0.85, dot(n, uSunV)) * (0.22 + 0.78 * vShade);
+          // (but not as a hard ball: one puff alone in the air beside the rocket was a beige ball with a lit side)
+          float lit = mix(0.42, smoothstep(-0.35, 0.85, dot(n, uSunV)), 0.62) * (0.22 + 0.78 * vShade);
           vec3 base = mix(vec3(0.44, 0.22, 0.115), vec3(0.95, 0.91, 0.86), vTone);
           // (the sky lights it from above and the red ground from below, and less)
           vec3 col = base * (uAmb * (0.72 + 0.28 * dot(n, uUpV)) + uSunCol * lit) + uGlowCol * (vGlow * (0.35 + 0.65 * lit));
@@ -238,7 +239,8 @@ function buildColumn(scene, smokeU) {
         // it is the air that makes smoke of an engine's breath: above nine hundred metres there is none; and it disperses
         // (and it does not reach the ground as a solid: its foot is the dust the skirt throws out. A wide foot to the
         // tube, seen from the pad, was a tent of cloth with fold lines.)
-        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(13.0, 24.0, age)) * smoothstep(0.0, 0.25, age) * smoothstep(1.0, 9.0, hgt);
+        // (and it does not hang for half a minute as a thing with an edge: in this thin air it is gone in a dozen seconds)
+        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(6.0, 17.0, age)) * smoothstep(0.0, 0.25, age) * smoothstep(1.0, 9.0, hgt);
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
@@ -252,14 +254,16 @@ function buildColumn(scene, smokeU) {
         // the billows on the billows
         float fine = vnoise(vP * 0.5 + vec3(0.0, vAge * 0.15, 0.0)) * 0.6 + vnoise(vP * 1.25 + 3.7) * 0.4;
         // (soft where it turns away from the eye: a cloud has no outline)
-        float a = vAlpha * smoothstep(0.02, 0.20 + 0.24 * fine, facing);
+        // (torn, with thin places in it: evenly thick it was a ribbon of cloth, and from far off a white stalagmite)
+        float a = vAlpha * smoothstep(0.02, 0.20 + 0.24 * fine, facing) * (0.30 + 0.95 * smoothstep(0.25, 0.75, fine));
         if (a < 0.004) discard;
         float lit = smoothstep(-0.5, 0.85, dot(n, uSunV)) * (0.66 + 0.68 * fine);
-        vec3 base = mix(vec3(0.52, 0.31, 0.17), vec3(0.95, 0.91, 0.86), smoothstep(3.0, 40.0, vHgt));
+        // (pale, and of the dust it rose through, not white: nothing in this engine's breath makes a white cloud)
+        vec3 base = mix(vec3(0.52, 0.31, 0.17), vec3(0.88, 0.78, 0.66), smoothstep(3.0, 40.0, vHgt));
         vec3 col = base * (uAmb * (0.72 + 0.28 * dot(n, uUpV)) + uSunCol * lit);
         vec3 gd = vP - uGlowPos;
         col += uGlowCol * (uGlow * 0.5 / (1.0 + dot(gd, gd) / 260.0));
-        gl_FragColor = vec4(col, a * 0.94);
+        gl_FragColor = vec4(col, a * 0.86);
         #include <fog_fragment>
       }`,
   });
@@ -271,11 +275,11 @@ function buildColumn(scene, smokeU) {
 
 // ---- the flame ---------------------------------------------------------------------------------------------------
 const flameTime = { value: 0 };
-function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 0) {
+function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 0, fall = 1.4, beads = 0) {
   const g = new THREE.CylinderGeometry(rTop, rBottom, length, 20, 10, true);
   g.translate(0, -length / 2, 0);                      // the nozzle at the origin, the tail below
   const u = { uTime: flameTime, uColor: { value: new THREE.Color(...color) }, uHot: { value: new THREE.Color(...hot) }, uGain: { value: gain }, uEdge: { value: edge },
-    uBulge: { value: bulge }, uSoft: { value: soft } };
+    uBulge: { value: bulge }, uSoft: { value: soft }, uFall: { value: fall }, uBeads: { value: beads } };
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
     vertexShader: /* glsl */`
@@ -292,7 +296,7 @@ function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */`
-      uniform float uTime, uGain, uEdge, uSoft; uniform vec3 uColor, uHot;
+      uniform float uTime, uGain, uEdge, uSoft, uFall, uBeads; uniform vec3 uColor, uHot;
       varying vec2 vUv; varying vec3 vN, vV;
       // (no sine in it: a hash through sin() comes out in bands on some phone GPUs)
         float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -307,7 +311,11 @@ function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 
         float f = abs(dot(normalize(vN), normalize(vV)));
         float along = vUv.y;                             // 1 at the nozzle, 0 at the tail
         float n = vn(vec2(vUv.x * 12.0, along * 4.0 + uTime * 19.0), 12.0) * 0.6 + vn(vec2(vUv.x * 28.0, along * 9.0 + uTime * 33.0), 28.0) * 0.4;
-        float body = pow(f, uEdge) * pow(along, 1.4) * smoothstep(0.0, 0.45, along) * (0.62 + 0.76 * n);
+        // (how fast it dims down its length: a flame as bright at its tail as at the nozzle, three of them laid over
+        // one another, was a white bar from the engine to the ground)
+        float body = pow(f, uEdge) * pow(along, uFall) * smoothstep(0.0, 0.45, along) * (0.62 + 0.76 * n);
+        // the jet is faster than sound in it: it stands in beads of light below the nozzle, closer as they fade
+        body *= 1.0 + uBeads * (0.5 + 0.5 * cos(pow(1.0 - along, 0.8) * 44.0)) * smoothstep(0.25, 0.9, along);
         // (a wide plume has no rim where it leaves the engine: seen from ahead, its open end was a hard pale disc round the nozzle)
         body *= 1.0 - uSoft * smoothstep(0.80, 0.98, along);
         gl_FragColor = vec4(mix(uColor, uHot, pow(f, 3.0) * along) * (body * uGain), 1.0);
@@ -321,8 +329,8 @@ function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 
 function buildFlame() {
   const g = new THREE.Group();
   const wide = plume(0.95, 3.6, 17, [1.0, 0.36, 0.10], [1.0, 0.55, 0.22], 1.5, 2.6, 0, 1);
-  const flame = plume(0.62, 0.10, 11, [1.0, 0.40, 0.09], [1.0, 0.80, 0.50], 3.2, 1.6, 0.85);
-  const core = plume(0.40, 0.05, 5.5, [1.0, 0.78, 0.46], [1.0, 0.95, 0.86], 6.0, 2.2, 0.45);
+  const flame = plume(0.62, 0.10, 11, [1.0, 0.34, 0.07], [1.0, 0.70, 0.36], 2.0, 1.6, 0.85, 0, 2.1);
+  const core = plume(0.36, 0.05, 4.6, [1.0, 0.72, 0.38], [1.0, 0.93, 0.80], 3.4, 2.2, 0.45, 0, 1.8, 0.9);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDisc(), color: new THREE.Color(2.8, 1.35, 0.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   glow.position.y = -0.8; glow.renderOrder = 23;
   g.add(wide, flame, core, glow);
@@ -525,7 +533,7 @@ export function startLaunch() {
         const a = rnd() * Math.PI * 2, far = 1.5 + rnd() * 2.5;
         _a.copy(east).multiplyScalar(Math.cos(a)).addScaledVector(north, Math.sin(a));
         _b.copy(pad).addScaledVector(_a, far).addScaledVector(up, 0.5 + rnd() * 0.6);
-        _c.copy(_a).multiplyScalar(12 + rnd() * 15).addScaledVector(up, 0.6 + rnd() * 5.0);
+        _c.copy(_a).multiplyScalar(12 + rnd() * 15).addScaledVector(up, 0.5 + rnd() * 2.8);      // (along the ground: thrown high, single puffs hung in the air beside the rocket)
         smoke.emit(_b, _c, 1.5 + rnd() * 1.3, 6 + rnd() * 8, 6 + rnd() * 4.5, rnd() * 0.16, 0.55 + rnd() * 0.2);
       }
       // the column the engine leaves up the sky
@@ -545,11 +553,14 @@ export function startLaunch() {
     } else if (lt < CUT_CHASE) {
       // 2. From far off: the land and its horizon, the skirt of dust spreading over it, the column standing on it,
       //    the rocket at its head. The horizon is held in the lower part of the frame until the cut.
-      setShot('wide', 40);
-      S.shake = 0.08;
+      //    (A long lens that follows it. With a wide one held on the horizon the rocket was 25 px of a phone's 390
+      //    two seconds after lift-off, and then out of the top of the frame: a column of smoke with nothing on it.
+      //    Now it is a third of the frame's height with its flame, in the upper part, the column under it; the
+      //    horizon is at the foot of the frame at the cut and drops out as it climbs.)
+      setShot('wide', 19);
+      S.shake = 0.05;
       cam.position.copy(camFar);
-      const tilt = clamp(Math.atan2(alt + 9, FAR) - 15 * DEG, 12 * DEG, 17.5 * DEG);
-      camLookAt(_a.copy(pad).addScaledVector(up, FAR * Math.tan(tilt)), up);
+      camLookAt(_a.copy(pad).addScaledVector(up, Math.max(40, alt + 9 - 12 - alt * 0.05)), up);
     } else if (lt < CUT_LEAVE) {
       // 3. Beside it and above, climbing with it: its trail running down to the pad, the ground dropping away, the
       //    horizon bending and the sky going black.
@@ -667,15 +678,14 @@ export function startLaunch() {
       }
       // the tether, slack as it pays out and drawn straight as he nears the end of it
       {
-        const pts = O.tether.geometry.attributes.position, n = pts.count, slack = 2.6 * (1 - 0.85 * Math.max(out - back, 0));
+        const line = O.tether.userData.line, n = line.length / 3, slack = 2.6 * (1 - 0.85 * Math.max(out - back, 0));
         O.clip.copy(beckAt).addScaledVector(up, 0.26 * (1 - carried)).addScaledVector(side2, -0.26 * carried).addScaledVector(ahead, 0.18);
         for (let i = 0; i < n; i++) {
           const k = i / (n - 1), sag = Math.sin(k * Math.PI) * slack;
           // (made fast at his pack, not his middle: from the ship's side it ran to his ankles)
           _a.copy(O.dock).lerp(O.clip, k).addScaledVector(up, -sag * (1 - k)).addScaledVector(O.x, Math.sin(k * 7 + ot * 0.8) * 0.25 * slack * (1 - k));
-          pts.setXYZ(i, _a.x - O.centre.x, _a.y - O.centre.y, _a.z - O.centre.z);
+          line[i * 3] = _a.x; line[i * 3 + 1] = _a.y; line[i * 3 + 2] = _a.z;
         }
-        pts.needsUpdate = true;
         O.tether.visible = ot > 1.9;
       }
       if (ot < CROSS_AT) {
@@ -692,7 +702,10 @@ export function startLaunch() {
         setShot('cross', 36);
         const ct = ot - CROSS_AT;
         _a.copy(O.f).multiplyScalar(Math.cos(O.crossAz)).addScaledVector(O.x, -Math.sin(O.crossAz));
-        stand(_d.copy(beckAt).addScaledVector(O.f, -3.5), _a, O.crossPitch, 10.5 - ct * 0.5, O.crossRoll);
+        // (it looks back toward the ship at first, the lock and the man both in the frame; as the tether pays out it
+        // comes round to him alone, so the ship leaves the frame whole: held on the first aim, a sliver of her ring
+        // hung in the corner for the last second of the shot)
+        stand(_d.copy(beckAt).addScaledVector(O.f, -3.5 + 6.0 * smoothstep(1.0, 3.4, ct)), _a, O.crossPitch, 10.5 - ct * 0.5, O.crossRoll);
       } else if (ot >= HOME_AT) {
         // behind the two of them and above, on the way home: the tether drawing them in, the ship and her open lock ahead
         setShot('home', 50);
@@ -709,6 +722,22 @@ export function startLaunch() {
         // (it follows them home: from the nose to the pair of them, and stands a little further off as they go)
         _d.copy(nose).addScaledVector(noseDir, 1.0).lerp(_c.copy(beckAt).lerp(markAt, 0.5), carried);
         stand(_d, _a, O.reachPitch, 6.4 + 4.5 * back + Math.min(ct, 6) * 0.12, O.reachRoll);
+      }
+      // the tether's width, now that this frame's camera stands where it will
+      {
+        const line = O.tether.userData.line, n = line.length / 3, pts = O.tether.geometry.attributes.position;
+        const perPx = 2 * Math.tan(cam.fov * DEG / 2) / Math.max(200, e.renderer.domElement.clientHeight || 390);
+        for (let i = 0; i < n; i++) {
+          const a = Math.max(i - 1, 0) * 3, b = Math.min(i + 1, n - 1) * 3, k = i * 3;
+          _a.set(line[b] - line[a], line[b + 1] - line[a + 1], line[b + 2] - line[a + 2]);
+          _b.set(line[k], line[k + 1], line[k + 2]);
+          _c.copy(cam.position).sub(_b);
+          const half = Math.max(0.012, _c.length() * perPx * 0.8);
+          _a.cross(_c).normalize().multiplyScalar(half);
+          pts.setXYZ(i * 2, _b.x + _a.x - O.centre.x, _b.y + _a.y - O.centre.y, _b.z + _a.z - O.centre.z);
+          pts.setXYZ(i * 2 + 1, _b.x - _a.x - O.centre.x, _b.y - _a.y - O.centre.y, _b.z - _a.z - O.centre.z);
+        }
+        pts.needsUpdate = true;
       }
     }
     if (S.shake > 0) cam.position.addScaledVector(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.35);
@@ -768,10 +797,14 @@ function enterOrbit(up, F) {
   });
   const stageLength = clamp(top - 0.2, 3, 14);
   const ventQ = new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(x, f.clone().negate(), up));          // (a plume's tail runs down its own -Y)
-  // the tether: a line from the airlock to the man on the end of it
-  const tg = new THREE.BufferGeometry();
-  tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(20 * 3), 3));
-  const tether = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xf4f0e8, fog: false }));
+  // the tether: a cord from the airlock to the man on the end of it. (A ribbon that is turned to the lens each frame,
+  // and never narrower on the screen than a pixel and a half: as a line it was a hair across the picture.)
+  const TN = 48, tg = new THREE.BufferGeometry(), ti = [];
+  tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TN * 2 * 3), 3));
+  for (let i = 0; i < TN - 1; i++) { const a = i * 2; ti.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  tg.setIndex(ti);
+  const tether = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xcfc8ba, fog: false, side: THREE.DoubleSide }));
+  tether.userData.line = new Float32Array(TN * 3);
   tether.frustumCulled = false; tether.position.copy(centre); tether.visible = false;
   ctx.world.add(tether);
   // what was loose in the lock: a few dozen scraps, each a point of light when it catches the sun

@@ -8,8 +8,8 @@
  *
  * Here the room is drawn once from straight above: a mask of whatever stands within a pace and a quarter of the
  * floor, and how high each thing is. Blurred at three widths (the mask's own smaller copies), it is laid on the
- * floor as a soft dark: tight and deep close under a thing, wide and faint round it, weaker under what stands high
- * (a table top) than under what lies low (a crate). It is drawn again whenever the furnishings change.
+ * floor as a soft dark: deep close under a thing, fading within a couple of feet of it, weaker under what stands
+ * high (a table top) than under what lies low (a crate). It is drawn again whenever the furnishings change.
  */
 import * as THREE from 'three';
 
@@ -54,10 +54,11 @@ export function createFloorShade(parent, radius, floorY) {
       // how much stands over this spot at a blur: all of it for what lies low, under half for what stands at TOP
       float over(float lod) { vec4 t = textureLod(uMap, vUv, lod); return t.a - 0.58 * t.r; }
       void main() {
-        // (three widths: about a hand, two feet and a pace and a half)
-        float a = (0.46 * over(1.6) + 0.34 * over(3.5) + 0.30 * over(5.0)) * uStrength;
+        // (Three widths: a hand, a foot and a half, and a faint pace. Most of the weight is close in: a wide dark is
+        // most of the floor, and the camera's exposure lifts the whole room to make up for it, which leaves nothing.)
+        float a = (0.62 * over(1.4) + 0.50 * over(3.0) + 0.12 * over(4.4)) * uStrength;
         if (a < 0.004) discard;
-        gl_FragColor = vec4(0.0, 0.0, 0.0, min(a, 0.60));
+        gl_FragColor = vec4(0.0, 0.0, 0.0, min(a, 0.70));
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -98,6 +99,8 @@ export function createFloorShade(parent, radius, floorY) {
   }
   return {
     mesh,
+    /** the mask itself (for tests) */
+    mask: rt,
     /**
      * Call each frame the room is drawn. `parts`: the groups that hold what stands in it. The mask is drawn again
      * when what they hold has changed (a bed built, a crop grown, a chair made), looked at twice a second.
