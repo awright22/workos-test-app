@@ -249,10 +249,14 @@ function setUpPlain(plain, ground) {
         // (... and what is left is the cooler half of the sky, more of it on what faces up: at seven tenths gone and
         // one flat tone his shaded side was the colour of the dirt behind him, with no form in it)
         float turned = min(uRim, 1.0) * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
-        vec3 fillTint = vec3(skyFill * (1.0 - 0.58 * turned)) * mix(vec3(1.0), vec3(0.90, 0.98, 1.10) * (0.84 + 0.30 * dot(normal, normalize((viewMatrix * vec4(uDustHere, 0.0)).xyz))), turned);
+        vec3 fillTint = vec3(skyFill * (1.0 - 0.50 * turned)) * mix(vec3(1.0), vec3(0.90, 0.98, 1.10) * (0.84 + 0.30 * dot(normal, normalize((viewMatrix * vec4(uDustHere, 0.0)).xyz))), turned);
         #else
         vec3 fillTint = vec3(skyFill);
         #endif
+        // What is turned edge-on to the eye sees more sky than what faces it, and dusty cloth scatters that light back:
+        // the soft edge that lifts a figure off the ground behind it, by night as by day. (By night, lit by nothing but
+        // the sky, he was a black cut-out.)
+        fillTint *= 1.0 + 0.9 * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.2);
         irradiance *= fillTint;
         #include <lights_fragment_maps>
         iblIrradiance *= fillTint; radiance *= fillTint;`)
@@ -263,15 +267,17 @@ function setUpPlain(plain, ground) {
         {
           vec3 rimV = normalize(vViewPosition);
           float rimBack = max(0.0, -dot(directionalLights[0].direction, rimV));
-          float rimEdge = pow(1.0 - clamp(dot(normal, rimV), 0.0, 1.0), 3.0) * smoothstep(-0.2, 0.25, dot(normal, directionalLights[0].direction));
-          // (stronger and not squared: at a tenth of the sun's light on an edge, under a high sun, no rim could be seen)
-          // (bounded: a rim many times brighter than white on an edge one pixel wide was a string of sparks along his outline)
-          reflectedLight.directDiffuse += min(directionalLights[0].color * (uRim * rimBack * rimEdge * 1.5), vec3(1.4)) * diffuseColor.rgb;
+          // (A band, not a hairline. Cubed, it was half strength only within the last fiftieth of a limb's width: on a
+          //  phone that is under a pixel, and three reviews saw a stipple of bright dots along his outline and no rim.
+          //  It now reaches a sixth of the way in, and wraps a little past where the sun itself stops.)
+          float rimEdge = pow(1.0 - clamp(dot(normal, rimV), 0.0, 1.0), 1.7) * smoothstep(-0.5, 0.15, dot(normal, directionalLights[0].direction));
+          // (bounded: a rim many times brighter than white on a thin edge was a string of sparks)
+          reflectedLight.directDiffuse += min(directionalLights[0].color * (uRim * rimBack * rimEdge * 0.75), vec3(0.9)) * diffuseColor.rgb;
         }
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust13' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust14' + (ground ? 'G' : '');
   return plain;
 }
 
