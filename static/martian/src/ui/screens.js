@@ -369,7 +369,7 @@ export function discoveriesFound() {
   return World.landers.filter((r) => S.discovered[r.data.name]).length + journalPlaces().filter((f) => S.discovered[f.name]).length + sightList().filter((x) => x.sol).length;
 }
 function tasksHtml() {
-  // (the tab's figure is the tasks still to do, the mission's and NASA's: the two headings under it say how many each)
+  // (the tab's figure is this one: the mission's tasks still to do)
   const toDo = missionList().filter((e) => !e.done).length;
   let h = wayHomeHtml() + `<div class="pane-hd">Mission <span>${toDo} to do</span></div><div class="obj-list">`;
   let primary = false, open = '', closed = '', nDone = 0;
@@ -506,11 +506,12 @@ const JOURNAL_TABS = [['tasks', 'target', 'Tasks', tasksHtml], ['disc', 'pin', '
 export function renderJournal() {
   wire();
   const body = UI.journalScreen.querySelector('.scr-body');
-  // A tab's count is the number of things its page lists as open or found, so the two always agree: the tasks still to
-  // do (the mission's and NASA's), the landers, places and sights found, the materials catalogued, the achievements
-  // earned. ("Tasks 6" stood over three mission tasks: it counted NASA's alone. And Samples had no count.)
+  // A tab's count is the figure its page opens on, so the two always agree: the mission's tasks still to do, the
+  // landers, places and sights found, the materials catalogued, the achievements earned. ("Tasks 6" stood over three
+  // mission tasks: it counted NASA's alone. Then "Tasks 9" stood over "Mission, 3 to do": it counted both, and
+  // NASA's six were under their own heading a screen further down. NASA's tasks are counted there, where they are.)
   const counts = {
-    tasks: missionList().filter((e) => !e.done).length + QUEST_DEFS.filter((q) => S.quests[q.id] === 'active').length || '',
+    tasks: missionList().filter((e) => !e.done).length || '',
     disc: discoveriesFound() || '',
     ach: ACHIEVEMENTS.filter((a) => S.achieved[a.id]).length || '', samples: scienceSummary().kinds || '',
   };

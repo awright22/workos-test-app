@@ -383,14 +383,15 @@ if (!onlySize || onlySize === 'play') {
   }));
   check('journal: the log shows as many entries as its heading says, each with a speaker', jl.shown >= 9 && new RegExp(`\\b${jl.shown} entries`).test(jl.head) && jl.who.every((w) => /^[A-Z]+$/.test(w)), jl);
   await page.locator('.journal [data-tab="tasks"]').click();
-  // a tab's count is the number of things its page lists ("Tasks 6" stood over three tasks), and the page says where it all leads
+  // a tab's count is the figure its page opens on ("Tasks 6" stood over three tasks, then "Tasks 9" over "3 to do"), and the page says where it all leads
   const jc = await page.evaluate(() => ({
     tab: parseInt((document.querySelector('#mg-journal [data-tab="tasks"] em') || { textContent: '0' }).textContent, 10),
-    listed: document.querySelectorAll('#mg-journal .obj-list:not(.done-list) .obj').length + document.querySelectorAll('#mg-journal .card.quest:not(.done)').length,
+    listed: document.querySelectorAll('#mg-journal .obj-list:not(.done-list) .obj').length,
+    head: parseInt((document.querySelector('#mg-journal .pane-hd span') || { textContent: '0' }).textContent, 10),
     way: [...document.querySelectorAll('#mg-journal .way li strong')].map((n) => n.textContent), wayText: (document.querySelector('#mg-journal .way') || { textContent: '' }).textContent,
     uplink: (document.querySelector('#mg-journal .empty') || { textContent: '' }).textContent,
   }));
-  check('journal: the Tasks tab counts the tasks its page lists', jc.tab > 0 && jc.tab === jc.listed, jc);
+  check('journal: the Tasks tab, the heading under it and the list all give one count', jc.tab > 0 && jc.tab === jc.listed && jc.tab === jc.head, jc);
   check('journal: the task page says where it all leads (a radio, then the rocket in Schiaparelli) and what an uplink is', jc.way.length === 3 && /radio/.test(jc.wayText) && /Schiaparelli/.test(jc.wayText) && /Sol \d+/.test(jc.wayText) && /\d\skm/.test(jc.wayText) && /radio/.test(jc.uplink) && /alive/.test(jc.uplink), jc);
   await page.keyboard.press('Escape');
   // FOOD on the HUD is the sum of the rows under Food in the inventory (13 was set against a list that came to 22)
