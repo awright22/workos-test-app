@@ -350,7 +350,7 @@ export class Engine {
     this.modelAmbient = lerp(lerp(0.17, lerp(0.32, 0.62, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
     // (the rim is strongest under a low sun, when the sun itself is weakest: at dawn and dusk a man against the light
     // had no edge at all)
-    this.modelRim = (1 - io) * sky.day * (1 + 1.8 * (1 - smoothstep(0.08, 0.5, sky.sunE)));
+    this.modelRim = (1 - io) * sky.day * (1 + 1.0 * (1 - smoothstep(0.08, 0.5, sky.sunE)));
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
     const near = alt > 400 ? 2 : 0.12;
@@ -438,7 +438,11 @@ function airHaze() {
   #endif`;
   C.fog_fragment = `#ifdef USE_FOG
     float fogHigh = length(cameraPosition) - 12000.0;
-    float fogAir = 0.5 * (exp(-clamp(fogHigh, -150.0, 900.0) / 180.0) + exp(-clamp(vFogAlt, -150.0, 900.0) / 180.0));
+    // How thick the dust is along the line of sight: it thins with height (by e in a hundred and eighty metres), and
+    // the line is summed through it exactly. (It was the mean of the two ends, which from seven hundred metres up
+    // counted twice the dust there is: the rocket climbed over a featureless tan ball.)
+    float fogHc = clamp(fogHigh, -150.0, 6000.0), fogHf = clamp(vFogAlt, -150.0, 900.0), fogDh = fogHc - fogHf;
+    float fogAir = abs(fogDh) > 2.0 ? (exp(-fogHf / 180.0) - exp(-fogHc / 180.0)) * 180.0 / fogDh : exp(-fogHf / 180.0);
     // Looking down into a deep, there is more air in the way than the distance says: the dust hangs lowest in the
     // lowest ground. So what lies well below the eye is hazier than what is level with it, and a canyon seen from its
     // rim has a far floor, not a pit with its bottom as sharp as its lip. (Not from the air: from there all is below.)
@@ -454,6 +458,10 @@ function airHaze() {
     float fogLine = vFogEl - fogFar;
     float fogNearLine = fogLine > 0.0 ? 1.0 - smoothstep(0.05, 0.22, fogLine) : 1.0 - smoothstep(0.012, 0.05, -fogLine);
     float fogBand = fogNearLine * smoothstep(60.0, 170.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - (1.0 - fogFactor) * (1.0 - fogBand));
+// Near haze is the ground's own dust hanging over it, lit as the ground is: redder and darker than the sky at
+    // the horizon, which is what far haze fades into. (One sky-pale colour at every distance lifted the middle
+    // ground to cream a hundred metres off, and the land broke from red to cream along the first ridge.)
+    vec3 fogTint = mix(fogColor * vec3(0.74, 0.56, 0.46), fogColor, smoothstep(160.0, 1400.0, vFogDepth));
+    gl_FragColor.rgb = mix(mix(gl_FragColor.rgb, fogTint, fogFactor), fogColor, fogBand);
   #endif`;
 }

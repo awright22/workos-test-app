@@ -244,13 +244,18 @@ function setUpPlain(plain, ground) {
       .replace('#include <lights_fragment_maps>', `
         float skyFill = uFill;
         #if NUM_DIR_LIGHTS > 0
-        // (seven tenths gone, not under half: seen from behind with the sun ahead, his white back was still the
+        // (most of it gone, not under half: seen from behind with the sun ahead, his white back was still the
         // brightest thing in the picture, lit alike from every side)
-        skyFill *= 1.0 - 0.70 * min(uRim, 1.0) * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
+        // (... and what is left is the cooler half of the sky, more of it on what faces up: at seven tenths gone and
+        // one flat tone his shaded side was the colour of the dirt behind him, with no form in it)
+        float turned = min(uRim, 1.0) * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
+        vec3 fillTint = vec3(skyFill * (1.0 - 0.58 * turned)) * mix(vec3(1.0), vec3(0.90, 0.98, 1.10) * (0.84 + 0.30 * dot(normal, normalize((viewMatrix * vec4(uDustHere, 0.0)).xyz))), turned);
+        #else
+        vec3 fillTint = vec3(skyFill);
         #endif
-        irradiance *= skyFill;
+        irradiance *= fillTint;
         #include <lights_fragment_maps>
-        iblIrradiance *= skyFill; radiance *= skyFill;`)
+        iblIrradiance *= fillTint; radiance *= fillTint;`)
       // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
@@ -260,12 +265,13 @@ function setUpPlain(plain, ground) {
           float rimBack = max(0.0, -dot(directionalLights[0].direction, rimV));
           float rimEdge = pow(1.0 - clamp(dot(normal, rimV), 0.0, 1.0), 3.0) * smoothstep(-0.2, 0.25, dot(normal, directionalLights[0].direction));
           // (stronger and not squared: at a tenth of the sun's light on an edge, under a high sun, no rim could be seen)
-          reflectedLight.directDiffuse += directionalLights[0].color * diffuseColor.rgb * (uRim * rimBack * rimEdge * 1.5);
+          // (bounded: a rim many times brighter than white on an edge one pixel wide was a string of sparks along his outline)
+          reflectedLight.directDiffuse += min(directionalLights[0].color * (uRim * rimBack * rimEdge * 1.5), vec3(1.4)) * diffuseColor.rgb;
         }
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust12' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust13' + (ground ? 'G' : '');
   return plain;
 }
 

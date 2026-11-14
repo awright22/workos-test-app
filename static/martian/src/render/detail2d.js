@@ -129,10 +129,12 @@ function crustTexture(size, anisotropy) {
   const SPAN = 12.8;
   const where = fbm(size, 3, 3, 167), wide = fbm(size, 7, 3, 173), tone = fbm(size, 5, 3, 179, 0.6), dome = fbm(size, 9, 3, 181);
   const h = new Float32Array(size * size), bright = new Float32Array(size * size), mask = new Float32Array(size * size);
-  const C = 9, rnd = rng(97), pts = new Float32Array(C * C * 2);
+  // (Six cells across, each some two metres; their edges nearly straight, meeting at angles; the troughs a hand
+  // across and dark, with hardly a rim. Nine small cells with wandering edges and raised rims were a net of welts.)
+  const C = 6, rnd = rng(97), pts = new Float32Array(C * C * 2);
   for (let i = 0; i < C * C; i++) { pts[i * 2] = 0.15 + rnd() * 0.7; pts[i * 2 + 1] = 0.15 + rnd() * 0.7; }
   for (let j = 0, k = 0; j < size; j++) for (let i = 0; i < size; i++, k++) {
-    const gx = (i / size) * C + wide[k] * 0.35, gy = (j / size) * C + dome[k] * 0.35, cx = Math.floor(gx), cy = Math.floor(gy);
+    const gx = (i / size) * C + wide[k] * 0.09, gy = (j / size) * C + dome[k] * 0.09, cx = Math.floor(gx), cy = Math.floor(gy);
     let d1 = 9, d2 = 9;
     for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
       const qx = ((cx + a) % C + C) % C, qy = ((cy + b) % C + C) % C, q = (qy * C + qx) * 2;
@@ -140,14 +142,14 @@ function crustTexture(size, anisotropy) {
       if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
     }
     const edge = Math.sqrt(d2) - Math.sqrt(d1);                          // 0 on a cell boundary
-    const width = 0.05 + 0.09 * Math.max(0, wide[k] + 0.5);               // troughs 6 to 18 cm across
+    const width = 0.028 + 0.034 * Math.max(0, wide[k] + 0.5);             // troughs 6 to 13 cm across
     const trough = Math.max(0, 1 - edge / width);
     const here = Math.max(0, Math.min(1, (where[k] + 0.25) * 3));         // most of the ground, not all of it
     const t2 = trough * trough * (3 - 2 * trough) * here;
     // each polygon is slightly domed, its rim a little raised beside the trough
     const rim = Math.max(0, 1 - Math.abs(edge - width * 1.6) / (width * 1.2)) * here;
-    h[k] = -t2 * 0.045 + rim * 0.008 + dome[k] * 0.01;
-    bright[k] = 0.56 + tone[k] * 0.12 - t2 * 0.2 + rim * 0.04;
+    h[k] = -t2 * 0.034 + rim * 0.003 + dome[k] * 0.01;
+    bright[k] = 0.56 + tone[k] * 0.12 - t2 * 0.30 + rim * 0.015;
     mask[k] = t2;
   }
   return pack(size, h, bright, mask, 1, SPAN, anisotropy);

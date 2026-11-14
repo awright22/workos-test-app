@@ -389,16 +389,19 @@ class RockShade {
     this.spot.setUsage(THREE.DynamicDrawUsage); this.lie.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aSpot', this.spot); geo.setAttribute('aLie', this.lie);
     geo.instanceCount = 0;
-    this.uniforms = { uSun: { value: new THREE.Vector3(0, 1, 0) }, uDark: { value: 0 }, fogDensity: { value: 0 } };
+    // (the shade hazes as the ground it lies on does, by the same rule: with a fall-off of its own it stayed dark on
+    // far hills that had gone pale, a scatter of dashes with no rocks to cast them)
+    this.uniforms = { uSun: { value: new THREE.Vector3(0, 1, 0) }, uDark: { value: 0 },
+      fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 }, fogNear: { value: 1 }, fogFar: { value: 2000 } };
     const mat = new THREE.ShaderMaterial({
-      uniforms: this.uniforms, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+      uniforms: this.uniforms, transparent: true, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
       vertexShader: /* glsl */`
         attribute vec4 aSpot;
         attribute vec4 aLie;
         uniform vec3 uSun;
         varying vec2 vAt;
         varying float vLit;
-        varying float vDepth;
+        #include <fog_pars_vertex>
         void main() {
           vec3 n = aLie.xyz;
           float high = dot(uSun, n);                            // the sun's height over this ground
@@ -412,19 +415,19 @@ class RockShade {
           vec3 at = aSpot.xyz + n * (0.02 + 0.012 * aSpot.w) + away * (reach * 0.5) + away * (position.z * (r + reach * 0.5)) + side * (position.x * r);
           vAt = position.xz;
           vLit = smoothstep(0.02, 0.22, high);                  // no sun, no shade
-          vec4 mv = modelViewMatrix * vec4(at, 1.0);
-          vDepth = -mv.z;
-          gl_Position = projectionMatrix * mv;
+          vec4 mvPosition = modelViewMatrix * vec4(at, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */`
         uniform float uDark;
-        uniform float fogDensity;
         varying vec2 vAt;
         varying float vLit;
-        varying float vDepth;
+        #include <fog_pars_fragment>
         void main() {
-          float a = (1.0 - smoothstep(0.3, 1.0, length(vAt))) * uDark * vLit * exp(-fogDensity * fogDensity * vDepth * vDepth);
+          float a = (1.0 - smoothstep(0.3, 1.0, length(vAt))) * uDark * vLit;
           gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+          #include <fog_fragment>
         }`,
     });
     const m = this.mesh = new THREE.Mesh(geo, mat);
@@ -450,7 +453,7 @@ class RockShade {
     if (!e) return;
     this.uniforms.uSun.value.copy(e.sunDir);
     this.uniforms.uDark.value = 0.46 * smoothstep(0.15, 1.5, e.sun.intensity);
-    this.uniforms.fogDensity.value = e.scene.fog ? e.scene.fog.density : 0;
+
     this.mesh.visible = this.n > 0 && this.uniforms.uDark.value > 0.01;
   }
 }

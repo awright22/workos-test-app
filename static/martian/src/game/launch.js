@@ -25,13 +25,14 @@ import { SUN_DECLINATION, updateSunDir } from './sim.js';
 const LIFT = 5.2;            // seconds from "punch it" to lift-off
 const IGNITE = 4.3;          // the engine lights just before
 const CUT_WIDE = 1.7;        // seconds after lift-off: cut from the pad to the far camera
-const CUT_CHASE = 4.7;       // ... to the camera that climbs beside the rocket
+const CUT_CHASE = 4.0;       // ... to the camera that climbs beside the rocket
 const CUT_LEAVE = 12.6;      // ... to the one ahead of it, looking back down at it over the curve of the planet
 const MECO = 15.2;           // the engine burns out
 const CUT_ORBIT = 16.4;      // ... the Hermes
 const WIN = 26.0;            // the rescue is called
-const CROSS_AT = 3.4;        // seconds into the last scene: cut from the whole ship to the man on the tether
-const CLOSE_AT = 6.7;        // ... and to the vehicle's open nose as he reaches it
+const CROSS_AT = 2.6;        // seconds into the last scene: cut from the whole ship to the man on the tether
+const CLOSE_AT = 6.7;        // ... to the vehicle's open nose as he reaches it
+const HOME_AT = 10.6;        // ... and to the two of them going home, the ship ahead of them
 const ORBIT_R = R * 1.45;    // where the Hermes waits, from the planet's centre
 const climb = (lt) => 14 * lt * lt;        // height of the ascent stage above the pad (m), lt seconds after lift-off
 
@@ -218,7 +219,7 @@ function buildColumn(scene, smokeU) {
         vec2 d = vec2(cos(a), sin(a));
         // it swells fast and then slowly; wider where the air is thin; and at the ground it splashes
         float rad = (1.2 + 5.0 * (1.0 - exp(-age * 0.9)) + 2.2 * pow(age, 0.75)) * (1.0 + 1.3 * smoothstep(200.0, 900.0, hgt));
-        rad += 24.0 * exp(-hgt / 6.5) * min(1.0, age * 0.45);
+        rad += 9.0 * exp(-hgt / 7.0) * min(1.0, age * 0.45);
         vec3 q = vec3(d * 1.9, hgt / 9.0 - age * 0.10);
         float n = (vnoise(q) - 0.5) * 1.2 + (vnoise(q * 2.3 + 7.1) - 0.5) * 0.8;
         float r = rad * (1.0 + 0.55 * n) * smoothstep(0.0, 0.4, age + 0.04);
@@ -235,7 +236,9 @@ function buildColumn(scene, smokeU) {
         vN = normalMatrix * nrm; vV = -mvPosition.xyz; vP = p; vHgt = hgt; vAge = age;
         gl_Position = projectionMatrix * mvPosition;
         // it is the air that makes smoke of an engine's breath: above nine hundred metres there is none; and it disperses
-        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(13.0, 24.0, age)) * smoothstep(0.0, 0.25, age);
+        // (and it does not reach the ground as a solid: its foot is the dust the skirt throws out. A wide foot to the
+        // tube, seen from the pad, was a tent of cloth with fold lines.)
+        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(13.0, 24.0, age)) * smoothstep(0.0, 0.25, age) * smoothstep(1.0, 9.0, hgt);
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
@@ -268,26 +271,28 @@ function buildColumn(scene, smokeU) {
 
 // ---- the flame ---------------------------------------------------------------------------------------------------
 const flameTime = { value: 0 };
-function plume(rTop, rBottom, length, color, hot, gain, edge) {
+function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 0) {
   const g = new THREE.CylinderGeometry(rTop, rBottom, length, 20, 10, true);
   g.translate(0, -length / 2, 0);                      // the nozzle at the origin, the tail below
-  const u = { uTime: flameTime, uColor: { value: new THREE.Color(...color) }, uHot: { value: new THREE.Color(...hot) }, uGain: { value: gain }, uEdge: { value: edge } };
+  const u = { uTime: flameTime, uColor: { value: new THREE.Color(...color) }, uHot: { value: new THREE.Color(...hot) }, uGain: { value: gain }, uEdge: { value: edge },
+    uBulge: { value: bulge }, uSoft: { value: soft } };
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
     vertexShader: /* glsl */`
       varying vec2 vUv; varying vec3 vN, vV;
-      uniform float uTime;
+      uniform float uTime, uBulge;
       void main() {
         vUv = uv;
-        // (its edge is never still: straight-sided, it was a white bar under the engine)
+        // (its edge is never still, and it swells below the nozzle before it tapers, as a flame in thin air does:
+        // straight-sided, it was a white bar under the engine)
         vec3 p = position;
-        p.xz *= 1.0 + (1.0 - uv.y) * (0.16 * sin(p.y * 1.9 + uTime * 37.0) + 0.10 * sin(p.y * 4.3 - uTime * 53.0));
+        p.xz *= 1.0 + (1.0 - uv.y) * (0.16 * sin(p.y * 1.9 + uTime * 37.0) + 0.10 * sin(p.y * 4.3 - uTime * 53.0)) + uBulge * sin(3.14159 * pow(1.0 - uv.y, 0.7));
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vN = normalMatrix * normal; vV = -mv.xyz;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */`
-      uniform float uTime, uGain, uEdge; uniform vec3 uColor, uHot;
+      uniform float uTime, uGain, uEdge, uSoft; uniform vec3 uColor, uHot;
       varying vec2 vUv; varying vec3 vN, vV;
       // (no sine in it: a hash through sin() comes out in bands on some phone GPUs)
         float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -303,6 +308,8 @@ function plume(rTop, rBottom, length, color, hot, gain, edge) {
         float along = vUv.y;                             // 1 at the nozzle, 0 at the tail
         float n = vn(vec2(vUv.x * 12.0, along * 4.0 + uTime * 19.0), 12.0) * 0.6 + vn(vec2(vUv.x * 28.0, along * 9.0 + uTime * 33.0), 28.0) * 0.4;
         float body = pow(f, uEdge) * pow(along, 1.4) * smoothstep(0.0, 0.45, along) * (0.62 + 0.76 * n);
+        // (a wide plume has no rim where it leaves the engine: seen from ahead, its open end was a hard pale disc round the nozzle)
+        body *= 1.0 - uSoft * smoothstep(0.80, 0.98, along);
         gl_FragColor = vec4(mix(uColor, uHot, pow(f, 3.0) * along) * (body * uGain), 1.0);
       }`,
   }));
@@ -313,9 +320,9 @@ function plume(rTop, rBottom, length, color, hot, gain, edge) {
 
 function buildFlame() {
   const g = new THREE.Group();
-  const wide = plume(0.95, 3.6, 17, [1.0, 0.36, 0.10], [1.0, 0.55, 0.22], 1.5, 2.6);
-  const flame = plume(0.85, 0.14, 11, [1.0, 0.40, 0.09], [1.0, 0.80, 0.50], 3.4, 1.6);
-  const core = plume(0.46, 0.05, 5.5, [1.0, 0.78, 0.46], [1.0, 0.95, 0.86], 6.5, 2.2);
+  const wide = plume(0.95, 3.6, 17, [1.0, 0.36, 0.10], [1.0, 0.55, 0.22], 1.5, 2.6, 0, 1);
+  const flame = plume(0.62, 0.10, 11, [1.0, 0.40, 0.09], [1.0, 0.80, 0.50], 3.2, 1.6, 0.85);
+  const core = plume(0.40, 0.05, 5.5, [1.0, 0.78, 0.46], [1.0, 0.95, 0.86], 6.0, 2.2, 0.45);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDisc(), color: new THREE.Color(2.8, 1.35, 0.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   glow.position.y = -0.8; glow.renderOrder = 23;
   g.add(wide, flame, core, glow);
@@ -333,7 +340,7 @@ function effects() {
   fx = { smoke: new Smoke(ctx.engine.scene), flame, level: 0, glow: 0 };
   fx.column = buildColumn(ctx.engine.scene, fx.smoke.u);
   // the air out of the Hermes' lock, when it blows: a cone of pale vapour, the same kind of thing as the plume
-  fx.vent = plume(0.5, 9.5, 38, [0.62, 0.72, 0.92], [1.0, 1.0, 1.0], 0, 1.5);
+  fx.vent = plume(0.5, 9.5, 38, [0.62, 0.72, 0.92], [1.0, 1.0, 1.0], 0, 1.5, 0, 1);
   fx.vent.visible = false;
   ctx.world.add(fx.vent);
   drape(groundGlow(World.mav, 34, new THREE.Color(1.0, 0.50, 0.18), 1.0, 'pool', () => fx.glow, 0.07), 0.07);
@@ -417,7 +424,7 @@ export function startLaunch() {
   };
   // (the far camera stands well back, so that the land and its horizon stay under the column for the whole of the shot:
   // at a hundred and fifty metres it had tilted up into bare sky within a second)
-  const FAR = 320;
+  const FAR = 250;
   const nearDir = around(38), farDir = around(-52);
   const camNear = clear(onGround(nearDir, 46, 2.0)), camFar = clear(onGround(farDir, FAR, 3.2));
 
@@ -518,8 +525,8 @@ export function startLaunch() {
         const a = rnd() * Math.PI * 2, far = 1.5 + rnd() * 2.5;
         _a.copy(east).multiplyScalar(Math.cos(a)).addScaledVector(north, Math.sin(a));
         _b.copy(pad).addScaledVector(_a, far).addScaledVector(up, 0.5 + rnd() * 0.6);
-        _c.copy(_a).multiplyScalar(22 + rnd() * 22).addScaledVector(up, 0.4 + rnd() * 3.6);
-        smoke.emit(_b, _c, 1.5 + rnd() * 1.3, 6 + rnd() * 8, 6 + rnd() * 4.5, rnd() * 0.16, 0.48 + rnd() * 0.2);
+        _c.copy(_a).multiplyScalar(12 + rnd() * 15).addScaledVector(up, 0.6 + rnd() * 5.0);
+        smoke.emit(_b, _c, 1.5 + rnd() * 1.3, 6 + rnd() * 8, 6 + rnd() * 4.5, rnd() * 0.16, 0.55 + rnd() * 0.2);
       }
       // the column the engine leaves up the sky
       F.column.material.uniforms.uLt.value = Math.max(lt, 0);
@@ -538,16 +545,18 @@ export function startLaunch() {
     } else if (lt < CUT_CHASE) {
       // 2. From far off: the land and its horizon, the skirt of dust spreading over it, the column standing on it,
       //    the rocket at its head. The horizon is held in the lower part of the frame until the cut.
-      setShot('wide', 46);
+      setShot('wide', 40);
       S.shake = 0.08;
       cam.position.copy(camFar);
-      const tilt = Math.max(0.3 * 46 * DEG, Math.atan2(alt + 9, FAR) - 21 * DEG);
+      const tilt = clamp(Math.atan2(alt + 9, FAR) - 15 * DEG, 12 * DEG, 17.5 * DEG);
       camLookAt(_a.copy(pad).addScaledVector(up, FAR * Math.tan(tilt)), up);
     } else if (lt < CUT_LEAVE) {
-      // 3. Beside it, climbing with it: level with it at first, the column falling away below, then above it as the
-      //    ground drops, the horizon bends and the sky goes black.
+      // 3. Beside it and above, climbing with it: its trail running down to the pad, the ground dropping away, the
+      //    horizon bending and the sky going black.
       setShot('chase', 50);
-      const rel = (lt - CUT_CHASE) / (CUT_LEAVE - CUT_CHASE), over = smoothstep(0.0, 0.5, rel);
+      // (above it from the first frame, looking down its trail to the pad and the dust still spreading there: level
+      // with it, the shot began as a rocket in a beige void over a blank horizon)
+      const rel = (lt - CUT_CHASE) / (CUT_LEAVE - CUT_CHASE), over = 1;
       const dist = 38 + Math.min(alt, 2400) * 0.014;
       S.shake = clamp(0.5 - (lt - CUT_CHASE) * 0.07, 0, 0.5);
       cam.position.copy(pad).addScaledVector(nearDir, dist).addScaledVector(side, -dist * (0.35 + 0.25 * rel))
@@ -629,29 +638,41 @@ export function startLaunch() {
       crew.beck.mixer.setTime(0.4 + 0.25 * Math.sin(ot * 0.9));
       // ... and Watney, in the open nose until he is fetched, then held at Beck's side on the way home
       const carried = smoothstep(8.0, 9.4, ot);
+      // (side by side and face to face, each with his arms about the other: stacked one above the other in one pose,
+      // seen from behind, they were two copies of one figure)
+      const side2 = O.side2.copy(_d);                                    // level, to Beck's right as he flies
       const markAt = O.markAt.copy(nose).addScaledVector(noseDir, 0.30)
-        .lerp(_b.copy(beckAt).addScaledVector(_d, 0.9).addScaledVector(ahead, -0.5).addScaledVector(up, -0.15), carried);
-      const markUp = O.markUp.copy(noseDir).lerp(_c.copy(ahead).addScaledVector(_d, -0.55).normalize(), carried).normalize();
+        .lerp(_b.copy(beckAt).addScaledVector(side2, 0.66).addScaledVector(ahead, -0.06), carried);
+      const markUp = O.markUp.copy(noseDir).lerp(ahead, carried).normalize();
+      const face = (fig, head, front) => {
+        _a.crossVectors(head, front).normalize();                         // his right... (x = y cross z)
+        fig.root.quaternion.setFromRotationMatrix(_m.makeBasis(_a, head, _c.crossVectors(_a, head)));
+      };
+      // Beck turns his front from the planet to the man he holds; Watney his, from the planet to Beck
+      face(crew.beck, ahead, _b.copy(up).negate().lerp(side2, carried).normalize());
       crew.mark.root.visible = true;
       crew.mark.root.position.copy(markAt);
-      crew.mark.root.quaternion.setFromRotationMatrix(_m.makeBasis(_d.crossVectors(up, markUp).normalize(), markUp, _a.crossVectors(_d, markUp)));
+      face(crew.mark, markUp, _b.copy(up).negate().lerp(_d.copy(side2).negate(), carried).normalize());
       crew.mark.mixer.setTime(0.2 + 0.2 * Math.sin(ot * 0.7 + 1));
       // Their arms: Beck reaches for him over the last of the crossing, and Watney for Beck; then Beck holds him
       // with one arm and the tether with the other.
       {
         crew.beck.root.updateWorldMatrix(true, true); crew.mark.root.updateWorldMatrix(true, true);
         const reaching = smoothstep(0.55, 0.92, out), hold = carried;
-        reach(crew.beck, 'L', markAt, reaching);
-        reach(crew.beck, 'R', hold > 0.5 ? from : markAt, reaching * (hold > 0.5 ? 0.8 : 1));
-        reach(crew.mark, 'L', beckAt, smoothstep(0.7, 0.98, out));
-        reach(crew.mark, 'R', beckAt, smoothstep(0.7, 0.98, out));
+        const chestB = _b.copy(beckAt).addScaledVector(ahead, 0.25), chestM = _c.copy(markAt).addScaledVector(markUp, 0.25);
+        reach(crew.beck, 'L', chestM, reaching);
+        reach(crew.beck, 'R', chestM, reaching * (1 - 0.25 * hold));
+        reach(crew.mark, 'L', chestB, smoothstep(0.7, 0.98, out));
+        reach(crew.mark, 'R', chestB, smoothstep(0.7, 0.98, out));
       }
       // the tether, slack as it pays out and drawn straight as he nears the end of it
       {
         const pts = O.tether.geometry.attributes.position, n = pts.count, slack = 2.6 * (1 - 0.85 * Math.max(out - back, 0));
+        O.clip.copy(beckAt).addScaledVector(up, 0.26 * (1 - carried)).addScaledVector(side2, -0.26 * carried).addScaledVector(ahead, 0.18);
         for (let i = 0; i < n; i++) {
           const k = i / (n - 1), sag = Math.sin(k * Math.PI) * slack;
-          _a.copy(O.dock).lerp(beckAt, k).addScaledVector(up, -sag).addScaledVector(O.x, Math.sin(k * 7 + ot * 0.8) * 0.25 * slack);
+          // (made fast at his pack, not his middle: from the ship's side it ran to his ankles)
+          _a.copy(O.dock).lerp(O.clip, k).addScaledVector(up, -sag * (1 - k)).addScaledVector(O.x, Math.sin(k * 7 + ot * 0.8) * 0.25 * slack * (1 - k));
           pts.setXYZ(i, _a.x - O.centre.x, _a.y - O.centre.y, _a.z - O.centre.z);
         }
         pts.needsUpdate = true;
@@ -672,6 +693,14 @@ export function startLaunch() {
         const ct = ot - CROSS_AT;
         _a.copy(O.f).multiplyScalar(Math.cos(O.crossAz)).addScaledVector(O.x, -Math.sin(O.crossAz));
         stand(_d.copy(beckAt).addScaledVector(O.f, -3.5), _a, O.crossPitch, 10.5 - ct * 0.5, O.crossRoll);
+      } else if (ot >= HOME_AT) {
+        // behind the two of them and above, on the way home: the tether drawing them in, the ship and her open lock ahead
+        setShot('home', 50);
+        const ct = ot - HOME_AT;
+        _a.copy(O.f).multiplyScalar(Math.cos(O.homeAz)).addScaledVector(O.x, -Math.sin(O.homeAz));
+        _d.copy(beckAt).lerp(markAt, 0.5);
+        _d.addScaledVector(_c.copy(from).sub(_d).normalize(), 3.2);
+        stand(_d, _a, O.homePitch, 8.2 + Math.min(ct, 8) * 0.15, O.homeRoll);
       } else {
         // above the vehicle's nose on the same side: the two of them, the dark line of the night behind them
         setShot('reach', 36);
@@ -755,7 +784,8 @@ function enterOrbit(up, F) {
     v.rate = 2 + rnd() * 7; v.phase = rnd() * 6.283;
     debrisVel.push(v);
   }
-  const debris = new THREE.Points(dg, new THREE.PointsMaterial({ size: 1.7 * e.renderer.getPixelRatio(), sizeAttenuation: false, vertexColors: true,
+  // (round and soft: as bare points they were crisp white squares, which is what a broken picture looks like)
+  const debris = new THREE.Points(dg, new THREE.PointsMaterial({ size: 3.4 * e.renderer.getPixelRatio(), sizeAttenuation: false, vertexColors: true, map: softDisc(32),
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   debris.frustumCulled = false; debris.position.copy(centre); debris.visible = false; debris.renderOrder = 24;
   ctx.world.add(debris);
@@ -766,8 +796,9 @@ function enterOrbit(up, F) {
   F.glow = 0; F.smoke.u.uGlow.value = 0; F.smoke.u.uColumn.value = 0; F.smoke.u.uWind.value.set(0, 0, 0);
   const V = () => new THREE.Vector3();
   return { centre, dock, f, x, s, h, rocketWorldQ, parentInvQ, stageLength, tether, debris, debrisVel, ventQ, said: 0,
-    mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), markAt: V(), markUp: V(), from: V(), to: V(), ahead: V(), way: V(), lat: V(),
+    mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), markAt: V(), markUp: V(), from: V(), to: V(), ahead: V(), way: V(), lat: V(), side2: V(), clip: V(),
     dist: 106, pitch: 50 * DEG, swing: 25 * DEG, roll: -0.14,
     crossAz: 35 * DEG, crossPitch: 40 * DEG, crossRoll: -0.3,
-    reachAz: 60 * DEG, reachPitch: 50 * DEG, reachRoll: -0.2 };
+    reachAz: 60 * DEG, reachPitch: 50 * DEG, reachRoll: -0.2,
+    homeAz: 52 * DEG, homePitch: 23 * DEG, homeRoll: 0.08 };
 }

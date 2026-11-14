@@ -494,6 +494,14 @@ function cameraClear(p, room) {
     siteWorldToLocal(b.group, p, _v3);
     if (_v3.y < 5 && Math.hypot(_v3.x, _v3.z) < 4.45) return false;
   }
+  // ... nor inside anything else that stands on the ground and can be walked into: a solar kit, a lander, the rover.
+  // (Backed into a panel's frame, the camera showed its struts across a quarter of the picture.)
+  const h = p.length();
+  for (const c of colliders) {
+    if (c.off || c.r < 0.5) continue;
+    const d = Math.sqrt(Math.max(0, 2 - 2 * (p.x * c.v.x + p.y * c.v.y + p.z * c.v.z) / h)) * h;      // along the ground, to the thing's middle
+    if (d < c.r + 0.45 && h < surfaceAt(p) + 3.2) return false;
+  }
   return true;
 }
 

@@ -549,7 +549,10 @@ export function buildRover(group) {
   m.inner.add(hl, hlT); hl.target = hlT;
   const lamps = [];
   m.inner.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && /^light_(white|red|amber)/.test(o.material.name)) { o.material = o.material.clone(); o.material.userData.baseEmissive = o.material.emissiveIntensity || 1; o.material.userData.marker = !/^light_white/.test(o.material.name); lamps.push(o.material); } });
-  World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish') };
+  World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish'), markers: 0 };
+  // what its red and amber markers put on the ground behind it after dark (drawn, as the buildings' pools are: lamps
+  // that glowed and lit nothing looked painted on)
+  groundGlow(group, 2.8, 0xff6a3a, 0.13, 'pool', () => World.rover.markers, 0.06).position.set(0, 0.06, 2.9);
   World.roverCollider = { v: group.position.clone().normalize(), r: 2.6 };
   colliders.push(World.roverCollider);
 }

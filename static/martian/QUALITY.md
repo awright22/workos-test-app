@@ -148,16 +148,16 @@ What round 3 added or sharpened (T-numbers), most damaging first:
 
 | # | Finding (pictures) | State |
 | --- | --- | --- |
-| T1 | Landmarks do not read: Valles Marineris from above is a striped bank with no rim or drop in frame; Olympus is a rippled dune (`canyon`, `olympus`) | acted on: the matrix has a rim view and a wall view of the north wall of Valles Marineris at 296 E (a hundred metres of layered cliff). The seven shield volcanoes now carry lava: three sizes of flow lobe lying on one another, leveed channels, dark rubble and boulders along each flow's edge, no ripple fields. New scenes `olympus-caldera` (the summit caldera from its south rim) and `olympus-flows`. To re-review |
+| T1 | Landmarks do not read: Valles Marineris from above is a striped bank with no rim or drop in frame; Olympus is a rippled dune (`canyon`, `olympus`) | part: bare basalt over more of each flow and ropes nearly twice as deep (after these pictures). No levees, rubble or flow fronts yet; the caldera's dapples and red smear open |
 | T2 | Polar ice is matte white cracked plaster with tan shadows; the outcrop is two smooth bars (`north-pole`, `pole-90`, `ice`) | acted on: bluer ice that is blue in its shadows; the outcrop rebuilt as six fractured, tilted blocks with rubble. To re-review |
-| T3 | Zigzag chevrons in rows on a far hillside (`lander-curiosity`); specks and a scalloped ledge on the canyon wall | acted on: band edges wobble at a scale finer than a far mesh's triangles and merge sooner with distance. The rows of teeth along cliff edges had a second cause, now fixed: every square of the terrain grid was cut into triangles the same way, so any crest crossing that cut came out jagged. Each square is now cut along the diagonal whose ends are nearer in height, and a ledge's riser is an S-curve at least three cells wide. To re-review |
-| T4 | At night the Hab, rover and astronaut look floodlit by ambient; porch and parked-rover lamps make no pool; the greenhouse is a white starburst | acted on: a ceiling on what reaches the bloom, less night fill, porch lamps that pool on the ground, gentler dome lamps, lower night exposure. To re-review |
-| T5 | Exposure and colour spread: pale peach at noon and toward the sun, deep rust elsewhere; `day-sun` is beige | acted on: the glow round the sun is about a third as strong, the bloom is weaker and starts higher, and the meter closes further at high sun. To re-review |
-| T6 | The nearest metres are a soft blur at high sun | acted on: the sand and near-grain textures carry more tone contrast, so ripples and grit hold when the sun is overhead. To re-review |
-| T7 | Rocks are one family of flat faceted slabs, near-black in places; few mid-size boulders; one floats (`debris-c`) | acted on: blockier rocks, less dark, more mid-size boulders; rocks and physics now rest on the ground the current quality draws (they used finer detail than low and medium meshes show, which floated some). To re-review |
+| T3 | Zigzag chevrons in rows on a far hillside (`lander-curiosity`); specks and a scalloped ledge on the canyon wall | acted on: near haze is tinted with the ground's own dust and fades to the sky's colour only far off, so the middle ground no longer jumps to cream (`dawn-light`, `walk-plain`); rock shadows haze by the ground's own rule (they had a fall-off of their own and stayed dark on pale hills); skyline boulders fade (`lander-insight`). To be reviewed |
+| T4 | At night the Hab, rover and astronaut look floodlit by ambient; porch and parked-rover lamps make no pool; the greenhouse is a white starburst | part: the shell was the soil cap fading toward an open edge under its own lip; the cap now starts underground behind the face and is solid, the stones that stood off it and the frost plates are gone, the blocks have crisp breaks and no single dark vertex (`ice`, `ice-face`, `ice-plain`). His tan shadow on ice, the caps' matte surface and fat cracks, the cobalt night open |
+| T5 | Exposure and colour spread: pale peach at noon and toward the sun, deep rust elsewhere; `day-sun` is beige | acted on: the far camera nearer and tighter (the rocket twice the size, leaving the top of the frame at the cut); the climb shot starts above the rocket looking down its trail over ground that has a broad mottle from the air; the haze along a line of sight is summed exactly (it counted twice the dust from 700 m up); the flame swells and tapers; no disc at the nozzle; the column has no solid foot; round sparks for debris; the cut to Beck at 2.6 s; the tether at his pack; the two face to face with arms about each other; a last shot from behind them with the ship and her open lock ahead. The ship's flat shading close up open. To be reviewed |
+| T6 | The nearest metres are a soft blur at high sun | fixed: out of doors the camera now keeps clear of anything that can be walked into (it had backed into a solar kit's frame) |
+| T7 | Rocks are one family of flat faceted slabs, near-black in places; few mid-size boulders; one floats (`debris-c`) | acted on: six two-metre cells with nearly straight edges, troughs a hand across and dark, hardly a rim (`lander-phoenix`, `lander-mars-3`). Mars 3's scarp squiggles open. To be reviewed |
 | T8 | The storm has no motion or threat; a straight band survives | acted on: 2,800 wind streaks (1,100 on low quality) that lengthen with the storm, fine and short near the eye so a still does not show bars; more dust sheets. Motion can only be judged on a real device. To re-review |
-| T9 | A row of pale soft discs across the mid-ground (`pod`, `pod-open`) | fixed: the storm's sheets are drawn only in a storm |
-| T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | acted on: the patches of packed soil are twice as strong and wider; soil aprons (the heap, the wreck's scorch, the ice berm) fade out where they meet the ground and have no sheen, so no edge shows. To re-review |
+| T9 | A row of pale soft discs across the mid-ground (`pod`, `pod-open`) | part: what is turned from the sun keeps more of the sky (0.58 gone, not 0.70), cooler, and more on what faces up, so the shade has form and is not the colour of the dirt (`mav`, `day-sun`); the rim is bounded so it cannot sparkle. Visor, clean suit, stance and blob shadow open |
+| T10 | Nothing touches the ground: no churned soil at the Hab, landers or greenhouse | part: the parked rover's markers put a dim red pool on the ground behind it (`hab-night`). The rest open |
 | T11 | The astronaut is pitched forward with bent knees in side views; tilted in one picture | acted on: the idle clip is rewritten from knee angles (knees 5 and 7 degrees, were 13 and 26; elbows 10 and 12, were 22 and 32; hands beside the thighs; trunk 1.6 degrees forward), and the game's own torso correction, which tipped him back, is gone. To re-review |
 | T12 | Blown emitters: the nav beacon in daylight, a workbench lamp, glare blobs at the frame edge | acted on: the same ceiling before the bloom. To re-review |
 
@@ -349,6 +349,50 @@ bare trays, the smudges at `yard`, `pile` and `hab-noon`, orange rocks on lava, 
 | S14 | The title globe's outline kinks where the glow ring begins; Olympus is a flat dark grey disc on it | part: the glow dies away over half the way round to midnight and no longer ends at a corner. Olympus as a flat grey disc open |
 | S15 | Rocks, better but not done: pebbles one colour and one size, evenly sprinkled; rocks crowding his boots; a smooth cracked bun in `canyon-foot`; a regular dot grid on a slab's top (`astronaut-front`) | open |
 | S16 | Smaller: Viking 1 one cream colour; a flat visor and clean legs; the dirt mound's flat facets (`hab-noon`); far dome struts sparkling; no flame light on the dust at lift-off and the flame a straight-sided bar; a small upright shape left of the pad at `04.9`; the rover's dust a dark smudge | part: Viking has grey covers, gold-wrapped tanks, its flag and less dust; the flame's edge moves and is less blown; the man no longer stands beside his own launch. The rest open |
+
+### Round 9 (iPhone size, "medium"; 71 stills and a 17-frame strip of the launch, all seen)
+
+A different reviewer again, given the bar and round 8's findings but not what had been done. The stills were taken
+before the lava ropes, the indoor camera and the drawn indoor shadow went in; the storm, title and launch pictures
+are of the later build.
+
+| Area | Verdict | What decided it |
+|---|---|---|
+| Day | NEARLY | reads as Mars at once (`yard`, `rover-park`, `rtg`, `pod-open`); held back by the red-to-cream break at the first ridge and an empty sky |
+| Dawn and dusk | NEARLY | `dawn` and `dusk` right; `dawn-light`, `hab-dusk` read as a hazy afternoon; no rim light on him |
+| Night | NEARLY | `hab-night`, `greenhouse-night`, `night-plain`, `twilight`, `rover-night` good, nothing blown; nothing lands from the parked rover's lights; the helmet pool small |
+| Dust storm | MET | `storm`, `storm-sun`: visibility collapses, the sun a small disc, streaks and grains, the Hab a ghost; the ribbons are gone |
+| Poles | NOT MET | no artefacts at the pole, but the cap a matte lilac snowfield with blurred blue cracks, and the outcrop a toy (`ice`, `ice-face`) |
+| Orbit | NEARLY | `title`, `title-globe` a real globe with a thin limb; Olympus a flat grey disc on it; the launch's globe featureless in two stills |
+| The launch | NEARLY | a real ship (`22.6`), a horizon and limb in the climb, a catch that reads (`29.0`); sags at 10.4 to 12.5 and ends on two stiff figures from behind |
+| Landmarks | NOT MET | `olympus-flows` brown dough; `canyon-rim` a pit with a smeared wall; only `canyon`, `canyon-climb`, `canyon-floor` read as a canyon |
+| Terrain | NOT MET | the colour break, crack nets as welts, dark dashes floating on far hills, a blurred canyon wall, a dot lattice on a slab |
+| Models | NEARLY | Hab, rover, MAV, pod, Pathfinder, InSight, Beagle, the RTG good; the Schiaparelli wreck, the ice outcrop and the greenhouse's top cap not |
+| Astronaut | NEARLY | a good suit, his back properly shaded with the sun ahead; the shaded side one flat brown, the visor a two-tone sticker, the suit spotless, the stance stiff |
+| Interiors | NEARLY | a real sense of place; legs cut by the frame, panes with no tint, props cleaner than outdoors |
+| Overall | NOT MET | about a third of the frames would pass; a random frame from Olympus, the poles, the canyon rim or the wreck would not |
+
+Round 8's list, re-checked by this reviewer: fixed are the storm ribbons (S9), the astronaut lit alike from every
+side (S4, though the shade is now flat), the title globe's kink (S14), the planet's lighting mismatch, the dot on a
+starfield, the dome's pool edge, the pool ahead of the rover, flame light on the dust; the backward lean (S5) was
+judged the lens (he tilts only at the frame's edge). Still there: the canyon (S3), the ice (S7), the colour break
+(S8), Olympus (S10), the wreck (S11), interiors (S12, before the camera change), crack welts and red regions (S13),
+pebbles and the cracked bun (S15), the visor, the mound's facets, the rover's dust.
+
+| # | Finding (most damaging first) | State |
+|---|---|---|
+| T1 | Olympus is brown dough: smooth lobes with no rock texture, levees, rubble or flow fronts (`olympus-flows`); orange dapples on the caldera's terrace and a red smear with bright blobs on its right slope | open (the ropes went in after these pictures) |
+| T2 | Valles Marineris from the rim is a pit: a far side at the same height close enough to count boulders, a blurred left wall, even wavy stripes topped by a dune (`canyon-rim`); bands painted on smooth hills (`canyon-wall`); melted folds (`canyon-foot`) | open |
+| T3 | The world breaks from red to cream along one line (measured (84,37,25) against (170,120,90) in `dawn-light`); dark dashes float on the cream far hills, rock shadows whose rocks have hazed away; dark boulders unhazed on ruler horizons at four lander sites | open |
+| T4 | The ice outcrop is a toy: a translucent ghost shell with a double outline, pebbles floating on it, a dark hexagon on a boulder, a thin sheet with a speckled edge, marshmallow boulders, a flat white hexagonal plate; his shadow on ice is tan; the caps matte with fat blurred cracks; `south-pole` at night a cobalt tile floor | open (the shell is a bug in the new model) |
+| T5 | The launch: a 20 px rocket in 85% sky (`07.4`); a beige void over a featureless ball (`10.4`, `12.5`); dust like draped cloth and blurred blobs at the frame's edges (`launch`); the flame a straight bar (`05.9`); a hard translucent disc round the nozzle (`18.4`, `20.2`); the vent a uniform cone and the debris crisp white squares; the crewman 20 px at `24.4`; the tether at his ankles; the ship flat-shaded close up; the last two frames two stacked stiff figures from behind with no ship | open |
+| T6 | A beam crosses a quarter of `greenhouse-door` (the camera behind a near object) | open |
+| T7 | Crack nets are raised sinuous welts (Mars 3, Phoenix, `ice-plain`, the caldera's foreground); pen squiggles on Mars 3's scarp | open |
+| T8 | The Schiaparelli wreck: flat-shaded shards, clean tan gumdrop lumps, black airbrushed scorch, murky maroon ground (and at Perseverance) | open |
+| T9 | The astronaut: his shaded side one flat brown the colour of the dirt; no rim at dawn and dusk but white pixels sparkling on his outline; a flat two-tone visor; a spotless suit; a stiff stance; his shadow a blob with a gap under the boots | open |
+| T10 | Night lights: nothing on the ground from the parked rover; the headlamps as two white dots through the cab; a small star flare still in the dome; the helmet pool small at twilight | open |
+| T11 | Interiors: legs cut by the frame; panes with no tint or reflection; a blown faceted funnel; props flat and clean; the contact shadow faint | part (the camera tip and the drawn shadow went in after these pictures) |
+| T12 | Smaller: an empty gradient sky in every day picture; pebbles one colour and size; the cracked bun; a dot lattice on a slab (`astronaut-front`); the mound's facets (`hab-noon`); the rover's dust a dark smudge with a square edge; the greenhouse's top cap a faceted cylinder; a dark-red patch in `debris-a`; the tank in `debris-c` with no furrow; `day-sun` dim for noon | open |
 
 ## Independent interface and onboarding review
 
@@ -570,6 +614,8 @@ button (J7), new-player hesitations (J17).
 | 20 | Elysium Mons and Hecates Tholus have no caldera (theirs are a texel or two across in the elevation data) | open |
 | 14 | Asset tooling: fold the helpers the model scripts each copied into `tools/assets/lib.py` | open |
 | 24 | The interface tests are sensitive to how busy the machine is: a long test lets the suit drain and the log fill, and two layout checks then fail on overlaps that a short test does not reach. The overlaps are real (fix in hand); the tests should also set their own state instead of inheriting elapsed time | open |
+
+35. **Round 9's picture list (T1 to T12)**, above: bugs first (T4's shell, T3's shadows, T6), then the launch (T5), the astronaut's shade (T9), then the landmarks (T1, T2), which need content the height model does not yet make.
 
 ## Decisions worth knowing
 

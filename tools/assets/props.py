@@ -2578,8 +2578,10 @@ def build_ice_outcrop():
         deep = 2.05 + 0.35 * noise3((u * 3.0, 3.0, 0.0), 1.0, 6.0) - 0.5 * abs(u - 0.5)
         col = []
         # (under the lip, its broken edge, then back over the top: distance behind the lip, height, tint)
-        dark_ = (0.30, 0.25, 0.22)
-        prof = [(0.02, hi - 0.01, dark_), (-over, hi + 0.012, dark_),
+        dark_ = (0.50, 0.42, 0.37)
+        # (it starts underground, behind the ice, and comes up behind the face to the lip: the game fades soil out toward
+        # any open edge, and with its edge under the lip the whole mantle was a ghost of itself over the ice)
+        prof = [(0.42, FOOT, dark_), (0.34, max(0.0, hi * 0.45), dark_), (0.06, hi - 0.012, dark_), (-over, hi + 0.012, dark_),
                 (-over * 0.9, hi + 0.55 * (h - hi), mix(DAMP, dark_, 0.55)), (-over * 0.35, h * 0.985, mix(DAMP, dark_, 0.25)), (0.10, h, mix(SPOIL, DAMP, 0.4))]
         for s, tint_ in ((0.16, SPOIL), (0.30, GROUND), (0.46, GROUND), (0.62, GROUND), (0.78, GROUND), (0.90, GROUND)):
             z = h * (1.0 - _smooth01(0.05, 1.0, s)) ** 1.15 * (1.0 + 0.10 * noise3((p0.x + s, s * 3.0, 0.0), 2.3, 1.1))
@@ -2645,19 +2647,19 @@ def build_ice_outcrop():
                 c_ = d.dot(n)
                 if c_ > 0.05:
                     r_ = o / c_
-                    acc += r_ ** -22.0
+                    acc += r_ ** -40.0
                     if r_ < near:
                         near, near2 = r_, near
                     elif r_ < near2:
                         near2 = r_
-            r_ = min(acc ** (-1.0 / 22.0) if acc > 0 else size, size * 1.35)
+            r_ = min(acc ** (-1.0 / 40.0) if acc > 0 else size, size * 1.35)
             edge = _smooth01(1.25, 1.02, near2 / max(near, 1e-4))                        # 1 on an edge between two breaks
             p = d * r_
             pit = max(0.0, noise3(p, 7.5, 3.0 + k)) ** 1.5
             p = p + d * (0.045 * noise3(p, 3.4, 1.0 + k) - 0.075 * pit * (1.0 - edge))
             p = lean @ p
             p.z += size * squat * 0.55 - 0.06                                             # sunk a little into the apron
-            c = mix(BODY, DEEP, 0.25 + 0.9 * pit + 0.2 * noise3(p, 2.3, 0.7))
+            c = mix(BODY, DEEP, 0.22 + 0.35 * pit + 0.2 * noise3(p, 2.3, 0.7))
             c = mix(c, CLOUDY, 0.5 * _smooth01(0.3, 0.75, 0.5 + 0.5 * sin(p.dot(bn) * 13.0 + k)))
             c = mix(c, CLEAN, 0.55 * edge)
             nz = (lean @ d).z
@@ -2672,9 +2674,9 @@ def build_ice_outcrop():
         node = part(f'block_{k}', parent=root, loc=(sx, sy, 0))
         if os.environ.get('TRIS'):
             print(f'    block_{k} {sum(len(f.verts) - 2 for f in bmk.faces):6d}')
-        mesh_obj(f'block_{k}.ice', bmk, 'ice', parent=node, smooth_angle=42.0)
+        mesh_obj(f'block_{k}.ice', bmk, 'ice', parent=node, smooth_angle=26.0)
 
-    # ---- what else lies at the foot: small talus, frost in the hollows, a lag of stones ----
+    # ---- what else lies at the foot: small talus and a lag of stones ----
     K = Kit('bank', root)
 
     def chunk(x, y, z, s, flat=1.0, tone=None):
@@ -2686,27 +2688,10 @@ def build_ice_outcrop():
             PI.add(M @ Vector(q), col)
         K.hull('ice', pts, M, smooth=14.0)
 
-    def frost(x, y, z, r, h, n=9):
-        """Frost and ground ice-dust banked in a hollow: a low pale drift."""
-        bmf = K.bm('frost', smooth=60.0)
-        a0 = rng.uniform(0, TAU)
-        r0 = []
-        for i in range(n):                                          # (a ragged outline: a drift, not a dome)
-            rr = r * (0.55 + 0.9 * rng.random())
-            r0.append(bmf.verts.new((x + rr * cos(a0 + TAU * i / n), y + rr * sin(a0 + TAU * i / n), z - 0.015)))
-        r1 = [bmf.verts.new((x + (v.co.x - x) * 0.6, y + (v.co.y - y) * 0.6, z + h * rng.uniform(0.5, 0.9))) for v in r0]
-        ct = bmf.verts.new((x + rng.uniform(-0.2, 0.2) * r, y + rng.uniform(-0.2, 0.2) * r, z + h))
-        for i in range(n):
-            j = (i + 1) % n
-            bmf.faces.new((r0[i], r0[j], r1[j], r1[i]))
-            bmf.faces.new((r1[i], r1[j], ct))
-
     for i in range(34):                                             # banked against the foot of the face, most where it is highest
         u = rng.uniform(0.08, 0.92)
         x, y = foot_at(u, rng.uniform(-0.02, 0.35) + 0.5 * rng.random() ** 3)
         chunk(x, y, 0.07, rng.uniform(0.05, 0.11) + 0.10 * sin(pi * u) * rng.random() ** 2, flat=0.8)
-        if i % 4 == 0:
-            frost(x + rng.uniform(-0.25, 0.25), y - rng.uniform(0.0, 0.3), 0.045, rng.uniform(0.22, 0.4), rng.uniform(0.04, 0.07))
     for i in range(10):                                             # and a few thrown further out over the apron
         u = rng.uniform(0.15, 0.85)
         x, y = foot_at(u, rng.uniform(0.9, 1.9))
@@ -2715,15 +2700,8 @@ def build_ice_outcrop():
     for i in range(16):                                             # stones the ice let go of as it wasted: a lag at its foot and on the mantle
         u = rng.uniform(0.06, 0.94)
         s_ = rng.uniform(0.03, 0.075)
-        if i % 4 == 3:                                              # on the mantle, behind the lip
-            p0, back = lip(u)
-            d = rng.uniform(0.2, 1.2)
-            q = p0 + back * d
-            z = crest(u) * (1.0 - _smooth01(0.05, 1.0, d / 2.0)) ** 1.15 + s_ * 0.3
-            x, y = q.x, q.y
-        else:
-            x, y = foot_at(u, rng.uniform(0.05, 1.3))
-            z = 0.04 + s_ * 0.3
+        x, y = foot_at(u, rng.uniform(0.05, 1.3))
+        z = 0.04 + s_ * 0.3
         vs = rock(stone, s_, (x, y, z), seed=70 + i, scale=(1.1, 0.9, 0.6), subdiv=1, rough=0.3)
         for v in vs:
             PD.add(v.co, LAG)

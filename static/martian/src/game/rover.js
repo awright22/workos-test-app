@@ -110,6 +110,7 @@ export function roverLights(dt) {
   const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5, driven = S.mode === 'rover';
   rv.headlight.intensity = lerp(rv.headlight.intensity, driven && dim ? 11 : 0, damp(0.15, dt));
   for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (dim && (driven || m.userData.marker) ? 1.6 : 0.12);
+  rv.markers = lerp(rv.markers, dim ? 1 : 0, damp(0.15, dt));
 }
 
 export function updateRover(dt) {

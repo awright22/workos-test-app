@@ -172,6 +172,13 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float hFar = nFar.a - 0.5, hMid = nMid.a - 0.5, hLump = nLump.a - 0.5;
         vec3 grad = (nFar.rgb - 0.5) * (0.40 * fFar) + (nMid.rgb - 0.5) * (0.36 * fMid * (0.35 + 0.65 * steep)) + (nLump.rgb - 0.5) * (0.80 * fLump);
         float tone = hFar * 0.22 + hMid * 0.34 * fMid + hLump * 0.75 * fLump;
+        // From the air. Between a few hundred metres up and orbit the ground is too far for its ripples and stones and
+        // too near for the survey's colours to have any shape in them: it was one flat tan, and the rocket climbed
+        // over a featureless ball. So the broad patches show more strongly with distance, and a broader mottle still
+        // (drifts, darker stony ground, the stains of old craters) comes in under them.
+        float fAir = smoothstep(250.0, 900.0, viewDist) * (1.0 - smoothstep(5000.0, 14000.0, viewDist));
+        vec4 nAir = texture(uGrain, (vPlanetPos * DETAIL_T) / 1100.0 + vec3(0.37, 0.11, 0.73));
+        tone += (hFar * 0.38 + (nAir.a - 0.5) * 0.62 + (nAir.r - 0.5) * (nFar.g - 0.5) * 1.2) * fAir;
         // lava that ponded and froze level: a caldera floor (its edge broken up by the noise: drawn from the mesh's own
         // vertices alone it followed their triangles in a saw-tooth)
         float pond = lava * (1.0 - smoothstep(0.004, 0.05, landSlope + (hMid * 0.03 + hLump * 0.015) * fMid));
@@ -420,6 +427,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain37' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain38' + (o.fine !== false ? 'F' : '');
   return mat;
 }
