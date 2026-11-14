@@ -65,7 +65,7 @@ export const SIGHTS = [
     note: 'No moon to speak of, no cities, a hundredth of the air: I can see the whole galaxy edge-on. It does not twinkle. There is not enough atmosphere to make it.',
     test: (v) => v.sunE < -0.3 && v.clear && _f.dot(v.up) > 0.8 },
   { id: 'devil', name: 'A dust devil, close to', value: 8, cheer: 3,
-    lead: 'They wander the plains on warm afternoons. Get near one.',
+    lead: 'They rise off the plains where the sun has warmed the ground. Get near one.',
     note: 'A dust devil: a column of spinning air half a kilometre high, with nothing in it but dust and static. It went over me like a slap from a pillow.',
     test: () => devils.some((d) => d.u && Math.acos(Math.min(1, d.u.dot(_up))) * R < 45) },
   { id: 'storm', name: 'The inside of a dust storm', value: 8, cheer: 0,

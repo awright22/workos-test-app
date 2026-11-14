@@ -225,7 +225,7 @@ export function winGame() {
     subtitle: 'You are off the surface.',
     // (each statistic has one name, here, in the journal and on the death screen)
     stats: [
-      ['Sols survived', S.sol], ['Food grown', grown], ['Dinners cooked', meals],
+      ['Sols survived', S.sol], ['Meals grown', grown], ['Dinners cooked', meals],
       // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
       //  and "3.4 / Km walked" here were the same number written two ways)
       ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', discoveriesFound()],

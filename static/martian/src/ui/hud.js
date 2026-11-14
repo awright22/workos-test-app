@@ -418,7 +418,8 @@ export function updateObjectivesHud() {
   // (or at once when what leads has changed: the marker and the compass follow the first task every frame, and for a
   //  third of a second the card beside them named the task before: at nightfall the marker stood on the Hab's door
   //  under a card that still said HEAP)
-  const lead = leadTask(), lk = lead ? lead.o.id : '';
+  // (and its own words are part of what leads: "0 of 2" stood under a place that had already moved on to the second machine)
+  const lead = leadTask(), lk = lead ? `${lead.o.id}|${lead.o.text()}` : '';
   if (lk !== objLead || now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objLead = lk; objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   for (const n of objNodes.values()) {
     let dist = '', place = n.place || '';
@@ -842,7 +843,7 @@ export function updateHud() {
   const suitRate = track('suit', S.suit, dt);
   // (a share of the tank it has: a larger tank read "150" over the same words, with no unit, where a new suit read
   //  100. What a larger tank gives is time, and the time is the line under the dial.)
-  setText('suit', UI.suitNum, `${Math.round(clamp(sf, 0, 1) * 100)}<small>%</small>`);
+  setText('suit', UI.suitNum, `${Math.round(clamp(sf, 0, 1) * 100)}<small class="pc">%</small>`);
   const off = (100 - clamp(sf, 0, 1) * 100).toFixed(1);
   if (hud.text.suitArc !== off) { hud.text.suitArc = off; UI.suitArc.style.strokeDashoffset = off; }
   const filling = suitRate > 0.5;
@@ -864,11 +865,11 @@ export function updateHud() {
   //  two, whatever the wait. Morale is a score out of 100 and carries no unit, here or anywhere.)
   const food = foodTotal(), wait = Math.max(3, S.rescueSol - S.sol);
   const rows = [
-    ['o2', S.o2 / 100, `${Math.round(S.o2)}<small>%</small>`, S.o2],
+    ['o2', S.o2 / 100, `${Math.round(S.o2)}<small class="pc">%</small>`, S.o2],
     ['water', S.water / BAL.waterMax, `${Math.round(S.water)}<small>L</small>`, S.water],
     ['food', food / wait, `${food}<small>${food === 1 ? 'meal' : 'meals'}</small>`, null, food / 18],
-    ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small>%</small>`, S.power],
-    ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small>%</small>`, S.health],
+    ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small class="pc">%</small>`, S.power],
+    ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small class="pc">%</small>`, S.health],
     ['morale', S.morale / 100, `${Math.round(S.morale)}`, null],
   ];
   let arrow = null;
@@ -881,7 +882,9 @@ export function updateHud() {
     if (raw !== null) {
       const r = track(k, raw, dt), j = hud.jump[k];
       if (j && (j.t -= dt) <= 0) hud.jump[k] = null;
-      const tr = hud.jump[k] ? (j.dir > 0 ? 'up' : 'dn') : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
+      // (and no arrow up on a full bar, or down on an empty one: "100% rising" is not a reading)
+      let tr = hud.jump[k] ? (j.dir > 0 ? 'up' : 'dn') : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
+      if ((tr === 'up' && frac >= 0.995) || (tr === 'dn' && frac <= 0.001)) tr = '';
       if (hud.cls[k + 't'] !== tr) { hud.cls[k + 't'] = tr; b.trend.className = 'tr' + (tr ? ' ' + tr : ''); }
       if (tr && !arrow && !b.wrap.hidden) arrow = b.wrap;
     }
@@ -921,8 +924,8 @@ export function updateHud() {
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
     a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`; a.wrap.style.setProperty('--f', clamp(pf, 0, 1).toFixed(3));
     b.fill.style.transform = `scaleX(${clamp(of, 0, 1).toFixed(3)})`; b.wrap.style.setProperty('--f', clamp(of, 0, 1).toFixed(3));
-    setText('rpwr', a.val, `${Math.round(pf * 100)}<small>%</small>`);
-    setText('ro2', b.val, `${Math.round(of * 100)}<small>%</small>`);
+    setText('rpwr', a.val, `${Math.round(pf * 100)}<small class="pc">%</small>`);
+    setText('ro2', b.val, `${Math.round(of * 100)}<small class="pc">%</small>`);
     setLevel('rpwr', a.wrap, pf, 0.2, 0.08);
     setLevel('ro2', b.wrap, of, 0.2, 0.08);
   }
@@ -968,7 +971,9 @@ export function updateHud() {
   const candles = S.inv.candle || 0;
   // the first minute teaches moving (on a phone the two hints go once he has walked: they sat on the prompt at the airlock); after that, the screens
   const keys = S.flags.coldOpen
-    ? (layout.touch ? (S.stats.walked > 8 || playTime() > 30 ? '' : ':Left thumb moves|:Drag to look') : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
+    // (and once he is walking, on a phone, the one thing nothing else says: with a minute and a half of air and
+    //  seventy metres to go, hold RUN. It goes when he has run.)
+    ? (layout.touch ? (S.stats.walked > 8 || playTime() > 30 ? (hud.ran || (hud.ran = player.speed > 6.5) ? '' : ':Hold RUN, the air is running out') : ':Left thumb moves|:Drag to look') : 'W A S D:Move|Shift:Run|Mouse:Look|E:Interact (hold)')
     : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? SCREEN_UNLOCKS.filter((s) => s.key && S.flags[s.flag]).sort((a, b) => 'JMC'.indexOf(a.key) - 'JMC'.indexOf(b.key)).map((s) => `${s.key}:${s.name}|`).join('') : '') + 'Esc:Menu';
   const keyState = keys + '#' + candles;
   if (keyState !== hud.keys) {

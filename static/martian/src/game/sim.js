@@ -335,7 +335,7 @@ export function newSol() {
     for (const c of S.storm.cells) {
       stormCellVec(c, _sv);
       if (angDist(_sv.x, _sv.y, _sv.z, _v3.copy(World.hab.position).normalize().x, _v3.y, _v3.z) * R < c.r + 2500) {
-        setTimeout(() => log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa'), 5000);
+        setTimeout(() => log('Forecast: a dust cell is drifting near the Hab. Panels will hate it.', 'nasa'), 5000);
         break;
       }
     }

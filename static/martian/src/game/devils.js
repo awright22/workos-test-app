@@ -122,7 +122,7 @@ export function updateDevils(dt) {
       }
     } else if (!S.flags.devilSeen && fade > 0.9 && groundDist(base, player.pos) < 320 && S.mode !== 'cutscene' && !S.inside) {
       S.flags.devilSeen = true;
-      log('Dust devil on the plain. They wander about on warm afternoons. Harmless, and Spirit\'s solar panels owed their life to them.', 'sys');
+      log('Dust devil on the plain. They rise where the sun has warmed the ground. Harmless, and Spirit\'s solar panels owed their life to them.', 'sys');
     }
   }
 }

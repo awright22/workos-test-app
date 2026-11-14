@@ -49,6 +49,8 @@
   transition: transform .35s linear, background .3s; }
 .row .val { font: 600 .8125rem/1 var(--f-cond); letter-spacing: .03em; text-align: right; white-space: nowrap; }
 .row .val small { font-size: .82em; font-weight: 500; color: var(--ink-2); margin-left: .12em; letter-spacing: .06em; }
+/* (a percent sign stands against its number, as it does in the ring, the prompts and the dawn sheet: "100 %" beside "100%" read as two things) */
+#mg-root .val small.pc { margin-left: 0; }
 .row .tr { width: 0; height: 0; border-left: .21875rem solid transparent; border-right: .21875rem solid transparent; opacity: .85; }
 .row .tr.up { border-bottom: .3125rem solid var(--ok); }
 .row .tr.dn { border-top: .3125rem solid var(--ink-3); }

@@ -464,7 +464,7 @@ function statsHtml() {
   return `<div class="pane-hd">This run <span>${esc(DIFFICULTIES[S.diff].name)} · rescue on Sol ${S.rescueSol}</span></div><div class="stat-grid">` +
     tile(S.sol, '', 'Sols survived') + tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue') +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
-    tile(st.potatoes + (st.produce || 0), '', 'Food grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
+    tile(st.potatoes + (st.produce || 0), '', 'Meals grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
     tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
     tile(World.builtMeshes.length, '', World.builtMeshes.length === 1 ? 'Structure deployed' : 'Structures deployed') + tile(st.booms, '', 'Hydrazine burns') + tile(st.closeCalls, '', 'Close calls') +
     tile(Math.round(st.stormOut), 's', 'Out in storms') + (st.discoTime >= 1 ? tile(Math.round(st.discoTime), 's', 'Disco endured') : '') +
