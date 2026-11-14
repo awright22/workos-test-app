@@ -315,7 +315,7 @@ function installDebug() {
     },
     /** Skip the cold open (suit sealed, systems checked, numbers run). */
     skipIntro() {
-      Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true, uiColony: true, uiJournal: true, uiMap: true });
+      Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true, uiColony: true, uiJournal: true, uiMap: true, uiBars: true });      // (uiBars: every bar met, see ui/hud.js)
       S.checkedSystems = { oxy: true, rec: true };
       S.suit = 100;
     },

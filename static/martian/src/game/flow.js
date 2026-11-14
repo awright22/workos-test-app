@@ -28,14 +28,17 @@ export function die(cause) {
   const iron = S.diff === 'iron';
   if (iron) wipeSave();
   const buttons = [];
-  if (!iron && Save.checkpoint) buttons.push({ label: `Wake at dawn (Sol ${Save.checkpoint.sol})`, fn: () => restoreCheckpoint() });
+  const back = !iron && Save.checkpoint ? Save.checkpoint.sol : 0;
+  if (back) buttons.push({ label: `Wake at dawn (Sol ${back})`, fn: () => restoreCheckpoint() });
   buttons.push({ label: 'Restart from Sol 1', ghost: !iron, keep: true, fn: () => { wipeSave(); tryReload(); } });
   showOverlay({
     kind: 'death',
     kicker: `Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}` + (iron ? ' · save deleted' : ''),
     title: 'You died on Mars',
     stats: [['Sols survived', S.sol], ['Driven', `${(S.stats.driven / 1000).toFixed(1)}<small>km</small>`], ['Food grown', S.stats.potatoes + (S.stats.produce || 0)]],
-    body: cause + (iron ? '\n\nYou knew the deal.' : '\n\nNobody plants the flag on the first try.'),
+    // (what waking at dawn costs is said: it was a button with a sol in it and nothing about what is lost)
+    body: cause + (iron ? '\n\nYou knew the deal.' : '\n\nNobody plants the flag on the first try.') +
+      (back ? `\n\n<b>Wake at dawn</b> takes you back to the last dawn you saw, on Sol ${back}: what you have done since is undone.` : ''),
     buttons,
   });
 }
@@ -45,7 +48,7 @@ export function showPause() {
   saveGame();
   showPauseMenu({
     sol: S.sol, time: fmtClock(), diffName: DIFFICULTIES[S.diff].name, rescueSol: S.rescueSol,
-    region: regionName(_v1.copy(player.pos).normalize()),
+    region: regionName(_v1.copy(player.pos).normalize()), uplink: !!S.pf.connected,
     onResume: () => tryLock(),
     onPhoto: canPhoto() ? () => { enterPhoto(); } : null,
     onRestart: () => { wipeSave(); tryReload(); },

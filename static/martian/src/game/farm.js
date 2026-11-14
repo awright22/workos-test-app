@@ -120,6 +120,26 @@ export function breakfast() {
   return text;
 }
 function mealName(id) { return id === 'ration' ? 'a ration' : id === 'potato' ? 'potato' : CROPS[id].name.toLowerCase(); }
+/**
+ * How many dawns the larder gives a breakfast for, eaten as breakfast() eats it: a staple, and a side with it while
+ * there are sides. This is what "food for N sols" means. (It used to be the count of meals, one a sol: after a
+ * breakfast of two things, "−2 food, 20 left" was followed by "food for 20 sols".)
+ */
+export function breakfastsLeft() {
+  farm();
+  let potatoes = S.potatoes, rations = S.food, n = 0;
+  const p = { ...S.pantry };
+  for (; n < 9999; n++) {
+    let staple = null;
+    if (potatoes > 0) { potatoes--; staple = 'potato'; }
+    else if (p.soy > 0) { p.soy--; staple = 'soy'; }
+    else if (rations > 0) { rations--; staple = 'ration'; }
+    let side = null;
+    for (const id of ['tomato', 'lettuce', 'radish', 'soy']) { if (id === staple || !(p[id] > 0)) continue; p[id]--; side = id; break; }
+    if (!staple && !side) break;
+  }
+  return n;
+}
 
 /** What a dinner would be made of now: a staple and two different vegetables, or the reason there is none. */
 export function dinnerPlan() {

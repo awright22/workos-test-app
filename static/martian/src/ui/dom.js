@@ -48,7 +48,7 @@ const ring = (r, vb) => `<svg class="ring" viewBox="0 0 ${vb} ${vb}" aria-hidden
 
 UI.vitals = el('div', 'mg-vitals', null, UI.hud);
 // (on a touch screen the panel is a control: pressed, it opens the guide to what it shows)
-if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'What the bars mean'); }
+if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'Guide: what the bars mean'); }
 UI.suit = el('div', null, 'suit', UI.vitals,
   `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
   // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
@@ -68,6 +68,7 @@ UI.suitState = UI.suit.querySelector('.st');
 // other touch buttons and carries a chip that says so. (The chip was a bare "?" in an 18 px ring, which read as a
 // button too small to press, and nothing else said the panel could be pressed once its pointer card had gone.)
 el('span', null, 'help', UI.suit, '<i>?</i>Guide').setAttribute('aria-hidden', 'true');
+UI.help = UI.suit.querySelector('.help');
 /** The resource rows beside the suit dial: [state key, icon, label]. */
 export const BARS = [
   ['o2', 'hab', 'HAB <span class="chem">O<sub>2</sub></span>'],
@@ -82,6 +83,7 @@ UI.bars = {};
 for (const [key, ic, label] of BARS) {
   const w = el('div', null, 'row', UI.res,
     `${icon(ic)}<span class="lb">${label}</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span><span class="tr"></span>`);
+  w.dataset.k = key;
   UI.bars[key] = { wrap: w, fill: w.querySelector('.fl'), val: w.querySelector('.val'), trend: w.querySelector('.tr') };
 }
 
@@ -99,12 +101,13 @@ UI.alerts.setAttribute('role', 'status');
 UI.tr = el('div', 'mg-tr', null, UI.hud);
 UI.clock = el('div', 'mg-clock', null, UI.tr,
   '<div class="sol"><span class="k">SOL</span><b class="n t-num">1</b><span class="of t-num"></span></div>' +
-  `<div class="meta"><span class="dn">${icon('sun')}</span><span class="time t-mono">--:--</span><i></i><span class="temp t-mono"></span></div>`);
+  `<div class="meta"><span class="dn">${icon('sun')}</span><span class="time t-mono">--:--</span><i class="sep"></i><span class="temp t-mono"></span></div>`);
 UI.clockSol = UI.clock.querySelector('.n');
 UI.clockOf = UI.clock.querySelector('.of');
 UI.clockDn = UI.clock.querySelector('.dn');
 UI.clockTime = UI.clock.querySelector('.time');
 UI.clockTemp = UI.clock.querySelector('.temp');
+UI.clockSep = UI.clock.querySelector('.sep');
 UI.objectives = el('div', 'mg-objectives', null, UI.tr);
 
 UI.log = el('div', 'mg-log', null, UI.hud);
@@ -159,11 +162,14 @@ UI.tSprint = tbtn('mg-tSprint', 'sec', 'Run', `${icon('run')}<span>RUN</span>`);
 // (an eye, not a camera: the camera is photo mode's, in the menu)
 UI.tCam = tbtn('mg-tCam', 'mini', 'Switch view', `${icon('eye')}<span>VIEW</span>`);
 // (it said only "O2": what it does is under it now)
-UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle: 40 more suit oxygen', '<i>+<span class="chem">O<sub>2</sub></span></i><span>CANDLE</span><b>0</b>');
+UI.tCandle = tbtn('mg-tCandle', 'mini', 'Crack an oxygen candle: more air for the suit', '<i>+<span class="chem">O<sub>2</sub></span></i><span>CANDLE</span><b>0</b>');
 UI.tCandle.style.display = 'none';
 UI.tRow = el('div', 'mg-trow', null, UI.touch);
 UI.tPause = tbtn('mg-tPause', 'top', 'Pause and menu', `${icon('pause')}<span>MENU</span>`, UI.tRow);
-for (const [k, label] of [['map', 'Map'], ['colony', 'Colony and fabrication'], ['journal', 'Journal']]) {
+// (They stand in the order they arrive, from the menu leftward: Journal after the numbers, Map on first stepping out,
+// Colony with the first thing he carries. Each new one takes the place to the left of the last, so none that is
+// already there ever moves: in the old order the Map arrived between two others and pushed them along.)
+for (const [k, label] of [['journal', 'Journal'], ['map', 'Map'], ['colony', 'Colony and fabrication']]) {
   // (each has its word under it: an icon alone has to be guessed at)
   tbtn(null, 'top', label, `${icon(k)}<span>${k.toUpperCase()}</span>`, UI.tRow).dataset.t = k;
 }
@@ -171,7 +177,8 @@ for (const [k, label] of [['map', 'Map'], ['colony', 'Colony and fabrication'], 
 // ------------------------------------------------------------------------------------------
 // Full screens: map, colony, journal (filled by ui/screens.js)
 // ------------------------------------------------------------------------------------------
-export const SCREENS = [['map', 'Map', 'Orbital Survey'], ['colony', 'Colony', 'Colony'], ['journal', 'Journal', 'Mission Journal']];
+// (in the order of their buttons on the HUD, left to right)
+export const SCREENS = [['colony', 'Colony', 'Colony'], ['map', 'Map', 'Orbital Survey'], ['journal', 'Journal', 'Mission Journal']];
 function screenShell(key, title) {
   const s = el('section', 'mg-' + key, 'mg-screen', root,
     `<header class="scr-hd"><div class="scr-title">${icon(key)}<h1>${title}</h1></div>` +
@@ -258,6 +265,8 @@ function paragraphs(text) {
 /**
  * A plain dialog: title, text and buttons.
  * opts: { title, subtitle, kicker, body (HTML; line breaks kept), stats: [[label, value]...], extra (HTML, placed under the stats),
+ *         later (a line set apart at the foot under the word LATER: where this is all going),
+ *         wide (a card with more to say is set wider, so that it stands whole on a phone held sideways),
  *         quote, kind: 'dialog' | 'death' | 'win' | 'error', buttons: [{ label, fn, ghost, keep, danger }] }
  * A button closes the dialog unless it has keep: true.
  */
@@ -270,13 +279,14 @@ export function showOverlay(opts) {
   // (the text is one part, which scrolls if it has to, and the buttons another, which is always on the screen: as one
   // scrolling box, the rescue screen on a small phone cut its last line and its only button)
   const panel = openOverlay(kind,
-    '<div class="dlg"><div class="dlg-bd mg-scroll">' +
+    `<div class="dlg${opts.wide ? ' wide' : ''}"><div class="dlg-bd mg-scroll">` +
     (opts.kicker ? `<div class="t-kicker">${opts.kicker}</div>` : '') +
     (opts.title ? `<h1 id="mg-dlg-title">${opts.title}</h1>` : '') +
     (opts.subtitle ? `<h2>${opts.subtitle}</h2>` : '') +
     (stats ? `<div class="stats">${stats}</div>` : '') +
     (opts.extra || '') +
     (opts.body ? `<div class="bd">${paragraphs(opts.body)}</div>` : '') +
+    (opts.later ? `<div class="dlg-later"><b>Later</b><span>${chem(esc(opts.later))}</span></div>` : '') +
     (opts.quote ? `<blockquote>${opts.quote}</blockquote>` : '') +
     '</div>' + (btns ? `<div class="btns">${btns}</div>` : '') +
     '</div>',
@@ -342,6 +352,7 @@ function closeToast(cur, atOnce) {
   if (toastNow !== cur) return;
   clearTimeout(cur.timer);
   toastNow = null;
+  if (cur.lit) cur.lit.classList.remove('fresh');           // (as the card begins to go, not when it has gone)
   const done = () => { cur.node.remove(); root.classList.remove('has-toast'); nextToast(); };
   if (atOnce) done();
   else { cur.node.classList.add('out'); setTimeout(done, 380); }
@@ -380,21 +391,42 @@ function nextToast() {
     if (reaches() || /…\s*$/.test(t3.textContent)) t3.remove();
   }
   const life = Math.max(t.life || 0, toastQueue.length ? 3400 : 6000);
-  const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now() };
-  cur.timer = setTimeout(() => closeToast(cur, false), life);
+  // (the thing a card is about, a new button or a bar, is lit for exactly as long as its card is up: lit on a timer of
+  //  its own, the Colony button shone while the card beside it was about the oxygenator, and had gone dark by the
+  //  time its own card came)
+  if (t.lit) t.lit.classList.add('fresh');
+  const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now(), lit: t.lit || null };
+  cur.life = life;
+  cur.timer = cardsHeld ? 0 : setTimeout(() => closeToast(cur, false), life);
 }
+let cardsHeld = false;
+/**
+ * For pictures and tests: while held, a card that is up stays up, and when it is let go it has its life again. (A card
+ * lives by the wall's clock. A machine that draws a frame a second can take longer over one picture than a card lives:
+ * the picture of a bar arriving was of the bar alone, its card come and gone.) Nothing in the game calls this.
+ */
+export function holdCards(on) {
+  cardsHeld = !!on;
+  const cur = toastNow;
+  if (!cur) return;
+  clearTimeout(cur.timer);
+  cur.timer = cardsHeld ? 0 : setTimeout(() => closeToast(cur, false), cur.life || 6000);
+}
+/** True when no card is up and none is waiting: a hint that can wait its turn asks this first. */
+export function toastsIdle() { return !toastBusy && !toastQueue.length; }
 /** Put the pointer at the bars away: he has opened what it points to. */
 export function dropPointer() { if (toastNow && toastNow.point) closeToast(toastNow, true); }
 /**
  * Queue a notice. `o.yields` marks a reminder (night has fallen, a new sol): it is shown like any other, but gives
  * up the screen at once if news arrives while it is up. `o.life` is the least time it stays, in milliseconds;
  * `o.soft` is how long it stays when something else is waiting behind it (a long-lived pointer must not hold up
- * the news). `o.point` draws it as a pointer at the panel it stands under on a phone (the bars).
+ * the news). `o.point` draws it as a pointer at the panel it stands under on a phone (the bars). `o.lit` is an
+ * element (a button, a bar) that is lit while the card is up and not a moment longer.
  */
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
   if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
-  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0 });
+  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0, lit: (o && o.lit) || null });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
   else if (toastNow && toastNow.soft) {
@@ -408,7 +440,13 @@ export function toast(kicker, title, note, o) {
 // ------------------------------------------------------------------------------------------
 // The log feed: three voices (the astronaut, the Hab's systems, NASA) and survey notes
 // ------------------------------------------------------------------------------------------
-export const VOICES = { nasa: 'NASA', sys: 'HAB', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
+// (What the Hab's systems report as an alarm, a breach or a reserve running out, is the HAB, in red. Everything else
+// that is not his own entry, the suit's, NASA's or a survey's is a NOTE, in the plain colour: a sample bagged, a
+// machine's condition, a passing dust devil. All of it used to be "HAB" in red, an alarm over a line about the
+// weather, and nothing said who HAB was.)
+export const VOICES = { nasa: 'NASA', sys: 'NOTE', alarm: 'HAB', note: 'NOTE', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
+/** A line of his own log as it is shown: the label beside it already says LOG ("LOG  Log, Sol 1." said it twice). */
+export const logText = (l) => (l.voice === 'log' ? l.text.replace(/^Log, /, '') : l.text);
 /** What has been said, newest last: { text, voice, sol }. The journal shows it, and the last of it is kept with the saved game. */
 export const logHistory = [];
 /** The last lines of the log, for the saved game (it was this session's only: a run continued the next day had an empty log). */
@@ -455,7 +493,8 @@ export function log(full, cls, o) {
   line.querySelector('.sr').textContent = full;
   // A phone's log has the room between the bars and the stick: a few short lines. A longer entry shows as many whole
   // sentences as fit there (the journal's log has all of it), so that it can never reach down onto the stick.
-  const text = layout.compact ? fitSentences(tx, full) : full;
+  const shownText = logText({ voice, text: full });
+  const text = layout.compact ? fitSentences(tx, shownText) : shownText;
   tx.textContent = '';
   const done = () => {
     setTimeout(() => { line.classList.add('fade'); setTimeout(() => line.remove(), 1300); }, 9500);
@@ -483,11 +522,16 @@ export function log(full, cls, o) {
  * runs the clock, every frame of play (ui/hud.js).
  */
 const pending = [];
+let playT = 0;
+/** Seconds of play so far this session: the clock that things on the HUD time themselves by. */
+export function playTime() { return playT; }
 /** Do `fn` after `seconds` of play. */
 export function after(seconds, fn) { pending.push({ t: seconds, fn }); }
 /** `dt` seconds of play have passed: do what has come due, the earliest first. */
 export function runAfter(dt) {
-  if (!pending.length || !(dt > 0)) return;
+  if (!(dt > 0)) return;
+  playT += dt;
+  if (!pending.length) return;
   for (const p of pending) p.t -= dt;
   pending.sort((a, b) => a.t - b.t);
   while (pending.length && pending[0].t <= 0) pending.shift().fn();
@@ -498,8 +542,10 @@ export function clearLog() { UI.log.textContent = ''; }
 // ------------------------------------------------------------------------------------------
 // The interaction prompt (and the touch action button, which shows the same verb)
 // ------------------------------------------------------------------------------------------
-const pr = { on: false, label: null, sub: null, state: null, pct: -1, minor: false, verb: null };
-const STATUS_MARK = '\u200b';                       // (a zero-width space, written as its escape so that it can be seen)
+const pr = { on: false, label: null, sub: null, state: null, pct: -1, minor: false, verb: null, key: null, since: 0, rest: false };
+const STATUS_MARK = '​';                       // (a zero-width space, written as its escape so that it can be seen)
+/** How long a prompt that asks for nothing stays up, in seconds of play (a reading, or an offer that is always there). */
+const PROMPT_REST = 6;
 /**
  * Marks a reason an interaction gives for not being available as a plain reading ("Potatoes — 41% grown",
  * "Panel is clean") rather than something in the way ("Needs regolith"). A reading is shown without the padlock.
@@ -522,44 +568,75 @@ export function refusalWord(reason) {
   return (m && m[1].trim().split(/\s+/).length <= 4 ? m[1].trim() : 'Not yet').toUpperCase();
 }
 /**
+ * A refusal's sentence as the prompt sets it: what is wanting on the first line, what to do about it on the line
+ * under. (As one run-on line it wrapped to two or three lines of the same weight on a small phone.)
+ */
+export function refusalParts(reason) {
+  const m = /^([^:—]{3,44}?)\s*[:—]\s*(\S.*)$/.exec(reason);
+  return m ? [m[1].trim(), m[2].charAt(0).toUpperCase() + m[2].slice(1)] : [reason, ''];
+}
+/**
+ * The pill is as wide as its longest line and no wider. (Its lines are balanced, so two lines of a length stand in a
+ * box sized for one long one: the text sat in the left half of a pill a hundred pixels too wide.)
+ */
+function fitPrompt() {
+  const pt = UI.promptLabel.parentNode.parentNode;
+  pt.style.width = '';
+  let left = 1e9, right = 0, lines = 0;
+  const range = document.createRange();
+  for (const n of [UI.promptLabel.parentNode, UI.promptSub]) {
+    if (n.style.display === 'none') continue;
+    range.selectNodeContents(n);
+    for (const r of range.getClientRects()) { if (r.width < 1) continue; left = Math.min(left, r.left); right = Math.max(right, r.right); lines++; }
+  }
+  if (lines > 1 && right > left) pt.style.width = Math.ceil(right - left + 1.5) + 'px';
+}
+/**
  * Show, update or hide (null) the interaction prompt.
  * p: { label, sub, disabled: false | reason string, hold: seconds to hold, progress: 0..1,
  *      minor: true for something always available here rather than something in reach }
  *
- * The rule of the prompt: a thing that cannot be done here says why, in the prompt line. `disabled` is therefore a
- * sentence: what is wanting, and after a colon what to do about it ("Needs regolith: dig it at the heap outside the
- * airlock"), or a reading made with statusText(). A refusal that gives no reason is not shown at all: a padlock
- * with nothing beside it was the first thing a new player met at an empty farm bed.
+ * The rules of the prompt:
+ *  - A thing that cannot be done here says why. `disabled` is therefore a sentence: what is wanting, and after a colon
+ *    what to do about it ("Needs regolith: dig it at the heap outside the airlock"), or a reading made with
+ *    statusText(). A refusal that gives no reason is not shown at all: a padlock with nothing beside it was the first
+ *    thing a new player met at an empty farm bed.
+ *  - The prompt means "something is here". What asks nothing of him does not stand in its place: a reading ("This
+ *    panel is clean") and, on a touch screen, an offer that is always there (`minor`, whose button carries it) go
+ *    after a few seconds, and come back when he comes back. (A dig prompt stood on the screen every second out of
+ *    doors, and a line about the bunk for as long as he stood near it.)
  */
 export function setPrompt(p) {
   if (p && p.disabled && (typeof p.disabled !== 'string' || !p.disabled.replace(STATUS_MARK, '').trim())) p = null;
   if (!p) {
     if (pr.on) {
-      pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null;
-      UI.prompt.classList.remove('on');
+      pr.on = false; pr.label = null; pr.state = null; pr.pct = -1; pr.verb = null; pr.key = null; pr.rest = false;
+      UI.prompt.classList.remove('on', 'rest');
       UI.tE.classList.remove('ready', 'no', 'holding', 'verb');
       UI.tEVerb.textContent = '';
       UI.tEArc.style.strokeDashoffset = 100;
     }
     return;
   }
-  // not available: either something is in the way (a padlock), or there is simply nothing to do here now (a reading)
+  // not available: either something is in the way (a barred ring), or there is simply nothing to do here now (a reading)
   const reading = typeof p.disabled === 'string' && p.disabled.charAt(0) === STATUS_MARK;
-  const label = p.disabled && typeof p.disabled === 'string' ? (reading ? p.disabled.slice(1) : p.disabled) : p.label;
+  const refusal = p.disabled && typeof p.disabled === 'string' && !reading ? refusalParts(p.disabled) : null;
+  const label = refusal ? refusal[0] : reading ? p.disabled.slice(1) : p.label;
   // (every interaction is held, the quick ones for half a second: the tag is on all of them, where it was on some)
   const state = p.disabled ? (reading ? 'info' : 'no') : 'hold';
   if (!pr.on) { pr.on = true; UI.prompt.classList.add('on'); }
+  let changed = false;
   if (label !== pr.label) {
-    pr.label = label;
+    pr.label = label; changed = true;
     UI.promptLabel.innerHTML = chem(esc(label));
   }
-  const verb = p.disabled ? (reading ? '' : refusalWord(label)) : verbOf(p.label);
+  const verb = p.disabled ? (reading ? '' : refusalWord(p.disabled)) : verbOf(p.label);
   if (verb !== pr.verb) { pr.verb = verb; UI.tEVerb.textContent = verb; }
   if (!!p.minor !== pr.minor) { pr.minor = !!p.minor; pr.state = null; UI.prompt.classList.toggle('minor', pr.minor); }
-  const sub = p.sub || '';
-  if (sub !== pr.sub) { pr.sub = sub; UI.promptSub.innerHTML = chem(esc(sub)); UI.promptSub.style.display = sub ? '' : 'none'; }
+  const sub = refusal ? refusal[1] : reading ? '' : p.sub || '';
+  if (sub !== pr.sub) { pr.sub = sub; changed = true; UI.promptSub.innerHTML = chem(esc(sub)); UI.promptSub.style.display = sub ? '' : 'none'; }
   if (state !== pr.state) {
-    pr.state = state;
+    pr.state = state; changed = true;
     UI.prompt.classList.toggle('no', state === 'no');
     UI.prompt.classList.toggle('info', state === 'info');
     UI.prompt.classList.toggle('hold', state === 'hold');
@@ -567,6 +644,7 @@ export function setPrompt(p) {
     UI.tE.classList.toggle('verb', state === 'hold');                       // a word on it only when there is something to do
     UI.tE.classList.toggle('ready', state === 'hold' && !pr.minor);          // lit only for something actually in reach
   }
+  if (changed) fitPrompt();
   const pct = p.disabled ? 0 : Math.round(Math.min(1, Math.max(0, p.progress || 0)) * 100);
   if (pct !== pr.pct) {
     pr.pct = pct;
@@ -575,6 +653,11 @@ export function setPrompt(p) {
     UI.prompt.classList.toggle('holding', pct > 0);
     UI.tE.classList.toggle('holding', pct > 0);
   }
+  // how long it has been saying this (a figure that ticks over in it, "41% grown", is the same thing said)
+  const key = state + '|' + label.replace(/\d+/g, '#');
+  if (key !== pr.key) { pr.key = key; pr.since = playT; }
+  const rest = (state === 'info' || (pr.minor && layout.touch && state === 'hold')) && pct === 0 && playT - pr.since > PROMPT_REST;
+  if (rest !== pr.rest) { pr.rest = rest; UI.prompt.classList.toggle('rest', rest); }
 }
 
 export function flashScreen(color, ms) {

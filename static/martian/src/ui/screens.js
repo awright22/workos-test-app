@@ -3,7 +3,7 @@ import { syncAllVisuals } from '../game/visuals.js';
 import { catalogue, scienceSummary } from '../game/science.js';
 import { MACHINES, serviceCost } from '../game/machines.js';
 import { CROPS, MORALE_WORD, PRODUCE, farm, foodTotal, moraleBand } from '../game/farm.js';
-import { UI, VOICES, log, logHistory, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
+import { UI, VOICES, log, logHistory, logText, anyScreenOpen, moveFocus, esc, chem } from './dom.js';
 import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
@@ -11,7 +11,7 @@ import { DIFFICULTIES, S } from '../game/state.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
 import { startDeploy } from '../game/interactables.js';
-import { ACHIEVEMENTS, QUEST_DEFS, checkAchievements, questTargetPos } from '../game/story.js';
+import { ACHIEVEMENTS, QUEST_DEFS, achievementDone, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
 import { sightList } from '../game/sights.js';
 import { layout } from './layout.js';
@@ -87,6 +87,8 @@ function wire() {
 const LOOT_NAMES = { rations: 'Rations', hydrazine: 'Hydrazine', water: 'L water', seedRadish: 'radish seed packet', seedLettuce: 'lettuce seed packet', seedSoy: 'soybean seed packet', seedTomato: 'tomato seed packet' };
 const itemName = (k, n) => (ITEM_NAMES[k] || LOOT_NAMES[k] || k) + (/^seed/.test(k) && n > 1 ? 's' : '');
 const KIT_ICON = { kitSolar: 'solar', kitGreenhouse: 'dome', kitBeacon: 'beacon', kitCache: 'cache' };
+/** Morale a thing gives each dawn, as it is written: whole numbers and halves ("+½", "+1½": "+0.5" sat beside a gauge in whole numbers). */
+const halves = (n) => { const w = Math.floor(n + 1e-6), h = n - w > 0.25; return `${w || !h ? w : ''}${h ? '½' : ''}`; };
 let colonyTab = 'craft';
 
 /**
@@ -167,7 +169,7 @@ export function renderColony() {
     inv += row('seed', 'Seed packets', n, '', n ? packs.map((id) => `${CROPS[id].name} ${S.seeds[id]}`).join(' · ') : 'NASA sends seeds with pods and science grants'); }
   inv += row('water', 'Water', Math.round(S.water), 'L');
   inv += row('power', 'Hydrazine burns', S.hydrazine, '', 'Each makes water at the rig');
-  inv += '<div class="pane-hd">Morale <span>0 to 100</span></div>';
+  inv += '<div class="pane-hd">Morale <span>Out of 100</span></div>';
   inv += `<div class="inv-row has morale ${moraleBand()}">${icon('mood')}<span class="nm">Morale<small>${MORALE_WORD[moraleBand()]}. ${moraleBand() === 'high' ? 'Working and mending faster.' : moraleBand() === 'low' ? 'Everything takes longer. Cook, play music, hear from home.' : 'Variety on the plate and a cooked dinner lift it.'}</small></span><span class="ct t-num">${Math.round(S.morale)}</span></div>`;
   inv += '<div class="pane-hd">Equipment <span>Service each at the machine</span></div>';
   for (const id of Object.keys(MACHINES)) {
@@ -196,8 +198,10 @@ export function renderColony() {
   let ready = 0;
   let craft = '';
   for (const r of RECIPES) {
+    // (a tab's figure is what he has the materials for, at the Hab or away from it: out of range the figures used to
+    //  go from the tabs, as if what he carried had gone with them. The cards say "Only at the Hab".)
     const can = hasCost(r.cost), ok = atHome && can;
-    if (ok) ready++;
+    if (can) ready++;
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
     craft += `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
       tags((ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '')) + '</div>' +
@@ -209,7 +213,7 @@ export function renderColony() {
   }
   // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
   //  where its materials come from instead)
-  craft = `<div class="pane-hd">Fabricator <span>${!atHome ? 'Out of range' : ready ? `${ready} ready to build` : 'Needs materials'}</span></div>` +
+  craft = `<div class="pane-hd">Fabricator <span>${!ready ? (atHome ? 'Needs materials' : 'Out of range') : atHome ? `${ready} ready to build` : `${ready} ready · only at the Hab`}</span></div>` +
     (atHome && !ready ? '<p class="pane-note">Nothing to build yet. The fabricator works in scrap metal and circuit boards: salvage the debris lying around the Hab, and the old landers further out.</p>' : '') + craft;
 
   // --- upgrades: what can still be installed first; what is in, under its own heading (among the others an installed
@@ -222,7 +226,7 @@ export function renderColony() {
       continue;
     }
     const gate = upgradeGate(u), can = hasCost(u.cost), ok = atHome && !gate && can;
-    if (ok) upReady++;
+    if (!gate && can) upReady++;
     // (a locked card: the one reason it is locked, what it will take, and no button to press in vain)
     up += `<article class="rcp ${ok ? 'ready' : gate ? 'locked' : ''}" data-card="${u.id}"><div class="rcp-hd"><h4>${chem(esc(u.name))}</h4>` +
       tags(ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
@@ -231,7 +235,9 @@ export function renderColony() {
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
           `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`);
   }
-  up = `<div class="pane-hd">Upgrades <span>${installed} of ${UPGRADES.length} installed</span></div>` + up +
+  // (a tab's figure is how many things on its page can be made now, and its page's heading says that figure first:
+  //  "UPGRADES 4" stood over "2 OF 10 INSTALLED" and "HOME 6" over "2 OF 9 MADE")
+  up = `<div class="pane-hd">Upgrades <span>${upReady ? `${upReady} ready · ` : ''}${installed} of ${UPGRADES.length} installed</span></div>` + up +
     (upDone ? `<div class="pane-hd">Installed <span>${installed}</span></div>${upDone}` : '');
 
   // --- home: comforts for the Hab (those made, under their own heading, as with the upgrades) ---
@@ -240,19 +246,19 @@ export function renderColony() {
   for (const c of COMFORTS) {
     const made = !!comforts()[c.id], block = made ? null : comfortBlock(c.id, World), locked = !made && !!(c.needs && !c.needs(World));
     const ok = !made && !block && atHome;
-    if (ok) homeReady++;
+    if (!made && !block) homeReady++;
     const costHtml = Object.keys(c.cost).length ? costChips(c.cost, locked) : '<span class="chip ok">Nothing but time</span>';
     const card = `<article class="rcp ${made ? 'done' : ok ? 'ready' : locked ? 'locked' : ''}" data-card="${c.id}"><div class="rcp-hd"><h4>${esc(c.name)}</h4>` +
       tags((made ? `<span class="badge done">${icon('check')}Made</span>` : ok ? '<span class="badge ready">Ready</span>' : locked ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') +
-        `<span class="badge mood">${icon('mood')}+${c.cheer} a sol</span>`) + `</div><p class="ds">${esc(c.desc)}</p>` +
+        `<span class="badge mood">${icon('mood')}+${halves(c.cheer)} a sol</span>`) + `</div><p class="ds">${esc(c.desc)}</p>` +
       (made ? '' : `<div class="cost">${costHtml}</div>` + (locked ? `<div class="rcp-ft"><span class="why gate">${esc(c.why)}</span></div>`
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
           `<span class="why${block && block !== 'Made' ? ' bad' : ''}">${block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`)) +
       '</article>';
     if (made) homeDone += card; else home += card;
   }
-  home = `<div class="pane-hd">Home <span>${madeN} of ${COMFORTS.length} made · morale +${comfortCheer()} a sol</span></div>` +
-    '<p class="pane-note">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
+  home = `<div class="pane-hd">Home <span>${homeReady ? `${homeReady} ready · ` : ''}${madeN} of ${COMFORTS.length} made · morale +${halves(comfortCheer())} a sol</span></div>` +
+    '<p class="pane-note intro">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');
 
   // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
@@ -260,10 +266,12 @@ export function renderColony() {
   //  filled "6 READY", round badges and bare numerals.)
   const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}` +
     `${n ? ` aria-label="${label}: ${n} ready"` : ''}>${icon(ic)}${label}${n ? `<em class="t-num">${n}</em>` : ''}</button>`;
+  // (The tabs come first and stay where they are. Away from the Hab a line under them says the fabricator is out of
+  //  reach; at the Hab there is nothing to say, and the room is the cards'. The line used to be a banner over the tabs,
+  //  which pushed them down a row whenever he walked out of range.)
   body.innerHTML = '<div class="colony">' +
-    `<div class="col-bar${atHome ? '' : ' off'}">${icon(atHome ? 'check' : 'warning')}<b>${atHome ? 'Fabricator online' : 'Fabricator out of range'}</b>` +
-    `<span>${atHome ? 'You are at the Hab. Anything marked Ready can be built now.' : 'Return to the Hab to fabricate or install. You can still deploy kits you carry.'}</span></div>` +
     `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}${tab('home', 'hab', 'Home', homeReady)}</div>` +
+    (atHome ? '' : `<div class="col-bar off">${icon('warning')}<b>Fabricator out of range</b><span>Return to the Hab to fabricate or install. You can still deploy kits you carry.</span></div>`) +
     '<div class="cols">' +
     `<section class="pane mg-scroll${colonyTab === 'inv' ? ' on' : ''}" id="mg-inv" aria-label="Inventory">${inv}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'craft' ? ' on' : ''}" id="mg-craft" aria-label="Fabrication">${craft}</section>` +
@@ -345,7 +353,7 @@ function wayHomeHtml() {
   const steps = [
     ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
     [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
-    [`Sol ${S.rescueSol}`, 'Fly home', `The Ares 4 rocket in Schiaparelli, ${mav} from the Hab.${S.flags.mavRevealed ? ' The window is open.' : ''}`, S.pf.connected ? 'next' : ''],
+    [`Sol ${S.rescueSol}`, 'Fly home', `The MAV, the only rocket on Mars: in Schiaparelli, ${mav} from the Hab.${S.flags.mavRevealed ? ' The window is open.' : ` It can launch on Sol ${S.rescueSol}.`}`, S.pf.connected ? 'next' : ''],
   ];
   return '<div class="pane-hd">The way home</div><ol class="way">' +
     steps.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';
@@ -361,7 +369,9 @@ export function discoveriesFound() {
   return World.landers.filter((r) => S.discovered[r.data.name]).length + journalPlaces().filter((f) => S.discovered[f.name]).length + sightList().filter((x) => x.sol).length;
 }
 function tasksHtml() {
-  let h = wayHomeHtml() + '<div class="pane-hd">Mission</div><div class="obj-list">';
+  // (the tab's figure is the tasks still to do, the mission's and NASA's: the two headings under it say how many each)
+  const toDo = missionList().filter((e) => !e.done).length;
+  let h = wayHomeHtml() + `<div class="pane-hd">Mission <span>${toDo} to do</span></div><div class="obj-list">`;
   let primary = false, open = '', closed = '', nDone = 0;
   // as on the HUD (the same list, the same distances): the most pressing first, each with its reason and how far
   for (const { o, done: d } of missionList()) {
@@ -401,8 +411,13 @@ function discoveriesHtml() {
   const more = (n, one, many, line) => (n ? `<article class="card locked"><div class="card-hd">${icon('lock')}<h4>${n} more ${n === 1 ? one : many}</h4></div><p>${line}</p></article>` : '');
   const landers = World.landers, found = landers.filter((r) => S.discovered[r.data.name]);
   const album = S.album || {}, shot = found.filter((r) => album[r.data.name]).length;
+  // (The tab's figure is everything found: landers, places and sights. The page says so at its head, and then each
+  //  of the three under its own heading: "DISCOVERIES 9" stood over "5 OF 14 FOUND", which counted the landers alone.)
+  const placesSeen = journalPlaces().filter((f) => S.discovered[f.name]).length, sightsSeen = sightList().filter((x) => x.sol).length;
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
   // (what NASA wants of them is said once, under the heading; each card then carries a mark. The same sentence was on every card.)
-  let h = `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found · ${shot} photographed</span></div>` +
+  let h = `<p class="pane-note first">${n(discoveriesFound(), 'discovery', 'discoveries')} so far: ${n(found.length, 'lander', 'landers')}, ${n(placesSeen, 'place', 'places')}, ${n(sightsSeen, 'sight', 'sights')}.</p>` +
+    `<div class="pane-hd">Landers <span>${found.length} of ${landers.length} found · ${shot} photographed</span></div>` +
     (found.length > shot ? `<p class="pane-note">NASA would like a photograph of each: stand near one and choose ${layout.touch ? 'Photo mode from MENU' : 'Photo mode (P)'}.</p>` : '') + '<div class="jr-grid">';
   for (const rec of found.sort((x, y) => x.data.year - y.data.year)) {
     // (the name is one piece and the year follows it or goes under it; the badges take the line below where the card
@@ -437,9 +452,9 @@ function achievementsHtml() {
     let prog = '';
     if (!g && ACH_PROGRESS[a.id]) {
       const [v, max, unit] = ACH_PROGRESS[a.id]();
-      prog = `<div class="prog"><i style="--p:${Math.min(100, v / max * 100).toFixed(0)}%"></i><span class="t-num">${num(Math.min(v, max))} / ${num(max)}${unit}</span></div>`;
+      prog = `<div class="prog"><i style="--p:${Math.min(100, v / max * 100).toFixed(0)}%"></i><span class="t-num">${num(Math.min(v, max))} of ${num(max)}${unit}</span></div>`;
     }
-    h += `<article class="card ${g ? 'got' : 'locked'}"><div class="card-hd">${icon(g ? 'trophy' : 'lock')}<h4>${esc(a.name)}</h4>${tags(g ? '<span class="badge done">Earned</span>' : '')}</div><p>${esc(a.desc)}</p>${prog}</article>`;
+    h += `<article class="card ${g ? 'got' : 'locked'}"><div class="card-hd">${icon(g ? 'trophy' : 'lock')}<h4>${esc(a.name)}</h4>${tags(g ? '<span class="badge done">Earned</span>' : '')}</div><p>${esc(g ? achievementDone(a) : a.desc)}</p>${prog}</article>`;
   }
   return h + '</div>';
 }
@@ -460,15 +475,18 @@ function logHtml() {
   let h = `<div class="pane-hd">Log <span>The last ${logHistory.length === 1 ? 'entry' : logHistory.length + ' entries'}, newest first</span></div><div class="jlog">`;
   for (let i = logHistory.length - 1; i >= 0; i--) {
     const l = logHistory[i];
-    h += `<div class="mg-line ${l.voice}"><span class="who">${VOICES[l.voice] || VOICES.sys}<small>SOL ${l.sol}</small></span><span class="tx">${chem(esc(l.text))}</span></div>`;
+    h += `<div class="mg-line ${l.voice}"><span class="who">${VOICES[l.voice] || VOICES.sys}<small>SOL ${l.sol}</small></span><span class="tx">${chem(esc(logText(l)))}</span></div>`;
   }
   return h + '</div>';
 }
 function samplesHtml() {
   const s = scienceSummary(), list = catalogue();
-  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials · ${s.points} science</span></div>` +
-    (s.nextGrant ? `<p class="pane-note">${s.points >= s.nextGrant ? 'A NASA grant is waiting on the next analysis.' : `NASA sends a grant at ${s.nextGrant} science.`}</p>` : '');
-  if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder, or bag soil where you dig. The analyser on the Hab work table says what it is. What you find depends on where on Mars you are standing.</div>`;
+  // (what the figures are for, and what to do about them: "52 SCIENCE" and "A NASA grant is waiting on the next
+  //  analysis" told him nothing he could act on)
+  let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials catalogued</span></div>` +
+    (s.nextGrant ? `<p class="pane-note">${s.points >= s.nextGrant ? `${s.points} science points: NASA has a supply grant for you. Analyse any sample at the Hab’s work table to receive it.`
+      : `${s.points} science points. NASA sends a supply grant at ${s.nextGrant}; a material you have not catalogued is worth the most.`}</p>` : '');
+  if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder; on new ground, bag a scoop of soil too. The analyser on the Hab work table says what each is. What you find depends on where on Mars you are standing.</div>`;
   else if (s.bagged) h += `<p class="jr-note">${s.bagged} of ${s.limit} sample bags are full and waiting for the analyser in the Hab.</p>`;
   h += '<div class="jr-grid">';
   for (const m of list.filter((x) => x.count).sort((a, b) => b.value - a.value)) {

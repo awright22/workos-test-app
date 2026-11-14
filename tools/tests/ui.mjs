@@ -150,9 +150,51 @@ if (!onlySize || onlySize === 'play') {
     return { suit: G.S.suit, t: window.__st(), rate: G.BAL.suitWalk * (1 + (1 - G.machineEff('suit')) * 0.9) * G.S.drainMult, inside: G.S.inside, sealed: G.S.flags.suitSealed, bars: getComputedStyle(document.querySelector('#mg-vitals .res')).display };
   });
   check('suit timer: a suit just sealed reads a full tank, not the leak', sealed.sealed && !sealed.inside && Math.abs(secs(sealed.t) - sealed.suit / sealed.rate) < 3 && secs(sealed.t) > 300, sealed);
-  check('first minute: the six bars wait for the Hab (at the door there is one number)', sealed.bars === 'none', sealed.bars);
-  const inHab = await g.eval((G) => { G.tpLocal(0, 3, 0); G.tick(0.05, 6); return getComputedStyle(document.querySelector('#mg-vitals .res')).display; });
-  check('first minute: stepping into the Hab brings up the six bars', inHab !== 'none', inHab);
+  check('first minute: the bars wait to be met (at the door there is one number)', sealed.bars === 'none', sealed.bars);
+  // Each bar arrives with the thing it measures, and is lit for as long as the card that names it is up. (All six used
+  // to arrive on the Hab's threshold, and the buttons were lit on timers of their own, out of step with their cards.)
+  await page.evaluate(() => {
+    window.__bars = () => [...document.querySelectorAll('#mg-vitals .res .row')].filter((r) => r.getBoundingClientRect().height > 2).map((r) => r.dataset.k);
+    window.__lit = () => [...document.querySelectorAll('#mg-vitals .row.fresh, #mg-trow .mg-tbtn.fresh')].map((r) => r.dataset.k || r.dataset.t);
+    window.__card = () => (document.querySelector('#mg-toast .toast') || { textContent: '' }).textContent;
+    window.__btns = () => [...document.querySelectorAll('#mg-trow .mg-tbtn[data-t]')].filter((b) => getComputedStyle(b).visibility !== 'hidden' && getComputedStyle(b).display !== 'none').map((b) => b.dataset.t);
+  });
+  const noToast = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 40000 }).catch(() => {});
+  const inHab = await g.eval((G) => { G.tpLocal(0, 3, 0); G.tick(0.05, 6); return window.__bars(); });
+  const oxy = await g.eval((G) => { G.tpLocal(4.0, -3.0); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 2); return { bars: window.__bars(), lit: window.__lit(), card: window.__card(), btns: window.__btns() }; });
+  await noToast();
+  const oxyAfter = await g.eval(() => window.__lit());
+  check('first minute: no bar on the threshold; inspecting the oxygenator brings HAB O2 alone, lit while the card that names it is up and no longer',
+    inHab.length === 0 && oxy.bars.join() === 'o2' && oxy.lit.join() === 'o2' && /oxygenator/i.test(oxy.card) && /HAB O/.test(oxy.card) && oxyAfter.length === 0 && oxy.btns.length === 0, { inHab, oxy, oxyAfter });
+  const rec = await g.eval((G) => { G.tpLocal(4.3, -0.4); G.tick(0.05, 6); G.hold(1.0); G.tick(0.05, 2); return { bars: window.__bars(), lit: window.__lit(), card: window.__card() }; });
+  await noToast();
+  // the numbers: the FOOD bar and then the Journal, one card at a time, each with its own thing lit
+  await g.eval((G) => { G.tpLocal(0, -5.0); G.tick(0.05, 6); G.hold(1.1); });
+  const sheet = await page.evaluate(() => ({ text: document.querySelector('#mg-panel .dlg').textContent, later: (document.querySelector('#mg-panel .dlg-later') || { textContent: '' }).textContent }));
+  await page.evaluate(() => document.querySelector('#mg-panel .btns button').click());
+  await g.eval((G) => { G.tick(0.05, 4); });
+  // (a card that came due under the sheet waits for it to be put down, and is up within half a second of that)
+  await page.waitForFunction(() => /food/i.test(window.__card()), null, { timeout: 20000 }).catch(() => {});
+  const food = await g.eval(() => ({ bars: window.__bars(), lit: window.__lit(), card: window.__card(), btns: window.__btns(), clock: document.querySelector('#mg-clock .of').textContent }));
+  await page.waitForFunction(() => /journal/i.test(window.__card()), null, { timeout: 40000 }).catch(() => {});
+  const jrn = await g.eval(() => ({ lit: window.__lit(), card: window.__card(), btns: window.__btns() }));
+  check('first minute: the reclaimer brings WATER, and the numbers bring FOOD and then the Journal, each lit with its own card',
+    rec.bars.join() === 'o2,water' && rec.lit.join() === 'water' && food.bars.join() === 'o2,water,food' && food.lit.join() === 'food' && /food/i.test(food.card) &&
+    jrn.lit.join() === 'journal' && /journal/i.test(jrn.card) && jrn.btns.join() === 'journal', { rec, food, jrn });
+  // (the plan is on the card he puts down himself, not on a line of the log that passes while he is at a bed)
+  check('the numbers: the card says where it all leads (a radio, the rocket in Schiaparelli, the sol), in meals, and the clock then names the rescue',
+    /meals left/i.test(sheet.text) && /radio/.test(sheet.later) && /Schiaparelli/.test(sheet.later) && /Sol \d+/.test(sheet.later) && /rescue\s*\d+/i.test(food.clock), { later: sheet.later, clock: food.clock });
+  await noToast();
+  // out of the door: the Map, to the left of the Journal, which does not move; and with the first load of regolith, the Colony
+  const jx = await page.evaluate(() => document.querySelector('#mg-trow [data-t="journal"]').getBoundingClientRect().left);
+  const out1 = await g.eval((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 6); return { lit: window.__lit(), card: window.__card(), btns: window.__btns() }; });
+  await noToast();
+  const out2 = await g.eval((G) => { G.tpNear(G.World.soilPiles[0].group.position, 1.2); G.tick(0.05, 6); G.hold(1.6); G.tick(0.05, 4); return { lit: window.__lit(), card: window.__card(), btns: window.__btns().sort(), inv: G.S.inv.regolith }; });
+  const jx2 = await page.evaluate(() => document.querySelector('#mg-trow [data-t="journal"]').getBoundingClientRect().left);
+  check('first minute: the Map arrives on stepping out and the Colony with the first load carried, and the buttons already there do not move',
+    out1.lit.join() === 'map' && /map/i.test(out1.card) && out1.btns.sort().join() === 'journal,map' && out2.inv === 1 && out2.lit.join() === 'colony' && /colony/i.test(out2.card) &&
+    out2.btns.join() === 'colony,journal,map' && Math.abs(jx - jx2) < 0.5, { out1, out2, jx, jx2 });
+  await noToast();
   // standing, walking, running, standing: it never rises unless the tank does, and always reads the tank at a walk
   const trace = await g.eval((G) => {
     G.skipIntro(); G.tpLocal(0, 150, 0); G.tick(0.05, 4);          // (well clear of the Hab: sixty metres of walking must not end in the airlock)
@@ -183,16 +225,18 @@ if (!onlySize || onlySize === 'play') {
   const where = () => g.eval(() => ({
     tag: document.querySelector('#mg-way b').textContent, shown: getComputedStyle(document.getElementById('mg-way')).display !== 'none',
     line: document.querySelector('#mg-objectives .obj:not(.done) .ds').textContent, lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent,
-    place: document.querySelector('#mg-objectives .obj:not(.done) .pl').textContent.toLowerCase(),
-    compass: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase()),
+    place: document.querySelector('#mg-objectives .obj:not(.done) .pl').textContent.toLowerCase(), then: document.querySelector('#mg-objectives .obj:not(.done) .nx').textContent.toLowerCase(),
+    compass: [...document.querySelectorAll('#mg-compass .dists span')].filter((s) => s.style.display !== 'none' && s.style.visibility !== 'hidden').map((s) => s.textContent.toLowerCase().trim()),
   }));
   await g.eval((G) => { G.S.inv.regolith = 2; G.tpLocal(0, 30, 0); G.tick(0.05, 1); });       // (a bed to fill: the way leads in through the airlock door)
   const d1 = await where();
   await g.eval((G) => { G.tpLocal(2, 55, 0); G.tick(0.05, 1); });
   const d2 = await where();
-  // (the compass names the place the mission's lead line sends him to, first: here the Hab, by its door)
-  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass.includes(`hab ${d.tag}`) && d.compass.every((t) => /^[a-z0-9 ]+ \d/.test(t));
-  check('distances: marker, mission line and compass give one number for the Hab, and every compass tag is named', agree(d1) && agree(d2) && d1.tag !== d2.tag, { d1, d2 });
+  // (The compass names the place the mission's lead line sends him to, first: here the Hab, by its door. It names it
+  //  and no more: the distance is the mission line's, and under the marker when the marker is on its place. Printed
+  //  under the compass as well, it was one distance three times over. Every other tag is a name and a distance.)
+  const agree = (d) => d.shown && d.tag === d.line && /\d+ m$/.test(d.tag) && d.compass.includes('hab') && d.compass.every((t) => t === 'hab' || /^[a-z0-9 ]+ \d/.test(t));
+  check('distances: the marker and the mission line give one number for the Hab; the compass names the Hab, and every other tag has a name and a distance', agree(d1) && agree(d2) && d1.tag !== d2.tag, { d1, d2 });
   // a breach, indoors: the compass names the breach, not a survey site kilometres away
   // (forty frames: the list and the compass look again at what there is to do every dozen or so)
   const br = await g.eval((G) => {
@@ -203,16 +247,63 @@ if (!onlySize || onlySize === 'play') {
     Object.assign(G.S.breach, JSON.parse(keep)); G.tick(0.05, 40);
     return out;
   });
-  check('compass: in a breach indoors its one label is the breach, with the mission line\'s distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0] === `breach ${br.line}`, br);
+  check('compass: in a breach indoors its one label is where the breach is, and the mission line has the distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0].trim() === 'far wall' && /\d+ m/.test(br.line), br);
   // inside, a thing outside is marked at the door with the whole walk; the marker's number is still the line's
   // (forty frames, as for the breach above: the compass looks again at what there is to do every dozen or so, and after
   // two it could still be naming the last place)
   await g.eval((G) => { G.S.inv.regolith = 0; G.tpLocal(0, 0, 0); G.tick(0.05, 40); });
   const d3 = await where();
-  check('distances: indoors the marker and the mission line still agree', d3.shown && d3.tag === d3.line, d3);
-  // ... and the distance is the distance to the thing named: the whole walk to the heap is the heap's, on the line
-  // and on the compass (it was labelled "Airlock": 46 m to a door that stood 13 m away)
-  check('distances: indoors, the walk to a thing outside is named for the thing, not for the airlock', d3.place === 'heap' && d3.compass.includes(`heap ${d3.tag}`) && !d3.compass.some((t) => /airlock/.test(t)), d3);
+  // (an arrowhead at the edge of the screen carries no number: on its place the marker's number is the line's)
+  check('distances: indoors the marker and the mission line still agree', d3.shown && (d3.tag === '' || d3.tag === d3.line), d3);
+  // ... and the way out is said: the line names the airlock, with the distance to the door, and then the thing itself
+  // with the rest of the walk. (The whole walk under the heap's name was a straight line through the wall with nothing
+  // to show where the door was; before that the whole walk stood under the airlock's name, 46 m to a door 13 m away.)
+  const walk = await g.eval((G) => ({ door: Math.round(G.groundDist(G.player.pos, G.at(0, 7.5))) }));      // (the inner door stands 7.5 m from the middle of the Hab)
+  check('distances: indoors, a thing outside is reached by the airlock: the line gives the door and its distance, then the thing and the rest of the walk',
+    d3.place === 'airlock' && Math.abs(parseInt(d3.line, 10) - walk.door) <= 2 && /^then heap \d+ m$/.test(d3.then.replace(/\s+/g, ' ').trim()) && d3.compass.includes('airlock'), { d3, walk });
+
+  // The rule of what is always there: digging the open ground is "ambient", and an ambient thing is offered only with
+  // a reason, and never under a red task. (A dig prompt and a DIG button stood on the screen every second out of doors,
+  // at 27 seconds of air and through a breach.)
+  const dig = await g.eval((G) => {
+    const S = G.S, p = document.getElementById('mg-prompt'), b = document.getElementById('mg-tE');
+    const now = () => ({ on: p.classList.contains('on'), minor: p.classList.contains('minor'), says: p.querySelector('.lb').textContent, sub: p.querySelector('.sub').textContent, active: !!G.interaction.active && G.interaction.active.priority >= 9 });
+    const keep = JSON.stringify({ piles: G.World.soilPiles.map((h) => h.left), inv: S.inv, suit: S.suit, breach: S.breach, plots: G.World.plots.map((q) => q.state) });
+    const out = { ambient: G.interactables.filter((it) => it.priority >= 9).length };
+    G.tpLocal(0, 60, 0); S.inv.regolith = 0; G.tick(0.05, 40);
+    out.idle = now();                                                   // heaps at the door, nothing wanted here
+    for (const h of G.World.soilPiles) h.left = 0;
+    G.World.plots[0].state = 'empty'; G.tick(0.05, 40);
+    out.wanted = now();                                                 // an empty bed and no heap left: dig here
+    S.suit = 20; G.tick(0.05, 40);
+    out.lowAir = now(); out.lead = document.querySelector('#mg-objectives .obj:not(.done)').className;
+    S.suit = 100; S.breach.active = true; G.tick(0.05, 40);
+    out.breach = now();
+    S.breach.active = false; G.tick(0.05, 40);
+    out.again = now();
+    S.inv.regolith = 6; G.tick(0.05, 40);
+    out.carrying = now();                                               // he has what the beds want: nothing to dig for
+    const k = JSON.parse(keep);
+    G.World.soilPiles.forEach((h, i) => { h.left = k.piles[i]; }); G.World.plots.forEach((q, i) => { q.state = k.plots[i]; });
+    Object.assign(S.inv, k.inv); S.suit = k.suit; Object.assign(S.breach, k.breach); G.syncAllVisuals(); G.tick(0.05, 40);
+    return out;
+  });
+  check('prompt: digging the open ground is offered only when something wants it, with its reason, and never under a red task',
+    dig.ambient >= 1 && !dig.idle.on && !dig.idle.active && dig.wanted.on && dig.wanted.minor && /dig/i.test(dig.wanted.says) && /bed/i.test(dig.wanted.sub) &&
+    /urgent/.test(dig.lead) && !dig.lowAir.active && !dig.lowAir.on && !dig.breach.active && !dig.breach.on && dig.again.on && !dig.carrying.on, dig);
+  // "food for N sols" is the breakfasts the larder gives, eaten as breakfast eats (a staple, and a side while there
+  // are sides): "−2 food, 20 left" used to be followed by "food for 20 sols"
+  const larderDays = await g.eval((G) => {
+    const S = G.S; G.farm.farm();
+    const keep = JSON.stringify({ potatoes: S.potatoes, food: S.food, pantry: S.pantry, morale: S.morale, diet: S.diet });
+    S.potatoes = 3; S.food = 4; S.pantry = { radish: 1, lettuce: 0, soy: 2, tomato: 2 };
+    const meals = G.farm.foodTotal(), said = G.farm.breakfastsLeft();
+    let eaten = 0;
+    while (G.farm.breakfast() !== 'skipped' && eaten < 99) eaten++;
+    const k = JSON.parse(keep); S.potatoes = k.potatoes; S.food = k.food; S.pantry = k.pantry; S.morale = k.morale; S.diet = k.diet;
+    return { meals, said, eaten };
+  });
+  check('food: the sols the larder lasts are the breakfasts it gives, which is fewer than its meals while there are sides', larderDays.said === larderDays.eaten && larderDays.said < larderDays.meals, larderDays);
 
   // the rule of the prompt: whatever cannot be done says why. Every interaction is asked, in states where it refuses,
   // and each answer is a sentence: a reading, or what is wanting and, after a colon, what to do about it (the first
@@ -244,7 +335,7 @@ if (!onlySize || onlySize === 'play') {
   {
     const READING = '\u200b';
     // (five refusals live in game files this test's author could not edit; they give their reason, in another form)
-    const elsewhere = /analyser|Sample case|Already sampled|Servicing the|has failed|in good order/;
+    const elsewhere = /analyser|Sample case|Already sampled|in good order/;
     const formed = (r) => r.startsWith(READING) ? r.length > 4 : /^[A-Z][^:—(]{2,21}?\s*[:—(]\s*\S/.test(r) && r.split(/[:—(]/)[0].trim().split(/\s+/).length <= 4;
     const bare = refusals.filter((x) => !x.isString || !x.r.replace(READING, '').trim());
     const unformed = refusals.filter((x) => x.isString && !elsewhere.test(x.r) && !formed(x.r));
@@ -254,11 +345,25 @@ if (!onlySize || onlySize === 'play') {
     const bed = await g.eval((G) => {
       const pl = G.World.plots[0], was = pl.state, reg = G.S.inv.regolith;
       pl.state = 'empty'; G.S.inv.regolith = 0; G.tpLocal(-6.7, -3.2); G.tick(0.05, 3);
-      const p = document.getElementById('mg-prompt'), out = { on: p.classList.contains('on') && getComputedStyle(p).visibility === 'visible' && +getComputedStyle(p).opacity > 0.99, no: p.classList.contains('no'), says: p.querySelector('.lb').textContent, button: document.querySelector('#mg-tE .vb').textContent };
+      const p = document.getElementById('mg-prompt'), out = { on: p.classList.contains('on') && getComputedStyle(p).visibility === 'visible' && +getComputedStyle(p).opacity > 0.99, no: p.classList.contains('no'), says: p.querySelector('.lb').textContent, sub: p.querySelector('.sub').textContent, button: document.querySelector('#mg-tE .vb').textContent };
       pl.state = was; G.S.inv.regolith = reg; G.syncAllVisuals(); G.tick(0.05, 3);
       return out;
     });
-    check('prompt: an empty bed with no regolith says what it needs and where to get it, at once, and the button says NEEDS REGOLITH', bed.on && bed.no && /needs regolith: .*heap/i.test(bed.says) && bed.button === 'NEEDS REGOLITH', bed);
+    check('prompt: an empty bed with no regolith says what it needs and, on the line under, where to get it, at once, and the button says NEEDS REGOLITH', bed.on && bed.no && /^needs regolith$/i.test(bed.says) && /^Dig it .*heap/.test(bed.sub) && bed.button === 'NEEDS REGOLITH', bed);
+    // a prompt that asks for nothing does not stand: a reading goes after a few seconds of play, and is back when he is
+    const reading = await g.eval((G) => {
+      const T = G.ctx.engine.camera.position.constructor, pn = G.World.panels[0], was = pn.dust, p = document.getElementById('mg-prompt');
+      const vis = () => p.classList.contains('on') && getComputedStyle(p).visibility === 'visible';
+      pn.dust = 0;
+      G.tpNear(new T().copy(pn.group.position).applyQuaternion(G.World.solarGroup.quaternion).add(G.World.solarGroup.position), 1.6); G.tick(0.05, 6);
+      const out = { first: vis(), says: p.querySelector('.lb').textContent, info: p.classList.contains('info') };
+      G.tick(0.05, 150); out.after = vis();
+      G.tpLocal(0, 60, 0); G.tick(0.05, 6);
+      G.tpNear(new T().copy(pn.group.position).applyQuaternion(G.World.solarGroup.quaternion).add(G.World.solarGroup.position), 1.6); G.tick(0.05, 6);
+      out.back = vis(); pn.dust = was; G.tick(0.05, 3);
+      return out;
+    });
+    check('prompt: a reading ("This panel is clean") is put away after a few seconds, and shown again when he comes back to it', reading.first && reading.info && !reading.after && reading.back, reading);
   }
 
   // the journal: a task's reason is a line of its own under its title
@@ -316,11 +421,20 @@ if (!onlySize || onlySize === 'play') {
   const sol0 = await g.eval((G) => { G.tpLocal(-5.0, -6.2); G.tick(0.05, 4); const s = G.S.sol; G.hold(1.4); return s; });
   await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
   const acct = await g.eval((G) => ({
-    head: document.querySelector('#mg-panel .solbig').textContent, notes: [...document.querySelectorAll('#mg-panel .sleep .notes div')].map((n) => n.textContent),
-    sol: G.S.sol, food: G.farm.foodTotal(), morale: G.S.morale,
+    head: document.querySelector('#mg-panel .solbig').textContent,
+    notes: [...document.querySelectorAll('#mg-panel .sleep .notes dt')].map((n) => `${n.textContent}: ${n.nextElementSibling.firstChild.textContent}`),
+    why: (document.querySelector('#mg-panel .sleep .notes .more') || { textContent: '' }).textContent, whyHidden: !!(document.querySelector('#mg-panel .sleep .notes .more') || {}).hidden,
+    tiles: [...document.querySelectorAll('#mg-panel .sleep .delta')].map((n) => n.textContent),
+    sol: G.S.sol, food: G.farm.foodTotal(), days: G.farm.breakfastsLeft(), morale: G.S.morale,
   }));
-  check('night: the account is headed with the new sol, and says what breakfast took and why morale moved',
-    acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(−\d+ food, \d+ left\)/.test(n)) && acct.notes.some((n) => /^Morale \d+.*another sol alone.*a night in the bunk/.test(n)), acct);
+  await page.evaluate(() => document.querySelector('#mg-panel .sleep-ft .why').click());
+  const whyShown = await page.evaluate(() => !document.querySelector('#mg-panel .sleep .notes .more').hidden);
+  // (rows with a name each; morale a score with no unit; food in meals, lasting as many sols as it gives breakfasts; and
+  //  what morale's change is made of there for the asking, where it was a bracketed sum the length of the screen)
+  check('night: the account is headed with the new sol, and says what breakfast took, how long the food lasts, and, asked, why morale moved',
+    acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(\d+ meals?, \d+ left\)/.test(n)) &&
+    acct.notes.some((n) => new RegExp(`^Morale: ${Math.round(acct.morale)} of 100`).test(n)) && acct.notes.some((n) => new RegExp(`^Food: Enough for ${acct.days} sols?\\b`).test(n)) &&
+    /another sol alone.*a night in the bunk/i.test(acct.why) && acct.whyHidden && whyShown && acct.tiles.every((t) => !/morale.*%/i.test(t)) && acct.tiles.some((t) => /now \d+\smeals?/.test(t)), { acct, whyShown });
   await g.eval(() => document.querySelector('#mg-panel .sleep .wake').click());
   await sleep(300);
   const woke = await g.eval((G) => { G.tick(0.05, 900); return { sol: G.S.sol, food: G.farm.foodTotal(), morale: G.S.morale, lead: document.querySelector('#mg-objectives .obj:not(.done) .tx').textContent }; });
@@ -445,7 +559,7 @@ for (const size of SIZES) {
       const tx = row.querySelector('.tx'), keep = [row.className, tx.innerHTML], out = [];
       for (const o of window.__UI.objectives) {
         row.className = o.urgent ? 'obj urgent first' : 'obj primary';
-        tx.textContent = o.text().replace(/\d+\/(\d+)\)$/, '$1/$1)');
+        tx.textContent = o.text().replace(/\d+ of (\d+)\)$/, '$1 of $1)');
         const lines = new Set([...(() => { const r = document.createRange(); r.selectNodeContents(tx); return r.getClientRects(); })()].map((b) => Math.round(b.top))).size;
         if (lines !== 1) out.push({ t: tx.textContent, lines });
       }
@@ -458,7 +572,7 @@ for (const size of SIZES) {
   const busy = async () => {
     await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 120000 });      // an earlier toast has gone
     await g.eval((G) => {
-      G.skipIntro(); G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };
+      G.skipIntro(); G.S.flags.uiBars = true; G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };      // (uiBars: a run with every bar met)
       G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
     });
     await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
@@ -502,7 +616,8 @@ for (const size of SIZES) {
     };
   });
   let hn = await hudNow();
-  check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
+  // (an arrowhead at the edge of the screen carries no number: the line has it)
+  check(`${size.name}: on foot, the marker's distance is the mission line's`, !hn.way || hn.tag === '' || hn.tag === hn.line, hn);
   if (phone) {
     // the card stands 8 px under the bars and 8 px over the stick (it came to rest 3 px from the stick: it was measured while it was still sliding in)
     // (a warning: with his life in the balance, as here, nothing else is said)
@@ -522,13 +637,54 @@ for (const size of SIZES) {
     check(`${size.name}: both banners keep their instruction, and the first mission line its reason`, hn.notes.length === 2 && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
     const a = await audit();
     check(`${size.name}: the busy HUD has nothing under 11 px or 44 px, and nothing cut`, a.length === 0, a);
+    // every prompt is a line, and at most one line under it (three-line prompts stood over the stick at 667 wide)
+    const prompts = await g.eval((G) => {
+      const S = G.S, U = window.__UI, seen = new Map();
+      const ask = () => {
+        for (const it of G.interactables) {
+          let label = '', sub = '', en = true;
+          try { if (it.visible && !it.visible()) continue; if (!it.pos()) continue; label = it.label(); sub = it.sub ? it.sub() : ''; en = it.enabled ? it.enabled() : true; } catch (e) { continue; }
+          if (label) seen.set(label + '|' + sub, { label, sub, minor: it.priority >= 9 });
+          if (typeof en === 'string' && en.charCodeAt(0) !== 0x200b) seen.set('no|' + en, { label, sub, disabled: en });
+        }
+      };
+      const keep = JSON.stringify({ inv: S.inv, water: S.water, breach: S.breach, suit: S.suit, storm: S.storm.hold === undefined ? null : S.storm.hold, piles: G.World.soilPiles.map((h) => h.left), plots: G.World.plots.map((q) => [q.state, q.growth, q.watered, q.crop]) });
+      S.suit = 100; G.setStorm(0); S.storm.i = 0;
+      const pl = G.World.plots[0];
+      G.tpLocal(-6.7, -3.2); G.tick(0.05, 2);
+      S.inv.regolith = 0; pl.state = 'empty'; ask(); S.inv.regolith = 2; ask();
+      pl.state = 'soil'; ask(); S.water = 2; ask(); S.water = 60;
+      pl.state = 'growing'; pl.crop = 'potato'; pl.growth = 0.45; pl.watered = 1; ask(); pl.state = 'ready'; ask(); pl.state = 'dead'; ask();
+      G.tpLocal(4.2, 2.6); G.tick(0.05, 2); ask(); S.flags.hydrazineBoom = !S.flags.hydrazineBoom; ask(); S.flags.hydrazineBoom = !S.flags.hydrazineBoom;
+      G.tpLocal(-5.0, -6.2); G.tick(0.05, 2); S.breach.active = true; ask(); S.breach.active = false;
+      G.tpLocal(4.2, 4.8); G.tick(0.05, 2); ask();
+      G.tpNear(G.World.soilPiles[0].group.position, 1.2); G.tick(0.05, 2); ask();
+      for (const h of G.World.soilPiles) h.left = 0;
+      pl.state = 'empty'; S.inv.regolith = 0; G.tpLocal(0, 60, 0); G.tick(0.05, 2); ask();
+      G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 2); ask();
+      const k = JSON.parse(keep);
+      G.World.soilPiles.forEach((h, i) => { h.left = k.piles[i]; }); G.World.plots.forEach((q, i) => { [q.state, q.growth, q.watered, q.crop] = k.plots[i]; });
+      Object.assign(S.inv, k.inv); S.water = k.water; Object.assign(S.breach, k.breach); S.suit = k.suit; G.setStorm(k.storm); G.syncAllVisuals();
+      const p = document.getElementById('mg-prompt'), lb = p.querySelector('.lb'), sb = p.querySelector('.sub'), out = [];
+      // (lines are counted by where their boxes stand, a line apart: the 2 of "O2" hangs a few pixels under its line and is not another)
+      const lines = (n) => { const r = document.createRange(); r.selectNodeContents(n); const tops = [...r.getClientRects()].filter((b) => b.width > 1).map((b) => b.top).sort((a, b) => a - b); let k = 0, last = -99; for (const t of tops) { if (t - last > 8) k++; last = t; } return k; };
+      for (const v of seen.values()) {
+        U.setPrompt(null); U.setPrompt(v);
+        const a = lines(lb), b = sb.style.display === 'none' ? 0 : lines(sb), text = p.querySelector('.pt').getBoundingClientRect(), box = p.getBoundingClientRect();
+        const slack = Math.round(box.right - text.right);
+        if (a !== 1 || b > 1 || slack > 24) out.push({ says: lb.textContent, sub: sb.textContent, lines: [a, b], slack });
+      }
+      U.setPrompt(null); G.tick(0.05, 3);
+      return { n: seen.size, out };
+    });
+    check(`${size.name}: every prompt is one line and at most one line under it, in a pill no wider than its words`, prompts.n >= 14 && prompts.out.length === 0, prompts);
   }
   bad = await crowded();
   check(`${size.name}: on foot with a long mission line, still nothing overlaps`, bad.length === 0, bad);
   bad = await driving();
   check(`${size.name}: in the rover, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
   hn = await hudNow();
-  check(`${size.name}: in the rover, the marker's distance is the mission line's`, !hn.way || hn.tag === hn.line, hn);
+  check(`${size.name}: in the rover, the marker's distance is the mission line's`, !hn.way || hn.tag === '' || hn.tag === hn.line, hn);
   // More text than usual: three long log entries, and a first mission line and a reason that would each run to three
   // lines on a phone. The log must still end short of the rover's panel (and of the stick), and the mission block
   // above the buttons under it. (Both failed with the content a long day produces, while passing with a quiet one.)
@@ -557,7 +713,22 @@ for (const size of SIZES) {
         const t = r.querySelector('.tk').getBoundingClientRect(), v = r.querySelector('.val'), l = r.querySelector('.lb');
         return { w: Math.round(t.width), h: Math.round(t.height), num: parseFloat(getComputedStyle(v).fontSize), name: parseFloat(getComputedStyle(l).fontSize), f: getComputedStyle(r).getPropertyValue('--f') };
       }));
-      check(`${size.name}: each gauge is a band at least 60 px long and 6 px tall, its number at 13 px or more`, gz.length === 6 && gz.every((z) => z.w >= 60 && z.h >= 6 && z.num >= 12.95 && z.name >= 10.95 && z.f !== ''), gz);
+      check(`${size.name}: each gauge is a band at least 60 px long and 6 px tall, its number at 13 px or more`, gz.length === 6 && gz.every((z) => z.w >= 60 && z.h >= 6 && z.num >= 12.95 && z.name >= 12.95 && z.f !== ''), gz);
+      // the task card: its reason is news, and is put away once read; a press on the card brings it back
+      const card = await g.eval((G) => {
+        const o = document.getElementById('mg-objectives'), why = () => [...o.querySelectorAll('.obj .why')].some((n) => getComputedStyle(n).display !== 'none' && n.getBoundingClientRect().height > 3);
+        G.tpLocal(0, 40, 0); G.tick(0.05, 30);
+        const out = { open: why(), h0: Math.round(o.getBoundingClientRect().height) };
+        G.tick(0.05, 220);
+        out.shut = !why(); out.mark = o.classList.contains('shut'); out.h1 = Math.round(o.getBoundingClientRect().height);
+        // (closed, its title is still one line: the mark that it opens once took a rem of the title's own line)
+        { const r = document.createRange(); r.selectNodeContents(o.querySelector('.obj.primary .tx, .obj.first .tx')); out.titleLines = new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size; }
+        out.lead = !!o.querySelector('.obj.primary .tx, .obj.first .tx') && !!o.querySelector('.obj .pl').textContent;
+        o.click(); G.tick(0.05, 2);
+        out.again = why();
+        return out;
+      });
+      check(`${size.name}: the task card closes to its title and its place once its reason has been read, and a press opens it again`, card.shut && card.mark && card.lead && card.titleLines === 1 && card.h1 < card.h0 && card.h1 >= 44 && card.again, card);
     }
     // the action button carries the verb for what is in reach, and holding it works the interaction
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });

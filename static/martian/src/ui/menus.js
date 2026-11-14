@@ -2,7 +2,7 @@
 // summary and the NASA uplink terminal. Pure presentation: the game passes in what to show and
 // what to do (see game/flow.js, game/sim.js, game/story.js). Death, rescue and other plain
 // dialogs go through showOverlay in ui/dom.js.
-import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, log, toast, dropPointer } from './dom.js';
+import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, holdCards, log, logHistory, toast, dropPointer, setPrompt } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { OBJECTIVES, missionList, suitTimeLeft } from './hud.js';
@@ -99,11 +99,12 @@ export function showNewGame(o, back) {
     const d = DIFFICULTIES[k];
     const pips = [0, 1, 2].map((n) => `<i${n <= i ? ' class="on"' : ''}></i>`).join('');
     // (how fast air, water and power are used, against the rated pace: "go 13% sooner" read as a mistake)
-    const drain = d.drain < 0.995 ? `${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `${Math.round((d.drain - 1) * 100)}% faster` : 'As rated';
+    // ("Consumption: as rated" asked a new player what was consumed, and rated by whom)
+    const drain = d.drain < 0.995 ? `Drain ${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `Drain ${Math.round((d.drain - 1) * 100)}% faster` : 'Normal drain';
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      `<dl><dt>Rescue</dt><dd>Sol ${d.rescueSol}</dd><dt>Consumption</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
+      `<dl><dt>Rescue on</dt><dd>Sol ${d.rescueSol}</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Wake at dawn'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
@@ -120,37 +121,57 @@ export function showNewGame(o, back) {
     { label: 'New game: choose a difficulty', onEscape: back });
   UI.overlay.classList.add('over-title');
   on(p, '[data-act="back"]', back);
-  on(p, '[data-diff]', (b) => { hideOverlay(); o.onNewGame(b.dataset.diff); });
+  on(p, '[data-diff]', (b) => {
+    const go = () => { hideOverlay(); o.onNewGame(b.dataset.diff); };
+    if (!o.saved) return go();
+    // (A run in hand is not replaced by one press: Restart in the pause menu asks first, and Begin, which does the
+    //  same thing, had only a line of small print beside Back.)
+    const again = () => showNewGame(o, back);
+    showOverlay({
+      kind: 'error', kicker: 'New game', title: 'Replace your saved run?',
+      body: `Starting a new game replaces your saved run: Sol ${o.saved.sol}${o.saved.region ? ', ' + esc(o.saved.region) : ''}, and everything you have built.`,
+      onEscape: again,
+      buttons: [
+        { label: 'Keep my run', ghost: true, keep: true, fn: again },
+        { label: 'Start a new game', danger: true, ghost: true, keep: true, fn: go },
+      ],
+    });
+    UI.overlay.classList.add('over-title');
+  });
 }
 
 // ------------------------------------------------------------------------------------------
 // What the bars are
 // ------------------------------------------------------------------------------------------
 /**
- * What each bar on the HUD is and what moves it. Opened from the pause menu, and on a phone by tapping
- * the bars themselves. (The premise card points at "the six bars"; nothing said what any of them was.)
+ * The Guide: what each bar on the HUD is and what moves it. Opened from the pause menu, and on a phone by pressing
+ * the bars themselves, whose chip carries the same word. It has one name wherever it is offered. (It was GUIDE on
+ * the chip, "What the bars mean" in the pause menu and "What keeps you alive" at its own head.)
+ *
+ * Each entry is a line to take in at a glance and, where there is more worth knowing, a second: in two columns, so
+ * that no line runs the width of a phone. (It was 150 words in lines of over a hundred characters.)
  */
 export function showBarsGuide(onDone) {
   dropPointer();
   const o2 = 'O<sub>2</sub>';
   const rows = [
-    ['suit', `Suit ${o2}`, `The air on your back: the ring shows how full the tank is. It drains outside and refills in the Hab, in the rover, or from an ${o2} candle. The time under it is how long that lasts at a walk. Empty, you start to die.`],
-    ['hab', `Hab ${o2}`, 'The air in the Hab. The oxygenator keeps it up while there is power; a breach lets it out.'],
-    ['water', 'Water', 'Litres in the tank. You drink some every sol and the farm drinks more. Burning hydrazine makes it.'],
-    ['food', 'Food', 'Meals: rations, potatoes and the pantry. Breakfast takes one each dawn, or two with something to go with it.'],
-    ['power', 'Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night empty it.'],
-    ['vitals', 'Vitals', 'Your body. It falls without air, water, food or sleep, and mends when you have them. At zero, the run is over.'],
-    ['mood', 'Morale', 'Your spirits. Variety on the plate, a cooked dinner, music, sights and comforts lift them; every sol alone lowers them. High, work goes a fifth faster; low, a fifth slower.'],
+    ['suit', `Suit ${o2}`, 'The air on your back.', `The ring is how full the tank is; the time under it, how long that lasts at a walk. It refills in the Hab, in the rover, or from a candle.`],
+    ['hab', `Hab ${o2}`, 'The air in the Hab.', 'The oxygenator keeps it up while there is power. A breach lets it out.'],
+    ['water', 'Water', 'Litres in the tank.', 'You and the farm drink it. Burning hydrazine makes more.'],
+    ['food', 'Food', 'Meals left.', 'Breakfast takes one each dawn, two with a side. The bar is full when there is enough to reach the rescue.'],
+    ['power', 'Power', 'The Hab’s battery.', 'Sun on clean panels fills it. The machines and the night drain it.'],
+    ['vitals', 'Vitals', 'Your body.', 'It falls without air, water, food or sleep. At zero the run is over.'],
+    ['mood', 'Morale', 'Your spirits, out of 100.', 'Good food, music and comforts lift them. High, work goes a fifth faster; low, a fifth slower.'],
+    ['chart', 'Arrows', 'Rising or falling.', 'An arrow beside a number shows which way it is going now.'],
   ];
-  // A sheet: the seven entries scroll between a fixed heading and a fixed foot, so "Got it" is on the screen at
+  // A sheet: the entries scroll between a fixed heading and a fixed foot, so "Got it" is on the screen at
   // every size. (As a plain dialog it was taller than a phone, and its one button was below the fold.)
   const done = () => { hideOverlay(); if (onDone) onDone(); };
   const p = openOverlay('sheet',
-    '<div class="sheet"><header class="sheet-hd"><div><span class="t-kicker">Field notes</span><h1 id="mg-dlg-title">What keeps you alive</h1></div></header>' +
-    `<div class="sheet-bd mg-scroll"><ul class="guide">${rows.map(([ic, name, text]) => `<li>${icon(ic)}<b>${name}</b><span>${text}</span></li>`).join('')}</ul>` +
-    '<p class="guide-n">A small arrow beside a number means it is rising or falling now.</p></div>' +
+    '<div class="sheet wide"><header class="sheet-hd"><h1 id="mg-dlg-title">Guide: what the bars mean</h1></header>' +
+    `<div class="sheet-bd mg-scroll"><ul class="guide">${rows.map(([ic, name, lead, text]) => `<li>${icon(ic)}<b>${name}</b><span><em>${lead}</em> ${text}</span></li>`).join('')}</ul></div>` +
     `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Got it</button></footer></div>`,
-    { label: 'What keeps you alive', onEscape: done, guard: true });
+    { label: 'Guide: what the bars mean', onEscape: done, guard: true });
   on(p, '[data-act="back"]', done);
 }
 
@@ -158,7 +179,7 @@ export function showBarsGuide(onDone) {
 // Pause
 // ------------------------------------------------------------------------------------------
 /**
- * o: { sol, time, diffName, rescueSol, region, onResume(), onRestart(), onQuit() }
+ * o: { sol, time, diffName, rescueSol, region, uplink (Earth has been told), onResume(), onRestart(), onQuit() }
  */
 export function showPauseMenu(o) {
   const again = () => showPauseMenu(o);
@@ -173,9 +194,10 @@ export function showPauseMenu(o) {
     '</nav></div>' +
     '<aside class="pause-side"><div class="kv">' +
     `<span>Rescue</span><b>Sol ${o.rescueSol}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
-    `<h3>Field notes</h3><p>The way home: stay fed, raise Earth on a radio, and be at the Ares 4 rocket in Schiaparelli on Sol ${o.rescueSol}.</p>` +
+    // (what is still to do, not what is done: it went on saying "raise Earth on a radio" after Houston had answered)
+    `<h3>The way home</h3><p>${o.uplink ? 'Stay fed, and reach the MAV in Schiaparelli' : 'Stay fed, find a radio and tell Earth, then reach the MAV in Schiaparelli'}: the only rocket on Mars. It can launch on Sol ${o.rescueSol}.</p>` +
     '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab.</p>' +
-    '<button type="button" class="mg-btn side-btn" data-act="bars">What the bars mean</button></aside>',
+    '<button type="button" class="mg-btn side-btn" data-act="bars">Guide: what the bars mean</button></aside>',
     { label: 'Paused', onEscape: resume });
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;
@@ -207,9 +229,16 @@ function seg(id, label, options, value) {
   return `<div class="mg-seg" role="radiogroup" aria-label="${label}" data-seg="${id}">` +
     options.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === value}" tabindex="${v === value ? 0 : -1}" data-v="${v}">${l}</button>`).join('') + '</div>';
 }
-function range(id, label, min, max, step, value, fmt) {
-  return `<input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
-    `style="--fill:${((value - min) / (max - min) * 100).toFixed(1)}%"><output for="set-${id}">${fmt(value)}</output>`;
+/**
+ * A slider. `mark` is given for a scale that does not run evenly either side of its usual value (80% to 140%, about
+ * 100%): the two ends of such a scale are lettered, and where the usual value lies is notched on the track. (With
+ * neither, a handle standing at "100%" a third of the way along looked like a handle out of place.)
+ */
+function range(id, label, min, max, step, value, fmt, mark) {
+  const at = (v) => ((v - min) / (max - min) * 100).toFixed(1), ends = mark !== undefined;
+  return (ends ? `<span class="range-end">${fmt(min)}</span>` : '') +
+    `<span class="mg-rangewrap"${ends ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
+    `style="--fill:${at(value)}%"></span>` + (ends ? `<span class="range-end">${fmt(max)}</span>` : '') + `<output for="set-${id}">${fmt(value)}</output>`;
 }
 function sw(id, label, onNow) {
   return `<button type="button" class="mg-switch" role="switch" aria-checked="${!!onNow}" aria-label="${label}" data-switch="${id}"></button>`;
@@ -230,10 +259,14 @@ export function showSettings(back, overTitle) {
     // graphics
     `<section class="set-sec" data-sec="graphics" style="grid-column:1/-1"><h3>${icon('monitor')}Graphics</h3>` +
     `<div class="set-row"><span class="lbl">Quality</span><div class="ctl">${seg('quality', 'Graphics quality', QUALITIES, quality)}</div>` +
-    '<p class="hint" id="set-q-hint"></p></div></section>' +
+    '<p class="hint" id="set-q-hint"></p></div>' +
+    // (the size of the interface is a matter of the display: here, the Graphics page of a phone is two rows on its
+    //  sheet where it was one over an empty sheet, and the Interface page the two switches)
+    `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct, 1)}</div>` +
+    '<p class="hint" id="set-scale-hint"></p></div></section>' +
     // controls
     `<section class="set-sec" data-sec="controls"><h3>${icon(layout.touch ? 'hand' : 'mouse')}Controls</h3>` +
-    `<div class="set-row"><label for="set-sensitivity">Look sensitivity</label><div class="ctl">${range('sensitivity', 'Look sensitivity', 0.3, 2.5, 0.05, settings.sensitivity, pct)}</div></div>` +
+    `<div class="set-row"><label for="set-sensitivity">Look sensitivity</label><div class="ctl">${range('sensitivity', 'Look sensitivity', 0.3, 2.5, 0.05, settings.sensitivity, pct, 1)}</div></div>` +
     `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div></section>` +
     // audio
     `<section class="set-sec" data-sec="sound"><h3>${icon('volume')}Sound</h3>` +
@@ -243,8 +276,6 @@ export function showSettings(back, overTitle) {
       `<div class="set-row"><label for="set-bus-${bus}">${label}</label><div class="ctl">${range('bus-' + bus, label + ' volume', 0, 1, 0.05, busVolume(bus), pct)}</div></div>`).join('') + '</section>' +
     // interface
     `<section class="set-sec" data-sec="interface" style="grid-column:1/-1"><h3>${icon('eye')}Interface</h3>` +
-    `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct)}</div>` +
-    '<p class="hint" id="set-scale-hint"></p></div>' +
     `<div class="set-row"><span class="lbl">Reduce motion</span><div class="ctl">${sw('reducedMotion', 'Reduce motion', reducedMotion())}</div>` +
     '<p class="hint">Stills the interface\'s animations and softens screen flashes.</p></div>' +
     `<div class="set-row"><span class="lbl">Colour-blind-safe colours</span><div class="ctl">${sw('colorBlind', 'Colour-blind-safe colours', settings.colorBlind)}</div>` +
@@ -260,7 +291,7 @@ export function showSettings(back, overTitle) {
   const qNote = () => {
     const q = savedQuality();
     const pending = running && ((q && q !== running) || (!q && quality !== 'auto'));
-    hint.textContent = (running ? `Running now: ${running}. ` : '') +
+    hint.textContent = (running ? `Running now: ${running.charAt(0).toUpperCase() + running.slice(1)}. ` : '') +
       (pending ? 'The new quality takes effect after a reload. Your progress is saved first.' : 'Auto picks for this device and lowers the resolution when the frame rate drops.');
     hint.classList.toggle('warn', !!pending);
     reload.hidden = !pending;
@@ -300,7 +331,7 @@ export function showSettings(back, overTitle) {
     });
   });
   p.querySelectorAll('[data-range]').forEach((r) => {
-    const out = r.nextElementSibling;
+    const out = r.closest('.ctl').querySelector('output');
     const key = r.dataset.range;
     const show = () => {
       r.style.setProperty('--fill', ((r.value - r.min) / (r.max - r.min) * 100).toFixed(1) + '%');
@@ -354,14 +385,15 @@ const TOUCH = [
   ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle'], ['Switch view', `${icon('eye')}View`],
   // (the four buttons at the top right carry their own names: one line for the three screens and one for the menu,
   //  and the whole list fits a phone held sideways without scrolling. A line apiece ran to seven rows.)
-  ['Journal, colony, map', 'Buttons, top right'], ['Pause, settings, photo mode', `${icon('pause')}Menu`],
+  ['The three screens', 'Top right'], ['Pause, settings, photo mode', `${icon('pause')}Menu`],
 ];
 export function showControls(back, which) {
   const mode = which || (layout.touch ? 'touch' : 'keys');
   const rows = (mode === 'touch' ? TOUCH : KEYBOARD).map(([a, k]) => `<div class="ctl-row"><span>${a}</span><span class="keys">${k}</span></div>`).join('');
   const p = openOverlay('sheet',
     '<div class="sheet"><header class="sheet-hd"><h1>Controls</h1>' +
-    (layout.touch ? seg('mode', 'Input', [['touch', 'Touch'], ['keys', 'Keyboard']], mode) : '') + '</header>' +
+    // (a tablet may have a keyboard on it; a phone held sideways does not, and was offered the keyboard's page)
+    (layout.touch && !layout.compact ? seg('mode', 'Input', [['touch', 'Touch'], ['keys', 'Keyboard']], mode) : '') + '</header>' +
     `<div class="sheet-bd mg-scroll"><div class="ctl-grid">${rows}</div></div>` +
     `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Done</button>` +
     '<span class="note">Look sensitivity and inverted look are in Settings.</span></footer></div>',
@@ -375,7 +407,7 @@ export function showControls(back, which) {
 // ------------------------------------------------------------------------------------------
 export function showCredits(back, overTitle) {
   const p = openOverlay('sheet',
-    '<div class="sheet"><header class="sheet-hd"><div><span class="t-kicker">About</span><h1>Stranded II</h1></div></header>' +
+    '<div class="sheet"><header class="sheet-hd"><div><span class="t-kicker">Stranded II</span><h1>Credits</h1></div></header>' +
     '<div class="sheet-bd mg-scroll"><div class="credits">' +
     '<section class="lead"><p>A survival game on a whole, real Mars: every mountain, canyon and crater where the orbiters measured it, and every lander where history left it. ' +
     'An unofficial fan project inspired by <b>The Martian</b> by Andy Weir.</p></section>' +
@@ -399,7 +431,9 @@ export function showSleep() {
   openOverlay('sleep', '<div class="sleep"><div class="zz">Sleeping</div><div class="sum"></div></div>', { label: 'Sleeping until dawn' });
 }
 /**
- * d: { sol, deltas: [{ icon, label, from, to, unit }], notes: [text] }
+ * d: { sol, turned, deltas: [{ icon, label, from, to, unit }], rows: [[name, text, more]...], later }
+ * A row's `more` is detail that is there for the asking (why morale moved, part by part): a button beside Start
+ * the day shows it.
  * Returns whether the account is up with its button (if not, the caller must not wait for a tap).
  */
 export function showSleepSummary(d, onDone) {
@@ -408,21 +442,32 @@ export function showSleepSummary(d, onDone) {
   const deltas = d.deltas.map((x) => {
     // (The change overnight, and under it what that leaves: both in whole numbers, as the gauges give them, so the
     //  change is the difference between two figures he can see. It was "+6.8%" over "now 100%". A unit that is a
-    //  word or a letter stands off from its figure, as everywhere else: "66 L", not "66L".)
-    const v = Math.round(x.to) - Math.round(x.from), u = x.unit === '%' ? '%' : x.unit ? '\u00a0' + x.unit : '';
-    return `<div class="delta"><b class="t-num ${v > 0 ? 'up' : v < 0 ? 'dn' : ''}">${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}${u}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${u}</i></div>`;
+    //  letter stands off from its figure, as everywhere else: "66 L", not "66L". One that is a word, "meals", goes
+    //  with what is left and not with the change; and morale, a score, has none.)
+    const v = Math.round(x.to) - Math.round(x.from), u = x.unit === '%' ? '%' : x.unit ? '\u00a0' + x.unit : '', du = x.unit && x.unit.length > 1 ? '' : u;
+    return `<div class="delta"><b class="t-num ${v > 0 ? 'up' : v < 0 ? 'dn' : ''}">${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}${du}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${u}</i></div>`;
   }).join('');
   // the first thing still to do, as the mission list has it
   const todo = missionList().find((e) => !e.done);
-  const today = todo ? todo.o.text() : '';
+  const rows = (d.rows || []).slice();
+  if (todo) rows.push(['Today', todo.o.text(), '', 'today']);
+  if (d.later) rows.push(['Later', d.later, '', 'later']);
+  const more = rows.find((r) => r[2]);
   box.querySelector('.sum').innerHTML =
     `<div class="solbig"><span>${d.turned === false ? 'Still sol' : 'Dawn · Sol'}</span>${d.sol}</div><div class="deltas">${deltas}</div>` +
-    // (the notes are the part that gives way when there is much to say on a small phone: they scroll, and the
-    //  heading, the five figures and the button keep their places)
-    `<div class="notes mg-scroll">${d.notes.map((n) => `<div>${chem(esc(n))}</div>`).join('')}${today ? `<div class="today"><b>Today</b> ${chem(esc(today))}</div>` : ''}` +
-    `${d.later ? `<div class="today later"><b>Later</b> ${chem(esc(d.later))}</div>` : ''}</div>` +
-    (onDone ? `<button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` : '');
+    // (the rows are the part that gives way when there is much to say on a small phone: they scroll, and the
+    //  heading, the five figures and the buttons keep their places)
+    `<dl class="notes mg-scroll">${rows.map(([k, v, m, cls]) => `<dt${cls ? ` class="${cls}"` : ''}>${esc(k)}</dt><dd>${chem(esc(v))}${m ? `<span class="more" hidden>${chem(esc(m))}</span>` : ''}</dd>`).join('')}</dl>` +
+    (onDone ? `<div class="sleep-ft"><button type="button" class="mg-btn primary wake" data-autofocus>${icon('sun')}Start the day</button>` +
+      (more ? `<button type="button" class="mg-btn why" aria-expanded="false">Why ${esc(more[0].toLowerCase())} moved</button>` : '') + '</div>' : '');
   box.classList.add('done');
+  const w = box.querySelector('.sleep-ft .why');
+  if (w) w.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const m = box.querySelector('.notes .more'), open = m.hidden;
+    m.hidden = !open; w.setAttribute('aria-expanded', open); Snd.click();
+    if (open && m.scrollIntoView) m.scrollIntoView({ block: 'nearest' });
+  });
   const b = box.querySelector('.wake');
   if (b) { b.addEventListener('click', (ev) => { ev.stopPropagation(); onDone(); }); try { b.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ } }
   return !!b;
@@ -433,8 +478,9 @@ export function showSleepSummary(d, onDone) {
 // ------------------------------------------------------------------------------------------
 let commsTimer = null;
 /**
- * o: { title, subtitle, lines: [[who ('n' = Houston, anything else = Watney), text]...], index, onNext() }
- * Shows lines 0..index; the newest types itself out. The button calls onNext.
+ * o: { title, subtitle, lines: [[who ('n' = Houston, anything else = Watney), text]...], index, onNext(), onSkip() }
+ * Shows lines 0..index; the newest types itself out. The button calls onNext; "Skip to the end", where the caller
+ * gives one, shows every line at once (the only way out of a six-message exchange was Next six times).
  */
 export function showComms(o) {
   clearInterval(commsTimer);
@@ -445,8 +491,10 @@ export function showComms(o) {
     `<div class="comms"><header class="comms-hd">${icon('dish')}<div><h1>${esc(o.title)}</h1><p>${esc(o.subtitle || '')}</p></div>` +
     '<span class="live"><i></i>LINK</span></header>' +
     `<div class="comms-log mg-scroll" aria-live="polite">${rows}</div>` +
-    `<footer class="comms-ft"><span class="prog">MSG ${String(o.index + 1).padStart(2, '0')} / ${String(o.lines.length).padStart(2, '0')}</span>` +
-    `<button type="button" class="mg-btn primary" data-autofocus>${last ? 'Close channel' : `Next${icon('next')}`}</button></footer></div>`,
+    // (the button that goes on is at the left of the foot, where Done, Back and Cancel are on every sheet)
+    `<footer class="comms-ft"><button type="button" class="mg-btn primary" data-act="next" data-autofocus>${last ? 'Close channel' : `Next${icon('next')}`}</button>` +
+    (!last && o.onSkip ? '<button type="button" class="mg-btn" data-act="skip">Skip to the end</button>' : '') +
+    `<span class="prog">Message ${o.index + 1} of ${o.lines.length}</span></footer></div>`,
     { label: o.title, guard: true });
   const logEl = p.querySelector('.comms-log');
   const tx = logEl.lastElementChild.querySelector('.tx');
@@ -463,7 +511,9 @@ export function showComms(o) {
     }, 22);
   }
   logEl.scrollTop = logEl.scrollHeight;
-  p.querySelector('.comms-ft button').addEventListener('click', (ev) => { ev.stopPropagation(); clearInterval(commsTimer); o.onNext(); });
+  p.querySelector('.comms-ft [data-act="next"]').addEventListener('click', (ev) => { ev.stopPropagation(); clearInterval(commsTimer); o.onNext(); });
+  const skip = p.querySelector('.comms-ft [data-act="skip"]');
+  if (skip) skip.addEventListener('click', (ev) => { ev.stopPropagation(); clearInterval(commsTimer); o.onSkip(); });
 }
 
 // ------------------------------------------------------------------------------------------
@@ -478,7 +528,7 @@ export function showChoice(o) {
   const rows = o.items.map((it, i) =>
     `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${esc(it.label)}</span>` +
     `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
-    `${it.note ? `<span class="ch-t">${chem(esc(it.note))}</span>` : ''}</button>`).join('');
+    `${it.note ? `<span class="ch-t">${chem(esc(it.note))}</span>` : ''}<span class="ch-go" aria-hidden="true">${icon('next')}</span></button>`).join('');
   const p = openOverlay('dialog',
     `<div class="dlg pick"><div class="dlg-bd mg-scroll">${o.kicker ? `<div class="t-kicker">${esc(o.kicker)}</div>` : ''}<h1 id="mg-dlg-title">${esc(o.title)}</h1>` +
     `<div class="choices n${o.items.length}">${rows}</div></div>` +
@@ -494,7 +544,9 @@ export function showChoice(o) {
 
 // test and debug handle (tools/tests/ui-shots.mjs drives every view through this)
 window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings, showControls, showCredits, showSleep, showSleepSummary, showComms, showChoice,
-  showOverlay, hideOverlay, toast, log, settings, setSetting, resetSettings, layout,
+  showOverlay, hideOverlay, toast, holdCards, log, logHistory, setPrompt, showBarsGuide, settings, setSetting, resetSettings, layout,
+  /** what the map lettered on its canvas at its last drawing (the audit holds it to the sizes of the page's own text) */
+  get mapLettering() { return UI.mapLettering || []; },
   /** the name of the region at a latitude and longitude (so a test's made-up title screen can name the real place) */
   regionAt: (lat, lon) => regionName(llToVec(lat, lon)),
   suitTimeLeft, missionList, objectives: OBJECTIVES };

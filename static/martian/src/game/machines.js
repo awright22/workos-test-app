@@ -83,8 +83,9 @@ export function serviceCost(id) {
 function canService(id) {
   const cost = serviceCost(id);
   if (!cost) return `The ${MACHINES[id].name} is in good order (${Math.round(mach()[id])}%)`;
-  if ((S.inv.scrap || 0) < cost.scrap) return `Servicing the ${MACHINES[id].name} now needs scrap metal`;
-  if ((S.inv.circuit || 0) < cost.circuit) return `The ${MACHINES[id].name} has failed: needs scrap and a circuit board`;
+  // (a refusal in the prompt's form: what is wanting, and after the colon what to do about it; ui/dom.js, setPrompt)
+  if ((S.inv.scrap || 0) < cost.scrap) return 'Needs scrap metal: salvage debris or an old lander';
+  if ((S.inv.circuit || 0) < cost.circuit) return 'Needs a circuit board: salvage an old lander';
   return true;
 }
 export function service(id) {
@@ -99,7 +100,9 @@ export function service(id) {
   emit('machine-serviced', { id });
   return true;
 }
-const label = (id) => { const c = serviceCost(id); return `Service the ${MACHINES[id].name} (${Math.round(mach()[id])}%${c && c.circuit ? ', scrap + circuit' : c && c.scrap ? ', 1 scrap' : ''})`; };
+// (a prompt is a line and a line under it: what holding does, and what it stands at and costs)
+const label = (id) => `Service the ${MACHINES[id].name}`;
+const cost = (id) => { const c = serviceCost(id); return `At ${Math.round(mach()[id])}% · ${c && c.circuit ? 'costs scrap and a circuit' : c && c.scrap ? 'costs 1 scrap' : 'costs nothing yet'}`; };
 
 const _p = new THREE.Vector3();
 function addService(id, where, o = {}) {
@@ -108,6 +111,7 @@ function addService(id, where, o = {}) {
     visible: () => !S.flags.coldOpen && S.flags.didMath && mach()[id] < 85 && (!o.visible || o.visible()),
     enabled: () => canService(id),
     label: () => label(id),
+    sub: () => cost(id),
     use: () => service(id),
   });
 }

@@ -1,13 +1,21 @@
 import { workRate } from './farm.js';
 import { S } from './state.js';
 import { screenOpen } from '../ui/screens.js';
-import { setPrompt } from '../ui/dom.js';
+import { UI, setPrompt } from '../ui/dom.js';
 import { World } from '../world/build.js';
 import { player } from './player.js';
 import { groundDist } from '../planet/geo.js';
 import { input } from './input.js';
 import { clamp } from '../core/math.js';
 // One verb for everything: find the nearest usable thing, show the prompt, run the hold timer.
+//
+// Two kinds of thing can be done. Most are in reach: a bed, a machine, the rover. A few can be done anywhere he
+// stands (digging the open ground): these are "ambient", given priority 9 so that anything in reach comes first.
+// The rule for an ambient one is that it is offered only with a reason. Its `visible` says when something wants it
+// (game/interactables.js, digOffer), and it is never offered while the first line of the mission is a red one: with
+// 27 seconds of air and "Run for air" on the list, the game was offering slow digging. An interaction may also name
+// the task it belongs to (`task`, an objective's id or a function giving one): standing at it, that task is the one
+// the HUD leads with (ui/hud.js).
 export const interactables = [];
 export function addI(def) { interactables.push(def); if (def.priority === undefined) def.priority = 0; }
 
@@ -21,6 +29,7 @@ export function updateInteract(dt) {
   for (const it of interactables) {
     if (it.mode && it.mode !== S.mode) continue;
     if (it.visible && !it.visible()) continue;
+    if (it.priority >= 9 && UI.urgentTask) continue;      // (ambient: never under a red task)
     const p = it.pos();
     if (!p) continue;
     const d = groundDist(pp, p);

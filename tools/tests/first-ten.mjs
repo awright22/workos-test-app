@@ -50,7 +50,9 @@ await shot('crash-first-seconds', 'The game begins: he comes to on the sand, som
 // the suit's countdown looked stuck)
 await ev((G) => { G.paused = true; G.tick(0.05, 180); });
 await shot('crash-after-ten-seconds', 'Ten seconds in, nothing touched.', 1200);
-await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 10); });
+// (he is put there, not walked: the 45 m he would have walked are counted, since the two hints about the stick go once
+//  he has walked a few metres, and a picture of him "walking" with them still up is not what a player sees)
+await ev((G) => { G.S.stats.walked += 45; G.tpLocal(0, 30, 0); G.tick(0.05, 10); });
 await shot('approaching-hab', 'Walking toward the Hab.');
 await ev((G) => { G.tpLocal(0, 10.0, 0); G.tick(0.05, 6); });
 await shot('at-the-airlock', 'At the airlock door.');
@@ -104,7 +106,10 @@ await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 30000 });
 await shot('night-summary', 'Sleeping until dawn: the account of the night, which waits to be read.', 2200);       // (past its fade-in, which software rendering stretches)
 await tapSel('#mg-panel .sleep .wake');
 await shot('woken', 'Awake again.', 4000);
-await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 20000);
+// (twenty seconds of the game's own time, stepped, as with the first ten: left to run, this machine drew a handful of
+// frames in twenty seconds of the wall clock, and what goes after a few seconds of play was photographed still there)
+await ev((G) => { G.paused = true; G.tick(0.05, 400); });
+await shot('sol-2-morning', 'The morning of Sol 2, twenty seconds in.', 1200);
 
 await writeFile(path.join(dir, 'steps.txt'), steps.join('\n') + '\n');
 console.log('console errors:', g.errors.length, g.errors.slice(0, 5));

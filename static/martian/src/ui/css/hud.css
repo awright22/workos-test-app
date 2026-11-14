@@ -440,7 +440,12 @@
 
 /* ================================================================ phones: nothing under 11 px
    (the interface's rem falls below 16 px on a small phone, so these are held in real pixels) */
-.mg-compact { --t11: max(.6875rem, 11px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); }
+/* (Sixth review: the floor is 12 px. Two more sizes are named for what they are for: --tcap, 14 px, for a label in
+   capitals, which is as tall as its capitals and no taller, so that 13 px of it measured as "about 10 px" beside the
+   text it labelled; and 13 px for the condensed face in lower case, which is narrow and small on its body. The name
+   --t11 is kept for the rules that use it: what they set is now 12 px.) */
+.mg-compact { --t11: max(.75rem, 12px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); --tcap: max(.875rem, 14px); }
+#mg-root:not(.mg-compact) { --tcap: max(.8125rem, 13px); }
 .mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
 .mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
 .mg-compact .suit .st { font-size: var(--t13); }
@@ -617,21 +622,21 @@
    footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
    under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
    holds both. */
-.mg-compact .row .lb { font-size: var(--t13); letter-spacing: .03em; }
+.mg-compact .row .lb { font-size: var(--tcap); letter-spacing: .03em; }
 .mg-compact { --grow: calc(.8 * var(--t14) + 1px + var(--gh)); }
-.mg-compact #mg-compass .dists span { font-size: var(--t13); letter-spacing: .02em; }
-.mg-compact #mg-region { font-size: var(--t13); letter-spacing: .12em; text-indent: .12em; }
+.mg-compact #mg-compass .dists span { font-size: var(--tcap); letter-spacing: .02em; }
+.mg-compact #mg-region { font-size: var(--tcap); letter-spacing: .12em; text-indent: .12em; }
 @keyframes mg-region-in-c { 0% { letter-spacing: .4em; text-indent: .4em; background: var(--accent-wash); } 100% { letter-spacing: .12em; text-indent: .12em; } }
-.mg-compact #mg-clock .sol .k { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact .alert { font-size: var(--t13); letter-spacing: .08em; }
+.mg-compact #mg-clock .sol .k { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact .alert { font-size: var(--tcap); letter-spacing: .08em; }
 .mg-compact .mg-line { grid-template-columns: 3rem 1fr; }
-.mg-compact .mg-line .who { font-size: var(--t13); letter-spacing: .04em; }
-.mg-compact .toast .t1 { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact #mg-rover .spd span { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--t13); letter-spacing: .12em; }
-.mg-compact #mg-keys { font-size: var(--t13); letter-spacing: .1em; }
-.mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .ph-title { font-size: var(--t13); }
+.mg-compact .mg-line .who { font-size: var(--tcap); letter-spacing: .04em; }
+.mg-compact .toast .t1 { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact #mg-rover .spd span { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact #mg-prompt .ph, .mg-compact #mg-prompt.minor .ph { font-size: var(--tcap); letter-spacing: .12em; }
+.mg-compact #mg-keys { font-size: var(--tcap); letter-spacing: .1em; }
+.mg-compact .ph-s span, .mg-compact .ph-btns .mg-btn, .mg-compact .ph-looks button { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .ph-title { font-size: var(--tcap); }
 @media (max-width: 760px) {
   /* (the narrowest phones: the name of the place stands between the bars and the mission list, in what room there is) */
   .mg-compact #mg-region { letter-spacing: 0; text-indent: 0; padding-left: .25rem; padding-right: .25rem; }
@@ -641,3 +646,100 @@
   .mg-compact .alert .ic { display: none; }
   .mg-compact .res .row { width: 7.375rem; }
 }
+
+/* ================================================================ sixth review
+   The prompt means "something is here". A reading, and on a touch screen an offer that is always there, are put
+   away after a few seconds (ui/dom.js); the pill is as wide as its longest line (its width is measured there). */
+#mg-prompt.rest { visibility: hidden; opacity: 0; }
+#mg-prompt .pt { flex: 0 1 auto; min-width: 0; }
+/* a refusal is two lines, as every prompt is: what is wanting, and under it what to do about it */
+#mg-prompt.no .lb { color: var(--ink); font-weight: 500; }
+#mg-prompt.no .sub { color: var(--ink-2); }
+
+/* The log's voices. The Hab reporting is in the plain colour; its alarms are red; a remark with no speaker is a note.
+   (Everything the Hab said was red, and so was a line about a dust devil.) */
+.mg-line.sys { border-left-color: var(--ink-3); }
+.mg-line.sys .who { color: var(--ink-2); }
+.mg-line.alarm { border-left-color: var(--danger); }
+.mg-line.alarm .who { color: var(--danger); }
+.mg-line.note { border-left-color: var(--ink-4); }
+.mg-line.note .who { color: var(--ink-3); }
+
+/* A bar, or a button, is lit while the card that introduces it is up (ui/dom.js lights it and puts it out). */
+.row.fresh .lb, .row.fresh .ic { color: var(--accent); }
+.mg-compact .row.fresh { background: var(--accent-wash); box-shadow: 0 0 0 2px var(--accent-wash), 0 0 0 3px var(--accent); }
+.mg-compact .row.fresh .lb { color: var(--accent); }
+/* with one bar or five, the panel keeps the bars at its head: each new one comes in under the last */
+.mg-compact #mg-vitals { align-items: flex-start; }
+.mg-compact .suit { align-self: center; }
+
+/* The guide's chip is a button to look at: the width of the dial's column and 28 px tall, in the frame the touch
+   buttons have. The whole panel is still what is pressed. (It was a pill 54 by 18.) */
+.mg-touch.mg-compact .suit .help { align-self: stretch; justify-content: center; height: max(1.75rem, 28px); padding: 0 .375rem; border: 1px solid rgba(245, 240, 232, .4); border-radius: .375rem;
+  background: rgba(245, 240, 232, .08); font-size: var(--t13); letter-spacing: .08em; }
+.mg-touch.mg-compact .suit .help i { font-size: var(--t14); }
+
+/* gauge units are words to be read: 13 px beside a 14 px figure, told apart by weight and colour */
+.mg-compact .row .val small { font-size: var(--t13); font-weight: 500; margin-left: .2em; letter-spacing: .01em; }
+.mg-compact .suit .num small { font-size: var(--t13); }
+
+/* The clock says what its second figure is: "SOL 1 · RESCUE SOL 25" (ui/hud.js leaves it out until he knows of it). */
+#mg-clock .sol, #mg-clock .meta { white-space: nowrap; flex: none; }
+#mg-clock .sol .of i { font-style: normal; color: var(--ink-3); margin-right: .25em; }
+/* (a phone's clock is a line of its own, with room for "SOL 1  RESCUE 25"; on a wide screen the clock shares its line
+   with the time and the temperature, and the rescue heads the mission list under it: "MISSION … RESCUE SOL 25") */
+#mg-root:not(.mg-compact) #mg-clock .sol .of { display: none; }
+#mg-objectives .hd b { letter-spacing: .14em; }
+@media (max-width: 760px) { .mg-compact #mg-clock { gap: .4375rem; } .mg-compact #mg-clock .meta .dn, .mg-compact #mg-clock .meta .sep { display: none; } }
+#mg-clock .sol .of:not(:empty) { margin-left: .625rem; text-transform: uppercase; letter-spacing: .08em; }
+.mg-compact #mg-clock .sol .of:not(:empty) { margin-left: .5rem; font-size: var(--t13); font-weight: 600; letter-spacing: .04em; color: var(--ink); }
+.mg-compact #mg-clock .sol .of i { color: var(--ink-2); font-weight: 500; }
+.mg-compact #mg-clock { gap: .625rem; }
+.mg-compact #mg-clock .meta { font-size: var(--t13); }
+
+/* The task card on a phone: solid enough that what is behind it never shows through its text; its reason at 12 px in
+   a colour that reads; and under its first line the way out, when the way leads through the airlock:
+   "AIRLOCK · 12 m  then HEAP 34 m". Closed (the reason read and put away), it carries a mark that it opens. */
+.mg-compact #mg-objectives { background: rgba(14, 12, 11, .9); }
+.mg-compact .obj .why { font-size: var(--t12); line-height: 1.3; color: rgba(245, 240, 232, .86); margin-top: .125rem; }
+.obj .nx { display: none; }
+.mg-compact #mg-objectives .obj.primary .at, .mg-compact #mg-objectives .obj.urgent.first .at { display: flex; flex-wrap: wrap; column-gap: .3125rem; }
+.mg-compact #mg-objectives .obj.primary .nx:not(:empty), .mg-compact #mg-objectives .obj.urgent.first .nx:not(:empty) { display: inline; margin-left: .3125rem; font: 500 var(--t12)/1.3 var(--f-body); color: var(--ink-2); white-space: nowrap; }
+.mg-compact #mg-objectives .obj .nx b { font: 600 var(--t13)/1.25 var(--f-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.mg-touch #mg-objectives { pointer-events: auto; cursor: pointer; }
+.mg-touch.mg-compact #mg-objectives { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+/* (the mark stands at the end of the line that names the place: beside the title it took a rem of the title's own
+   line, and a title that stood on one line open ran to two closed) */
+.mg-compact #mg-objectives.shut .obj.primary .at::after, .mg-compact #mg-objectives.shut .obj.urgent.first .at::after { content: ""; margin: 0 .1875rem .1875rem auto; align-self: center; width: .375rem; height: .375rem;
+  border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(45deg); }
+
+/* the compass: the mission's own mark is named and no more (its distance is on the first line of the list) */
+#mg-compass .dists span b:empty { display: none; }
+
+/* a banner's second line is read in a hurry: 13 px, and the banner has the width between the bars and the list */
+.mg-compact .alert small { font-size: var(--t13); line-height: 1.15; }
+@media (max-width: 760px) { .mg-compact .alert { max-width: 9.375rem; } .mg-compact .mg-line { font-size: var(--t12); } }
+
+/* what is said on a card or in the log on a phone is 12 px at the least */
+.mg-compact .toast .t3, .mg-compact .mg-line { font-size: var(--t12); }
+
+/* photo mode: the way out is the first of its buttons, at the left, as on every sheet */
+.ph-btns [data-act="done"] { order: -1; }
+
+/* capitals at 14 px on a phone: the labels that are set outside the section that lists the rest */
+.mg-compact .suit .cap, .mg-compact .suit .st, .mg-touch.mg-compact .suit .help { font-size: var(--tcap); }
+.mg-compact #mg-objectives .obj.primary .pl, .mg-compact #mg-objectives .obj.urgent.first .pl, .mg-compact #mg-objectives .obj .nx b { font-size: var(--tcap); }
+.mg-compact #mg-clock .sol .of:not(:empty) { font-size: var(--tcap); }
+
+/* (an arrowhead at the edge of the screen has no number, and no empty plate where one would be) */
+#mg-way b:empty { display: none; }
+/* (the letters of the compass are read at a glance: 14 px on a phone, where N stood at 12.5) */
+.mg-compact #mg-compass .cards span { font-size: var(--t14); }
+
+/* the first minute's two hints, on the small phone: between the stick and JUMP, with a margin (at 14 px they reached 6 px into JUMP) */
+@media (max-width: 760px) { .mg-touch.is-cold #mg-keys { left: calc(50% - 1.5rem); letter-spacing: .03em; gap: .25rem; } .mg-touch.is-cold #mg-keys span { padding: .3125rem .5rem; } }
+
+/* Closed, the card is the one thing to do and where: the lines under it go with its reason, and come back with it.
+   (On the small phone the room the reason gave up was taken by the next line, and the card was no shorter.) A
+   second line that is itself a red one stays. */
+.mg-compact #mg-objectives.shut .obj:not(.primary):not(.urgent):not(.done) { display: none; }

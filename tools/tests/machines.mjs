@@ -53,7 +53,7 @@ s = await ev((G) => {
   G.hold(3.2);
   return { oxy, oxyAfter, suit, suitAfter: G.S.machines.suit };
 });
-check('the oxygenator and the suit rack offer a service and take it', /Service the oxygenator \(62%\)/.test(s.oxy || '') && s.oxyAfter > 99.9 && /Service the suit scrubber \(55%/.test(s.suit || '') && s.suitAfter > 99.9, s);
+check('the oxygenator and the suit rack offer a service and take it', /^Service the oxygenator$/.test(s.oxy || '') && s.oxyAfter > 99.9 && /^Service the suit scrubber$/.test(s.suit || '') && s.suitAfter > 99.9, s);
 
 s = await ev((G) => {
   const top0 = G.roverTopSpeed ? 0 : 0;
@@ -75,7 +75,7 @@ s = await ev((G) => {
   return { after10km, suit, label, rover: G.S.machines.rover, scrap: G.S.inv.scrap };
 });
 check('driving wears the rover, walking outside wears the scrubber', Math.abs(s.after10km - 80) < 0.5 && Math.abs(s.suit - 89) < 0.5, s);
-check('the rover is serviced from behind it', /Service the rover drivetrain \(45%, 1 scrap\)/.test(s.label || '') && s.rover === 100 && s.scrap === 0, s);
+check('the rover is serviced from behind it', /^Service the rover drivetrain$/.test(s.label || '') && s.rover === 100 && s.scrap === 0, s);
 
 s = await ev((G) => {
   G.S.machines.oxygenator = 33; G.S.machines.rover = 71;

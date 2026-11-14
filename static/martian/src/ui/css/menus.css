@@ -511,32 +511,32 @@
    footer and a dozen other places. On a phone every label in capitals is now 13 px (9 px of letter); the caption
    under an icon on a touch button, which is half of a label and has 46 px to stand in, is 12. tests/audit-lib.mjs
    holds both. */
-.mg-compact .t-kicker, .mg-compact .dlg h2 { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact .stat span { font-size: var(--t13); letter-spacing: .04em; color: var(--ink-2); }
-.mg-compact .title-foot { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
-.mg-compact .menu-col .tag { font-size: var(--t13); letter-spacing: .16em; }
-.mg-compact .menu-item .mi-s { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
-.mg-compact .pause-side .kv { font-size: var(--t13); letter-spacing: .08em; color: var(--ink-2); }
-.mg-compact .pause-side h3, .mg-compact .credits section h3, .mg-compact .set-sec h3 { font-size: var(--t13); letter-spacing: .16em; }
-.mg-compact .diff .dx { font-size: var(--t13); letter-spacing: .1em; }
+.mg-compact .t-kicker, .mg-compact .dlg h2 { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact .stat span { font-size: var(--tcap); letter-spacing: .04em; color: var(--ink-2); }
+.mg-compact .title-foot { font-size: var(--tcap); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .menu-col .tag { font-size: var(--tcap); letter-spacing: .16em; }
+.mg-compact .menu-item .mi-s { font-size: var(--tcap); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .pause-side .kv { font-size: var(--tcap); letter-spacing: .08em; color: var(--ink-2); }
+.mg-compact .pause-side h3, .mg-compact .credits section h3, .mg-compact .set-sec h3 { font-size: var(--tcap); letter-spacing: .16em; }
+.mg-compact .diff .dx { font-size: var(--tcap); letter-spacing: .1em; }
 .mg-compact .diff .dx em { letter-spacing: .08em; }
-.mg-compact .diff dt { font-size: var(--t13); letter-spacing: .04em; color: var(--ink-2); }
-.mg-compact .mg-seg button { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact .ctl-row .keys { font-size: var(--t13); }
+.mg-compact .diff dt { font-size: var(--tcap); letter-spacing: .04em; color: var(--ink-2); }
+.mg-compact .mg-seg button { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact .ctl-row .keys { font-size: var(--tcap); }
 .mg-compact .dlg .steps li { grid-template-columns: 3.75rem 1fr; }
-.mg-compact .dlg .steps b { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact .dlg blockquote cite { font-size: var(--t13); letter-spacing: .08em; }
-.mg-compact .sleep .delta > span { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .sleep .notes .today b { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact .choice .ch-n { font-size: var(--t13); letter-spacing: .04em; }
+.mg-compact .dlg .steps b { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact .dlg blockquote cite { font-size: var(--tcap); letter-spacing: .08em; }
+.mg-compact .sleep .delta > span { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .sleep .notes .today b { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact .choice .ch-n { font-size: var(--tcap); letter-spacing: .04em; }
 /* (a crop's timings are a line to read, not a label: in lower case, where it was capitals too long for its card) */
 .mg-compact .choice .ch-s { font: 500 var(--t12)/1.25 var(--f-body); letter-spacing: 0; text-transform: none; }
-.mg-compact .guide li b { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .comms-hd .live, .mg-compact .comms-ft .prog { font-size: var(--t13); }
-.mg-compact .msg .who { font-size: var(--t13); letter-spacing: .06em; }
-.mg-compact .ld-row { font-size: var(--t13); letter-spacing: .14em; }
-.mg-compact .mg-btn.small { font-size: var(--t13); }
-.mg-compact .sheet-ft .mg-btn, .mg-compact .dlg .mg-btn, .mg-compact .comms-ft .mg-btn { font-size: max(.875rem, 13px); }
+.mg-compact .guide li b { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .comms-hd .live, .mg-compact .comms-ft .prog { font-size: var(--tcap); }
+.mg-compact .msg .who { font-size: var(--tcap); letter-spacing: .06em; }
+.mg-compact .ld-row { font-size: var(--tcap); letter-spacing: .14em; }
+.mg-compact .mg-btn.small { font-size: var(--tcap); }
+.mg-compact .sheet-ft .mg-btn, .mg-compact .dlg .mg-btn, .mg-compact .comms-ft .mg-btn { font-size: var(--tcap); }
 @media (max-width: 760px) {
   .mg-compact .newgame .diff dt { letter-spacing: 0; }
   .mg-compact .stat span { letter-spacing: 0; }
@@ -558,3 +558,94 @@
   .mg-compact #mg-overlay.k-win .dlg .t-kicker { margin-bottom: .3125rem; }
   .mg-compact #mg-overlay.k-win .stat { padding-top: .25rem; padding-bottom: .25rem; }
 }
+
+/* ================================================================ sixth review */
+/* A dialog's last line, set apart under the word LATER: where all of this is going (the numbers card). */
+.dlg-later { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .875rem; align-items: baseline; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--line-2);
+  font-size: .9375rem; line-height: 1.45; color: var(--ink-2); }
+.dlg-later b { font: 600 .8125rem/1.4 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--cold); }
+.mg-compact .dlg-later { margin-top: .5rem; padding-top: .4375rem; column-gap: .625rem; font-size: var(--t12); line-height: 1.4; }
+.mg-compact .dlg-later b { font-size: var(--t13); letter-spacing: .12em; }
+
+/* The night's account: under the five figures, rows with a name each, set from the left like a page of a logbook.
+   (They were sentences centred one under another, the longest of them a sum in brackets.) What morale's change is
+   made of is there for the asking, by the button beside Start the day. */
+.sleep .notes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .375rem 1.125rem; align-items: baseline; text-align: left; }
+.sleep .notes dt { font: 600 .8125rem/1.4 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
+.sleep .notes dd { color: var(--ink); text-wrap: pretty; }
+.sleep .notes dt.today { color: var(--accent); }
+.sleep .notes dt.later { color: var(--cold); }
+.sleep .notes dt.later + dd { color: var(--ink-2); }
+.sleep .notes .more { display: block; color: var(--ink-2); }
+.sleep-ft { flex: none; align-self: stretch; display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+.sleep .sleep-ft .wake { margin-top: 0; }
+.mg-compact .sleep .notes { gap: .1875rem .875rem; font-size: var(--t13); line-height: 1.35; }
+.mg-compact .sleep .notes dt { font-size: var(--t13); letter-spacing: .1em; }
+.mg-compact .sleep-ft { margin-top: .75rem; }
+@media (max-width: 760px) { .mg-compact .sleep-ft { margin-top: .5rem; } }
+/* (what is left stands as large as its label: "now 65 L" was the smallest thing on the sheet) */
+.mg-compact .sleep .delta i { font-size: var(--t13); letter-spacing: .04em; }
+
+/* The guide to the bars: two columns of short entries; the first words of each say what the thing is. */
+.sheet .guide { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem 2.25rem; }
+.guide li { grid-template-columns: 1.25rem 4.75rem minmax(0, 1fr); }
+.guide li em { font-style: normal; font-weight: 500; color: var(--ink); }
+.mg-compact .sheet .guide { gap: .4375rem 1.25rem; }
+.mg-compact .guide li { grid-template-columns: 1rem 3.875rem minmax(0, 1fr); gap: .4375rem; line-height: 1.32; }
+
+/* A slider whose scale runs from under 100% to well over it carries a notch where 100% is. */
+.mg-rangewrap { position: relative; display: inline-flex; align-items: center; --th: .875rem; }
+.mg-touch .mg-rangewrap { --th: max(2.75rem, 44px); }
+.mg-rangewrap[data-mark]::before { content: ""; position: absolute; left: calc(var(--th) / 2 + (100% - var(--th)) * var(--mark) - 1px); top: 50%; width: 2px; height: .875rem; margin-top: -.4375rem;
+  background: var(--ink-3); pointer-events: none; }
+
+/* The uplink's foot: the button that goes on at the left, as on every sheet; the count of messages at the right. */
+.comms-ft .prog { flex: 1; text-align: right; font-family: var(--f-cond); letter-spacing: .12em; text-transform: uppercase; }
+
+/* A choice is pressed: each row carries the mark that says so. */
+.choice { position: relative; padding-right: 2.5rem; }
+.choice .ch-go { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); display: grid; color: var(--ink-3); }
+.choice .ch-go .ic { width: 1.125rem; height: 1.125rem; }
+.choice:hover .ch-go, .choice:focus-visible .ch-go, .choice:active .ch-go { color: var(--accent); }
+.mg-compact .choice { padding-right: 2rem; }
+.mg-compact .choice .ch-go { right: .5rem; }
+
+/* The rescue screen. Whose words the last entry is comes first, on its own line; and a tile's label stands on one
+   line where the tiles are wide enough for the longest of them, and where they are not every row of tiles is the
+   height of the tallest (one row stood a line taller than the other two). */
+.dlg blockquote cite { margin: 0 0 .375rem; }
+/* (on a phone it is a run-in head, on the entry's own first line; and the card's second heading gives up its line:
+   a run with every step dated was a line too tall for the screen with both) */
+.mg-compact #mg-overlay.k-win .dlg blockquote cite { display: inline; margin: 0 .625em 0 0; white-space: normal; }
+.mg-compact #mg-overlay.k-win .dlg h2 { display: none; }
+#mg-overlay.k-win .stats { grid-auto-rows: 1fr; }
+@media (min-width: 761px) {
+  .mg-compact #mg-overlay.k-win .dlg-bd { grid-template-columns: minmax(0, 1fr) auto; }
+  .mg-compact #mg-overlay.k-win .stats { grid-template-columns: repeat(3, auto); }
+  .mg-compact #mg-overlay.k-win .stat span { white-space: nowrap; }
+}
+#mg-overlay.k-win .dlg .btns { justify-content: flex-start; }
+.stat b small { font-size: .5em; letter-spacing: .04em; }
+
+/* The title's rows are of a height on a phone: what a row has to add (the sol of the saved run, "a new crash site")
+   stands beside its name, not under it. (Rows with a second line were 54 px among rows of 44.) */
+.mg-compact #mg-overlay.k-title .menu { width: auto; max-width: 30rem; align-self: flex-start; }
+.mg-compact #mg-overlay.k-title .menu-item { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: .875rem; }
+.mg-compact #mg-overlay.k-title .menu-item .mi-s { white-space: nowrap; }
+
+/* capitals at 14 px on a phone, where they are set outside the section that lists the rest; and the condensed face
+   in lower case at 13 */
+.mg-compact .dlg-later b, .mg-compact .sleep .notes dt, .mg-compact .sleep .solbig span, .mg-compact .diff .go { font-size: var(--tcap); }
+.mg-compact .stat b small { font-size: var(--t13); }
+.range-end { font: 500 .8125rem/1 var(--f-cond); letter-spacing: .02em; color: var(--ink-3); }
+.mg-compact .range-end { font-size: var(--t13); color: var(--ink-2); }
+.set-row .ctl .range-end + .mg-rangewrap, .set-row .ctl .mg-rangewrap + .range-end { margin-left: -.25rem; }
+.mg-compact .set-row .ctl .range-end ~ output { min-width: 3rem; font-size: var(--t14); color: var(--ink); }
+
+/* A card with more to say (the numbers, with where it all leads) is the width of a phone held sideways, and its
+   name gives up its line there, so that all of it stands on the screen with its button. */
+.mg-compact .dlg.wide { width: 46rem; }
+.mg-compact .dlg.wide .t-kicker { display: none; }
+.mg-compact .dlg.wide .dlg-bd { padding-top: .75rem; }
+.mg-compact .dlg.wide .stats { margin-top: .5rem; }
+.mg-compact .dlg.wide .btns { padding-top: .5rem; padding-bottom: .625rem; }
