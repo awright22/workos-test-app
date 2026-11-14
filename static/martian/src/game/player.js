@@ -145,7 +145,7 @@ export function collideUnit(q, radius) {
 // The astronaut model and its animation
 // ------------------------------------------------------------------------------------------
 export let astro = null;
-const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
+const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, blob: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
 const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
@@ -154,6 +154,20 @@ export function buildAstronaut() {
   const m = model('astronaut', { face: true });
   astro = m.root;
   anim.inner = m.inner;
+  // Under a roof nothing casts his shadow (the lamps there throw none), and a man with no shadow at his feet
+  // floats on the floor. So indoors a soft dark patch lies under him: drawn, as the lamps' own pools are.
+  {
+    const N = 64, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const g = cv.getContext('2d'), gr = g.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.62)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, N, N);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.NoColorSpace;
+    const geo = new THREE.PlaneGeometry(1.25, 1.0); geo.rotateX(-Math.PI / 2);
+    anim.blob = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: tex, transparent: true, opacity: 0, depthWrite: false, fog: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    anim.blob.position.y = 0.02; anim.blob.renderOrder = 2; anim.blob.visible = false;
+    astro.add(anim.blob);
+  }
   anim.mixer = new THREE.AnimationMixer(m.inner);
   for (const clip of m.clips) {
     const a = anim.mixer.clipAction(clip);
@@ -293,6 +307,12 @@ export function updateAstronaut(dt) {
     const yawTo = clamp(-wrap(player.face), -1.1, 1.1);          // head turns toward the camera's heading
     if (anim.bones.chest) anim.bones.chest.rotateX(-look * 0.06);
     if (anim.bones.head) { anim.bones.head.rotateX(-look * 0.5); anim.bones.head.rotateY(yawTo * 0.55); }
+  }
+  // his shadow on a floor (see buildAstronaut): there under a roof, gone in the rover and out of doors
+  if (anim.blob) {
+    const want = (S.inside || S.inAirlock) && !driving ? 0.38 : 0;
+    anim.blob.material.opacity = lerp(anim.blob.material.opacity, want, damp(0.2, dt));
+    anim.blob.visible = anim.blob.material.opacity > 0.01;
   }
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
@@ -561,6 +581,12 @@ function updateWalkCamera(dt, running) {
     const floor = surfaceAt(c.position) + 0.3;
     if (c.position.length() < floor) c.position.normalize().multiplyScalar(floor);
     c.quaternion.copy(_cq);
+    // Under a roof the boom is short, and a level camera three metres behind a man cuts him off at the shins (in
+    // the dome, at the thighs). So indoors the view is tipped down a little, more as the boom shortens, and less
+    // as he looks up: his boots stay in the picture. (The camera itself does not move: only where it looks.)
+    const tip = room ? (0.14 + 0.26 * clamp(1 - cam.dist / 3.1, 0, 1)) * (1 - clamp(Math.max(0, player.pitch) * 3, 0, 1)) : 0;
+    cam.tip = jumped ? tip : lerp(cam.tip || 0, tip, damp(0.2, dt));
+    if (cam.tip > 0.002) c.quaternion.multiply(_q2.setFromAxisAngle(X_AXIS, -cam.tip));
   }
   if (S.shake > 0) {
     S.shake = Math.max(0, S.shake - dt * 1.6);
