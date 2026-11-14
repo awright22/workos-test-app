@@ -182,7 +182,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // the twelve-metre grain as well.)
         vec4 nCrag = texture(uGrain, vTex / 12.0 + vec3(0.37, 0.11, 0.59));
         float farEdge = smoothstep(50.0, 180.0, viewDist);
-        float basalt = lava * max(smoothstep(mix(0.30, 0.12, farEdge), mix(0.62, 0.84, farEdge), flowTop + hMid * 0.26 * fMid + hFar * 0.18 + (nCrag.a - 0.5) * 0.5 * farEdge), pond);
+        float basalt = lava * max(smoothstep(mix(0.16, 0.06, farEdge), mix(0.48, 0.70, farEdge), flowTop + hMid * 0.26 * fMid + hFar * 0.18 + (nCrag.a - 0.5) * 0.5 * farEdge), pond);
 
         // ---- 2D layers on level ground: slope of the surface in the texture's own axes ----
         vec2 flatSlope = vec2(0.0);
@@ -307,8 +307,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           float w1 = 6.2832 * (down / 3.6 - bend), w2 = 6.2832 * (down / 11.0 - bend * 0.6 + 0.3);
           float broken = clamp(0.55 + 1.6 * (nCrag.a - 0.5), 0.0, 1.0);
           float fine = 1.0 - smoothstep(120.0, 320.0, viewDist);          // (the close-set ridges only as far as they can be told apart)
-          grad += (fall * DETAIL_T) * ((cos(w1) * 0.8 * fine + cos(w2) * 0.9) * ropy * broken);
-          basaltCol *= 1.0 + (sin(w1) * 0.14 * fine + sin(w2) * 0.16) * ropy * broken;
+          // (deep enough to be seen from the air: at a seventh of the tone they were a rumour, and the flows smooth lobes)
+          grad += (fall * DETAIL_T) * ((cos(w1) * 1.3 * fine + cos(w2) * 1.5) * ropy * broken);
+          basaltCol *= 1.0 + (sin(w1) * 0.26 * fine + sin(w2) * 0.30) * ropy * broken;
         }
         col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift));
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
@@ -419,6 +420,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain36' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain37' + (o.fine !== false ? 'F' : '');
   return mat;
 }
