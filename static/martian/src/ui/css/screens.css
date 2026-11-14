@@ -474,3 +474,7 @@
 /* A journal card's badges stand on the line under its name on a phone, on every card: beside the name where they
    fitted and under it where they did not, a page of cards had its badges in two places. */
 .mg-compact .card-hd .tags { flex: 1 0 100%; }
+
+/* On the small phone the scale's words crowd the player's own coordinates off the bar ("303...."): the bar and its
+   length stay, and the words are in the key. */
+@media (max-width: 720px) { .map-scale em { display: none; } }

@@ -487,7 +487,8 @@ function rebuildObjectives(now) {
   // night: said once as it falls, as well as listed
   // (not when he is already standing at the bunk: there the task, the prompt and the button say it, and the card was a fourth)
   const night = list.some((e) => e.o.id === 'sleep');
-  if (night && !sleepTold && objSeeded) { const w = objectiveWhere(list.find((e) => e.o.id === 'sleep').o); if (!w || w.near > 6) toast('Night', 'Time to sleep', '', { yields: true }); }
+  // (and not on a phone, where the task card sixty pixels away has just turned to "Sleep until dawn": there it was the same thing said twice)
+  if (night && !sleepTold && objSeeded && !layout.compact) { const w = objectiveWhere(list.find((e) => e.o.id === 'sleep').o); if (!w || w.near > 6) toast('Night', 'Time to sleep', '', { yields: true }); }
   sleepTold = night;
   objSeeded = true;
   // the two nearest active survey tasks
