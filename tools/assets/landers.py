@@ -455,6 +455,10 @@ def weathered():
     mat('kapton_black', color=(0.028, 0.026, 0.026), metallic=0.0, roughness=0.60)  # black film, composite edges
     mat('vectran', color=(0.68, 0.65, 0.57), metallic=0.0, roughness=0.92)          # airbag cloth: pale straw, far lighter than the soil
     mat('paint_olive', color=(0.30, 0.31, 0.26), metallic=0.1, roughness=0.60)      # Viking's grey-olive body paint
+    mat('cover_grey', color=(0.50, 0.47, 0.42), metallic=0.0, roughness=0.75)       # its RTG wind covers: a warm grey, not the dish's white
+    mat('tank_wrap', color=(0.62, 0.55, 0.38), metallic=0.45, roughness=0.50)       # its propellant tanks in their pale gold insulation
+    mat('flag_red', color=(0.50, 0.05, 0.06), metallic=0.0, roughness=0.7)
+    mat('flag_blue', color=(0.04, 0.07, 0.28), metallic=0.0, roughness=0.7)
     mat('blanket_white', color=(0.84, 0.84, 0.82), metallic=0.0, roughness=0.92)    # white thermal cloth
     mat('scorched', color=(0.040, 0.036, 0.034), metallic=0.0, roughness=0.95)      # burnt metal and soot
     mat('ground_dust', color=(0.38, 0.225, 0.14), metallic=0.0, roughness=1.0)      # the surface itself, for aprons that feather into it
@@ -1244,8 +1248,9 @@ def build_viking():
     k = Kit(root)
     white, alu, dark = k('painted_white', 30), k('aluminium'), k('painted_dark')
     body_b = k('paint_olive', 25, 0.012)                 # the body was painted a grey olive; covers, dish and tanks white
-    cover = k('painted_white', 25, 0.012)
-    tank, gold, lens, steel = k('blanket_white', 50), k('gold_foil', 28), k('lens'), k('steel')
+    cover = k('cover_grey', 25, 0.012)
+    tank, gold, lens, steel = k('tank_wrap', 50), k('gold_foil', 28), k('lens'), k('steel')
+    red, blue = k('flag_red'), k('flag_blue')
     L, s = 1.09, 0.56
     dL, ds = (L + 2 * s) / (2 * sqrt(3)), (2 * L + s) / (2 * sqrt(3))
     z0, z1 = 0.25, 0.70
@@ -1322,7 +1327,12 @@ def build_viking():
             box(alu, (0.20, 0.08, 0.012), (0.43, -0.156 + 0.104 * i, z1 + 0.035 + 0.356), Mt)
         for sy in (-1, 1):
             box(alu, (0.36, 0.012, 0.035), (0.445, sy * 0.22, z1 + 0.018), Mt)
-            prism(white, rrect(0.22, 0.15, 0.02, 2), 0.008, Mt @ T(0.44, sy * 0.25, z1 + 0.20) @ R('X', -sy * 90), z0=0.0)
+            Mp = Mt @ T(0.44, sy * 0.25, z1 + 0.20) @ R('X', -sy * 90)
+            prism(white, rrect(0.22, 0.15, 0.02, 2), 0.008, Mp, z0=0.0)
+            if sy == 1:                                                     # the flag, on the plate each cover carried for it
+                for j in range(7):
+                    box(red, (0.19, 0.0092, 0.002), (0.0, -0.0555 + 0.0185 * j, 0.009), Mp)
+                box(blue, (0.078, 0.065, 0.0024), (-0.056, 0.0278, 0.0094), Mp)
         tube(dark, [Mt @ Vector((0.33, 0.12, z1 + 0.30)), Mt @ Vector((0.19, 0.12, z1 + 0.30)), Mt @ Vector((0.17, 0.12, z1 + 0.03))],
              0.014, 5, round_r=0.04)
 
@@ -3695,7 +3705,7 @@ def build_schiaparelli_wreck():
     # --- rays of soil thrown out from under the dust: lines of pale clods across the soot ---
     # A clod is a lump with a crown and flanks that run down into the ground, most of as high as it is wide: a flat
     # hull of a few random points lay on the soot like a scrap of card.
-    ej = k('ejecta', 30)
+    ej = k('ejecta', 62)
     for i in range(7):
         th = (TAU * i + pi / 2 - 2.1) / 7.0                          # where _blast_ray peaks
         rr = 1.45 + 0.25 * rng.random()
@@ -3703,17 +3713,24 @@ def build_schiaparelli_wreck():
             rr += rng.uniform(0.14, 0.72)
             c = Vector(polar(rr, math.degrees(th) + rng.uniform(-3.5, 3.5), 0.012))
             sz = (0.095 - 0.013 * m) * rng.uniform(0.7, 1.25)
-            n, a0 = (5 if m < 2 else 4), rng.uniform(0.0, TAU)
-            top = ej.verts.new(c + Vector((rng.uniform(-0.3, 0.3) * sz, rng.uniform(-0.3, 0.3) * sz, sz * rng.uniform(0.6, 1.0))))
-            mid = [ej.verts.new(c + Vector((cos(a0 + TAU * q / n), sin(a0 + TAU * q / n), 0.0)) * (sz * rng.uniform(0.6, 0.95)) + Vector((0, 0, sz * rng.uniform(0.2, 0.55))))
-                   for q in range(n)]
-            foot = [ej.verts.new(c + Vector((cos(a0 + TAU * (q + 0.5) / n), sin(a0 + TAU * (q + 0.5) / n), 0.0)) * (sz * rng.uniform(1.0, 1.3)) + Vector((0, 0, -0.02)))
-                    for q in range(n)]
+            # (a rounded crown, a waist and a foot, each ring uneven: with a single point for a top and four sides it was a
+            # little pyramid, and twenty-eight of them were a board game)
+            n, a0 = (7 if m < 2 else 6), rng.uniform(0.0, TAU)
+            lean = Vector((rng.uniform(-0.25, 0.25) * sz, rng.uniform(-0.25, 0.25) * sz, 0.0))
+            hgt = sz * rng.uniform(0.55, 0.9)
+
+            def ring(rad, z, half=0.0, shift=1.0):
+                return [ej.verts.new(c + lean * shift + Vector((cos(a0 + TAU * (q + half) / n), sin(a0 + TAU * (q + half) / n), 0.0)) * (rad * rng.uniform(0.78, 1.15))
+                                     + Vector((0, 0, z * rng.uniform(0.85, 1.1)))) for q in range(n)]
+            crown, waist, foot = ring(sz * 0.38, hgt, 0.5), ring(sz * 0.82, hgt * 0.55, 0.0, 0.5), ring(sz * 1.2, -0.02, 0.5, 0.0)
+            top = ej.verts.new(c + lean + Vector((0, 0, hgt * 1.08)))
             for q in range(n):
                 q2 = (q + 1) % n
-                ej.faces.new((top, mid[q], mid[q2]))
-                ej.faces.new((mid[q], foot[q], mid[q2]))
-                ej.faces.new((foot[q], foot[q2], mid[q2]))
+                ej.faces.new((top, crown[q], crown[q2]))
+                ej.faces.new((crown[q], waist[q2], crown[q2]))
+                ej.faces.new((crown[q], waist[q], waist[q2]))
+                ej.faces.new((waist[q], foot[q], waist[q2]))
+                ej.faces.new((foot[q], foot[q2], waist[q2]))
 
     # everything lies ON the blast patch: lift each vertex by the height of the dish under it
     for bm in list(k.b.values()) + list(w.b.values()):
@@ -3765,7 +3782,10 @@ def build_schiaparelli_wreck():
                 burn = max(burn, smooth01(1.75, 1.2, d))                   # inside the rim: fused black
                 burn *= 1.0 - 0.85 * _blast_ray(th) * smooth01(0.34, 0.46, f)      # thrown soil lies over the soot
                 burn = max(0.0, min(1.0, burn))
-                attr.data[i].color = (c[0] * (1 - 0.90 * burn), c[1] * (1 - 0.87 * burn), c[2] * (1 - 0.80 * burn), 1.0)
+                # (soot over soil is a dark grey-brown, patchy where the wind has been at it: at nine tenths black it was a
+                # hole airbrushed into the picture)
+                burn *= 0.80 + 0.20 * smear
+                attr.data[i].color = (c[0] * (1 - 0.76 * burn), c[1] * (1 - 0.72 * burn), c[2] * (1 - 0.64 * burn), 1.0)
                 continue
             if name == 'ejecta':
                 attr.data[i].color = (c[0] * (0.82 + 0.18 * smear), c[1] * (0.82 + 0.18 * smear), c[2] * (0.82 + 0.18 * smear), 1.0)

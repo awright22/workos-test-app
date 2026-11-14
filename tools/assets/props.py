@@ -1216,6 +1216,12 @@ def build_greenhouse():
             return a * (0.80 + 0.20 * hash01(round(c[0], 2), round(c[1], 2)))
         if abs(co.x) < GH_XI + 0.01 and GH_YF - 0.13 < co.y < GH_YF + 0.045 and co.z > GH_FLOOR + 0.008 and name != 'glass_clear':
             return 0.72 + 0.28 * a              # the door leaf moves: it must not carry the shade of the doorway it was baked in
+        if name in ('painted_white', 'blanket_white'):
+            # Off-white, worn and uneven, the fittings and the base ring more than the frame overhead: pure white under
+            # glass at noon was the brightest thing in the picture, and the air duct a blown-out shape with nothing in it.
+            low = _smooth01(GH_FLOOR + 1.7, GH_FLOOR + 0.4, co.z)
+            k = a * (0.88 - 0.13 * low) * (0.94 + 0.06 * noise3(co, 2.6, 1.0))
+            return (k, k * 0.985, k * 0.95)
         return None
 
     return finish(root, 'greenhouse', samples=24, distance=1.0, tint=tint, soften={'painted_grey': 0.8})

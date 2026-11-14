@@ -133,7 +133,7 @@ const DUST = {
   // (the second review: decades-old landers were a uniform beige wash, and his own gear showroom-clean.
   //  Dust now lies mostly on what faces up and near the ground, so less of it goes further.)
   hab: 0.46, rover: 0.5, astronaut: 0.34, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
-  pathfinder: 0.4, viking: 0.6, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
+  pathfinder: 0.4, viking: 0.44, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
   crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
@@ -156,8 +156,8 @@ export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { va
 const LIGHTS_BEGIN = (() => {
   const chunk = THREE.ShaderChunk.lights_fragment_begin;
   const cap = `#if ( NUM_POINT_LIGHTS > 0 || NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )
-	reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( 0.9 ) );
-	reflectedLight.directDiffuse = min( reflectedLight.directDiffuse, vec3( 1.25 ) );
+	reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( 0.6 ) );
+	reflectedLight.directDiffuse = min( reflectedLight.directDiffuse, vec3( 0.9 ) );
 #endif
 `;
   for (const mark of ['#if ( NUM_SUN_LIGHTS > 0 ) && defined( RE_Direct )', '#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )']) {
@@ -263,7 +263,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust10' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust11' + (ground ? 'G' : '');
   return plain;
 }
 
