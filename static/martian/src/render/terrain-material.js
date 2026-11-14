@@ -194,7 +194,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (Far off, a flow's edge is known only at the corners of big triangles, and a hard line drawn through them
         // runs along their diagonals in a saw-tooth: so with distance the edge is drawn softer and is pushed about by
         // the twelve-metre grain as well.)
-        vec4 nCrag = texture(uGrain, vTex / 12.0 + vec3(0.37, 0.11, 0.59));
+        // (12.8 m, not 12: the coordinates wrap every 64 m, a tile at a time, and a period that does not divide 64 jumps
+        //  at the border between two tiles: a seam down a cliff or across a flow)
+        vec4 nCrag = texture(uGrain, vTex / 12.8 + vec3(0.37, 0.11, 0.59));
         float farEdge = smoothstep(50.0, 180.0, viewDist);
         float basalt = lava * max(smoothstep(mix(0.16, 0.06, farEdge), mix(0.48, 0.70, farEdge), flowTop + hMid * 0.26 * fMid + hFar * 0.18 + (nCrag.a - 0.5) * 0.5 * farEdge), pond);
 
@@ -205,6 +207,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float snowLie = 0.35, snowTone = 0.0;
         // (for the clinker layer, read inside a branch: there a texture has no mip level of its own, so it is handed these)
         vec2 uvDx = dFdx(vUv3.xy), uvDy = dFdy(vUv3.xy);
+        vec3 texDx = dFdx(vTex), texDy = dFdy(vTex);
         float iceGlow = 0.0;
         {
           vec2 uv = vUv3.xy;
@@ -329,6 +332,29 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         grad += (nLump.rgb - 0.5) * (0.8 * (1.0 - smoothstep(24.0, 110.0, viewDist)) * rubble * level);
         // (the beds a little closer in tone to one another: the wall's shape is its spurs and gullies, not its stripes)
         vec3 rockCol = alb * mix(vec3(0.48, 0.435, 0.44), vec3(0.82, 0.735, 0.675), bedTone);
+        // Jointed rock. A cliff is not a smooth banded surface: its beds are broken by joints into blocks, some
+        // standing proud, some fallen out, with shade in the gaps. The clinker's blocks again, laid on the face from
+        // three sides (whichever the face is turned to), a pace across near and a few metres across from further off.
+        // (With only soft lumps and its colour bands, a wall close up was bands painted on smooth hills.)
+        float faceTone = 0.0;
+        // (in the hard beds, the dark ones, that stand as ledges; the soft beds between weather smooth and lie back. One
+        //  even net of cracks over the whole wall was dried mud.)
+        float hardBed = 1.0 - smoothstep(0.36, 0.60, beds * 0.68 + band.a * 0.32);
+        float faceW = rock * (1.0 - lava) * (1.0 - ice) * (1.0 - smoothstep(380.0, 800.0, viewDist)) * mix(0.22, 1.0, hardBed);
+        if (faceW > 0.004) {
+          vec3 tw = abs(geoN * DETAIL_T);
+          tw *= tw; tw *= tw; tw /= tw.x + tw.y + tw.z;
+          float k1 = smoothstep(5.0, 16.0, viewDist) * (1.0 - smoothstep(60.0, 160.0, viewDist));
+          float k2 = smoothstep(40.0, 120.0, viewDist);
+          vec4 ax = textureGrad(uClinker, vTex.yz / 8.0, texDx.yz / 8.0, texDy.yz / 8.0), bx = textureGrad(uClinker, vTex.yz / 32.0 + vec2(0.31, 0.57), texDx.yz / 32.0, texDy.yz / 32.0);
+          vec4 ay = textureGrad(uClinker, vTex.zx / 8.0, texDx.zx / 8.0, texDy.zx / 8.0), by = textureGrad(uClinker, vTex.zx / 32.0 + vec2(0.31, 0.57), texDx.zx / 32.0, texDy.zx / 32.0);
+          vec4 az = textureGrad(uClinker, vTex.xy / 8.0, texDx.xy / 8.0, texDy.xy / 8.0), bz = textureGrad(uClinker, vTex.xy / 32.0 + vec2(0.31, 0.57), texDx.xy / 32.0, texDy.xy / 32.0);
+          vec4 fx = ax * k1 + bx * k2 - 0.5 * (k1 + k2), fy = ay * k1 + by * k2 - 0.5 * (k1 + k2), fz = az * k1 + bz * k2 - 0.5 * (k1 + k2);
+          grad += (vec3(0.0, fx.r, fx.g) * tw.x + vec3(fy.g, 0.0, fy.r) * tw.y + vec3(fz.r, fz.g, 0.0) * tw.z) * (3.4 * faceW);
+          // (the texture's fourth channel is where dust lies between its blocks: on a face that is the gap, in shade)
+          float gap = (ax.a * tw.x + ay.a * tw.y + az.a * tw.z) * k1 + (bx.a * tw.x + by.a * tw.y + bz.a * tw.z) * k2;
+          faceTone = ((fx.b * tw.x + fy.b * tw.y + fz.b * tw.z) * 1.1 - 0.26 * gap) * faceW;
+        }
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
         // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
         rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.060, 0.058), 0.75) * mix(1.0, 0.72 + 0.56 * bedTone, smoothstep(0.22, 0.45, slope)), lava * 0.9);
@@ -400,7 +426,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         gFlute -= pDir * (dot(gFlute, pDir) * 0.875);
         grad += gFlute * (2.2 * fFlute);
         float fluteTone = (nFlute.a - 0.5) * fFlute;
-        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7 + fluteTone * 0.6), rock * 0.9);
+        col = mix(col, rockCol * (1.0 + hLump * 0.5 * fLump + clamp(tone, -0.4, 0.4) * 0.5 + cragTone * 0.7 + fluteTone * 0.6 + faceTone), rock * 0.9);
         // Spur and gully. The beds show on the spurs, which are bare rock. A chute between two spurs is floored with
         // what fell from them: scree with no beds in it, running down the wall in a pale tongue. (Without it a wall
         // was banded from end to end like a layer cake, and its spurs could only be seen by their shading.)
@@ -481,6 +507,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain46' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain48' + (o.fine !== false ? 'F' : '');
   return mat;
 }

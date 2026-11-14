@@ -73,8 +73,10 @@
 .is-rover #mg-tJump, .is-rover #mg-tSprint { display: none; }
 
 /* pause and the three screens, top right: each with its word under it */
-#mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .25rem; pointer-events: auto; }
+#mg-trow { position: absolute; right: calc(var(--sar) + var(--m)); top: calc(var(--sat) + var(--m)); display: flex; flex-direction: row-reverse; gap: .5rem; pointer-events: auto; }
 #mg-trow .mg-tbtn { position: static; width: 3.25rem; height: 2.875rem; min-width: 52px; min-height: 46px; border-radius: .375rem; }
+/* (8 px between them where there is the width. On the small phone they keep 2 px: the row ends 5 px short of the
+   compass, and any more gap puts it on top of the compass.) */
 @media (max-width: 760px) { #mg-trow { gap: 2px; } #mg-trow .mg-tbtn { min-width: 50px; width: 50px; } }
 #mg-trow .mg-tbtn, #mg-tCam { gap: .125rem; }
 /* (a caption is a label in capitals like any other: 13 px. At 12 it measured as 10 px type beside the 13 px labels.) */
