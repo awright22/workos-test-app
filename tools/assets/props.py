@@ -2275,8 +2275,10 @@ def build_regolith_pile():
     root = part('regolith_pile')
     H = Kit('heap', part('heap', parent=root))
     P = Paint()
-    bm = H.bm('ground_dust', smooth=42.0)
-    cut = H.bm('ground_dust', smooth=8.0)                    # the spade cuts: flat facets with hard edges
+    # (loose soil has no facets: smooth over all but its sharpest breaks. And a spade's cut is a curved scoop with an
+    #  edge to it, not a flat card: at 8 degrees the dug side was a heap of triangles.)
+    bm = H.bm('ground_dust', smooth=62.0)
+    cut = H.bm('ground_dust', smooth=34.0)                   # the spade cuts: scoops with hard edges between them
     NA, NR = 48, 10
     dumps = ((0.55, 0.35, 0.50, 0.36), (-0.50, 0.30, 0.55, 0.40), (-0.15, -0.60, 0.50, 0.30), (0.60, -0.35, 0.42, 0.22), (-0.75, -0.30, 0.40, 0.22),
              (0.05, 0.78, 0.36, 0.20))

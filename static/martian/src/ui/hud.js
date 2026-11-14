@@ -52,6 +52,8 @@ function farmStep() {
   for (const h of World.soilPiles) { if (h.left <= 0) continue; const d = distTo(h.group.position); if (d < best) { best = d; heap = h; } }
   return heap ? { heap, why: 'Beds need regolith. Dig it at the heap outside the airlock.' } : { why: 'The heaps are spent. Dig regolith anywhere outside, slowly.' };
 }
+/** The solar panel with the most dust on it, if that is at least `least` (0..1); else null. */
+const dustiestPanel = (least) => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p && p.dust >= least ? p : null; };
 /**
  * What there is to do, in the order it is offered. Each has the place its marker stands on (`pos`), the reason it
  * matters (`why`, a line or a function), when it is on the list (`shown`) and when it is ticked off (`done`).
@@ -87,6 +89,12 @@ export const OBJECTIVES = [
   { id: 'lowwater', press: () => true, place: () => (S.hydrazine > 0 ? 'Rig' : 'Fabricator'), text: () => 'Make water',
     why: () => (S.hydrazine > 0 ? 'The tank is nearly dry. Burn hydrazine at the rig.' : (S.inv.ice || 0) > 0 ? 'The tank is nearly dry. Melt ice at the fabricator.' : 'The tank is nearly dry. Mine ice, and melt it at the fabricator.'),
     pos: () => (S.hydrazine > 0 ? habPoint(4.2, 1.3, 2.6) : habPoint(-4.75, 1.3, 4.2)), shown: () => !!S.flags.suitSealed && S.water < 12, done: () => false },
+  // (and so is the battery, once the first panels task is behind him: the power stood amber at 18% with nothing on
+  //  the list. Dusty panels are the usual cause and the cure is in reach; if they are clean, it is the night.)
+  { id: 'lowpower', press: () => true, place: () => (dustiestPanel(0.25) ? 'Panels' : 'Hab'), text: () => (dustiestPanel(0.25) ? 'Wipe the solar panels' : 'Spare the Hab’s power'),
+    why: () => (dustiestPanel(0.25) ? 'The Hab is low on power: dust on the panels is starving it.' : 'The Hab is low on power. The panels charge it by day; melting ice and fabricating draw it down.'),
+    pos: () => { const p = dustiestPanel(0.25); return p ? above(p.group.getWorldPosition(_wv), 1.2) : null; },
+    shown: () => !!S.flags.suitSealed && S.power < 20 && S.stats.panels >= 3, done: () => false },
   { id: 'water', place: 'Farm bed', text: () => 'Water the stalled beds', why: 'A bed stops at half grown until it is watered again.',
     pos: () => { const p = World.plots.find(thirsty); return p ? above(p.worldPos, 0.9) : null; }, shown: () => World.plots.some(thirsty), done: () => false },
   // "farm or starve" is the premise: the farm leads until three beds are in, whatever else has joined the list

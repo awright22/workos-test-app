@@ -432,7 +432,8 @@ export function showSleep() {
   openOverlay('sleep', '<div class="sleep"><div class="zz">Sleeping</div><div class="sum"></div></div>', { label: 'Sleeping until dawn' });
 }
 /**
- * d: { sol, turned, deltas: [{ icon, label, from, to, unit }], rows: [[name, text, more]...], later }
+ * d: { sol, turned, deltas: [{ icon, label, from, to, unit, low }], rows: [[name, text, more]...], later }
+ * A delta's `low` says that what is left is little (a fall is then printed in red; otherwise in plain ink).
  * A row's `more` is detail that is there for the asking (why morale moved, part by part): a button beside Start
  * the day shows it.
  * Returns whether the account is up with its button (if not, the caller must not wait for a tap).
@@ -446,7 +447,9 @@ export function showSleepSummary(d, onDone) {
     //  letter stands off from its figure, as everywhere else: "66 L", not "66L". One that is a word, "meals", goes
     //  with what is left and not with the change; and morale, a score, has none.)
     const v = Math.round(x.to) - Math.round(x.from), u = x.unit === '%' ? '%' : x.unit ? '\u00a0' + x.unit : '', du = x.unit && x.unit.length > 1 ? '' : u;
-    return `<div class="delta"><b class="t-num ${v > 0 ? 'up' : v < 0 ? 'dn' : ''}">${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}${du}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${u}</i></div>`;
+    // (A night costs power, water and a breakfast: that is the price of a night, not an alarm, and it is printed in
+    //  plain ink. Red is kept for a fall that leaves little: "−10% POWER" in red every morning said something was wrong.)
+    return `<div class="delta"><b class="t-num ${v > 0 ? 'up' : v < 0 ? (x.low ? 'dn' : 'cost') : ''}">${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}${du}</b><span>${icon(x.icon)}${x.label}</span><i class="t-num">now ${Math.round(x.to)}${u}</i></div>`;
   }).join('');
   // the first thing still to do, as the mission list has it
   const todo = missionList().find((e) => !e.done);
@@ -521,13 +524,13 @@ export function showComms(o) {
 // A choice: one of a few things, each with a line of detail
 // ------------------------------------------------------------------------------------------
 /**
- * o: { kicker, title, note, items: [{ label, sub, note, count, fn }], onCancel() }
+ * o: { kicker, title, note, items: [{ label, sub, note, count, icon, fn }], onCancel() }
  * Picking an item closes the dialog and calls its fn; Escape or Cancel closes it.
  */
 export function showChoice(o) {
   const cancel = () => { hideOverlay(); if (o.onCancel) o.onCancel(); };
   const rows = o.items.map((it, i) =>
-    `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${esc(it.label)}</span>` +
+    `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${it.icon ? icon(it.icon) : ''}${esc(it.label)}</span>` +
     `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
     `${it.note ? `<span class="ch-t">${chem(esc(it.note))}</span>` : ''}<span class="ch-go" aria-hidden="true">${icon('next')}</span></button>`).join('');
   const p = openOverlay('dialog',

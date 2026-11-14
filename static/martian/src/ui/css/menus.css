@@ -182,6 +182,7 @@
 .sleep .delta b { font: 600 1.375rem/1 var(--f-cond); letter-spacing: .02em; }
 .sleep .delta b.up { color: var(--ok); }
 .sleep .delta b.dn { color: var(--danger); }
+.sleep .delta b.cost { color: var(--ink); }
 .sleep .delta > span { display: flex; align-items: center; gap: .3125rem; font: 500 .6875rem/1 var(--f-cond); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
 .sleep .delta .ic { width: .875rem; height: .875rem; }
 .sleep .notes { margin-top: 1.125rem; font-size: .9375rem; line-height: 1.55; color: var(--ink-2); }
@@ -318,6 +319,7 @@
   padding: .75rem 1rem; background: rgba(245, 240, 232, .04); border: 1px solid var(--line-2); border-left: 2px solid var(--line); color: var(--ink-2); cursor: pointer;
   transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease); }
 .choice .ch-l { font: 600 1.25rem/1.05 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.choice .ch-l .ic { width: 1.1em; height: 1.1em; margin-right: .4em; vertical-align: -.2em; color: var(--accent); }
 .choice .ch-n { font: 600 .875rem/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .choice .ch-s { grid-column: 1 / -1; font: 500 .8125rem/1.25 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .choice .ch-t { grid-column: 1 / -1; font-size: .875rem; line-height: 1.35; color: var(--ink-3); }

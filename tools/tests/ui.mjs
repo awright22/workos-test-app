@@ -410,6 +410,30 @@ if (!onlySize || onlySize === 'play') {
   check('colony: FOOD on the HUD is the sum of the inventory\'s food rows, and no food row counts seed packets', hudFood === larder.sum && new RegExp(`^Food\\s*${larder.sum} meals`).test(larder.head) && larder.rows >= 4 && larder.packets === 0, { hudFood, larder });
   await page.keyboard.press('Escape');
   await g.eval((G) => { const [p, n] = JSON.parse(window.__larder); G.S.pantry = p; G.S.potatoes = n; G.tick(0.05, 3); });
+  // the colony's lists: what can be made now stands first and what is locked last (a locked card stood ahead of the ready ones)
+  await page.keyboard.press('c');
+  const order = {};
+  for (const t of ['craft', 'build', 'home']) {
+    await page.locator(`.colony [data-tab="${t}"]`).click();
+    order[t] = await page.evaluate(() => {
+      const ranks = [...document.querySelectorAll('.colony .pane.on .rcp:not(.done)')].map((c) => (c.classList.contains('ready') ? 0 : c.classList.contains('locked') ? 2 : 1));
+      return ranks.every((r, i) => !i || ranks[i - 1] <= r) ? ranks.length : -1;
+    });
+  }
+  check('colony: on each list what is ready stands first and what is locked last', Object.values(order).every((n) => n > 0), order);
+  await page.keyboard.press('Escape');
+  // a low battery is a task once the first panels task is behind him (the bar stood amber at 18% with nothing on the list)
+  const lp = await g.eval((G) => {
+    const S = G.S, keep = [S.power, S.stats.panels, S.flags.suitSealed];
+    S.power = 15; S.stats.panels = 3; S.flags.suitSealed = true;
+    const e = window.__UI.missionList().find((x) => x.o.id === 'lowpower');
+    const r = e ? { text: e.o.text(), why: typeof e.o.why === 'function' ? e.o.why() : e.o.why } : null;
+    S.power = 60;
+    const gone = !window.__UI.missionList().some((x) => x.o.id === 'lowpower');
+    S.power = keep[0]; S.stats.panels = keep[1]; S.flags.suitSealed = keep[2];
+    return { r, gone };
+  });
+  check('tasks: a Hab battery under 20% is a task once the panels task is done, and goes when the power is back', !!lp.r && /panels|power/i.test(lp.r.text) && /low on power/.test(lp.r.why) && lp.gone, lp);
 
   // night: sleep leads the list and is said aloud; the account carries the new sol and explains itself; nothing more is taken on waking
   await page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 30000 }).catch(() => {});

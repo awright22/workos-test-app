@@ -159,10 +159,10 @@ export function renderColony() {
   const meals = foodTotal();
   let inv = `<div class="pane-hd">Food <span>${meals} ${meals === 1 ? 'meal' : 'meals'} in all</span></div>`;
   inv += row('box', 'Rations', S.food, '', 'One a sol, when the potatoes run out');
-  inv += row('food', 'Potatoes', S.potatoes, '', 'Eaten first; also seed for the farm');
+  inv += row('potato', 'Potatoes', S.potatoes, '', 'Eaten first; also seed for the farm');
   for (const id of PRODUCE) {
     if (S.pantry[id] <= 0 && !(S.stats.grown && S.stats.grown[id])) continue;      // never grown and none in the pantry: not food yet
-    inv += row('food', CROPS[id].name, S.pantry[id], '', CROPS[id].note);
+    inv += row(id, CROPS[id].name, S.pantry[id], '', CROPS[id].note);      // (each crop its own mark: the larder was a column of one leaf)
   }
   inv += '<div class="pane-hd">Supplies</div>';
   { const packs = PRODUCE.filter((id) => S.seeds[id] > 0), n = packs.reduce((k, id) => k + S.seeds[id], 0);
@@ -197,20 +197,25 @@ export function renderColony() {
   // --- fabrication ---
   let ready = 0;
   let craft = '';
+  // (What can be made now comes first, then what wants materials, then what is locked: a locked card stood ahead of
+  //  the ready ones, and on a phone the ready ones were below the fold. Within each, the list's own order.)
+  const ranked = (cards) => cards.map((c, i) => [c[0], i, c[1]]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((c) => c[2]).join('');
+  const craftCards = [];
   for (const r of RECIPES) {
     // (a tab's figure is what he has the materials for, at the Hab or away from it: out of range the figures used to
     //  go from the tabs, as if what he carried had gone with them. The cards say "Only at the Hab".)
     const can = hasCost(r.cost), ok = atHome && can;
     if (can) ready++;
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
-    craft += `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
+    craftCards.push([ok ? 0 : can ? 1 : 2, `<article class="rcp ${ok ? 'ready' : ''}" data-card="${r.id}"><div class="rcp-hd"><h4>${chem(esc(r.name))}</h4>` +
       tags((ok ? '<span class="badge ready">Ready</span>' : '') + (have !== null && have > 0 ? `<span class="badge">Have ${have}</span>` : '')) + '</div>' +
       `<p class="ds">${chem(esc(r.desc + (r.how ? ': ' + r.how[layout.touch ? 1 : 0] : '')))}</p><div class="cost">${costChips(r.cost)}</div>` +
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
       // a kit he is carrying can be set down from here too, without a trip to the Inventory tab
       (/^kit/.test(r.id) && have > 0 ? `<button type="button" class="mg-btn small" data-deploy="${r.id.slice(3).toLowerCase()}">Deploy</button>` : '') +
-      `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`;
+      `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`]);
   }
+  craft = ranked(craftCards);
   // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
   //  where its materials come from instead)
   craft = `<div class="pane-hd">Fabricator <span>${!ready ? (atHome ? 'Needs materials' : 'Out of range') : atHome ? `${ready} ready to build` : `${ready} ready · only at the Hab`}</span></div>` +
@@ -219,6 +224,7 @@ export function renderColony() {
   // --- upgrades: what can still be installed first; what is in, under its own heading (among the others an installed
   //     card was as tall as its neighbours and half empty) ---
   let up = '', upDone = '', upReady = 0, installed = 0;
+  const upCards = [];
   for (const u of UPGRADES) {
     if (S.upgrades[u.id]) {
       installed++;
@@ -228,13 +234,14 @@ export function renderColony() {
     const gate = upgradeGate(u), can = hasCost(u.cost), ok = atHome && !gate && can;
     if (!gate && can) upReady++;
     // (a locked card: the one reason it is locked, what it will take, and no button to press in vain)
-    up += `<article class="rcp ${ok ? 'ready' : gate ? 'locked' : ''}" data-card="${u.id}"><div class="rcp-hd"><h4>${chem(esc(u.name))}</h4>` +
+    upCards.push([ok ? 0 : gate ? 2 : 1, `<article class="rcp ${ok ? 'ready' : gate ? 'locked' : ''}" data-card="${u.id}"><div class="rcp-hd"><h4>${chem(esc(u.name))}</h4>` +
       tags(ok ? '<span class="badge ready">Ready</span>' : gate ? `<span class="badge locked">${icon('lock')}Locked</span>` : '') + '</div>' +
       `<p class="ds">${chem(esc(u.desc))}</p><div class="cost">${costChips(u.cost, !!gate)}</div>` +
       (gate ? `<div class="rcp-ft"><span class="why gate">${esc(gate)}</span></div></article>`
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
-          `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`);
+          `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`)]);
   }
+  up = ranked(upCards);
   // (a tab's figure is how many things on its page can be made now, and its page's heading says that figure first:
   //  "UPGRADES 4" stood over "2 OF 10 INSTALLED" and "HOME 6" over "2 OF 9 MADE")
   up = `<div class="pane-hd">Upgrades <span>${upReady ? `${upReady} ready · ` : ''}${installed} of ${UPGRADES.length} installed</span></div>` + up +
@@ -242,6 +249,7 @@ export function renderColony() {
 
   // --- home: comforts for the Hab (those made, under their own heading, as with the upgrades) ---
   let home = '', homeDone = '', homeReady = 0;
+  const homeCards = [];
   const madeN = comfortCount();
   for (const c of COMFORTS) {
     const made = !!comforts()[c.id], block = made ? null : comfortBlock(c.id, World), locked = !made && !!(c.needs && !c.needs(World));
@@ -255,8 +263,9 @@ export function renderColony() {
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
           `<span class="why${block && block !== 'Made' ? ' bad' : ''}">${block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`)) +
       '</article>';
-    if (made) homeDone += card; else home += card;
+    if (made) homeDone += card; else homeCards.push([ok ? 0 : locked ? 2 : 1, card]);
   }
+  home = ranked(homeCards);
   home = `<div class="pane-hd">Home <span>${homeReady ? `${homeReady} ready · ` : ''}${madeN} of ${COMFORTS.length} made · morale +${halves(comfortCheer())} a sol</span></div>` +
     '<p class="pane-note intro">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');

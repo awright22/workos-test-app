@@ -3401,9 +3401,11 @@ def build_schiaparelli_wreck():
     mat('aluminium_bare', color=(0.70, 0.71, 0.74), metallic=0.6, roughness=0.5)       # torn structure: brighter than a lander that has only stood in the dust
     root = part('schiaparelli_wreck')
     k, w = Kit(root), Wound(root)
-    alu, char, cfk = k('aluminium_bare', 32), k('scorched', 32), k('carbon', 32)
-    gold_k, white_k = k('gold_foil', 14), k('blanket_white', 22)
-    wc, wa, wg, ww = w('carbon', 30), w('aluminium_bare', 30), w('gold_foil', 20), w('blanket_white', 34)
+    # (Bent plate is smooth across its bends and sharp only at its torn edge, a right angle: shaded flat at every
+    #  crease over thirty degrees, the wreck was a heap of cut card. Foil keeps its crinkles.)
+    alu, char, cfk = k('aluminium_bare', 52), k('scorched', 52), k('carbon', 52)
+    gold_k, white_k = k('gold_foil', 14), k('blanket_white', 50)
+    wc, wa, wg, ww = w('carbon', 62), w('aluminium_bare', 62), w('gold_foil', 24), w('blanket_white', 62)
     tank = w('aluminium_bare', 40)                                  # the tanks (titanium: tinted after the bake)
     rng = random.Random(16)
     fresh = []                                                      # points of torn edges: bright whatever the soot round them

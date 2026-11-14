@@ -459,11 +459,13 @@ export function sleepToDawn(inRover) {
   const summary = {
     sol: S.sol, rows, turned: rolled, later,
     deltas: [
-      { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%' },
-      { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L' },
-      { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%' },
-      { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: 'meals' },
-      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '' },
+      // (low: what is left is little, so a fall is an alarm and not the ordinary price of a night; the Hab's air
+      //  should not fall at all)
+      { icon: 'hab', label: 'Hab <span class="chem">O<sub>2</sub></span>', from: before.o2, to: S.o2, unit: '%', low: true },
+      { icon: 'water', label: 'Water', from: before.water, to: S.water, unit: 'L', low: S.water < 20 },
+      { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%', low: S.power < 25 },
+      { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: 'meals', low: breakfastsLeft() < 4 },
+      { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', low: S.morale < 40 },
     ],
   };
   // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,

@@ -250,9 +250,11 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
             float f1 = smoothstep(7.0, 22.0, viewDist) * (1.0 - smoothstep(45.0, 110.0, viewDist));
             float f2 = smoothstep(28.0, 80.0, viewDist) * (1.0 - smoothstep(220.0, 480.0, viewDist));
             float f3 = smoothstep(110.0, 300.0, viewDist) * (1.0 - smoothstep(800.0, 1500.0, viewDist));
-            vec4 c1 = textureGrad(uClinker, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
-            vec4 c2 = textureGrad(uClinker, vec2(uv.y, -uv.x) / 32.0 + vec2(0.37, 0.61), vec2(uvDx.y, -uvDx.x) / 32.0, vec2(uvDy.y, -uvDy.x) / 32.0);
-            vec4 c3 = textureGrad(uClinker, uv / 64.0 + vec2(0.13, 0.29), uvDx / 64.0, uvDy / 64.0);
+            // (each size is read only over the range it is drawn at: at most two of the three at once)
+            vec4 c1 = vec4(0.5), c2 = vec4(0.5), c3 = vec4(0.5);
+            if (f1 > 0.0) c1 = textureGrad(uClinker, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
+            if (f2 > 0.0) c2 = textureGrad(uClinker, vec2(uv.y, -uv.x) / 32.0 + vec2(0.37, 0.61), vec2(uvDx.y, -uvDx.x) / 32.0, vec2(uvDy.y, -uvDy.x) / 32.0);
+            if (f3 > 0.0) c3 = textureGrad(uClinker, uv / 64.0 + vec2(0.13, 0.29), uvDx / 64.0, uvDy / 64.0);
             flatSlope += ((c1.rg - 0.5) * f1 + vec2(-(c2.g - 0.5), c2.r - 0.5) * f2 + (c3.rg - 0.5) * f3) * (4.0 * clinkW);
             clinkTone = ((c1.b - 0.5) * f1 + (c2.b - 0.5) * f2 + (c3.b - 0.5) * f3) * clinkW;
             clinkDust = max(max(c1.a * f1, c2.a * f2), c3.a * f3) * clinkW;
@@ -263,8 +265,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           if (ice > 0.004) {
             float g1 = (0.45 + 0.55 * smoothstep(2.5, 9.0, viewDist)) * (1.0 - smoothstep(45.0, 130.0, viewDist)) * level;
             float g2 = smoothstep(35.0, 120.0, viewDist) * (1.0 - smoothstep(900.0, 2000.0, viewDist)) * level;
-            vec4 w1 = textureGrad(uSastrugi, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
-            vec4 w2 = textureGrad(uSastrugi, uv / 64.0 + vec2(0.41, 0.23), uvDx / 64.0, uvDy / 64.0);
+            vec4 w1 = vec4(0.5, 0.5, 0.5, 0.35), w2 = vec4(0.5, 0.5, 0.5, 0.35);
+            if (g1 > 0.0) w1 = textureGrad(uSastrugi, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
+            if (g2 > 0.0) w2 = textureGrad(uSastrugi, uv / 64.0 + vec2(0.41, 0.23), uvDx / 64.0, uvDy / 64.0);
             flatSlope += ((w1.rg - 0.5) * g1 + (w2.rg - 0.5) * g2) * (4.0 * ice);
             snowTone = ((w1.b - 0.5) * g1 + (w2.b - 0.5) * g2) * ice;
             snowLie = clamp(0.35 + (w1.a - 0.35) * g1 + (w2.a - 0.35) * g2 * (1.0 - 0.5 * g1), 0.0, 1.0);
@@ -346,13 +349,30 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           tw *= tw; tw *= tw; tw /= tw.x + tw.y + tw.z;
           float k1 = smoothstep(5.0, 16.0, viewDist) * (1.0 - smoothstep(60.0, 160.0, viewDist));
           float k2 = smoothstep(40.0, 120.0, viewDist);
-          vec4 ax = textureGrad(uClinker, vTex.yz / 8.0, texDx.yz / 8.0, texDy.yz / 8.0), bx = textureGrad(uClinker, vTex.yz / 32.0 + vec2(0.31, 0.57), texDx.yz / 32.0, texDy.yz / 32.0);
-          vec4 ay = textureGrad(uClinker, vTex.zx / 8.0, texDx.zx / 8.0, texDy.zx / 8.0), by = textureGrad(uClinker, vTex.zx / 32.0 + vec2(0.31, 0.57), texDx.zx / 32.0, texDy.zx / 32.0);
-          vec4 az = textureGrad(uClinker, vTex.xy / 8.0, texDx.xy / 8.0, texDy.xy / 8.0), bz = textureGrad(uClinker, vTex.xy / 32.0 + vec2(0.31, 0.57), texDx.xy / 32.0, texDy.xy / 32.0);
-          vec4 fx = ax * k1 + bx * k2 - 0.5 * (k1 + k2), fy = ay * k1 + by * k2 - 0.5 * (k1 + k2), fz = az * k1 + bz * k2 - 0.5 * (k1 + k2);
+          // (a face is read from the side or two it is turned to, and each size only over its own range: two to four
+          //  reads on most of a wall, not twelve)
+          vec4 fx = vec4(0.0), fy = vec4(0.0), fz = vec4(0.0);
+          float gap = 0.0;
+          if (tw.x > 0.04) {
+            vec4 a = vec4(0.5), b = vec4(0.5);
+            if (k1 > 0.0) a = textureGrad(uClinker, vTex.yz / 8.0, texDx.yz / 8.0, texDy.yz / 8.0);
+            if (k2 > 0.0) b = textureGrad(uClinker, vTex.yz / 32.0 + vec2(0.31, 0.57), texDx.yz / 32.0, texDy.yz / 32.0);
+            fx = a * k1 + b * k2 - 0.5 * (k1 + k2); gap += (a.a * k1 + b.a * k2) * tw.x;
+          }
+          if (tw.y > 0.04) {
+            vec4 a = vec4(0.5), b = vec4(0.5);
+            if (k1 > 0.0) a = textureGrad(uClinker, vTex.zx / 8.0, texDx.zx / 8.0, texDy.zx / 8.0);
+            if (k2 > 0.0) b = textureGrad(uClinker, vTex.zx / 32.0 + vec2(0.31, 0.57), texDx.zx / 32.0, texDy.zx / 32.0);
+            fy = a * k1 + b * k2 - 0.5 * (k1 + k2); gap += (a.a * k1 + b.a * k2) * tw.y;
+          }
+          if (tw.z > 0.04) {
+            vec4 a = vec4(0.5), b = vec4(0.5);
+            if (k1 > 0.0) a = textureGrad(uClinker, vTex.xy / 8.0, texDx.xy / 8.0, texDy.xy / 8.0);
+            if (k2 > 0.0) b = textureGrad(uClinker, vTex.xy / 32.0 + vec2(0.31, 0.57), texDx.xy / 32.0, texDy.xy / 32.0);
+            fz = a * k1 + b * k2 - 0.5 * (k1 + k2); gap += (a.a * k1 + b.a * k2) * tw.z;
+          }
           grad += (vec3(0.0, fx.r, fx.g) * tw.x + vec3(fy.g, 0.0, fy.r) * tw.y + vec3(fz.r, fz.g, 0.0) * tw.z) * (3.4 * faceW);
           // (the texture's fourth channel is where dust lies between its blocks: on a face that is the gap, in shade)
-          float gap = (ax.a * tw.x + ay.a * tw.y + az.a * tw.z) * k1 + (bx.a * tw.x + by.a * tw.y + bz.a * tw.z) * k2;
           faceTone = ((fx.b * tw.x + fy.b * tw.y + fz.b * tw.z) * 1.1 - 0.26 * gap) * faceW;
         }
         // lava is basalt: dark and grey under its dust, and the dust is thin on the backs of the flows
@@ -507,6 +527,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain48' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain50' + (o.fine !== false ? 'F' : '');
   return mat;
 }

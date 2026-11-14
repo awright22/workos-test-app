@@ -28,6 +28,8 @@ const PLANET_SCALE = Math.round(3389500 / R);
  * sizes. (Latitudes and longitudes were 11 px and place names 12 where the page's labels were 13.)
  */
 const lettering = [];
+/** Where the graticule's own figures are drawn this frame ([x, y, w, h] each): names keep off them. */
+const gratBoxes = [];
 UI.mapLettering = lettering;
 const R2D = 180 / Math.PI;
 const view = { lon: 180, lat: 0, ppd: 0 };      // centre and scale (CSS pixels per degree)
@@ -160,6 +162,8 @@ function placeLabels(you, storms, stormBoxes) {
     if (b.width) boxes.push([b.left - wr.left - 6, b.top - wr.top - 6, b.width + 12, b.height + 12]);
   }
   boxes.push([you.x - 13 * U, you.y - 13 * U, 26 * U, 26 * U]);
+  // (and off the graticule's own figures: a region's name lay across "0°E", and a lander's across a latitude)
+  for (const b of gratBoxes) boxes.push(b);
   for (const m of markers) { if (m.under) continue; const q = m.small ? 7 * U : r; boxes.push([m.x - q, m.y - q, q * 2, q * 2]); }
   // (What is lettered on the map is in capitals, and capitals are as tall as seven tenths of their size: a marker's
   //  name is 13 px at the least, as every label in capitals on a phone is; a place's name and a storm's, 12. The map
@@ -297,12 +301,13 @@ function draw() {
   for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = Math.round(sy(lat)) + 0.5; c.moveTo(0, y); c.lineTo(W, y); }
   c.stroke();
   lettering.length = 0;
+  gratBoxes.length = 0;
   const GS = Math.max(12, 11 * U);
   c.font = `500 ${GS}px "JetBrains Mono", monospace`; c.fillStyle = 'rgba(245,240,232,.7)'; c.textBaseline = 'alphabetic';
   c.textAlign = 'left';
-  for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = sy(lat); if (y > 16 * U && y < H - 6 && lat % (step * (step === 30 ? 1 : 2)) === 0) { const t = lat === 0 ? '0°' : fmtLat(lat).replace('.0', ''); c.fillText(t, 6 * U, y - 3 * U); lettering.push({ text: t, size: GS, mono: true }); } }
+  for (let lat = Math.ceil(Math.max(-90, latBot) / step) * step; lat <= Math.min(90, latTop); lat += step) { const y = sy(lat); if (y > 16 * U && y < H - 6 && lat % (step * (step === 30 ? 1 : 2)) === 0) { const t = lat === 0 ? '0°' : fmtLat(lat).replace('.0', ''); c.fillText(t, 6 * U, y - 3 * U); lettering.push({ text: t, size: GS, mono: true }); gratBoxes.push([2 * U, y - 3 * U - GS, c.measureText(t).width + 8 * U, GS + 4 * U]); } }
   c.textAlign = 'center';
-  for (let lon = Math.ceil(lonL / step) * step; lon <= lonR; lon += step) { const x = W / 2 + (lon - view.lon) * ppd; if (x > 40 * U && x < W - 30 * U && lon % (step * 2) === 0) { const t = `${((lon % 360) + 360) % 360}°E`; c.fillText(t, x, H - 6 * U); lettering.push({ text: t, size: GS, mono: true }); } }
+  for (let lon = Math.ceil(lonL / step) * step; lon <= lonR; lon += step) { const x = W / 2 + (lon - view.lon) * ppd; if (x > 40 * U && x < W - 30 * U && lon % (step * 2) === 0) { const t = `${((lon % 360) + 360) % 360}°E`; c.fillText(t, x, H - 6 * U); lettering.push({ text: t, size: GS, mono: true }); const gw = c.measureText(t).width + 8 * U; gratBoxes.push([x - gw / 2, H - 6 * U - GS, gw, GS + 6 * U]); } }
 
   // storm cells
   const stormLabels = [], stormBoxes = [];
@@ -335,6 +340,8 @@ function draw() {
     //  own radius out of place. A survey target's ring was cut in half by the top of the whole-planet map.)
     const q = ((m.unknown ? 8 : m.small ? 6 : 10) + (m.main ? 6 : 2)) * U;
     if (m.y > -q && m.y < q) m.y = q; else if (m.y > H - q && m.y < H + q) m.y = H - q;
+    // (and the same at the sides: on a phone a lander's ring was cut in half by the map's left edge, its name beside it whole)
+    if (m.x > -q && m.x < q) m.x = q; else if (m.x > W - q && m.x < W + q) m.x = W - q;
   }
   // Markers that fall on one another at this zoom are shown as one: the most important (or the one
   // selected), with a count of the rest. Tapping it again steps through them.

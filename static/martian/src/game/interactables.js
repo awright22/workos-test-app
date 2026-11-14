@@ -138,7 +138,7 @@ addI({
               const plural = (k, one) => `${k} ${one}${k === 1 ? '' : 's'}`;
               const potatoNote = S.potatoes > 0 && S.food > 0 ? `The staple. A bed takes one potato (you have ${S.potatoes}), then one ration (${S.food}).`
                 : `The staple. A bed takes one of your ${S.potatoes > 0 ? plural(S.potatoes, 'potato').replace('potatos', 'potatoes') : plural(S.food, 'ration')}.`;
-              return { label: c.name, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield} meal${c.yield === 1 ? '' : 's'}`,
+              return { label: c.name, icon: id, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield} meal${c.yield === 1 ? '' : 's'}`,
                 // (every crop says what it would be planted from: lettuce alone, with packets and nothing in the pantry, said only that it crunched)
                 note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.`
                   : packets ? `${plural(packets, 'seed packet')}. ${c.note}` : `${kept} from the pantry. ${c.note}`,
