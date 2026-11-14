@@ -433,7 +433,7 @@ if (!onlySize || onlySize === 'play') {
   //  what morale's change is made of there for the asking, where it was a bracketed sum the length of the screen)
   check('night: the account is headed with the new sol, and says what breakfast took, how long the food lasts, and, asked, why morale moved',
     acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(\d+ meals?, \d+ left\)/.test(n)) &&
-    acct.notes.some((n) => new RegExp(`^Morale: ${Math.round(acct.morale)} of 100`).test(n)) && acct.notes.some((n) => new RegExp(`^Food: Enough for ${acct.days} sols?\\b`).test(n)) &&
+    acct.notes.some((n) => new RegExp(`^Morale: ${Math.round(acct.morale)} of 100`).test(n)) && acct.notes.some((n) => new RegExp(`^Food: (Enough for ${acct.days} sols?\\b|\\d+ meals make ${acct.days} breakfasts?\\b)`).test(n)) &&
     /another sol alone.*a night in the bunk/i.test(acct.why) && acct.whyHidden && whyShown && acct.tiles.every((t) => !/morale.*%/i.test(t)) && acct.tiles.some((t) => /now \d+\smeals?/.test(t)), { acct, whyShown });
   await g.eval(() => document.querySelector('#mg-panel .sleep .wake').click());
   await sleep(300);

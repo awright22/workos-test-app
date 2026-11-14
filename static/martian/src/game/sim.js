@@ -429,7 +429,10 @@ export function sleepToDawn(inRover) {
   { const named = (dawn ? dawn.alone + dawn.meal + dawn.sky + dawn.home + dawn.mail + dawn.faults : 0) + bed, rest = S.morale - before.morale - named;
     if (Math.abs(rest) >= 0.75) why.push(`the night's other events ${signed(rest)}`); }
   // (morale is a score out of 100, with no unit, in the figure above and in its parts)
-  rows.push(['Morale', `${Math.round(S.morale)} of 100: ${MORALE_WORD[moraleBand()].toLowerCase()}`, cap(why.join(', '))]);
+  // (the first morning says what morale is: this sheet used to score it a night before anything had named it)
+  const moraleIs = S.flags.moraleTold ? '' : '. Your spirits: variety on the plate, music and the comforts of the Hab lift them, and in good spirits work goes faster';
+  S.flags.moraleTold = true;
+  rows.push(['Morale', `${Math.round(S.morale)} of 100: ${MORALE_WORD[moraleBand()].toLowerCase()}${moraleIs}`, cap(why.join(', '))]);
   if (growing + ready > 0) rows.push(['Farm', `${growing} growing, ${ready} ready`]);
   // what the numbers mean for the days ahead: the rescue is a fixed date, and the larder gives so many breakfasts
   { const have = foodTotal(), days = breakfastsLeft(), wait = Math.max(0, S.rescueSol - S.sol);
@@ -440,7 +443,9 @@ export function sleepToDawn(inRover) {
     // (And the larder lasts as many sols as it gives breakfasts, which is fewer than its meals while there is
     //  something to go with the staple: "−2 food, 20 left" was followed by "food for 20 sols".)
     const short = wait - days, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
-    const lasts = days === have ? `Enough for ${sols(days)}` : `Enough for ${sols(days)}, eating as today`;
+    // ("eating as today" it used to say, on a morning he had eaten two meals of a larder that could do that five
+    //  more times: the count was right and the words were not)
+    const lasts = days === have ? `Enough for ${sols(days)}` : `${have} meals make ${days} breakfast${days === 1 ? '' : 's'}`;
     // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
     rows.push(['Food', short <= 0 ? `${lasts}; the rescue is in ${wait}`
       : coming >= short ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${wait}`

@@ -329,6 +329,8 @@ export async function walk(size, o = {}) {
     const n = U.logHistory.length;
     U.logHistory.forEach((l, i) => { l.sol = Math.max(1, Math.min(12, Math.round(1 + 11 * Math.pow(i / Math.max(1, n - 1), 1.6)))); });
     G.S.stats.marks = { ...(G.S.stats.marks || {}), reach: 1, systems: 1, math: 1, farm: 1, hydra: 2, panels: 3, harvest: 4, dinner: 6, pf: 9 };
+    // (a run whose timeline has a dinner in it has cooked one: the win sheet's count is read from here)
+    G.S.diet = { ...(G.S.diet || {}), meals: Math.max(3, (G.S.diet && G.S.diet.meals) || 0) };
   });
   for (const [t, name] of [['disc', 'discoveries'], ['samples', 'samples'], ['ach', 'achievements'], ['stats', 'statistics'], ['log', 'log']]) {
     await click(`.journal [data-tab="${t}"]`);
