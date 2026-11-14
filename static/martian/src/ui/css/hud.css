@@ -745,3 +745,8 @@
    (On the small phone the room the reason gave up was taken by the next line, and the card was no shorter.) A
    second line that is itself a red one stays. */
 .mg-compact #mg-objectives.shut .obj:not(.primary):not(.urgent):not(.done) { display: none; }
+
+/* The region's name is where he is, not somewhere to go: on a phone it is a caption under the compass, plain letters
+   with no plate behind them. (As a second plate under the target's it read as a second destination.) */
+.mg-compact #mg-region { background: none; color: var(--ink-2); text-shadow: 0 1px 2px rgba(0, 0, 0, .85), 0 0 6px rgba(0, 0, 0, .5); }
+.mg-compact #mg-region.enter { animation: none; }

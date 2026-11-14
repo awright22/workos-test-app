@@ -501,12 +501,22 @@ function prepare(gltf, name) {
               float el = dot(mR, normalize((viewMatrix * vec4(uDustHere, 0.0)).xyz));
               vec3 mSky = mix(uSkyHor * 1.25, uSkyTop * 0.62, smoothstep(0.03, 0.7, el));
               vec3 mGround = uGroundLit * mix(0.5, 1.05, smoothstep(-0.75, -0.04, el));
-              vec3 mScene = mix(mGround, mSky, smoothstep(-0.02, 0.03, el));
+              vec3 mScene = mix(mGround, mSky, smoothstep(-0.05, 0.05, el));
+              // (the horizon is not a ruled line between two tones: the haze along it glows, and the sky is brightest
+              // round the sun, which the visor shows as a soft bloom with the sun's own spark in it. Two flat bands
+              // with a hard split read as a sticker.)
+              mScene += uSkyHor * (0.42 * exp(-(el * el) / 0.012));
+              #if NUM_DIR_LIGHTS > 0
+              {
+                float toSun = max(dot(mR, directionalLights[0].direction), 0.0);
+                mScene += directionalLights[0].color * (0.10 * pow(toSun, 14.0) + 0.9 * pow(toSun, 220.0)) * step(-0.05, el);
+              }
+              #endif
               float mEdge = pow(1.0 - clamp(dot(normal, mV), 0.0, 1.0), 4.0);
               reflectedLight.indirectSpecular = mScene * mix(diffuse * 1.5, vec3(1.0), mEdge * 0.8);
             }`);
         };
-        m.customProgramCacheKey = () => 'visor2';
+        m.customProgramCacheKey = () => 'visor3';
       }
       if (m.metalness > 0.5 && !name.startsWith('visor')) { m.envMapIntensity = 1.25; m.roughness = Math.max(m.roughness, 0.2); }
       // (thin sheet seen from both sides: a petal with its back cut away showed only its ribs)
