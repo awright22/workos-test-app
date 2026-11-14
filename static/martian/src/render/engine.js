@@ -341,7 +341,9 @@ export class Engine {
     // (At night a sixth: at a fifth the whole dome stood evenly pale with nothing to light it. And at midday under
     // two thirds, not four fifths: with the sun ahead, his shaded back measured as bright as the lit sand.)
     this.modelAmbient = lerp(lerp(0.17, lerp(0.32, 0.62, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
-    this.modelRim = (1 - io) * sky.day;
+    // (the rim is strongest under a low sun, when the sun itself is weakest: at dawn and dusk a man against the light
+    // had no edge at all)
+    this.modelRim = (1 - io) * sky.day * (1 + 1.8 * (1 - smoothstep(0.08, 0.5, sky.sunE)));
     // near/far follow altitude so depth precision is spent where the camera is
     // (the projection must follow at once: the shadow cascades are fitted to it, and a stale one sizes them wrongly)
     const near = alt > 400 ? 2 : 0.12;

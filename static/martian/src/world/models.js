@@ -244,7 +244,9 @@ function setUpPlain(plain, ground) {
       .replace('#include <lights_fragment_maps>', `
         float skyFill = uFill;
         #if NUM_DIR_LIGHTS > 0
-        skyFill *= 1.0 - 0.45 * uRim * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
+        // (seven tenths gone, not under half: seen from behind with the sun ahead, his white back was still the
+        // brightest thing in the picture, lit alike from every side)
+        skyFill *= 1.0 - 0.70 * min(uRim, 1.0) * clamp(-dot(normal, directionalLights[0].direction), 0.0, 1.0);
         #endif
         irradiance *= skyFill;
         #include <lights_fragment_maps>
@@ -263,7 +265,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust11' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust12' + (ground ? 'G' : '');
   return plain;
 }
 
