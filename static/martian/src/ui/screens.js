@@ -8,10 +8,10 @@ import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
 import { DIFFICULTIES, S, isBase } from '../game/state.js';
-import { BULK } from '../game/base.js';
+import { BULK, MADE, WORKS } from '../game/base.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
-import { startDeploy } from '../game/interactables.js';
+import { startBuild, startDeploy } from '../game/interactables.js';
 import { ACHIEVEMENTS, QUEST_DEFS, achievementDone, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
 import { sightList } from '../game/sights.js';
@@ -98,7 +98,7 @@ let colonyTab = 'craft', colonyChosen = false;
  */
 /** The badges of a card, as one group: beside the name where there is room, under it where there is not. */
 const tags = (h) => (h ? `<span class="tags">${h}</span>` : '');
-function costChips(cost, plain) {
+export function costChips(cost, plain) {
   const keys = Object.keys(cost);
   if (!keys.length) return '<span class="chip ok">No materials needed</span>';
   return keys.map((k) => {
@@ -113,11 +113,11 @@ function costChips(cost, plain) {
 const SOURCE = {
   scrap: 'salvage debris and old landers', circuit: 'salvage old landers', regolith: 'dig it outside',
   ice: 'mine ice deposits', candle: 'fabricate one, or open supply pods',
-  ...Object.fromEntries(BULK.map((b) => [b.id, b.from])),
+  ...Object.fromEntries(BULK.concat(MADE).map((b) => [b.id, b.from])),
 };
 /** (ice names how the drill is come by, until he has it: "with the ice drill" named a thing he had never seen) */
 const sourceOf = (k) => (k === 'ice' && !S.upgrades.drill ? 'mine ice deposits, once the Ice Drill is installed (Upgrades)' : SOURCE[k]);
-function missingText(cost) {
+export function missingText(cost) {
   const parts = [], from = [];
   for (const k in cost) {
     const need = cost[k] - (S.inv[k] || 0);
@@ -186,6 +186,8 @@ export function renderColony() {
     // (what a base is built of: each says where it lies until he has some, since nothing else on this screen does)
     inv += '<div class="pane-hd">Minerals <span>Quarried, for the base</span></div>';
     for (const b of BULK) inv += row(b.icon, b.name, S.inv[b.id] || 0, '', (S.inv[b.id] || 0) > 0 ? '' : b.from[0].toUpperCase() + b.from.slice(1));
+    inv += '<div class="pane-hd">Made <span>By the works, for building</span></div>';
+    for (const b of MADE) inv += row(b.icon, b.name, S.inv[b.id] || 0, '', (S.inv[b.id] || 0) > 0 ? '' : b.from[0].toUpperCase() + b.from.slice(1));
   }
   inv += '<div class="pane-hd">Kits <span>Build, then place outside</span></div>';
   for (const k of ['kitSolar', 'kitGreenhouse', 'kitBeacon', 'kitCache']) {
@@ -278,6 +280,24 @@ export function renderColony() {
     '<p class="pane-note intro">Things to make the Hab a place to live in. Each one lifts morale a little every dawn.</p>' + home +
     (homeDone ? `<div class="pane-hd">Made <span>${madeN}</span></div>${homeDone}` : '');
 
+  // --- base: the works a base is built with (the game with no rescue only) ---
+  let baseHtml = '', baseReady = 0;
+  if (isBase()) {
+    const cards = [];
+    for (const w of WORKS) {
+      const n = World.builtMeshes.filter((b) => b.kind === w.id).length, can = hasCost(w.cost);
+      if (can) baseReady++;
+      const makes = [...new Set(w.jobs.flatMap((j) => Object.keys(j.out)))].map((k) => itemName(k).toLowerCase()).join(', ');
+      cards.push([can ? 0 : 1, `<article class="rcp ${can ? 'ready' : ''}" data-card="${w.id}"><div class="rcp-hd"><h4>${esc(w.name)}</h4>` +
+        tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}Built${n > 1 ? ' ' + n : ''}</span>` : '')) + '</div>' +
+        `<p class="ds">${chem(esc(w.desc))} Makes ${esc(makes)}.</p><div class="cost">${costChips(w.cost)}</div>` +
+        `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
+        `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`]);
+    }
+    baseHtml = `<div class="pane-hd">Works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${World.builtMeshes.filter((b) => b.def).length} standing</span></div>` +
+      '<p class="pane-note intro">What a base is made with. Each is built outside, within reach of the Hab’s power, and works by itself once it has a job.</p>' + ranked(cards);
+  }
+
   // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
   //  this screen and of the journal carries its count the same way, a figure in a pill: there were three styles, a
   //  filled "6 READY", round badges and bare numerals.)
@@ -291,18 +311,20 @@ export function renderColony() {
   //  reach; at the Hab there is nothing to say, and the room is the cards'. The line used to be a banner over the tabs,
   //  which pushed them down a row whenever he walked out of range.)
   body.innerHTML = '<div class="colony">' +
-    `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}${tab('home', 'hab', 'Home', homeReady)}</div>` +
+    `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}${tab('home', 'hab', 'Home', homeReady)}${isBase() ? tab('base', 'brick', 'Base', baseReady) : ''}</div>` +
     (atHome ? '' : `<div class="col-bar off">${icon('warning')}<b>Fabricator out of range</b><span>Return to the Hab to fabricate or install. You can still deploy kits you carry.</span></div>`) +
     '<div class="cols">' +
     `<section class="pane mg-scroll${colonyTab === 'inv' ? ' on' : ''}" id="mg-inv" aria-label="Inventory">${inv}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'craft' ? ' on' : ''}" id="mg-craft" aria-label="Fabrication">${craft}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'build' ? ' on' : ''}" id="mg-build" aria-label="Upgrades">${up}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'home' ? ' on' : ''}" id="mg-home" aria-label="Home">${home}</section>` +
+    (isBase() ? `<section class="pane mg-scroll${colonyTab === 'base' ? ' on' : ''}" id="mg-base" aria-label="Base">${baseHtml}</section>` : '') +
     '</div></div>';
   body.querySelectorAll('.pane').forEach((p) => { if (keep[p.id]) p.scrollTop = keep[p.id]; });
 
   body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { colonyTab = b.dataset.tab; colonyChosen = true; Snd.click(); renderColony(); }));
   body.querySelectorAll('[data-deploy]').forEach((b) => b.addEventListener('click', () => startDeploy(b.dataset.deploy)));
+  body.querySelectorAll('[data-build]').forEach((b) => b.addEventListener('click', () => startBuild(b.dataset.build)));
   const bump = (id) => { const c = UI.colonyScreen.querySelector(`[data-card="${id}"]`); if (c) c.classList.add('bump'); };
   body.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
     const r = RECIPES.find((x) => x.id === b.dataset.r);

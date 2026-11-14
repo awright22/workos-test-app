@@ -121,8 +121,8 @@ function buildMarkers() {
     }
   }
   World.builtMeshes.forEach((b, i) => {
-    const names = { beacon: 'Nav beacon', solar: 'Solar panel', greenhouse: 'Greenhouse dome', cache: 'O2 cache' };
-    const icons = { beacon: 'beacon', solar: 'solar', greenhouse: 'dome', cache: 'cache' };
+    const names = { beacon: 'Nav beacon', solar: 'Solar panel', greenhouse: 'Greenhouse dome', cache: 'O2 cache', ...(b.def ? { [b.kind]: b.def.name } : {}) };
+    const icons = { beacon: 'beacon', solar: 'solar', greenhouse: 'dome', cache: 'cache', kiln: 'brick', smelter: 'ingot', glassworks: 'pane' };
     add({ id: 'b:' + i, icon: icons[b.kind] || 'box', color: col.ok, pos: b.group.position, label: b.kind === 'beacon' ? 'Beacon' : '', pri: b.kind === 'beacon' ? 5 : 7,
       title: names[b.kind] || 'Structure', type: 'You built this', note: b.kind === 'cache' ? `${b.charges} suit refills left.` : '' });
   });

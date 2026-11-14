@@ -1,6 +1,7 @@
-// Pictures of Base mode's own things, for review: each kind of mineral deposit with the astronaut beside it, from
-// a little way off and from close, at iPhone size on the preset a phone starts on.
-//   node tests/base-shots.mjs [--out DIR] [--size=667] [--only=hematite,salt] [--hour=14]
+// Pictures of Base mode's own things, for review, at iPhone size on the preset a phone starts on: each kind of
+// mineral deposit with the astronaut beside it, from a little way off and from close; and the three works beside
+// the Hab, each with a job on, by day and after dark.
+//   node tests/base-shots.mjs [--out DIR] [--size=667] [--only=hematite,salt,works] [--hour=14]
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { openGame, outDir, sleep } from './lib.mjs';
@@ -36,6 +37,40 @@ for (const kind of kinds) {
     await sleep(900);
     await g.page.screenshot({ path: path.join(dir, `${kind}-${tag}.png`), timeout: 420000 });
     console.log('  shot', `${kind}-${tag}`);
+  }
+}
+// ---- the works: a kiln, a smelter and a glassworks beside the Hab, each with a job on, by day and after dark
+if (!only.length || only.includes('works')) {
+  await g.eval(async (G) => {
+    G.tpLocal(30, 30, 0); await G.settle();
+    const spots = { kiln: [26, 20, 2.4], smelter: [36, 27, 2.6], glassworks: [44, 16, 2.9] };
+    for (const k of Object.keys(spots)) G.build(k, ...spots[k]);
+    Object.assign(G.S.inv, { regolith: 40, brick: 20, iron: 6, glass: 4 });
+    G.S.power = 90;
+    for (const b of G.World.builtMeshes) if (b.def) G.works.startJob(b, b.def.jobs[0].id, 4);
+    G.syncAllVisuals();
+    G.tick(0.05, 60);
+    await G.settle();
+  });
+  for (const [hr, tag] of [[14, 'day'], [20.6, 'night']]) {
+    for (const kind of ['kiln', 'smelter', 'glassworks']) {
+      await g.eval(async (G, [k, h]) => {
+        const b = G.World.builtMeshes.find((x) => x.kind === k);
+        const c = b.group.position, up = c.clone().normalize(), V = c.constructor;
+        const front = new V(0, 0, 1).applyQuaternion(b.group.quaternion);
+        const e = new V(-up.z, 0, up.x).normalize(), n = new V().crossVectors(up, e);
+        const bear = Math.atan2(front.dot(e), front.dot(n)) * 180 / Math.PI;
+        G.tpAround(c, 3.6, bear + 58);
+        G.setLocalTime(h);
+        G.S.power = 90;
+        G.photo(c, 8.2, bear + 22, 2.2, 1.0);
+        G.tick(0.05, 30);
+        await G.settle();
+      }, [kind, hr]);
+      await sleep(900);
+      await g.page.screenshot({ path: path.join(dir, `works-${kind}-${tag}.png`), timeout: 420000 });
+      console.log('  shot', `works-${kind}-${tag}`);
+    }
   }
 }
 console.log('console errors:', g.errors.length, g.errors.slice(0, 3));

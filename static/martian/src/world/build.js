@@ -12,6 +12,7 @@ import { addLamp } from './lamps.js';
 import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
 import { log } from '../ui/dom.js';
+import { WORK_BY_ID } from '../game/base.js';
 // Builds everything that stands on the planet: the Hab colony, the rover, story sites,
 // historic landers, ice, deployables and supply pods; and the collider list.
 export const World = { plots: [], panels: [], soilPiles: [], landers: [], iceSites: [], builtMeshes: [],
@@ -665,7 +666,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
   {
     // a dome needs level ground under it; the small things need a clear, level spot (no rock under a tripod)
     const u = _aw.copy(atVec).normalize();
-    const padRec = kind === 'greenhouse' ? ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5) : ctx.planet.addPad(u.x, u.y, u.z, 1.4, 2.2);
+    const w = WORK_BY_ID[kind];
+    const padRec = w ? ctx.planet.addPad(u.x, u.y, u.z, w.pad, w.pad * 0.9)
+      : kind === 'greenhouse' ? ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5) : ctx.planet.addPad(u.x, u.y, u.z, 1.4, 2.2);
     ctx.terrain.syncPads([padRec]);
   }
   const g = placeAt(atVec, undefined, yaw);
@@ -700,6 +703,14 @@ export function buildDeployable(kind, atVec, yaw = 0) {
   } else if (kind === 'cache') {
     const m = addSiteModel(g, 'o2_cache');
     b.tanks = [0, 1, 2].map((i) => m.part('tank_' + i));
+  } else if (WORK_BY_ID[kind]) {
+    // one of a base's works (game/base.js): masonry with a fire in it, which burns while it has a job (game/works.js)
+    b.def = WORK_BY_ID[kind];
+    const m = addSiteModel(g, b.def.model, { stain: b.def.pad * 0.95, stainOpacity: 0.3 });
+    b.fire = ownMaterials(m.root, /^light_amber/);
+    b.stock = m.part('stock');
+    b.job = null; b.working = false; b.heat = 0;
+    addLamp(m.part('fire') || g, { color: 0xff8a30, power: 10, range: 9, decay: 1.4, level: () => b.heat * (0.35 + 0.65 * (World.dark || 0)) });
   }
   World.builtMeshes.push(b);
   return b;

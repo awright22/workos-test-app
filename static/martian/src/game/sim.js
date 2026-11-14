@@ -1,4 +1,5 @@
 import { comfortCheer } from './comforts.js';
+import { updateWorks } from './works.js';
 import { CROPS, MORALE_WORD, breakfast, breakfastsLeft, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
 import { BAL, S, isBase, machineEff, roverPowerCap, suitCap } from './state.js';
@@ -119,6 +120,7 @@ export function applyRates(dt, sleeping) {
   if (tempAtHab < -70 && !S.upgrades.rtg) baseDraw += 8;             // heaters fight the cold
   let rtgGen = S.upgrades.rtg ? 6 / SL : 0;
   S.power = clamp(S.power + (gen + rtgGen - (baseDraw / SL) * m) * dt, 0, BAL.powerMax);
+  updateWorks(dt);                                        // (a base's kiln, smelter and glassworks draw on it too)
   const powered = S.power > 0.5;
   // --- panel dust ---
   const dustMult = S.upgrades.wiper ? 0.3 : 1;

@@ -688,3 +688,17 @@
 .mg-compact .sleep .delta { padding: .3125rem .25rem .3125rem; gap: .25rem; }
 .mg-compact .sleep .notes { margin-top: .5rem; gap: .0625rem .875rem; line-height: 1.32; }
 .mg-compact .sleep .wake { margin-top: .5rem; }
+
+/* The sheet of a works (ui/works.js): its jobs side by side, the one that is running with a bar under it. */
+.work .sheet-hd .t-kicker { max-width: 44rem; text-transform: none; letter-spacing: 0; font: 400 .875rem/1.4 var(--f-body, inherit); color: var(--ink-2); }
+.work-state { flex: none; max-width: 22rem; padding: .3125rem .625rem; border: 1px solid var(--line-2); border-radius: .125rem; font: 500 .8125rem/1.3 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.work-state.on { border-color: var(--accent); color: var(--accent); }
+.work-jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .75rem; align-items: stretch; }
+.work-jobs .rcp { margin-bottom: 0; display: flex; flex-direction: column; }
+.work-jobs .rcp .rcp-ft { margin-top: auto; padding-top: .6875rem; flex-wrap: wrap; }
+.work-bar { height: .5rem; margin-top: .75rem; background: rgba(245, 240, 232, .1); border-radius: .125rem; overflow: hidden; }
+.work-bar i { display: block; height: 100%; background: var(--accent); transition: width .4s linear; }
+.mg-compact .work .sheet-hd .t-kicker { display: none; }
+.mg-compact .work-state { font-size: var(--t12); max-width: 18rem; }
+.mg-compact .work-jobs { gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.mg-compact .work-jobs .rcp .rcp-ft { padding-top: .4375rem; gap: .5rem; }

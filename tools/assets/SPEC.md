@@ -361,3 +361,17 @@ terrain at its own edge. The mineral
 is the material `mineral` (or `mineral_sheen` for the hematite beads): white in itself, its colour
 painted on the vertices. The script takes its helpers from `props.py`.
 The game loads these five only when a base is begun or continued (`BASE_MODELS` in `base.js`).
+
+## Family H — the works of a base (`works.py`)
+
+`bs_kiln.glb` (≤ 14,000), `bs_smelter.glb` (≤ 9,000), `bs_glassworks.glb` (≤ 5,000): what a base's
+materials are made in (`WORKS` in `static/martian/src/game/base.js` says what each makes). One man
+built each out of what he quarried and salvaged, so they are masonry with machinery bolted on: dark
+basalt blocks, red brick, steel fittings, a grey control box on a post with a cable running off
+toward the Hab. The kiln is a beehive of coursed blocks with a firing mouth and a flue; the smelter
+a banded brick shaft with a blower, a tap and a bed of pig moulds; the glassworks a low furnace with
+a glory hole, a mirror dish that heats it, a casting table and a rack of panes.
+Every surface that glows when the works is working is in `light_amber`: the game turns it up while
+a job runs and down to nothing when it stands idle. Part `stock` is the product stacked beside it,
+shown when there is some in the stores. Anchor `fire` is where the game hangs its lamp; `col_*`
+anchors are the circles the player cannot walk into. The script takes its helpers from `props.py`.

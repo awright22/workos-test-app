@@ -91,6 +91,10 @@ export async function walk(size, o = {}) {
     return { states: n, seconds: ((Date.now() - t0) / 1000).toFixed(0), errors: errs };
   }
 
+  // (asked only for the base's screens, the story's walk is skipped: it is six minutes of play)
+  const baseOnly = !!only && only.every((x) => x.startsWith('base'));
+  story: {
+  if (baseOnly) break story;
   // ---------------------------------------------------------------- menus before the game
   await shot('title', 2200);
   // (the saved run on this made-up title is the run the rest of the pictures play: the same site, so the same region's name)
@@ -390,10 +394,61 @@ export async function walk(size, o = {}) {
   await click('#mg-panel button >> text=/punch it/i');
   await ev((G) => { G.tick(0.05, 900); });
   await shot('win', 900);
+  }
 
-  const took = ((Date.now() - t0) / 1000).toFixed(0);
+  // ---------------------------------------------------------------- the second game: a base (its own screens)
+  // (a page of its own, asked for with ?base: the story's run above is over)
   const found = g.errors.slice();
   await g.close();
+  const b = await openGame({ width: size.w, height: size.h, touch: size.touch, quality: 'low', query: (size.safe ? 'safe=' + size.safe + '&' : '') + 'base' });
+  const bpage = b.page;
+  if (o.reducedMotion) await bpage.evaluate(() => window.__UI.setSetting('reducedMotion', true));
+  const bshot = async (name, wait = 500) => {
+    n++;
+    await sleep(wait);
+    if (only && !only.some((x) => name.includes(x))) return;
+    await bpage.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await bpage.waitForFunction(settledInPage, null, { timeout: 15000, polling: 100 }).catch(() => {});
+    const label = `${String(n).padStart(2, '0')}-${name}`;
+    if (shoot) { await bpage.screenshot({ path: path.join(dir, label + '.png'), timeout: 120000 }); total++; }
+    if (o.onState) await o.onState(label, bpage);
+  };
+  const bclick = (sel) => bpage.locator(sel).first().click({ timeout: 60000 });
+  await bclick('#mg-panel [data-act="new"]');
+  await bshot('base-which-game');
+  await bclick('#mg-panel [data-kind="base"]');
+  await bshot('base-newgame');
+  await b.eval(async (G) => {
+    await G.start(-1.9, 354.5, 'survival', 'base'); G.skipIntro(); await G.settle(); G.paused = true;
+    Object.assign(G.S.inv, { stone: 14, scrap: 6, regolith: 9, ore: 4, brick: 3 });
+    G.S.base = { found: {}, left: {} };
+    const d = G.World.deposits.find((x) => x.dep.id === 'hematite'); G.S.base.found[d.key] = 1; d.left = 22;
+    G.tick(0.05, 4);
+  });
+  await bpage.keyboard.press('c');
+  if (await bpage.locator('.colony [data-tab="inv"]').first().isVisible()) await bclick('.colony [data-tab="inv"]');
+  await bpage.evaluate(() => { const h = [...document.querySelectorAll('#mg-inv .pane-hd')].find((x) => /minerals/i.test(x.textContent)); if (h) h.scrollIntoView(); });
+  await bshot('base-inventory-minerals', 300);
+  await bclick('.colony [data-tab="base"]');
+  await bshot('base-works-tab', 300);
+  await bpage.keyboard.press('Escape');
+  await bpage.keyboard.press('m');
+  await bshot('base-map', 900);
+  await bpage.keyboard.press('Escape');
+  // a kiln standing, its sheet idle and then with a job on
+  await b.eval(async (G) => { G.tpLocal(26, 22, 0); await G.settle(); G.build('kiln', 26, 16, 0); G.S.power = 80; G.tick(0.05, 10); G.hold(0.7); });
+  await bpage.waitForSelector('.sheet.work', { timeout: 60000 });
+  await bshot('base-work-sheet', 400);
+  await bclick('.sheet.work [data-run="brick"][data-n="3"]');
+  await b.eval((G) => { G.tick(0.5, 30); });
+  await bshot('base-work-running', 700);
+  await bclick('.sheet.work [data-act="done"]');
+  await b.eval((G) => { G.tick(0.05, 10); });
+  await bshot('base-hud-at-works', 400);
+  found.push(...b.errors);
+  await b.close();
+
+  const took = ((Date.now() - t0) / 1000).toFixed(0);
   return { states: n, seconds: took, errors: found };
 }
 

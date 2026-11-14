@@ -136,10 +136,13 @@ const DUST = {
   pathfinder: 0.4, viking: 0.44, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
-  // (a base's mineral deposits: a breath of dust, no more: their colour is what tells one from another)
-  dep_hematite: 0.1, dep_silica: 0.06, dep_clay: 0.12, dep_sulfate: 0.1, dep_salt: 0.05,
+  // (a base's mineral deposits: dust on their ledges and in their hollows, as on every rock here; their faces show their colour)
+  dep_hematite: 0.3, dep_silica: 0.26, dep_clay: 0.4, dep_sulfate: 0.4, dep_salt: 0.22,
+  bs_kiln: 0.3, bs_smelter: 0.3, bs_glassworks: 0.26,
   crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
 };
+/** Materials that are bare rock (the mineral deposits of Base mode): given a rock's grain and blotches, and dust in its hollows. */
+const ROCK = /^mineral$/;
 /** Materials that are the ground itself: drawn in the local ground colour, tinted by their vertex colours. */
 const GROUND = /^ground_dust/;
 /** Parts that are indoors, whatever their model's dust. */
@@ -231,6 +234,15 @@ function setUpPlain(plain, ground) {
             dust *= 0.86;
             // no real surface is one flat colour: a broad mottle and a fine grain, fixed in the model's own space
             diffuseColor.rgb *= 0.925 + 0.11 * patchy + (fine - 0.5) * 0.09;
+            if (vPbr.y < -0.5) {
+              // Bare rock (a mineral outcrop: its metalness channel says so) is blotched and gritty at every scale, and
+              // dust lies thicker in its hollows. (In one flat colour beside this terrain and its boulders, an outcrop
+              // was a wax casting: a review called five of them "imported from a low-poly game".)
+              float grit = texture(uDustGrain, vObjPos * 9.7 + 0.71).a;
+              float blotch = texture(uDustGrain, vObjPos * 0.31 + 0.13).a;
+              diffuseColor.rgb *= (0.74 + 0.52 * fine) * (0.88 + 0.24 * grit) * (0.80 + 0.40 * blotch);
+              dustAmount = clamp(dustAmount + vPbr.z * 0.9 * smoothstep(0.52, 0.30, grit) * facing, 0.0, 0.94);
+            }
             diffuseColor.rgb = mix(diffuseColor.rgb, dust, dustAmount);
           }
           surfGrain = fine;
@@ -242,6 +254,12 @@ function setUpPlain(plain, ground) {
           vec3 gA = texture(uDustGrain, vObjPos * 1.7).rgb * 2.0 - 1.0;
           vec3 gB = texture(uDustGrain, vObjPos * 0.37 + 0.2).rgb * 2.0 - 1.0;
           normal = normalize(normal + normalMatrix * (gA * 0.30 + gB * 0.42));
+        } else if (vPbr.y < -0.5) {
+          // ... nor is bare rock: broken faces, pits and grit, in the model's own space
+          vec3 rA = texture(uDustGrain, vObjPos * 3.9 + 0.4).rgb * 2.0 - 1.0;
+          vec3 rB = texture(uDustGrain, vObjPos * 1.05 + 0.2).rgb * 2.0 - 1.0;
+          vec3 rC = texture(uDustGrain, vObjPos * 12.5).rgb * 2.0 - 1.0;
+          normal = normalize(normal + normalMatrix * (rA * 0.34 + rB * 0.32 + rC * 0.18) * (1.0 - 0.7 * dustAmount));
         }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(clamp(vPbr.x * (0.86 + 0.28 * surfGrain), 0.05, 1.0), 0.96, dustAmount);')
       // soil has no sheen (the terrain's own material has none): with one, an apron pales at a low angle and shows
@@ -287,7 +305,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust16' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust17' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -336,7 +354,8 @@ function mergeStatic(scene, dust) {
     for (const [mat, list] of byMat) {
       const geos = list.map(({ mesh, bake, ground }) => {
         const g = ground ? floatGeometry(mesh.geometry, null, 0.96, 0, 2)
-          : floatGeometry(mesh.geometry, bake ? mesh.material.color : null, mesh.material.roughness, mesh.material.metalness, CLEAN_PARTS.test(owner.name || '') ? 0 : dust);
+          // (a mineral is bare rock: said in the metalness channel, which rock has no other use for)
+          : floatGeometry(mesh.geometry, bake ? mesh.material.color : null, mesh.material.roughness, ROCK.test(mesh.material.name || '') ? -1 : mesh.material.metalness, CLEAN_PARTS.test(owner.name || '') ? 0 : dust);
         g.applyMatrix4(rel.multiplyMatrices(inv, mesh.matrixWorld));
         return g;
       });

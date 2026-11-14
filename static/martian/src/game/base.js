@@ -15,7 +15,7 @@ import { hash3 } from '../core/math.js';
 import { BAL, S } from './state.js';
 
 /** Models only a base needs (loaded when a base is begun or continued, not at boot). */
-export const BASE_MODELS = ['dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfate', 'dep_salt'];
+export const BASE_MODELS = ['dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfate', 'dep_salt', 'bs_kiln', 'bs_smelter', 'bs_glassworks'];
 
 /**
  * The bulk materials of a base, in the order the inventory lists them (keys of S.inv).

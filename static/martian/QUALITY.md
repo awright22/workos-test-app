@@ -838,7 +838,7 @@ preview before the next.
 | --- | --- | --- |
 | A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built, tested and on the preview (`tools/tests/base.mjs`) |
 | B | **Materials.** Basalt off any boulder (once the ground by it has given its sample), and five minerals quarried at deposits that stand where each was really found: 47 of them, in 23 fields (hematite pavements, silica beds, clay banks, sulfate ledges, salt pans; `game/base.js`). The map shows from the first sol where each was seen from orbit; a deposit is marked when he has stood at it. Each is a Blender model (`tools/assets/deposits.py`) on level, untrodden ground, with six loose pieces that go as it is worked. The inventory lists them and says where the ones he lacks lie. | built; `base.mjs` covers it; its pictures (`node tests/base-shots.mjs`) have had one look of my own and wait for a reviewer |
-| C | **Stations.** A kiln (bricks from clay and soil), a smelter (iron), a glassworks (panes from silica), an electrolyser and a Sabatier reactor (oxygen and methane from water and the air). Each a Blender model, each with a recipe sheet on the Colony screen. | not started |
+| C | **Works.** A kiln (brick from soil or clay, cement from gypsum), a smelter (iron from hematite, scrap or soil) and a glassworks (glass from silica or soil). Each is chosen on the Colony screen's new Base tab, set down outside within reach of the Hab's power (`game/interactables.js`), and given jobs at a sheet of its own (`ui/works.js`): so many batches, each taking hours and Hab power, going on by itself through the night, waiting when the Hab is under 12% (`game/works.js`). Each is a Blender model with a fire that burns while it works and its product stacked beside it (`tools/assets/works.py`). The fuel plant (oxygen and methane) is moved to part D. | built; `base.mjs` covers building one and running its jobs; pictures and review to come |
 | D | **Buildings and milestones.** A solar field, a battery bank, a water tank, a large greenhouse, a second living module, a garage, a comms tower, a landing pad; set down where the player chooses. Milestones in the journal in place of the story's steps (a larder that lasts a season, water that closes its own loop, power through a dust storm). | not started |
 
 **What is made of what** (the plan for parts C and D; numbers are first guesses, to be tuned by play):
@@ -858,6 +858,30 @@ A station is set down outside like a kit, and works by itself once given a job: 
 time and Hab power, the product going to the stores. Running three of them is what the solar field is for. A base
 anywhere can make everything slowly from soil and basalt; each deposit he reaches makes one thing fast. That is the
 reason to cross the planet.
+
+**First review of the deposits** (14 November; one independent reviewer, ten pictures at iPhone size on "medium",
+all opened; held to the indie standard). Verdict: **NOT MET** as a set. Clay and sulfate NOT MET; hematite, silica
+and salt NEARLY, each with one part that failed on its own. The findings, most damaging first, and what was done:
+
+| # | Finding | State |
+| --- | --- | --- |
+| D1 | Every band of the clay bank ended in a saw-tooth of stretched triangles; the same, milder, on the sulfate butte | fixed: the vertices are no longer nudged off the grid and shaded in facets (which made the teeth); and a ledge now runs out toward the bank's ends, where a bed a hand high had stood up as fins |
+| D2 | All five spotless, each ending at a clean line: no red dust, drifted soil or rubble at the foot | fixed in the shader and the models: mineral surfaces take the ground's own dust on their ledges, near the ground and in their hollows (`world/models.js`, the `ROCK` materials), and the clay and sulfate have rubble against their feet |
+| D3 | No surface grain: flat colour beside textured terrain, boulders and astronaut ("imported from a low-poly game") | fixed: bare rock is blotched and gritty at three scales, in colour and in its normals |
+| D4 | Man-made forms: the clay "a layered cake", the sulfate "a beehive" of equal concentric tiers | rebuilt: the clay is one side of a broken bed, a face with the bands on it and the top bed running back into the ground; the sulfate's beds dip, are thick and thin by turns, its plan is lobed and one side has come down |
+| D5 | The silica stood in a flat sand-yellow apron with a hard outline ("a puddle of custard") | fixed: between the knobs the crust is under the sand; knobs stand out of it singly at the edge |
+| D6 | The hematite heaps were smooth grey domes with a few beads stuck on, in an even arc | fixed: a heap is the beads' own colour and covered in them; six sizes, not in a row |
+| D7 | The salt was a thin sheet with a hard lobed outline and clean holes | rebuilt: white ridges where the polygons meet, a skin of salt in some dishes and the terrain's own sand showing in the rest; ridges sink away toward its edge |
+| D8 | Loose pieces flat-faceted, off-colour, up to a metre across, strung along the front | smaller (a quarter to a third of a metre), their parent's colours, at six different distances; the silica's are knobs like the mound's |
+| D9 | Four of five the same cream; silica and salt confusable at 9 m | part: silica is now a cool white and knobbed, salt a ring-work of ridges, sulfate straw-yellow with a white bed, clay banded rust and blue-grey |
+| D10 | Primitives: brown cubes on the salt, rectangular tiles on the clay | gone: the cubes are removed; the clay's cracks are in its top bed, not tiles laid on it |
+| D11 | Lit faces of the white loose stones nearly blown out | part: darker, and broken up by the grain |
+| D12 | A saw-toothed plate edge and creases on the pavement; a seam down the butte | plates are now whole or absent at the edge (a thinned one met the ground along a staircase) |
+
+Learnt on the way: a hem of drifted soil in `ground_dust` is the colour of trodden ground, and on open sand it is a
+dark stain (the deposits have none; they go into the terrain at their own edge, on a pad that is level but not
+trodden); and a height function that jumps (a ridge cut off at its neighbour's edge, a terrace at the end of a
+bank) is drawn on a grid as a saw.
 
 **While it is being built it is not on the title.** New Game goes straight to the story unless the
 address ends in `?base` (or a base has already been saved in that browser). The card for it says

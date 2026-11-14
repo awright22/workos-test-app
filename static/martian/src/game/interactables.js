@@ -1,4 +1,4 @@
-import { HAB_R, World, buildDeployable, plotPlants, setSiteShown, siteLocalToWorld } from '../world/build.js';
+import { HAB_R, World, buildDeployable, colliders, plotPlants, setSiteShown, siteLocalToWorld } from '../world/build.js';
 import { syncDeposit } from '../world/base-sites.js';
 import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
@@ -24,6 +24,10 @@ import { CROPS, MORALE_WORD, cookDinner, dinnerPlan, foodTotal, harvest, moraleB
 import { showChoice } from '../ui/menus.js';
 import { R } from '../planet/constants.js';
 import { layout } from '../ui/layout.js';
+import { WORK_BY_ID } from './base.js';
+import { jobLine, works } from './works.js';
+import { showWork } from '../ui/works.js';
+import { costStr, hasCost, payCost } from './inventory.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
 //
 // When a thing cannot be done, `enabled` gives the reason as a sentence, never a bare false: the prompt shows it, and a
@@ -284,6 +288,8 @@ addI({
  *    else for) and there is no heap left within a walk: the heaps are quicker, and the farm's task sends him to them;
  *  - this is new ground and there is room in the sample case: a scoop of it is a sample (and a load besides).
  */
+/** Loads of regolith to a turn of digging in a base: he digs for a kiln now, not for a flowerpot. */
+const BASE_DIG = 3;
 let digMemo = null, digMemoAt = -1;
 export function digOffer() {
   if (digMemoAt === playTime()) return digMemo;
@@ -293,6 +299,10 @@ export function digOffer() {
 function digReason() {
   if (!S.flags.didMath) return null;
   const carried = S.inv.regolith || 0;
+  // (a base's works run on soil where there is nothing better: while one stands and the stores are low, the open
+  //  ground is worth digging anywhere, three loads to a turn)
+  if (isBase() && carried < 12 && works().some((w) => !w.job && w.def.jobs.some((j) => j.in.regolith)))
+    return { label: 'Dig regolith here', sub: `+${BASE_DIG} for the works · ${carried} in the stores` };
   if (!World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 400)) {
     const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · no heap near` });
     if (World.plots.filter((p) => p.state === 'empty').length > carried) return why('an empty farm bed');
@@ -317,7 +327,7 @@ addI({
   visible: () => !S.flags.coldOpen && !S.inside && !!digOffer(),
   label: () => (digOffer() || { label: 'Dig here' }).label,
   sub: () => (digOffer() || { sub: '' }).sub,
-  use: () => { S.inv.regolith++; Snd.play('dig'); bagSoilHere(); digMemoAt = -1; },
+  use: () => { S.inv.regolith += isBase() ? BASE_DIG : 1; Snd.play('dig'); bagSoilHere(); digMemoAt = -1; },
 });
 // hydrazine rig
 addI({
@@ -684,7 +694,7 @@ addI({
 // kit deployment
 export let deployKind = null;
 export function startDeploy(kind) {
-  deployKind = kind;
+  deployKind = kind; buildKind = null;
   closeScreens();
   // (how to do it is said on a card and not kept: in the log it stood under the Hab's name, in red, for the rest of
   //  the run, an instruction with no subject)
@@ -713,6 +723,73 @@ addI({
     deployKind = null;
     checkAchievements();
   },
+});
+// A base's works (kiln, smelter, glassworks: game/base.js): chosen on the Colony screen, set down outside like a kit.
+// What it costs is paid when it is set down, and it must stand where the Hab's power cable will reach.
+export let buildKind = null;
+export function startBuild(id) {
+  buildKind = id; deployKind = null;
+  closeScreens();
+  toast('BUILD', WORK_BY_ID[id].name, 'Pick a spot outside, near the Hab, then hold to build it.');
+}
+/** Where a works would stand: ahead of him, far enough that he is not built into it. Writes the place into `out`. */
+function buildSpot(def, out) {
+  out.copy(player.pos).normalize();
+  _v2.set(0, 0, -1).applyQuaternion(player.q);
+  return out.addScaledVector(_v2, (def.r + 2.2) / R).normalize();
+}
+/** Why a works cannot be built where he stands, or true. */
+function buildBlock() {
+  const def = WORK_BY_ID[buildKind];
+  if (!def) return 'Nothing chosen';
+  if (!hasCost(def.cost)) return 'Not enough materials';
+  buildSpot(def, _v3).multiplyScalar(R);
+  const hab = groundDist(_v3, World.hab.position);
+  if (hab > 150) return 'Too far from the Hab: its power cable will not reach';
+  if (hab < HAB_R + def.r + 5) return 'Too close to the Hab';
+  if (groundDist(_v3, World.rover.group.position) < def.r + 4) return 'The rover is in the way';
+  for (const b of World.builtMeshes) {
+    const r = b.def ? b.def.r : b.kind === 'greenhouse' ? 5 : 1.2;
+    if (groundDist(_v3, b.group.position) < def.r + r + 1.5) return 'Too close to what is already built';
+  }
+  // (the array, the uplink, a heap, a pod: whatever else stands there)
+  for (const c of colliders) if (c.r > 0.01 && groundDist(_v3, c.v) < def.r + c.r + 0.8) return 'Something is in the way';
+  return true;
+}
+addI({
+  pos: () => player.pos, r: 99, hold: 2.4, mode: 'walk', priority: 2,
+  visible: () => !!buildKind && !S.inside,
+  enabled: buildBlock,
+  label: () => `Build the ${WORK_BY_ID[buildKind].name.toLowerCase()} here`,
+  sub: () => costStr(WORK_BY_ID[buildKind].cost),
+  use: () => {
+    const def = WORK_BY_ID[buildKind];
+    if (buildBlock() !== true) return;
+    payCost(def.cost);
+    buildSpot(def, _v1);
+    _v2.set(0, 0, -1).applyQuaternion(player.q);
+    tangentBasis(_v1, _fe, _fn);
+    // (its front, the mouth of its fire, turned toward him)
+    buildDeployable(def.id, _v1, Math.atan2(_v2.dot(_fe), _v2.dot(_fn)));
+    S.stats.built = (S.stats.built || 0) + 1;
+    Snd.play('deploy');
+    log(`${def.name} built. ${def.id === 'kiln' ? 'Stone on stone, like the first man who ever wanted a pot. It needs a job: walk up to it.' : 'It needs a job: walk up to it.'}`);
+    syncAllVisuals();
+    buildKind = null;
+    checkAchievements();
+  },
+});
+// ... and one that stands is given its jobs at its own sheet
+addI({
+  pos: () => {
+    const b = nearestOf(works(), (w) => w.group.position, 5.2);
+    return b ? (World._activeWork = b).group.position : null;
+  },
+  r: 5.2, hold: 0.5, mode: 'walk', pose: 'stand', priority: 1,
+  visible: () => isBase() && !S.flags.coldOpen && !buildKind,
+  label: () => (World._activeWork ? `Use the ${World._activeWork.def.name.toLowerCase()}` : 'Use'),
+  sub: () => (World._activeWork ? jobLine(World._activeWork) : ''),
+  use: () => { if (World._activeWork) showWork(World._activeWork, syncAllVisuals); },
 });
 // MAV: strip + launch
 addI({

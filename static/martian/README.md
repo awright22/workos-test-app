@@ -77,6 +77,22 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 - **Structure**: a checkpoint every dawn, automatic saving, three difficulties (rescue on
   Sol 15, 25 or 35).
 
+## The second game: a base (being built)
+
+A second way to play, with no rescue: the same storm and the same Hab, but the next ship is four
+years out, so the long game is a base that can keep one man alive for good. It is being built in
+parts (see `QUALITY.md`), and until it has its own buildings it is offered only when the address
+ends in `?base`, or when a base is already saved in that browser. It keeps a save of its own beside
+the story's.
+
+- **Minerals**: basalt off any boulder, and five minerals quarried at deposits that stand where
+  each was really found: hematite on Meridiani, silica in Gusev crater, clay at Mawrth Vallis,
+  sulfates in Valles Marineris, salt on the northern plains (47 deposits; `src/game/base.js`).
+  The map shows where each was seen from orbit.
+- **Works**: a kiln, a smelter and a glassworks, built outside the Hab and given jobs at a sheet
+  of their own: brick, cement, iron and glass, made by the batch on the Hab's power while he does
+  something else.
+
 ## Controls
 
 | Key | Action |

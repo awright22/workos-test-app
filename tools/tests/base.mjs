@@ -156,12 +156,71 @@ await g.page.locator('#mg-colony [data-tab="inv"]').click();
 const larder = (await g.page.locator('#mg-inv').innerText()).replace(/\s+/g, ' ');
 check('the inventory lists a base\'s minerals, and says where the ones he lacks lie', /minerals/i.test(larder) && /iron ore 12/i.test(larder) && /basalt 2/i.test(larder) && /gusev crater/i.test(larder), larder.slice(-420));
 await g.page.keyboard.press('Escape');
+
+// ---- the works: built from the Colony screen's Base tab, set down outside, given a job at their own sheet
+await g.eval((G) => { G.S.inv.stone = 12; G.S.inv.scrap = 5; G.S.inv.regolith = 9; G.S.power = 80; });
+await g.page.keyboard.press('c');
+await g.page.locator('#mg-colony [data-tab="base"]').click();
+const tab = (await g.page.locator('#mg-base').innerText()).replace(/\s+/g, ' ');
+check('the Base tab lists the works, the kiln ready to build', /works/i.test(tab) && /kiln/i.test(tab) && /smelter/i.test(tab) && /glassworks/i.test(tab) && /1 ready to build/i.test(tab), tab.slice(0, 260));
+await g.page.locator('#mg-base [data-build="kiln"]').click();
+const built = await g.eval(async (G) => {
+  G.paused = true;
+  G.tpLocal(26, 22, 0); await G.settle(); G.tick(0.05, 6);
+  const prompt = G.interaction.active ? G.interaction.active.label() : '';
+  G.hold(2.7); G.tick(0.05, 4);
+  const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
+  const use = G.interaction.active ? G.interaction.active.label() : '';
+  return { prompt, kiln: !!b, stone: G.S.inv.stone, scrap: G.S.inv.scrap, use, away: b ? Math.round(b.group.position.distanceTo(G.player.pos) * 10) / 10 : -1 };
+});
+check('set down outside for twelve basalt and two scrap, and it offers itself for use', /build the kiln here/i.test(built.prompt) && built.kiln && built.stone === 0 && built.scrap === 3 && /use the kiln/i.test(built.use), built);
+await g.eval((G) => { G.hold(0.7); });
+await g.page.waitForSelector('.sheet.work', { timeout: 60000 });
+const sheet2 = (await g.page.locator('.sheet.work').innerText()).replace(/\s+/g, ' ');
+check('its sheet lists its jobs, what a batch takes and makes, and what is missing', /fire bricks from soil/i.test(sheet2) && /fire bricks from clay/i.test(sheet2) && /burn gypsum to cement/i.test(sheet2) && /missing 2 clay/i.test(sheet2) && /standing idle/i.test(sheet2), sheet2.slice(0, 400));
+await g.page.locator('.sheet.work [data-run="brick"][data-n="3"]').click();
+const run = await g.eval((G) => {
+  const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
+  const t = document.querySelector('.sheet.work').innerText.replace(/\s+/g, ' ');
+  document.querySelector('.sheet.work [data-act="done"]').click();
+  const p0 = G.S.power, start = { regolith: G.S.inv.regolith, left: b.job && b.job.left };
+  G.tick(0.5, 90);                                                    // 45 s: a batch is two hours, 39 s
+  const mid = { brick: G.S.inv.brick || 0, left: b.job && b.job.left, working: b.working, spent: +(p0 - G.S.power).toFixed(1) };
+  G.tick(0.5, 180);                                                   // and the other two
+  return { text: t.slice(0, 200), start, mid, brick: G.S.inv.brick, job: b.job, working: b.working };
+});
+check('three batches: the soil is taken at once, and a batch comes out every two hours', run.start.regolith === 0 && run.start.left === 3 && run.mid.brick === 2 && run.mid.left === 2 && run.mid.working && run.brick === 6 && run.job === null && !run.working, run);
+const more = await g.eval((G) => {
+  const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
+  G.S.inv.regolith = 9;
+  // no power to spare: the job waits
+  G.works.startJob(b, 'brick', 3); G.S.power = 6; G.tick(0.5, 20);
+  const waiting = { t: b.job.t, working: b.working, line: G.works.jobLine(b) };
+  G.S.power = 70; G.tick(0.5, 20);
+  const going = { t: +b.job.t.toFixed(1), working: b.working };
+  // (what it draws, by itself: ten seconds of a 39-second batch that costs 3% of the Hab's power)
+  const p0 = G.S.power; G.works.updateWorks(10);
+  going.draw = +(p0 - G.S.power).toFixed(2);
+  // the save keeps the job
+  G.saveGame();
+  const d = JSON.parse(localStorage.getItem('stranded2-save-base'));
+  const kept = d.built.find((x) => x.kind === 'kiln').job;
+  b.job = null; G.applyState(d);
+  const back = G.World.builtMeshes.find((x) => x.kind === 'kiln').job;
+  // stopped: what has not gone into the fire comes back
+  G.works.stopJob(G.World.builtMeshes.find((x) => x.kind === 'kiln'));
+  return { waiting, going, kept, back, regolith: G.S.inv.regolith, kilns: G.World.builtMeshes.filter((x) => x.kind === 'kiln').length };
+});
+check('with no power to spare the job waits; working, it draws on the Hab; the save keeps it; stopped, the unfired soil comes back', more.waiting.t === 0 && !more.waiting.working && /waiting for hab power/i.test(more.waiting.line) && more.going.t > 5 && more.going.working && more.going.draw > 0.6 && more.going.draw < 0.9 && more.kept && more.kept.left === 3 && more.back && more.back.left === 3 && more.regolith === 6 && more.kilns === 1, more);
 const errsBase = g.errors.slice();
 await g.close();
 
 g = await openGame({ quality: 'low' });
 s = await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.saveGame(); return { kind: G.S.kind, rescue: G.S.rescueSol, key: !!localStorage.getItem('stranded2-save'), baseKey: !!localStorage.getItem('stranded2-save-base'), deposits: G.World.deposits ? G.World.deposits.length : 0 }; });
-check('the story is as it was: a rescue on Sol 25, saved in the story\'s slot, and no deposits', s.kind === 'story' && s.rescue === 25 && s.key && s.deposits === 0, s);
+await g.page.keyboard.press('c');
+s.baseTab = await g.page.locator('#mg-colony [data-tab="base"]').count();
+await g.page.keyboard.press('Escape');
+check('the story is as it was: a rescue on Sol 25, saved in the story\'s slot, no deposits and no Base tab', s.kind === 'story' && s.rescue === 25 && s.key && s.deposits === 0 && s.baseTab === 0, s);
 g.errors.push(...errsBase);
 
 console.log(`\n${fails.length ? 'FAILED: ' + fails.length : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));

@@ -61,7 +61,10 @@ export function syncAllVisuals() {
   if (World.rtgSite) { setSiteShown(World.rtgSite.group, !World.rtgSite.taken); setColliders(World.rtgSite.cols, !World.rtgSite.taken); }
   for (const site of World.iceSites) syncIce(site);
   for (const site of World.deposits || []) syncDeposit(site);
-  for (const b of World.builtMeshes) if (b.tanks) b.tanks.forEach((t, i) => { if (t) t.visible = i < b.charges; });
+  for (const b of World.builtMeshes) {
+    if (b.tanks) b.tanks.forEach((t, i) => { if (t) t.visible = i < b.charges; });
+    if (b.stock && b.def) b.stock.visible = b.def.jobs.some((j) => Object.keys(j.out).some((k) => (S.inv[k] || 0) > 0));
+  }
   // pathfinder: exactly one home per state, collider follows (review finding: all 3 states)
   const pfG = World.pathfinder;
   if (S.pf.connected) {

@@ -47,6 +47,7 @@ import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from '.
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
 import { showStart, newGame, continueGame, ensureKind } from './game/flow.js';
+import * as worksApi from './game/works.js';
 import { syncAllVisuals } from './game/visuals.js';
 import { showLoading as loading } from './ui/menus.js';
 const _hero = new THREE.Vector3(), _heroCam = new THREE.Vector3();
@@ -248,6 +249,10 @@ function tick(dt) {
   for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }
   for (const b of World.builtMeshes) {
     if (b.glow && b.group.visible) setGlow(b.glow, 0.16 + 0.44 * (World.dark || 0));      // (not full even at night: at full the apex fitting burnt a star through the glass)
+    if (b.fire) {
+      b.heat += ((b.working ? 1 : 0) - b.heat) * Math.min(1, dt * 0.8);                  // (a fire takes a moment to draw, and a while to die)
+      if (b.group.visible) setGlow(b.fire, b.heat * (0.8 + 0.2 * Math.sin(blinkT * 9 + b.yaw * 7) * Math.sin(blinkT * 3.3)));
+    }
     if (!b.lamp) continue;
     b.pulse = Math.max(0, Math.sin(blinkT * 2.2)) ** 6;
     if (b.group.visible) setGlow(b.lamp, 0.25 + 1.5 * b.pulse);
@@ -313,7 +318,7 @@ function installDebug() {
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod, startLaunch,
     science: { MATERIALS, identify, takeSample, analyseAll, catalogue, scienceSummary },
-    mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, photoSubjects, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
+    works: worksApi, mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, photoSubjects, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
     tick(dt, n = 1) { for (let i = 0; i < n; i++) { lastFocus = tick(dt); if (ctx.vfx) ctx.vfx.time += dt; } },     // (dust kicked up in a tick ages by that tick)
@@ -341,6 +346,12 @@ function installDebug() {
       initPlayerAt(llToVec(lat, lon), yaw);
       if (S.mode === 'walk') updateWalk(0.001);
       return this.settle();
+    },
+    /** Set one of a base's works (or any deployable) down at a place in the Hab's frame, with no cost: for tests and pictures. */
+    build(kind, lx, lz, yaw = 0) {
+      const b = buildDeployable(kind, siteLocalToWorld(World.hab, lx, 0, lz).normalize(), yaw);
+      syncAllVisuals();
+      return b;
     },
     /** Put the astronaut `east`,`north` metres from the Hab centre. */
     async tpHab(east, north, yaw = 0) {

@@ -39,7 +39,7 @@ export function serializeState() {
     ice: World.iceSites.map(s => s.left),
     rtgTaken: World.rtgSite ? World.rtgSite.taken : false,
     built: World.builtMeshes.map(b => ({ kind: b.kind, charges: b.charges, yaw: b.yaw || 0,
-      ll: vecToLl(_v1.copy(b.group.position).normalize()) })),
+      ll: vecToLl(_v1.copy(b.group.position).normalize()), ...(b.job ? { job: { ...b.job } } : {}) })),
     playerQ: player.q.toArray(), roverQ: roverF.q.toArray(),
     log: logSnapshot(),                  // (optional: the last lines of the log, for the journal; older saves have none)
   };
@@ -75,6 +75,7 @@ export function applyState(d) {
     const bb = buildDeployable(b.kind, llToVec(b.ll.lat, b.ll.lon), b.yaw || 0);
     bb.charges = b.charges;
   }
+  (d.built || []).forEach((b, i) => { const bb = World.builtMeshes[i]; if (bb && bb.def) bb.job = b.job ? { ...b.job } : null; });
   d.plots.forEach((cp, i) => { if (World.plots[i]) Object.assign(World.plots[i], { crop: 'potato' }, cp); });
   d.panels.forEach((v, i) => { if (World.panels[i]) World.panels[i].dust = v; });
   d.piles.forEach((v, i) => { if (World.soilPiles[i]) World.soilPiles[i].left = v; });
