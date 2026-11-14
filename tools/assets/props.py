@@ -640,6 +640,48 @@ def ground_dust():
     return mat('ground_dust', color=(0.38, 0.225, 0.14), metallic=0.0, roughness=1.0)
 
 
+def sand_drift(root, name, seed, reach=1.4, high=0.14, centre=(0.0, 0.0), lee=(0.8, -0.6), long=1.7):
+    """Sand the wind has banked against a thing that lies on the ground, so that it stands in the ground and not
+    on it: a low mound of the ground's own colour (`ground_dust`) about `centre`, `high` m deep under the thing and
+    gone `reach` m out, piled a little higher up wind and drawn out down wind (`lee`, a level unit vector) into a
+    tail `long` times as far. Its open edge lies on the ground, where the game fades it out. Build the thing first,
+    sunk or not; then call this, and use what it returns for the drift's vertices in the model's tint function:
+        drift = sand_drift(root, 'x', 3);   def tint(co, name, a): return drift(co, a) if name == 'ground_dust' else ..."""
+    ground_dust()
+    bm = bm_new()
+    NA, NR = 30, 6
+    cx, cy = centre
+    lx, ly = lee
+    top = bm.verts.new((cx, cy, high))
+    rings = []
+    for j in range(1, NR + 1):
+        t = j / NR
+        ring = []
+        for i in range(NA):
+            a = TAU * i / NA
+            dx, dy = cos(a), sin(a)
+            down = dx * lx + dy * ly                                       # 1 straight down wind, -1 straight up wind
+            far = reach * (1.0 + (long - 1.0) * max(0.0, down) ** 2) * (0.86 + 0.28 * noise3((dx, dy, seed * 1.7), 1.6, seed))
+            x, y = cx + dx * far * t, cy + dy * far * t
+            pile = 1.0 + 0.45 * max(0.0, -down)                             # banked up on the side the wind comes from
+            h = high * pile * (1.0 - t) ** 1.7 * (0.8 + 0.4 * noise3((x, y, 0.0), 2.3, seed + 3.0))
+            ring.append(bm.verts.new((x, y, 0.004 if j == NR else max(0.01, h))))
+        rings.append(ring)
+    for i in range(NA):
+        bm.faces.new((top, rings[0][i], rings[0][(i + 1) % NA]))
+    for j in range(NR - 1):
+        a_, b_ = rings[j], rings[j + 1]
+        for i in range(NA):
+            bm.faces.new((a_[i], b_[i], b_[(i + 1) % NA], a_[(i + 1) % NA]))
+    mesh_obj(f'{name}.drift', bm, 'ground_dust', parent=root, smooth_angle=70.0)
+
+    def tint(co, a):
+        # the ground's own colour (1) at the hem, a shade darker where the thing stands over it
+        k = 1.0 if co.z < 0.008 else min(1.0, 0.72 + 0.30 * a)
+        return (k, k, k)
+    return tint
+
+
 LIGHTS_FLAT = {'light_white': 1.0, 'light_green': 1.0, 'light_red': 1.0, 'light_amber': 1.0, 'light_blue': 1.0,
                'light_grow': 1.0, 'glass_clear': 1.0, 'screen': 1.0}
 
@@ -2043,7 +2085,12 @@ def build_debris_a():
     anchor('col_body', root, loc=(0, 0.1, 0), radius=1.1)
     burns = [tuple(G[NU - 3][NV - 3]), tuple(G[6][4]), tuple(G[NU][4])]
 
+    # (it has stood through a storm since it fell: sand is banked against it)
+    drift = sand_drift(root, 'hull', 5, reach=1.5, high=0.13, centre=(0.0, 0.1), lee=(0.8, -0.6))
+
     def tint(co, name, a):
+        if name == 'ground_dust':
+            return drift(co, a)
         if name in ('painted_white', 'painted_orange', 'gold_foil', 'aluminium'):
             return a * _soot(co, burns, 0.95, 0.10)
         return None
@@ -2146,7 +2193,11 @@ def build_debris_b():
     anchor('col_body', root, loc=(0, 0.05, 0), radius=1.0)
     burns = [tuple(Pk[5][1]), tuple(Pk[6][0]), tuple(cl[5])]
 
+    drift = sand_drift(root, 'truss', 6, reach=1.5, high=0.10, centre=(0.0, 0.05), lee=(0.9, 0.44), long=1.5)
+
     def tint(co, name, a):
+        if name == 'ground_dust':
+            return drift(co, a)
         if name in ('aluminium', 'gold_foil', 'painted_white'):
             return a * (0.10 + 0.90 * _soot(co, burns, 0.9, 0.1))
         return None
@@ -2254,7 +2305,12 @@ def build_debris_c():
     anchor('col_body', root, loc=(0, 0, 0), radius=0.9)
     hw = W @ hc
 
+    # (a tank that came down hard and has lain through a storm: it is bedded in sand, with a tail of it down wind)
+    drift = sand_drift(root, 'tank', 8, reach=1.25, high=0.17, centre=(0.0, 0.0), lee=(0.6, 0.8), long=1.8)
+
     def tint(co, name, a):
+        if name == 'ground_dust':
+            return drift(co, a)
         if name in ('painted_white', 'painted_orange', 'aluminium', 'steel'):
             return a * _soot(co, [tuple(hw)], 0.52, 0.30)
         return None

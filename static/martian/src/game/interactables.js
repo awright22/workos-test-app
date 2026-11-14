@@ -130,7 +130,9 @@ addI({
           const first = !World.plots.some((p) => (p.state === 'growing' || p.state === 'ready') && (p.crop || 'potato') === 'potato') && can.includes('potato');
           showChoice({
             kicker: 'Farm', title: 'What goes in this bed?',
-            note: `${first ? 'Potatoes first: they are what keeps you fed. ' : ''}Each bed takes 5 L of water to plant.`,
+            // (which to plant first is said on the potato's own card, as a mark; under the list it was a second
+            //  sentence that wrapped in a narrow column beside Cancel)
+            note: 'Each bed takes 5 L of water to plant.',
             items: can.map((id) => {
               const c = CROPS[id], n = seedStock(id);
               const packets = id === 'potato' ? 0 : (S.seeds[id] || 0), kept = id === 'potato' ? 0 : (S.pantry[id] || 0);
@@ -139,7 +141,7 @@ addI({
               const plural = (k, one) => `${k} ${one}${k === 1 ? '' : 's'}`;
               const potatoNote = S.potatoes > 0 && S.food > 0 ? `The staple. A bed takes one potato (you have ${S.potatoes}), then one ration (${S.food}).`
                 : `The staple. A bed takes one of your ${S.potatoes > 0 ? plural(S.potatoes, 'potato').replace('potatos', 'potatoes') : plural(S.food, 'ration')}.`;
-              return { label: c.name, icon: id, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · ${c.yield} meal${c.yield === 1 ? '' : 's'}`,
+              return { label: c.name, icon: id, tag: first && id === 'potato' ? 'Plant first' : '', sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · ${c.yield} meal${c.yield === 1 ? '' : 's'}`,
                 // (every crop says what it would be planted from: lettuce alone, with packets and nothing in the pantry, said only that it crunched)
                 note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.`
                   : packets ? `${plural(packets, 'seed packet')}. ${c.pick || c.note}` : `${kept} from the pantry. ${c.pick || c.note}`,

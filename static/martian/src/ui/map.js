@@ -508,7 +508,7 @@ export function initMap(body) {
     `<button type="button" class="mg-iconbtn" data-a="legend" aria-label="Key to the map" title="Key" aria-pressed="false">${icon('layers')}<span class="cap">Key</span></button>`);
   legend = el('div', null, 'map-legend', wrap,
     '<h3>Key</h3><ul>' + LEGEND.map(([ic, colour, label]) => `<li style="color:var(--${colour})"><i>${icon(ic)}</i><span>${label}</span></li>`).join('') +
-    '<li><i class="dot"></i><span>A marker with no room for its name: zoom in</span></li>' +
+    '<li><i class="dot"></i><span>A dot, in its marker’s colour: no room for the name. Zoom in</span></li>' +
     '<li style="color:rgba(240,210,170,.9)"><i class="sw"></i><span>Dust storm</span></li><li><i class="night"></i><span>Night side</span></li></ul>' +
     `<p>Amber marks where the mission leads. The planet is Mars at 1/${PLANET_SCALE} of its size, ${Math.round(2 * Math.PI * R / 1000)} km round: distances are as you will walk and drive them.</p>`);
   info = el('div', null, 'map-info', wrap);

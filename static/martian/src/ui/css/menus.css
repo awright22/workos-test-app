@@ -232,7 +232,11 @@
 /* the rescue screen: the record of the run on the left, the numbers on the right, his last entry across the foot
    (down the left column it ran to five lines, and a phone held sideways had to scroll for the end of it) */
 #mg-overlay.k-win .dlg { width: 58rem; }
-#mg-overlay.k-win .dlg-bd { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto 1fr auto; column-gap: 2.25rem; align-content: start; }
+/* (Every row takes its height from what is in it. The fourth was "1fr": in a sheet as tall as the screen that is
+   whatever is left over, which is nothing, and a row of no spare height does not grow for a thing that spans it. So
+   the figures, which span rows two to four, ran down over the closing log entry whenever they were taller than the
+   title and the list of steps beside them: a short run on any phone, and the list of nine on the small one.) */
+#mg-overlay.k-win .dlg-bd { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto auto auto; column-gap: 2.25rem; align-content: start; }
 #mg-overlay.k-win .dlg-bd > * { grid-column: 1; }
 #mg-overlay.k-win .dlg-bd > .more-cue { grid-column: 1 / -1; }
 #mg-overlay.k-win .dlg .t-kicker { grid-column: 1 / -1; grid-row: 1; }
@@ -325,6 +329,8 @@
   transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease); }
 .choice .ch-l { font: 600 1.25rem/1.05 var(--f-cond); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
 .choice .ch-l .ic { width: 1.1em; height: 1.1em; margin-right: .4em; vertical-align: -.2em; color: var(--accent); }
+.choice .ch-tag { display: inline-block; margin-left: .625rem; padding: .1875rem .4375rem; border: 1px solid var(--accent); border-radius: .125rem; font: 600 var(--tcap, .8125rem)/1 var(--f-cond); font-style: normal;
+  letter-spacing: .08em; color: var(--accent); vertical-align: .12em; white-space: nowrap; }
 .choice .ch-n { font: 600 .875rem/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .choice .ch-s { grid-column: 1 / -1; font: 500 .8125rem/1.25 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .choice .ch-t { grid-column: 1 / -1; font-size: .875rem; line-height: 1.35; color: var(--ink-3); }

@@ -104,7 +104,10 @@ const GLSL_SKY = /* glsl */`
     // (It was thinned by the camera's height alone, and from 1,400 m the whole sky below the level was one brown,
     // with the stars showing through it.)
     float passes = mu >= 0.0 ? max(uAlt, 0.0) : max(b - ${R.toFixed(1)}, 0.0);
-    fromSpace = max(fromSpace, col * exp(-passes / ${(ATMO_H * 0.55).toFixed(1)}) * h * mix(1.0, limbLit, step(mu, 0.0)));
+    // (and from well out the band is thin: the air is a hundredth of the planet's radius deep. Its depth here is what
+    // the climb needs, and seen from orbit and from the title's distance that was a fat halo: a third of it there.)
+    float deep = ${(ATMO_H * 0.55).toFixed(1)} * mix(1.0, 0.30, smoothstep(${(ATMO_H * 1.5).toFixed(1)}, ${(ATMO_H * 6).toFixed(1)}, uAlt));
+    fromSpace = max(fromSpace, col * exp(-passes / deep) * h * mix(1.0, limbLit, step(mu, 0.0)));
     col = mix(col, fromSpace, space);
     return col;
   }

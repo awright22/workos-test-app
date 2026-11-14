@@ -540,7 +540,7 @@ export function showComms(o) {
 export function showChoice(o) {
   const cancel = () => { hideOverlay(); if (o.onCancel) o.onCancel(); };
   const rows = o.items.map((it, i) =>
-    `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${it.icon ? icon(it.icon) : ''}${esc(it.label)}</span>` +
+    `<button type="button" class="choice" data-i="${i}"${i === 0 ? ' data-autofocus' : ''}><span class="ch-l">${it.icon ? icon(it.icon) : ''}${esc(it.label)}${it.tag ? `<em class="ch-tag">${esc(it.tag)}</em>` : ''}</span>` +
     `${it.count ? `<span class="ch-n t-num">${esc(it.count)}</span>` : ''}<span class="ch-s">${esc(it.sub || '')}</span>` +
     `${it.note ? `<span class="ch-t">${chem(esc(it.note))}</span>` : ''}<span class="ch-go" aria-hidden="true">${icon('next')}</span></button>`).join('');
   const p = openOverlay('dialog',

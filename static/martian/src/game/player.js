@@ -199,10 +199,15 @@ export function buildAstronaut() {
   // lamp at head height, so the pool was a smear at his hip and the way ahead was dark. This one hardly falls off with
   // distance at all, is wide, soft from its middle to its edge, and ends at fourteen metres: it lights the ground from
   // two paces ahead of him to a dozen, and a white wall at arm's length no harder than the ground.)
-  const lamp = new THREE.SpotLight(0xfff4e0, 0, 14, 0.52, 1.0, 0.4);
+  // (Even so the pool was two paces to five and dark beyond: ground far ahead is lit edge-on, and takes a share of
+  // the light that falls as one over its distance. So this lamp grows stronger with distance (a negative decay), by
+  // well under that loss: level ground is lit from two paces to a dozen, falling gently, and fades out by eighteen
+  // metres, and whatever stands close in front of him is lit least. (Making up the whole loss burnt out any slope
+  // that rose toward him: a white disc on a dune.)
+  const lamp = new THREE.SpotLight(0xfff4e0, 0, 18, 0.56, 1.0, -0.3);
   const at = m.part('eye') || anim.bones.head;
   const tgt = new THREE.Object3D();
-  tgt.position.set(0, -1.5, 8);
+  tgt.position.set(0, -1.3, 8);
   lamp.position.set(0, 0.12, 0.1);
   at.add(lamp, tgt);
   lamp.target = tgt;
@@ -339,7 +344,7 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 3 : lerp(anim.lamp.intensity, lampOn * 3, damp(0.25, dt));
+  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 1.3 : lerp(anim.lamp.intensity, lampOn * 1.3, damp(0.25, dt));
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };

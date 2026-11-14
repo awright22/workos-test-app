@@ -219,7 +219,7 @@ export function objectiveThen(o, where) {
   return w && w.via === 'out' ? [placeOf(o) || 'Outside', fmtDist(w.on)] : null;
 }
 export const objDone = new Set();
-let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null;
+let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null, objWatch = null;
 /** How long the reason under the first line stays open on a phone, in seconds of play, after it changes or is asked for. */
 const WHY_OPEN = 9;
 const objFrom = new THREE.Vector3();
@@ -232,6 +232,7 @@ function objRow(key) {
     const e = el('div', null, 'obj new', UI.objectives, '<i class="mk"></i><span class="tx"></span><span class="at"><span class="pl"></span><span class="ds t-num"></span><span class="nx"></span></span><span class="why"></span>');
     n = { el: e, tx: e.querySelector('.tx'), at: e.querySelector('.at'), pl: e.querySelector('.pl'), ds: e.querySelector('.ds'), nx: e.querySelector('.nx'), wy: e.querySelector('.why'), o: null, q: null, text: null, place: null, dist: null, then: null, cls: null, why: null };
     objNodes.set(key, n);
+    if (objWatch) objWatch.observe(e);
     setTimeout(() => e.classList.remove('new'), 600);
   }
   return n;
@@ -477,7 +478,21 @@ export function updateObjectivesHud() {
   if (refit || now - fitAt > 1) fitObjectives(now);
 }
 function rebuildObjectives(now) {
-  if (!objHead) objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span><b></b>');
+  if (!objHead) {
+    objHead = el('div', null, 'hd', UI.objectives, '<span>Mission</span><b></b>');
+    // Whatever changes the block's height (a line ticked off and not yet gone, a reason opening, a font arriving),
+    // it is fitted again as soon as the browser has laid it out, and not when the next rebuild or the clock gets to
+    // it. (Each cause found was given its own refit, and the audit then found the next one: a second line cut through
+    // by the buttons under it, on the small phone, while a ticked line still stood above the first.)
+    // (Each line is watched, not the block: on a phone the block is held to the room it has, so its own size does
+    //  not change when what is in it outgrows it.
+    //  The touch buttons under it are watched too: the room it has ends at whichever of them is showing, and they
+    //  come and go with a sheet, the rover and the candle.)
+    if (typeof ResizeObserver === 'function') {
+      objWatch = new ResizeObserver(() => { if (S.started) fitObjectives(perf()); });
+      for (const b of [UI.tCam, UI.tSprint, UI.tExit, UI.tCandle]) if (b) objWatch.observe(b);
+    }
+  }
   // (on a touch screen the block is pressed to bring the reason under its first line back)
   if (!objTap && layout.touch) {
     objTap = true;

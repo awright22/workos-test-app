@@ -414,7 +414,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           basaltCol *= 1.0 + (sin(w1) * 0.26 * fine + sin(w2) * 0.30) * ropy * broken;
         }
         basaltCol *= 1.0 + 1.5 * clinkTone;
-        col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift) * (1.0 - 0.5 * clinkDust));
+        // (From orbit a volcano is not a dark patch: its flows are dusted like the plains round them, and what the
+        // orbital map shows is the colour it has from there. Kept at full strength, Olympus was a black oval on the globe.)
+        col = mix(col, basaltCol, basalt * 0.9 * (1.0 - drift) * (1.0 - 0.5 * clinkDust) * (1.0 - 0.8 * uSpace));
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
         col = mix(col, col * vec3(0.80, 0.78, 0.78) * (1.0 + clamp(tone, -0.4, 0.4) * 0.35), worn * 0.75);
@@ -540,6 +542,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain52' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain53' + (o.fine !== false ? 'F' : '');
   return mat;
 }

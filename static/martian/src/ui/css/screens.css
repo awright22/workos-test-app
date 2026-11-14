@@ -473,7 +473,7 @@
 .map-legend { background: #100e0d; }
 .map-legend p { margin-top: .5rem; padding-top: .4375rem; border-top: 1px solid var(--line-2); font-size: .8125rem; line-height: 1.4; color: var(--ink-2); }
 .map-legend li i.dot { border: 0; background: none; }
-.map-legend li i.dot::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px rgba(12, 10, 8, .88); }
+.map-legend li i.dot::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--ink-2); box-shadow: 0 0 0 1.5px rgba(12, 10, 8, .88); }
 .mg-compact .map-legend { bottom: max(2rem, 32px); }
 .mg-touch.mg-compact .map-legend { left: 0; right: 0; bottom: max(2.75rem, 44px); border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
 .mg-compact .map-legend p { font-size: var(--t12); }

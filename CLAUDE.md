@@ -21,9 +21,10 @@ These points are the game, and they stay:
    whole, and animations for the things he does.
 5. It plays on a phone as an installable PWA, as well as on a desktop.
 
-The owner's latest ask: "Get this to AAA quality." That means a game that looks, sounds, plays
-and holds together like a polished commercial release, on a desktop and on a phone. There is no
-deadline. Take the time to do it properly.
+The owner's latest ask: "the goal is now a solid indie release, not AAA. 'Nearly' on the picture
+and interface bars is good enough." That means a game that looks, sounds, plays and holds together
+like a solid independent release, on a phone and on a desktop. A bar in `QUALITY.md` that a
+reviewer marks "nearly" counts as reached.
 
 Direction the owner has given since, in the owner's words:
 - The phone comes first. "Desktop is a bonus but I think this should be optimized for my iphone
@@ -85,7 +86,7 @@ or use another tool. A deliberate blocker (access that was withheld on purpose, 
 guardrail) is left alone: say plainly what you found and look for another safe way forward.
 
 ## How to know it is good
-AAA is judged from the running game, not from the code.
+Quality is judged from the running game, not from the code.
 - Play it. Chromium and Playwright are installed in cloud sessions. Drive the real game in a
   browser, desktop size and phone size with touch, capture screenshots and short sequences, and
   look at them before you call anything better. Build a debug hook or a scripted playthrough so
