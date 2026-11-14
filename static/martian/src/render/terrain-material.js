@@ -296,7 +296,11 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (dark whatever dust colours the land round it: a flow's cliff shows grey-brown beds, some paler with dust)
         rockCol = mix(rockCol, mix(alb * vec3(0.44, 0.41, 0.44), vec3(0.075, 0.060, 0.058), 0.75) * mix(1.0, 0.72 + 0.56 * bedTone, smoothstep(0.22, 0.45, slope)), lava * 0.9);
         float nearLump = 1.0 - smoothstep(24.0, 110.0, viewDist);
-        vec3 basaltCol = mix(alb * vec3(0.46, 0.43, 0.47), vec3(0.050, 0.043, 0.044), 0.86) * (0.86 + 0.6 * hMid * fMid + 0.55 * hLump * nearLump + 0.3 * clamp(tone, -0.5, 0.5));
+        // (grey, and broken: a flow's top is clinker, rubble the size of a fist to a chest, and from the air it is a dark
+        // grit, not a smooth brown skin. With little of the land's dust colour in it and a coarse speckle it stops
+        // reading as chocolate.)
+        vec3 basaltCol = mix(alb * vec3(0.46, 0.43, 0.47), vec3(0.058, 0.054, 0.058), 0.92)
+          * (0.80 + 0.6 * hMid * fMid + 0.55 * hLump * nearLump + 0.3 * clamp(tone, -0.5, 0.5) + 0.75 * (nCrag.a - 0.5) * (1.0 - smoothstep(260.0, 700.0, viewDist)));
         // (a frozen lava lake is not swept clean: dust lies on it in broad drifts)
         float drift = pond * smoothstep(0.02, 0.26, hFar * 0.8 + hMid * 0.5 * fMid) * 0.7;
         // (the joints of a frozen lava lake are dark, where frost in an ice field's cracks is pale)
@@ -432,6 +436,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain40' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain41' + (o.fine !== false ? 'F' : '');
   return mat;
 }
