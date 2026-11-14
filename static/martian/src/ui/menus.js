@@ -464,7 +464,8 @@ export function showSleepSummary(d, onDone) {
   const todo = missionList().find((e) => !e.done);
   const rows = (d.rows || []).slice();
   // (what today is for: a task for today. "Today: survive to Sol 25" was the whole game set down as a morning's job.)
-  if (todo && todo.o.id !== 'survive') rows.push(['Today', todo.o.text(), '', 'today']);
+  // (and it leads the rows: last of six on the first morning, it was the one line under the fold on a phone)
+  if (todo && todo.o.id !== 'survive') rows.unshift(['Today', todo.o.text(), '', 'today']);
   if (d.later) rows.push(['Later', d.later, '', 'later']);
   const more = rows.find((r) => r[2]);
   box.querySelector('.sum').innerHTML =

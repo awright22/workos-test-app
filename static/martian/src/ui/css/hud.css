@@ -410,8 +410,12 @@
 #mg-way b { font: 600 .6875rem/1 var(--f-cond); letter-spacing: .06em; color: var(--ink); padding: .125rem .3125rem; background: rgba(19, 17, 15, .72); border-radius: .125rem; white-space: nowrap; }
 #mg-way.urgent .wp { background: var(--danger); box-shadow: 0 0 0 2px rgba(19, 17, 15, .7), 0 0 .625rem rgba(255, 106, 92, .7); }
 /* out of view: an arrowhead at the edge, pointing the way */
-#mg-way.off .wp { width: 0; height: 0; background: none; box-shadow: none; animation: none; border-left: .4375rem solid transparent; border-right: .4375rem solid transparent; border-bottom: .8125rem solid var(--accent); }
-#mg-way.off.urgent .wp { border-bottom-color: var(--danger); }
+/* Off the place it is a dart: taller than wide, notched at the tail, so which end is the point cannot be mistaken.
+   (It was a triangle 14 px by 13, as near equilateral as makes no difference: a reviewer measuring its sides could not
+   say which corner was the tip.) */
+#mg-way.off { filter: drop-shadow(0 0 2px rgba(12, 10, 8, .9)); }
+#mg-way.off .wp { width: 1rem; height: 1.375rem; background: var(--accent); box-shadow: none; animation: none; border: 0; clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%); }
+#mg-way.off.urgent .wp { background: var(--danger); box-shadow: none; }
 @keyframes mg-way-bob { 50% { margin-top: -.25rem; margin-bottom: .25rem; } }
 .mg-reduced #mg-way .wp { animation: none; }
 .is-modal #mg-way, .is-photo #mg-way, .is-cutscene #mg-way { display: none !important; }
@@ -529,13 +533,19 @@
 .mg-compact .row.warn .tk { background: rgba(255, 180, 84, .26); }
 .mg-compact .row.crit .tk { background: rgba(255, 106, 92, .3); }
 .mg-compact .row.crit .tr.dn { border-top-color: var(--danger); }
-/* colour-blind-safe: a low gauge's bar is striped from end to end, a critical one's cross-hatched, and the critical
-   row keeps its ring: the two differ by pattern and by shape as well as by tint (on a 3 px line the hatching was a
-   sliver nobody could see) */
+/* colour-blind-safe: a low gauge's track is striped, a critical one's cross-hatched, and the critical row keeps its
+   ring: the two differ by pattern and by shape as well as by tint (on a 3 px line the hatching was a sliver nobody
+   could see). The pattern is FAINT and the fill is solid: at full strength the hatched track was brighter than the
+   plain one, and a bar with 9 L in it read as a bar nearly full, to the very players the setting is for. */
 .mg-cb.mg-compact .row.warn .fl, .mg-cb.mg-compact .row.crit .fl { background-image: none; }
-.mg-cb.mg-compact .row.warn .tk { background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--accent) 3px 5px); }
-.mg-cb.mg-compact .row.crit .tk { background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--danger) 3px 5px), repeating-linear-gradient(45deg, transparent 0 3px, var(--danger) 3px 5px); }
+.mg-cb.mg-compact .row.warn .tk { background-color: rgba(245, 240, 232, .10); background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgba(255, 216, 74, .30) 3px 5px); }
+.mg-cb.mg-compact .row.crit .tk { background-color: rgba(245, 240, 232, .10);
+  background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgba(255, 122, 51, .32) 3px 5px), repeating-linear-gradient(45deg, transparent 0 3px, rgba(255, 122, 51, .32) 3px 5px); }
 .mg-cb.mg-compact .row.warn .fl, .mg-cb.mg-compact .row.crit .fl { box-shadow: 2px 0 0 #0c0a09; }
+.mg-cb.mg-compact .row.warn .fl { background-color: var(--accent); }
+.mg-cb.mg-compact .row.crit .fl { background-color: var(--danger); }
+/* (and the figures of a critical row and of the suit's dial take the safe palette's vermilion, not the usual red) */
+.mg-cb .suit.crit .num, .mg-cb .suit.crit .cap, .mg-cb.mg-compact .row.crit .lb, .mg-cb.mg-compact .row.crit .val, .mg-cb.mg-compact .row.crit .val small { color: #ffa46b; }
 @media (max-width: 760px) {
   .mg-compact .res .row { width: 7.75rem; }
   .mg-compact #mg-rover .row { width: 8rem; }

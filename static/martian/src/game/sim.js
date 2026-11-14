@@ -451,10 +451,12 @@ export function sleepToDawn(inRover) {
     const lasts = days === have ? `Breakfast for ${sols(days)}` : `${have} meals: breakfast for ${sols(days)}, some with a side`;
     // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
     // (the wait has its unit: "the rescue is in 12" was read as a date)
-    rows.push(['Food', short <= 0 ? `${lasts}; the rescue is in ${sols(wait)}`
-      : coming >= short ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${sols(wait)}`
-        : coming > 0 ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${sols(wait)}: ${sols(short - coming)} still with nothing to eat`
-          : `${lasts}; the rescue is in ${sols(wait)}: ${sols(short)} with nothing to eat`]); }
+    // (one line on a phone: the first morning's sheet had six rows, this one two lines of them, and its last row,
+    //  the day's task, was under the fold)
+    rows.push(['Food', short <= 0 ? `${lasts}; rescue in ${sols(wait)}`
+      : coming >= short ? `${lasts}, ${coming} more in the beds; rescue in ${sols(wait)}`
+        : coming > 0 ? `${lasts}, ${coming} more in the beds; rescue in ${sols(wait)}: ${sols(short - coming)} with nothing to eat`
+          : `${lasts}; rescue in ${sols(wait)}: ${sols(short)} with nothing to eat`]); }
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
   const later = rolled && S.sol === 2 && !S.pf.connected

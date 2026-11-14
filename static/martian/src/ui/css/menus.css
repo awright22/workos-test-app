@@ -387,7 +387,7 @@
 
 /* the night's account: what each number stands at now, and what today is for */
 .sleep .delta i { font: 500 .75rem/1 var(--f-cond); font-style: normal; letter-spacing: .08em; color: var(--ink-2); }
-.sleep .notes .today { margin-top: .5rem; color: var(--ink); }
+.sleep .notes .today { margin-bottom: .25rem; color: var(--ink); }
 .sleep .notes .today b { font: 600 .75rem/1 var(--f-cond); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-right: .5rem; }
 .sleep .solbig span { text-transform: uppercase; }
 
@@ -680,3 +680,9 @@
   .mg-compact #mg-overlay.k-win .stat b { font-size: 1rem; white-space: nowrap; }
   .mg-compact #mg-overlay.k-win .stat span { white-space: nowrap; letter-spacing: .06em; }
 }
+
+/* The dawn sheet on a phone: the tiles and the rows a little closer, so that the first morning's six rows stand
+   on a screen 390 px high with its buttons (the day's task leads them in any case). */
+.mg-compact .sleep .delta { padding: .3125rem .25rem .3125rem; gap: .25rem; }
+.mg-compact .sleep .notes { margin-top: .5rem; gap: .0625rem .875rem; line-height: 1.32; }
+.mg-compact .sleep .wake { margin-top: .5rem; }

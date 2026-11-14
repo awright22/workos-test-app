@@ -99,16 +99,16 @@ run of the suite takes an hour and a half.
 | Story arc | Every step from the crash to the rescue works | 23/23 scripted checks (`tests/arc.mjs`) |
 | Systems | Every system does what it says | Science 16/16, equipment wear 8/8, farm, meals, morale and comforts 8/8, photo mode 9/9, sights, moons and compass 9/9, audio wiring 26/26 |
 | Saves | Old saves load or the player is told plainly why not | Format 4. Version-2 and version-3 saves migrate (terrain re-seated, sol count converted to the longer sols) and the player is told (tested). A format-4 save from before the pantry existed loads with a fresh pantry and morale (tested). Unreadable saves are reported on the title screen (tested) |
-| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 7 (iPhone size): **MET** |
-| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 7: **MET** |
-| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 7: NEARLY. Stars, silhouette, lamp pool and headlight cone work; buildings do not light the ground (Q3) |
-| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 7: NEARLY. Visibility collapses and the sun is a dim disc; the dust is smooth ribbons with no grit, and the airlock stays crisp (Q9) |
-| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 7: NEARLY. No artefacts; the cap reads as a snowfield and the outcrop as a toy (Q8) |
-| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 7: **MET**. The launch itself still lacks spectacle (Q1) |
-| Models | Every object is a purpose-built model; nothing reads as a primitive | Round 7: NEARLY. Everything built meets the bar (the rocket, the pods, the rover, the landers); rocks, the commonest object, do not (Q4) |
+| Picture: day | Reads as Mars at a glance: butterscotch sky paler at the horizon, sunlit regolith with rocks, hard shadows, haze with distance | Round 7 (iPhone size): **MET**. Round 11 (indie standard): **MET** |
+| Picture: dawn and dusk | Low sun, long shadows, the blue glow around the sun, readable ground | Round 7: **MET**. Round 11: **MET** |
+| Picture: night | Stars, readable silhouette of the ground, helmet lamps and rover headlights light the way, Hab windows glow | Round 7: NEARLY. Stars, silhouette, lamp pool and headlight cone work; buildings do not light the ground (Q3). Round 11: **MET**, narrowly |
+| Picture: dust storm | Visibility collapses, the sun dims to a disc, dust streams past, it is audibly and visibly dangerous | Round 7: NEARLY. Visibility collapses and the sun is a dim disc; the dust is smooth ribbons with no grit, and the airlock stays crisp (Q9). Round 11: NEARLY, which by the target of 14 November is reached |
+| Picture: poles | Ice caps look like ice, no artefacts at the poles | Round 7: NEARLY. No artefacts; the cap reads as a snowfield and the outcrop as a toy (Q8). Round 11: NEARLY ("the closest to NOT MET"), reached by the target of 14 November; V3 lists what is weak |
+| Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 7: **MET**. The launch itself still lacks spectacle (Q1). Round 11: **MET**; the launch NEARLY (V2, V5, V6) |
+| Models | Every object is a purpose-built model; nothing reads as a primitive | Round 7: NEARLY. Everything built meets the bar (the rocket, the pods, the rover, the landers); rocks, the commonest object, do not (Q4). Round 11: **MET** |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Fourteen clips blended. Idle is a relaxed, asymmetric stand (8 s); he takes his helmet off where there is air; kneeling has clips of its own. The builder's checks find no sliding or sinking foot in any clip. Not yet reviewed in motion |
-| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fifth independent review: NEARLY. At every step there is one task with a distance, a compass tag, a world marker and a hold prompt, and most earlier hesitations are answered. Remaining: a pile-up at the moment the suit is sealed (J2), a bare "LOCKED" at the first empty bed (J3), a distance labelled AIRLOCK that looks wrong (J4), and no word on the long-term goal (J16) |
-| Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fifth independent review (phone only, incomplete: see the review): 844 wide NEARLY (clean, unclipped, clear of the notch, one product; short on settings controls under 44 px, an 18 px help button, labels under 11 px and a few numbers that read as bugs); 667 wide NEARLY, provisionally (its three broken screens are fixed; its HUD and map were not seen). The suite's audit measures 128 phone states and finds nothing, which the review shows is not the same as nothing to find |
+| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fifth independent review: NEARLY. At every step there is one task with a distance, a compass tag, a world marker and a hold prompt, and most earlier hesitations are answered. Remaining: a pile-up at the moment the suit is sealed (J2), a bare "LOCKED" at the first empty bed (J3), a distance labelled AIRLOCK that looks wrong (J4), and no word on the long-term goal (J16). **Ninth review (held to the indie standard): NEARLY at both phone sizes, which by the owner's target of 14 November is reached.** What it still lists is under N9 |
+| Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fifth independent review (phone only, incomplete: see the review): 844 wide NEARLY (clean, unclipped, clear of the notch, one product; short on settings controls under 44 px, an 18 px help button, labels under 11 px and a few numbers that read as bugs); 667 wide NEARLY, provisionally (its three broken screens are fixed; its HUD and map were not seen). The suite's audit measures 128 phone states and finds nothing, which the review shows is not the same as nothing to find. **Ninth review (held to the indie standard): NEARLY at 844 x 390 (55 of 66 interface pictures seen) and NEARLY at 667 x 375 (all seen): reached, by the owner's target of 14 November.** Its four bugs and blockers (N1 to N4) are fixed; the rest of its list is polish |
 | Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Synthesised in the browser, no audio files. Measured offline: peaks under -1.4 dBFS with everything at once, calm day about -34 LUFS, storm -18. **Nobody has listened to it**: timbre and musicality are judged only from spectrograms. Calm beds are mostly below 300 Hz and will be faint on a phone speaker |
 | Feel | Walking, jumping and driving have weight; the camera never clips through walls or ground | New controllers in. The camera treats the Hab, its airlock and greenhouse domes as rooms from inside and as obstacles from outside. Not yet reviewed in motion |
 | Depth | "On par with Stardew Valley or Animal Crossing": many systems that feed each other, and always something worth doing | Survival, five crops with a pantry and cooked dinners, morale, field science with 17 materials and NASA grants, equipment wear, crafting and ten upgrades, four deployables, seven survey tasks, fourteen landers to salvage, dust storms and dust devils, mail from Earth and the Hermes, nine comforts to make for the Hab, photo mode, nineteen achievements. Still thin: things to do with a second greenhouse, anything to do with other people's hardware beyond salvage |
@@ -457,6 +457,57 @@ the heap's facets (T12).
 | U16 | The greenhouse: a dark diagonal band on the ground outside its door; a plain cap, chunky struts, no glass seen from above; an octagon fan and paper plants | open |
 | U17 | Smaller: the heap faceted (`hab-noon`, `hab-dusk`); noon flat; Beagle 2 dim; one idle pose in every prop picture | open |
 
+### Round 11 (iPhone size, "medium"; 72 stills and a 17-frame strip of the launch, all seen; held to the indie standard)
+
+A different reviewer again, given the bar and round 10's findings but not what had been done, and told the standard
+is a solid independent release on a phone and not a big-studio one. The pictures are of the build published to the
+preview as `529c501`. Headline: **NEARLY**: "about three-quarters of the set would pass as a solid indie release
+without comment". **Nothing is NOT MET**, so by the owner's target of 14 November every picture bar is reached.
+
+| Area | Verdict | What decided it |
+|---|---|---|
+| Day | **MET** | `walk-plain`, `astronaut-side`, `day-sun`, `canyon`; noon itself flat (`hab-noon`, `pile`) |
+| Dawn and dusk | **MET** | `dawn`, `dusk`, `hab-morning`, `lander-mars-3`; `dawn-light` spoiled by the ground seam (V1 below) |
+| Night | **MET**, narrowly | `hab-night`, `greenhouse-night`, `rover-night`, `twilight`; he is a black cut-out, the portholes dimmer than the dome's skin |
+| Dust storm | NEARLY | visibility collapses and he is swallowed by haze; the sun a hard pinpoint, the ground bands darker than the ground |
+| Poles | NEARLY, "the closest to NOT MET" | `north-pole` reads as snow and `pole-90` has blue shadow; the ice matte chalk, `south-pole` a lily-pad carpet, chevrons and shards at `pole-90`, the outcrop's blocks blue plastic |
+| Orbit | **MET** | `title`, `title-globe`, `launch-20.2`, `launch-22.6`; the limb fat only in `launch-climb` |
+| The launch | NEARLY | spectacle at lift-off, a ship that looks like a ship, a catch that reads; the trail a wax cone, the exhaust a cloth bell, one orbit frame nearly empty |
+| Landmarks | **MET** | Valles Marineris a great layered canyon; Olympus a volcano, not a dune; `canyon-wall` and `olympus-flows` the weaker frames |
+| Terrain | NEARLY | no saw-teeth, flecks or floating rocks; a straight near/far seam, ruler horizons with dark boulders, one crack net, stray pen lines |
+| Models | **MET** | every object purpose-built and recognisable; many props rest on the ground and are showroom clean; the ice blocks the one near-primitive |
+| Astronaut | **MET** | a believable stylised suit, natural from every side; his shadow and his lighting the weak parts |
+| Interiors | **MET** | the greenhouse excellent, the Hab rich and readable; its light still mostly even |
+| Overall | NEARLY | "coherent and largely finished"; two plain faults a paying player would notice (V1, V2) and two visible gaps in finish (V3, V4) |
+
+Round 10's seventeen: fixed or gone are the tether, the rocket's size at the far camera, the white flame, the
+clam-shell outcrop and its hexagon, the canyon rim's one beige, the headlamp dots, Beagle 2, the lens smudges,
+Olympus black on the globe, the white storm sun, the crack net on `debris-c`. Partly: his shadow's edge (soft now;
+still a blob at a high sun), the storm, the helmet pool, the Hab's floor, `debris-a` and `-c`. Still there: the
+near/far line, the trail, the catch from behind, the lily pads, Olympus's lobes, the wreck's lumps, cliff cracks at
+one size, pebbles of one colour, the greenhouse's band and cap, flat noon.
+
+| # | Finding (and whether the reviewer called it a blocker for a solid indie release) | State |
+| --- | --- | --- |
+| V1 | A straight line between near and far ground: in `dawn-light` two straight segments meeting at a corner, dark maroon below and bright orange above; a tonal step in `hab-noon`, `hab-morning`, `hab-dusk`; milder in `walk-plain`, `lander-perseverance` (bug; **blocker**, it shows at the home base) | open |
+| V2 | The ascent trail and exhaust read as solid objects: an opaque cream cone with lumpy shading (`launch-wide`, `07.4` to `10.4`), a draped teardrop with folds between flame and ground (`launch`) (**blocker for the ending**) | open |
+| V3 | Ice does not look like ice: matte plaster with wedges (`north-pole`), one-size blobs (`south-pole`), chevrons, grey shards and a pen-line arc at `pole-90`, flat-shaded baby-blue blocks with drawn edges, blue patches with no height step (not quite a blocker; the weakest environment) | open |
+| V4 | His shadow is a shapeless blob at most sun angles, where the rover's rack and InSight's panels cast crisp ones (polish, high priority) | open |
+| V5 | Weak frames in the rescue: `27.6` a sliver of ship and a small figure from behind; faceted cylinders with a fine cross-hatch at `24.4`; the ship's unlit sides orange-brown; no visor toward the camera at the catch | part: the crossing shot now comes round to the man so the ship leaves the frame whole (after these pictures). The rest open |
+| V6 | The climb loses scale in the middle: walking-scale boulders "far below" at `09.4`, a smeared planet and fat limb at `12.5` to `15.5`, the exhaust ending in a puff on the surface at `18.4`, one camera angle from `09.4` to `15.5` | open |
+| V7 | One crack net (`canyon-wall`, `canyon-gully`, `olympus-flows`), pen lines on Mars 3's mesa, twig lines in `dawn-light` and `rtg`, hexagon lines underfoot in `olympus-caldera` | open |
+| V8 | Ruler horizons with dark boulders on the line (`dusk`, `twilight`, `night-plain`, four lander sites) | open |
+| V9 | Storm: ground bands darker than the ground; the sun a 10 px point in a halo; dark dashes that read as rain | open |
+| V10 | Night: he is a black cut-out; the helmet pool a disc with no forward throw; the rover's beam ends 30 m out; portholes dim | open |
+| V11 | The suit reads beige against ice, and at `dusk` is evenly bright from behind with no rim | open |
+| V12 | Rocks: bevelled boxes, a bun with drawn cracks, flat plates, white streaks, a dot lattice on a slab, pebbles of one colour evenly sprinkled | open |
+| V13 | Props rest on the surface and are clean (`o2-cache`, `solar-kit`, `lander-viking-1`, `lander-pathfinder`); no furrow behind the tank; no tracks in the yard | open |
+| V14 | Olympus: an undetailed maroon mass and dapples in the caldera; dough lobes and an untextured channel in `olympus-flows` | open |
+| V15 | The Schiaparelli wreck zoomed in: gumdrop stones, flat white quads, an airbrushed scorch (at phone size it reads as a crash site) | open |
+| V16 | Flat noon and empty frames (`hab-noon`, `pile`, the middle of `canyon-rim`) | open |
+| V17 | The Hab's light still mostly even; a soft disc under him in `inside-farm` | open (the floor shade and the boot pads are in these pictures) |
+| V18 | Smaller: a weave on the dome that may shimmer (`yard`); the dark band at the greenhouse's door, its plain cap, the fan's polygon ring; the rover's trails wide smears; the title's globe touching the credit line; stars of one size | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -723,6 +774,41 @@ card ahead of ready ones (L14: fixed after these pictures).
 | M18 | Numbers that read as slips (844): the FOOD card's "you eat one a sol" against the guide's "one each dawn, two with a side"; "13 SOLS SURVIVED" for a death on Sol 13; "Potatoes: 4% grown" on a bed just sown; a falling arrow on the Hab's air after a single burn | fixed, but for the arrow: the card says what the guide says; the death sheet gives the sol reached; a new bed is "just planted". The arrow after a one-off loss is kept (it is news, and goes in seconds). Not slips: "Suit air: 9 to 12 minutes" is Tank II over Tank I (the reviewer set it against a first tank's 5:56 elsewhere), and the Tasks badge read 3 with a breach on the list and 2 without |
 | M19 | The colony out of range: "Only at the Hab" four times on one screen (844) | fixed: the line under the tabs and the page's heading say it; the cards do not |
 | M20 | "Survive to Sol 25" under-directs the middle of the game: nothing on the card says a drive stands between him and the rescue (844) | part: its reason is "The MAV can launch then: 15.1 km from the Hab, in Schiaparelli" |
+
+### Ninth review (phone only; two reviewers, one a size; held to the indie standard)
+
+After the eighth review's list (M1 to M20), on the build published to the preview as `529c501` (pictures from
+`7b7852e`, which differs from it only in how the "Plant first" mark is put into the page). The reviewers were told the
+standard is a solid independent release on a phone, and asked to say of each finding whether it would stop the game
+passing as one. Verdicts: interface **NEARLY at 844 x 390** (on 55 of its 66 interface pictures: the title's three
+states, the new-game sheet, the four settings tabs, the credits, loading and the cold open dropped out of that
+reviewer's reader before notes were written; four of those states were seen in the same-size first-ten set) and
+**NEARLY at 667 x 375** (all 94 pictures seen); first ten minutes **NEARLY at both**. By the owner's target of 14
+November both bars are reached at both sizes. The small phone's reviewer: "the sheets and menus would pass as a paid
+indie game today. The HUD nearly does: it is cramped at this width, and worst exactly when an emergency is on."
+
+Of the eighth review's twenty: gone are the clamped bar cards (M1), the lead task following his feet (M2), the
+difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four times (M19); mostly gone the cold open
+(M3: RUN ringed from the first frame, "TAP RUN"; the worded hint still comes late), the map (M8) and the win sheet
+(M16: fits at 844; a list that still scrolls at 667); partly the dawn sheet (M4), the lists (M5), the left column
+(M6), emergencies (M7), onboarding order (M10), vocabulary (M11), settings (M12), the destination and the strip
+(M13), the small things (M17), the slips (M18) and "Survive to Sol 25" (M20); still there the direction arrow (M9).
+
+| # | Finding (which reviewer called it a blocker) | State |
+| --- | --- | --- |
+| N1 | The direction arrow: a bare triangle of 12 to 14 px with no distance, never introduced, turning up beside the task card, between the buttons and beside the stick; its point could not be told from its other corners (844: blocker; 667: fails "no unlabelled icon") | fixed, to re-review: off the screen it is a dart (taller than wide, notched) on the screen's edge with the distance under it, within twenty-five degrees of the true way or not drawn; on the screen but under a panel it stands just clear of the panel within five rem of the place, or is not drawn; on the place it is the diamond and distance as before |
+| N2 | The first morning's dawn sheet scrolls, and the line under the fold is TODAY (844: blocker; scrolls at 667 too) | fixed, to re-review: the day's task leads the rows; the food line is one line on a phone ("Breakfast for 8 sols, 4 more in the beds; rescue in 23 sols: 11 sols with nothing to eat"); tiles and rows stand closer. Whether six rows now fit at 667 is to be seen |
+| N3 | Colour-blind-safe mode hatched the empty part of a low gauge in bright vermilion or yellow, so a bar with 9 L in it read as nearly full (667: bug, blocker) | fixed: the hatch is faint and the fill solid and in the safe palette; the figures of a critical row and of the suit's dial take that palette's vermilion |
+| N4 | A falling arrow on the Hab's air after one burn, beside "no Hab air lost now" (both: bug) | fixed: for a few seconds after a single cost or gift a bar carries no arrow; the prompt says "the first costs 7% of the Hab's air" before and "these cost no air" after |
+| N5 | Lists still cut text at the fold: the colony shows one row of cards and the heads of the next at 667, the journal's way-home tiles are cut mid-sentence (both: polish) | open |
+| N6 | At 667 the HUD leaves a window 145 px wide between its two columns and fills it in an emergency: about 40% of the picture under interface with everything at once (667: fix the stacked case before release) | open |
+| N7 | "? GUIDE" is bare text of about 47 x 12 px in four places as the bars arrive; at 667 the guide sheet shows four of seven entries (blocker only if its touch area is as small as it is drawn: it is not, the whole panel opens the guide) | open: nothing shows that the panel is the control |
+| N8 | Gauge rows on a 20 px pitch, values about 12 px, the alarm outline touching the rows either side of it | open |
+| N9 | Onboarding: five NEW cards in 39 game minutes; two bars with one card; trend arrows seen eleven pictures before their card; VIEW, JUMP, the rover and watering never explained; POWER and VITALS with no "at zero"; morale scored before its bar | open |
+| N10 | Vocabulary: "HAB AIR" under the ring beside the "HAB O2" bar, "ROVER AIR" beside "O2 TANK"; fabricate, install, make, build; three names for restarting and for a storm; the meal rule said three ways; "12 SOLS SURVIVED" on Sol 12; the recommended difficulty labelled "HARDER" | open |
+| N11 | The HUD's "Survive to Sol 25" line names no drive (the journal and the pause card do) | open |
+| N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
+| N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
 ## Open items
 

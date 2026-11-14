@@ -288,7 +288,9 @@ export function updateWaypoint(camera) {
   if (behind) { nx = -nx; ny = -ny; const m = Math.max(Math.abs(nx), Math.abs(ny), 1e-3); nx /= m; ny = Math.min(ny / m, -0.2); }
   const px = (nx * 0.5 + 0.5) * w, py = (-ny * 0.5 + 0.5) * h;
   // the marker's own box about its point (the diamond above, the distance under it), and the ring it keeps to
-  const bx = rem * 1.875 + 6, up = rem * 1.4 + 5, dn = rem * 0.95 + 6;
+  // (below it there is room for the distance under a dart as well as under the diamond: the dart stands lower in the
+  //  marker's box, and with the figure back under it the figure hung past the safe edge on a large screen)
+  const bx = rem * 1.875 + 6, up = rem * 1.4 + 5, dn = rem * 1.75 + 6;
   const L = layout.safe[3] + bx + 4, R = w - layout.safe[1] - bx - 4, T = layout.safe[0] + up + 4, B = h - layout.safe[2] - dn - 4;
   const now = perf();
   // (looked at again five times a second, and every tenth frame whatever the clock says: a log line or a toast must not sit under the marker for long)
@@ -318,7 +320,7 @@ export function updateWaypoint(camera) {
           // (For a place off the screen the arrow keeps to the screen's edge: it used to give way inward as far as
           //  a third of the way from the middle, and three reviews found an arrowhead floating in the picture with
           //  nothing to say what it was. At the edge it is an edge marker; in the middle it was a stray glyph.)
-          for (let r = inView && !k ? Math.min(1, Math.hypot(dx, dy) / t) : 1; r >= (inView ? 0.3 : 0.88); r -= 0.07) {
+          for (let r = 1; r >= 0.9; r -= 0.05) {
             const qx = cx + ux * t * r, qy = cy + uy * t * r;
             if (!hit(qx, qy, kinds)) { x = qx; y = qy; if (k) waySide = s; return true; }
           }
@@ -331,12 +333,26 @@ export function updateWaypoint(camera) {
     // and if there is nowhere at all, it is not drawn (the mission line still gives the distance, the compass the way).
     // (off the screen it turns no more than fifty degrees from the true way to find room: further round than that it
     //  points somewhere else, and the compass and the task card already say where)
-    if (!(inView ? seek(2, 12) || seek(1, 12) || seek(1, 22) : seek(2, 6) || seek(1, 6))) { if (wayShown) { wayShown = false; wayEl.style.display = 'none'; } return; }
+    // Off the screen it is a dart on the screen's edge with how far beside it, no more than twenty-five degrees
+    // from the true way; with no room there it is not drawn, and the compass has the way.
+    // On the screen but under a panel, the dart stands just clear of the panel on the line from the middle of the
+    // screen to the place, pointing at it, within five rem of it; further off than that it would point at the panel,
+    // and it is not drawn. (It used to give way as far as it liked, and round: two more reviews found an arrowhead
+    // hanging in the picture, by the task card, between the buttons, beside the stick, with nothing to say what it was.)
+    let found = false;
+    if (inView) {
+      const d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+      for (let back = rem * 1.2; back <= rem * 5.2 && back < d; back += rem * 0.5) {
+        const qx = px - ux * back, qy = py - uy * back;
+        if (qx >= L && qx <= R && qy >= T && qy <= B && !hit(qx, qy, 1)) { x = qx; y = qy; found = true; break; }
+      }
+    } else found = seek(2, 3) || seek(1, 3);
+    if (!found) { if (wayShown) { wayShown = false; wayEl.style.display = 'none'; } return; }
   }
-  // (On the place, the marker carries how far it is. At the edge of the screen it is an arrowhead and no more: the
-  //  first line of the list has the distance, and an arrow with a number in a box under the compass's own tag was the
-  //  same figure a third time.)
-  const tag = off ? '' : fmtDist(at.show);
+  // (The marker carries how far it is, on the place and at the screen's edge alike. For a while the edge's arrow went
+  //  without: it then stood under the compass's own tag, and the figure was there a third time. At the edge, alone,
+  //  an arrowhead with no figure was a glyph to be guessed at: both the ninth review's readers asked what it was.)
+  const tag = fmtDist(at.show);
   const key = `${Math.round(x)},${Math.round(y)},${off ? Math.round(ang * 20) : 'on'},${tag},${urgent}`;
   if (!wayShown) { wayShown = true; wayEl.style.display = ''; }
   if (key === wayKey) return;
@@ -852,9 +868,9 @@ function track(key, value, dt) {
   hud.prev[key] = value;
   if (prev === undefined || dt <= 0 || dt > 1) return hud.rate[key] || 0;
   const inst = (value - prev) / dt;
-  // a refill, a burn, a save loaded: not a trend. But it is news: the arrow shows which way it went for a few seconds
+  // a refill, a burn, a save loaded: not a trend, and the arrow rests for a few seconds after one
   // (the Hab's air had just dropped seven points and the arrow beside it pointed up, because it was already recovering)
-  if (Math.abs(value - prev) > 6) { hud.jump[key] = { dir: value > prev ? 1 : -1, t: 5 }; return hud.rate[key] || 0; }
+  if (Math.abs(value - prev) > 6) { hud.jump[key] = { dir: value > prev ? 1 : -1, t: 4 }; return hud.rate[key] || 0; }
   const old = hud.rate[key] || 0;
   // a real change (stepping out of the airlock, breaking into a run, the sun going down) shows at once; jitter is smoothed
   const jump = inst * old <= 0 || Math.abs(inst) < Math.abs(old) * 0.5 || Math.abs(inst) > Math.abs(old) * 1.5;
@@ -933,7 +949,10 @@ export function updateHud() {
       const r = track(k, raw, dt), j = hud.jump[k];
       if (j && (j.t -= dt) <= 0) hud.jump[k] = null;
       // (and no arrow up on a full bar, or down on an empty one: "100% rising" is not a reading)
-      let tr = hud.jump[k] ? (j.dir > 0 ? 'up' : 'dn') : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
+      // (A single cost or gift is not a trend, and for a few seconds after one the bar carries no arrow at all: the
+      //  bar's own jump is the news. It carried an arrow the way of the jump, and after one burn that cost the Hab
+      //  seven points of air two reviews read the falling arrow as a leak: the arrow a real breach shows.)
+      let tr = hud.jump[k] ? '' : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
       if ((tr === 'up' && frac >= 0.995) || (tr === 'dn' && frac <= 0.001)) tr = '';
       if (hud.cls[k + 't'] !== tr) { hud.cls[k + 't'] = tr; b.trend.className = 'tr' + (tr ? ' ' + tr : ''); }
       if (tr && !arrow && !b.wrap.hidden) arrow = b.wrap;

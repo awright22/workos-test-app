@@ -328,7 +328,7 @@ addI({
   // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
   //  gone, nothing said whether the second would cost air again. "Untried indoors" was the warning's old wording:
   //  untried by whom, and risking what?)
-  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
+  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'these cost no air' : 'first costs 7% of Hab air') : ''),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
