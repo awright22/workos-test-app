@@ -84,7 +84,11 @@ const scenes = {
     G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
   'canyon': async () => ev(async (G) => { await G.tp(-11.5, 293, 3.14); G.setLocalTime(15.5); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
   // the north wall of Valles Marineris at 296 E: about 13 m of drop in every 4 m of ground, a hundred metres in all
-  'canyon-rim': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
+  // (the rim of the main trough, where it is six hundred metres across and a hundred and forty deep, looking over it.
+  // The picture used to be taken at a side gully forty metres wide two hundred metres north of here, and was judged
+  // "a pit": a canyon's rim should be photographed where the canyon is.)
+  'canyon-rim': async () => ev(async (G) => { await G.tp(-10.74, 293, 3.14); G.setLocalTime(15); G.look(-0.2); G.tick(0.05, 40); await G.settle(); }),
+  'canyon-gully': async () => ev(async (G) => { await G.tp(-8.47, 296, 3.14); G.setLocalTime(15); G.look(-0.3); G.tick(0.05, 40); await G.settle(); }),
   'canyon-wall': async () => ev(async (G) => { await G.tp(-12.19, 293, 3.14); G.setLocalTime(15); G.look(0.3); G.tick(0.05, 40); await G.settle(); }),
   // on the wall itself, looking along it: scree underfoot, the spurs' rock beside
   'canyon-climb': async () => ev(async (G) => { await G.tp(-12.235, 292.86, 1.3); G.setLocalTime(15); G.look(0.05); G.tick(0.05, 40); await G.settle(); }),

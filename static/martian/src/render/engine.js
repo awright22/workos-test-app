@@ -446,7 +446,8 @@ function airHaze() {
     // Looking down into a deep, there is more air in the way than the distance says: the dust hangs lowest in the
     // lowest ground. So what lies well below the eye is hazier than what is level with it, and a canyon seen from its
     // rim has a far floor, not a pit with its bottom as sharp as its lip. (Not from the air: from there all is below.)
-    float fogDeep = 1.0 + 1.3 * smoothstep(18.0, 120.0, fogHigh - vFogAlt) * (1.0 - smoothstep(500.0, 2000.0, fogHigh));
+    float fogBelow = smoothstep(18.0, 120.0, fogHigh - vFogAlt) * (1.0 - smoothstep(500.0, 2000.0, fogHigh));
+    float fogDeep = 1.0 + 0.7 * fogBelow;
     float fogThick = fogNear * fogAir * fogDeep * vFogDepth;
     // (it gathers from the start and not all at once: with the square alone the ground was clear red to the first
     // ridge and cream beyond it, along one line)
@@ -462,6 +463,9 @@ function airHaze() {
     // the horizon, which is what far haze fades into. (One sky-pale colour at every distance lifted the middle
     // ground to cream a hundred metres off, and the land broke from red to cream along the first ridge.)
     vec3 fogTint = mix(fogColor * vec3(0.74, 0.56, 0.46), fogColor, smoothstep(160.0, 1400.0, vFogDepth));
+    // (... but the air that fills a deep is the sky's own haze, pale and a little cool: it is what puts the far wall
+    // and the floor of a canyon a long way off, on a planet where they are a few hundred metres away)
+    fogTint = mix(fogTint, fogColor * vec3(0.95, 0.99, 1.06), 0.75 * fogBelow);
     gl_FragColor.rgb = mix(mix(gl_FragColor.rgb, fogTint, fogFactor), fogColor, fogBand);
   #endif`;
 }
