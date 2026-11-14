@@ -264,7 +264,12 @@ export class Sky {
     this.sunE = sunE;
     // direct sunlight: fades through the dust near the horizon; slightly blue-white when low
     const through = smoothstep(-0.04, 0.16, sunE);
-    this.sunIntensity = 3.3 * through * (1 + 1.2 * low * low) * (1 - dust * 0.94);
+    // (A low sun is not a stronger sun. Raised to more than double at the horizon, to keep level ground lit, it lit
+    //  whatever leaned toward it two and three times as brightly as the level ground beside it: a plain at dawn was
+    //  dark maroon up to the first crest and bright orange beyond, along one line. Through that much dust most of the
+    //  light at dawn is the sky's, and the sky's share is raised instead (see the engine's environment light).)
+    this.sunIntensity = 3.3 * through * (1 + 0.3 * low * low) * (1 - dust * 0.94);
+    this.lowSun = low * low * day;
     this.sunColor.setRGB(lerp(0.80, 1.0, 1 - low * 0.6), lerp(0.80, 0.93, 1 - low), lerp(0.86, 0.80, 1 - low));
     // sky light: the dome's average colour above, the lit ground's bounce below
     const k = 0.90 * day, nk = 1 - day;

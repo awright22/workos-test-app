@@ -306,7 +306,8 @@ export class Engine {
     // the hemisphere light's "up" must be the local up, not world +Y
     this.hemi.position.copy(_u);
     this._updateEnvironment(p.dt || 0.016, p.dust || 0);
-    this.scene.environmentIntensity = lerp(1.05, 0.12, this.indoor);
+    // (more of the light is the sky's under a low sun: it fills level ground and shade alike)
+    this.scene.environmentIntensity = lerp(1.05 * (1 + 1.3 * (sky.lowSun || 0)), 0.12, this.indoor);
     // fog: aerial perspective that matches the horizon; thins out with altitude
     const fog = this.scene.fog;
     fog.color.copy(sky.fogColor);
