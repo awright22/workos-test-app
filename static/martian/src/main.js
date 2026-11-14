@@ -319,12 +319,12 @@ function installDebug() {
     tick(dt, n = 1) { for (let i = 0; i < n; i++) { lastFocus = tick(dt); if (ctx.vfx) ctx.vfx.time += dt; } },     // (dust kicked up in a tick ages by that tick)
     fixedResolution: new URLSearchParams(location.search).has('fixed'),
     /** Start a new game at a chosen crash site without the menus. */
-    async start(lat, lon, diff = 'survival') {
+    async start(lat, lon, diff = 'survival', kind = 'story') {
       if (lat !== undefined) {
         const real = Math.random; const q = [(lat / 52 + 1) / 2, lon / 360];
         Math.random = () => (q.length ? q.shift() : real());
-        try { newGame(diff); } finally { Math.random = real; }
-      } else newGame(diff);
+        try { newGame(diff, kind); } finally { Math.random = real; }
+      } else newGame(diff, kind);
       hideOverlay();
       await this.settle();
       return { lat: World.spawn.lat, lon: World.spawn.lon };

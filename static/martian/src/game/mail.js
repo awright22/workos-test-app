@@ -4,7 +4,7 @@
  * done (a harvest, a storm sat out, a failed machine, a sample nobody expected), so the planet
  * stops being quite so empty. Messages arrive in the log; nothing needs replying to.
  */
-import { S } from './state.js';
+import { S, isBase } from './state.js';
 import { cheer } from './farm.js';
 import { log } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
@@ -75,10 +75,10 @@ export const MAIL = [
   { id: 'science2', when: () => kinds() >= 8, lines: [
     ['n', 'Eight materials. Mark, sample return missions were budgeted at nine billion dollars to bring back a tenth of what is in your case.'],
     ['w', 'I accept payment in pizza. One pizza. Delivered. I will wait.'] ] },
-  { id: 'halfway', when: () => S.sol >= Math.ceil(S.rescueSol / 2), lines: [
+  { id: 'halfway', when: () => !isBase() && S.sol >= Math.ceil(S.rescueSol / 2), lines: [
     ['Johanssen', 'Halfway, Mark. I have the intercept burn programmed. I have checked it four hundred times. Martinez says that is too many. Martinez is wrong.'],
     ['w', 'Check it four hundred more. I will be the one in the convertible.'] ] },
-  { id: 'hermes', when: () => S.sol >= S.rescueSol - 4, lines: [
+  { id: 'hermes', when: () => !isBase() && S.sol >= S.rescueSol - 4, lines: [
     ['Lewis', 'Hermes is inbound. We voted. It was unanimous, it was mutiny, and nobody is sorry. Be at that MAV, Watney.'],
     ['w', 'Commander, I would not miss it for the world. Any world.'] ] },
   { id: 'mav', when: () => S.flags.mavRevealed, lines: [

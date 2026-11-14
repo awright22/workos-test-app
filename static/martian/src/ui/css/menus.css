@@ -114,6 +114,8 @@
 .brief-1 { display: none; }
 .brief b { color: var(--ink); }
 .diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .875rem; }
+/* (the choice of game before it: two cards of the same make) */
+.diffs.two { grid-template-columns: repeat(2, 1fr); }
 .diff { position: relative; display: flex; flex-direction: column; align-items: stretch; text-align: left; padding: 1.125rem 1.125rem 1rem; cursor: pointer;
   background: rgba(245, 240, 232, .035); border: 1px solid var(--line-2); border-top: 2px solid var(--ink-4); border-radius: .1875rem; color: var(--ink);
   transition: background .2s, border-color .2s, transform .2s var(--ease); }
@@ -648,7 +650,7 @@
    stands beside its name, not under it. (Rows with a second line were 54 px among rows of 44.) */
 .mg-compact #mg-overlay.k-title .menu { width: auto; max-width: 30rem; align-self: flex-start; }
 .mg-compact #mg-overlay.k-title .menu-item { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: .875rem; }
-.mg-compact #mg-overlay.k-title .menu-item .mi-s { white-space: nowrap; }
+.mg-compact #mg-overlay.k-title .menu-item .mi-s, .mg-compact #mg-overlay.k-title .menu-item .mi-l { white-space: nowrap; }
 
 /* capitals at 14 px on a phone, where they are set outside the section that lists the rest; and the condensed face
    in lower case at 13 */

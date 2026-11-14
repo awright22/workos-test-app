@@ -5,7 +5,16 @@ export const DIFFICULTIES = {
   iron:     { name: 'SPACE PIRATE', rescueSol: 35, drain: 1.15, desc: 'Rescue: Sol 35. Death rewinds nothing —\none life, whole planet, no complaints.' },
 };
 
+/**
+ * The two games. 'story' is the book: hold out until the rescue, drive to the MAV, fly. 'base' has no rescue: the
+ * same opening, and then a base to build that can keep him alive for good. (Base mode is being built: see QUALITY.md.)
+ */
+export const KINDS = ['story', 'base'];
+/** In Base mode nobody is coming: the rescue's sol is a number no run reaches. */
+export const NO_RESCUE = 1e9;
+
 export const S = {
+  kind: 'story',
   started: false, uiOpen: false, over: false, won: false, sleeping: false,
   firstPerson: false,
   mode: 'walk',                    // walk | rover | cutscene
@@ -32,6 +41,11 @@ export const S = {
            crafted: 0, discoveries: 0, discoTime: 0, stormOut: 0 },
   holdT: 0, shake: 0, dead: null,
 };
+
+/** True in the game with no rescue. */
+export const isBase = () => S.kind === 'base';
+/** The sol of the rescue for a difficulty in a kind of game. */
+export const rescueSolFor = (diffKey, kind) => (kind === 'base' ? NO_RESCUE : (DIFFICULTIES[diffKey] || DIFFICULTIES.survival).rescueSol);
 
 /** Rescue sols before sols were lengthened (saves made then are converted on load). */
 export const OLD_RESCUE_SOL = { story: 20, survival: 45, iron: 60 };

@@ -8,7 +8,7 @@ import { reducedMotion } from './settings.js';
 import { fmtDist, groundDist, llToVec, vecToLl } from '../planet/geo.js';
 import { _v1 } from '../core/scratch.js';
 import { FEATURES, REGIONS, regionName } from '../planet/features.js';
-import { BAL, S, roverPowerCap } from '../game/state.js';
+import { BAL, S, isBase, roverPowerCap } from '../game/state.js';
 import { R } from '../planet/constants.js';
 import { World } from '../world/build.js';
 import { player } from '../game/player.js';
@@ -135,9 +135,9 @@ function buildMarkers() {
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
   // (the rocket says what it is from the first sol: it stood on the map as "Ares 4 MAV" with nothing to say it was the way home)
-  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 2, main: !!S.flags.mavRevealed,
-    title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'The way home · Schiaparelli crater',
-    note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
+  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed || isBase() ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : isBase() ? 3 : 2, main: !!S.flags.mavRevealed,
+    title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : isBase() ? 'Ares 4 · Schiaparelli crater' : 'The way home · Schiaparelli crater',
+    note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : isBase() ? 'The next mission’s ascent vehicle, standing ready in Schiaparelli. No ship is coming to meet it.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
     title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
   add({ id: 'hab', icon: 'hab', color: col.accent, pos: World.hab.position, label: 'Hab', pri: 2, home: true,

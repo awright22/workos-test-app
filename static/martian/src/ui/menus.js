@@ -7,7 +7,7 @@ import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { OBJECTIVES, missionList, suitTimeLeft } from './hud.js';
 import { layout } from './layout.js';
-import { DIFFICULTIES } from '../game/state.js';
+import { DIFFICULTIES, isBase } from '../game/state.js';
 import { regionName } from '../planet/features.js';
 import { llToVec } from '../planet/geo.js';
 import { ctx } from '../game/ctx.js';
@@ -69,8 +69,9 @@ let titleSeen = false;
 export function showTitle(o) {
   const again = () => showTitle(o);
   const items =
-    (o.saved ? menuItem('continue', 'Continue', `Sol ${o.saved.sol} · ${o.saved.diffName}${o.saved.region ? ' · ' + o.saved.region : ''}`, 'first') : '') +
-    menuItem('new', 'New Game', o.saved ? 'A new random crash site' : 'Somewhere on Mars', o.saved ? '' : 'first') +
+    (o.saved ? menuItem('continue', o.savedBase ? 'Continue the story' : 'Continue', `Sol ${o.saved.sol} · ${o.saved.diffName}${o.saved.region ? ' · ' + o.saved.region : ''}`, 'first') : '') +
+    (o.savedBase ? menuItem('continue-base', 'Continue the base', `Sol ${o.savedBase.sol} · ${o.savedBase.diffName}${o.savedBase.region ? ' · ' + o.savedBase.region : ''}`, o.saved ? '' : 'first') : '') +
+    menuItem('new', 'New Game', o.saved || o.savedBase ? 'A new random crash site' : 'Somewhere on Mars', o.saved || o.savedBase ? '' : 'first') +
     menuItem('settings', 'Settings') + menuItem('credits', 'Credits');
   const p = openOverlay('title',
     `<div class="menu-col">${WORDMARK}<p class="tag">The whole planet. All of it. Against you.</p><nav class="menu" aria-label="Main menu">${items}</nav>` +
@@ -82,8 +83,9 @@ export function showTitle(o) {
   titleSeen = true;
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;
-    if (a === 'continue') { hideOverlay(); o.onContinue(); }
-    else if (a === 'new') showNewGame(o, again);
+    if (a === 'continue') { hideOverlay(); o.onContinue('story'); }
+    else if (a === 'continue-base') { hideOverlay(); o.onContinue('base'); }
+    else if (a === 'new') (o.base ? showKind : showNewGame)(o, again);
     else if (a === 'settings') showSettings(again, true);
     else if (a === 'credits') showCredits(again, true);
   });
@@ -96,7 +98,33 @@ const DIFF_ORDER = ['story', 'survival', 'iron'];
 const DIFF_TAG = { story: 'Gentle', survival: 'Recommended', iron: 'One life' };
 // (what the three bars under a name count: they stood there with no word, and nothing said a longer wait is the harder game)
 const DIFF_LEVEL = { story: 'Easiest', survival: 'Harder', iron: 'Hardest' };
-export function showNewGame(o, back) {
+/**
+ * Which game: the story, or the base. (Asked only where Base mode is offered: see showStart in game/flow.js.) The
+ * two cards are the difficulty sheet's cards, so the choice looks like the one that follows it.
+ */
+export function showKind(o, back) {
+  const again = () => showKind(o, back);
+  const card = (kind, n, tag, name, rows, text) =>
+    `<button type="button" class="diff${kind === 'story' ? ' rec' : ''}" data-kind="${kind}"${kind === 'story' ? ' data-autofocus' : ''} aria-label="${name}. Choose">` +
+    `<div class="dx"><span>0${n}</span><em>${tag}</em></div><div class="dn">${name}</div>` +
+    `<dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><p>${text}</p><div class="go">Choose ${icon('next')}</div></button>`;
+  const p = openOverlay('sheet',
+    '<div class="sheet wide newgame"><header class="sheet-hd"><div><span class="t-kicker">New game</span><h1>Two ways to be stranded</h1></div></header>' +
+    '<div class="sheet-bd mg-scroll"><p class="brief-1">The same storm, the same holed suit, the same Hab. What differs is whether anyone is coming.</p>' +
+    '<div class="diffs two">' +
+    card('story', 1, 'The book', 'Get home', [['Ends', 'With a rescue'], ['Length', '15 to 35 sols'], ['You build', 'What gets you there']],
+      'Hold out until the Hermes comes back, drive to the rocket in Schiaparelli, and fly.') +
+    card('base', 2, 'Being built', 'Stay', [['Ends', 'Never'], ['Length', 'As long as you like'], ['You build', 'A base']],
+      'No ship can reach Mars for four years. Make this somewhere a man can live. More to gather and build is on its way.') +
+    '</div></div>' +
+    `<footer class="sheet-ft"><button type="button" class="mg-btn" data-act="back">${icon('back')}Back</button><span class="note">Each keeps its own saved run.</span></footer></div>`,
+    { label: 'New game: choose which game', onEscape: back });
+  UI.overlay.classList.add('over-title');
+  on(p, '[data-act="back"]', back);
+  on(p, '[data-kind]', (b) => showNewGame(o, again, b.dataset.kind));
+}
+export function showNewGame(o, back, kind = 'story') {
+  const base = kind === 'base', kept = base ? o.savedBase : o.saved;
   const cards = DIFF_ORDER.map((k, i) => {
     const d = DIFFICULTIES[k];
     const pips = [0, 1, 2].map((n) => `<i${n <= i ? ' class="on"' : ''}></i>`).join('');
@@ -104,36 +132,36 @@ export function showNewGame(o, back) {
     // ("Consumption: as rated" asked a new player what was consumed, and rated by whom)
     const drain = d.drain < 0.995 ? `Drain ${Math.round((1 - d.drain) * 100)}% slower` : d.drain > 1.005 ? `Drain ${Math.round((d.drain - 1) * 100)}% faster` : 'Normal drain';
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
-    return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
+    return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: ${base ? 'no rescue' : `rescue on Sol ${d.rescueSol}`}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}<span>${DIFF_LEVEL[k]}</span></div>` +
       // ("Rescue on Sol 35" did not say that a later rescue is the harder game, nor "Wake at dawn" what it costs; and
       //  "To last: 35 sols" did not say what lasts, him or his supplies. It is how long he must hold out.)
-      `<dl><dt>Hold out</dt><dd>${d.rescueSol} sols to rescue</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Start that sol again'}</dd></dl>` +
+      `<dl>${base ? '<dt>Rescue</dt><dd>None</dd>' : `<dt>Hold out</dt><dd>${d.rescueSol} sols to rescue</dd>`}<dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Start that sol again'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
     // (the way back is at the foot at every size, where Done and Cancel are on every other sheet: on a phone it was a
     //  button in the header, and the ways out of a sheet were in four different corners)
     '<div class="sheet wide newgame"><header class="sheet-hd"><div><span class="t-kicker">New game</span><h1>Choose your Mars</h1></div></header>' +
-    '<div class="sheet-bd mg-scroll"><p class="brief-1">Stranded on the real Mars. Farm, make water, call home, drive to the rocket.</p><div class="brief">' +
+    `<div class="sheet-bd mg-scroll"><p class="brief-1">${base ? 'Stranded on the real Mars, for good. Farm, make water, call home, and build.' : 'Stranded on the real Mars. Farm, make water, call home, drive to the rocket.'}</p><div class="brief">` +
     '<p>The storm hit. The crew evac\'d. Your bio-monitor said you were dead. It exaggerated. You are stranded <b>somewhere on Mars</b> — a real Mars: Olympus Mons, Valles Marineris, both ice caps, and every probe humanity ever threw at this planet, rusting exactly where history left it.</p>' +
-    '<p>Grow food. Make water. Salvage the dead landers. Find Pathfinder in Ares Vallis. Call home. Then drive to Schiaparelli crater and fly out.</p></div>' +
+    `<p>Grow food. Make water. Salvage the dead landers. Find Pathfinder in Ares Vallis. Call home. ${base ? 'Nobody can come for you: build a base that can keep you alive for good.' : 'Then drive to Schiaparelli crater and fly out.'}</p></div>` +
     `<div class="diffs">${cards}</div></div>` +
     `<footer class="sheet-ft"><button type="button" class="mg-btn" data-act="back">${icon('back')}Back</button>` +
-    (o.saved ? `<span class="note warn">Starting a new game replaces your saved run (Sol ${o.saved.sol}).</span>` : '<span class="note">Your crash site is random. So is the length of the road trip.</span>') +
+    (kept ? `<span class="note warn">Starting a new game replaces your saved ${base ? 'base' : 'run'} (Sol ${kept.sol}).</span>` : `<span class="note">${base ? 'Your crash site is random. So is what lies in reach of it.' : 'Your crash site is random. So is the length of the road trip.'}</span>`) +
     '</footer></div>',
     { label: 'New game: choose a difficulty', onEscape: back });
   UI.overlay.classList.add('over-title');
   on(p, '[data-act="back"]', back);
   on(p, '[data-diff]', (b) => {
-    const go = () => { hideOverlay(); o.onNewGame(b.dataset.diff); };
-    if (!o.saved) return go();
+    const go = () => { hideOverlay(); o.onNewGame(b.dataset.diff, kind); };
+    if (!kept) return go();
     // (A run in hand is not replaced by one press: Restart in the pause menu asks first, and Begin, which does the
     //  same thing, had only a line of small print beside Back.)
-    const again = () => showNewGame(o, back);
+    const again = () => showNewGame(o, back, kind);
     showOverlay({
-      kind: 'error', kicker: 'New game', title: 'Replace your saved run?',
-      body: `Starting a new game replaces your saved run: Sol ${o.saved.sol}${o.saved.region ? ', ' + esc(o.saved.region) : ''}, and everything you have built.`,
+      kind: 'error', kicker: 'New game', title: base ? 'Replace your saved base?' : 'Replace your saved run?',
+      body: `Starting a new game replaces your saved ${base ? 'base' : 'run'}: Sol ${kept.sol}${kept.region ? ', ' + esc(kept.region) : ''}, and everything you have built.`,
       onEscape: again,
       buttons: [
         { label: 'Keep my run', ghost: true, keep: true, fn: again },
@@ -162,7 +190,7 @@ export function showBarsGuide(onDone) {
     ['suit', `Suit ${o2}`, 'The air on your back.', `The ring is how full the tank is; the time under it, how long that lasts at a walk. It refills in the Hab, in the rover, or from a candle.`],
     ['hab', `Hab ${o2}`, 'The air in the Hab.', 'The oxygenator keeps it up while there is power. A breach lets it out.'],
     ['water', 'Water', 'Litres in the tank.', 'You and the farm drink it. Burning hydrazine makes more.'],
-    ['food', 'Food', 'Meals left.', 'Breakfast takes one each dawn, two with a side. The bar is full when there is enough to reach the rescue.'],
+    ['food', 'Food', 'Meals left.', `Breakfast takes one each dawn, two with a side. The bar is full ${isBase() ? 'at twenty sols of meals' : 'when there is enough to reach the rescue'}.`],
     ['power', 'Power', 'The Hab’s battery.', 'Sun on clean panels fills it. The machines and the night drain it.'],
     ['vitals', 'Vitals', 'Your body.', 'It falls without air, water, food or sleep. At zero the run is over.'],
     ['mood', 'Morale', 'Your spirits, out of 100.', 'Good food, music and comforts lift them. High, work goes a fifth faster; low, a fifth slower.'],
@@ -197,9 +225,10 @@ export function showPauseMenu(o) {
     menuItem('quit', 'Save and quit') + menuItem('restart', 'Restart run', '', 'danger') +
     '</nav></div>' +
     '<aside class="pause-side"><div class="kv">' +
-    `<span>Rescue</span><b>Sol ${o.rescueSol}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
+    `<span>Rescue</span><b>${o.base ? 'None' : `Sol ${o.rescueSol}`}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
     // (what is still to do, not what is done: it went on saying "raise Earth on a radio" after Houston had answered)
-    `<h3>The way home</h3><p>${o.uplink ? 'Stay fed, and reach the MAV in Schiaparelli' : 'Stay fed, find a radio and tell Earth, then reach the MAV in Schiaparelli'}: the only rocket on Mars. It can launch on Sol ${o.rescueSol}.</p>` +
+    (o.base ? `<h3>The long stay</h3><p>${o.uplink ? 'Stay fed, and build' : 'Stay fed, find a radio and tell Earth, and build'}: no ship can reach Mars for four years. Make this somewhere a man can live.</p>`
+      : `<h3>The way home</h3><p>${o.uplink ? 'Stay fed, and reach the MAV in Schiaparelli' : 'Stay fed, find a radio and tell Earth, then reach the MAV in Schiaparelli'}: the only rocket on Mars. It can launch on Sol ${o.rescueSol}.</p>`) +
     '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab.</p>' +
     '<button type="button" class="mg-btn side-btn" data-act="bars">Guide: what the bars mean</button></aside>',
     { label: 'Paused', onEscape: resume });

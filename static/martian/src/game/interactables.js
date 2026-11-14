@@ -2,7 +2,7 @@ import { HAB_R, World, buildDeployable, plotPlants, setSiteShown, siteLocalToWor
 import { groundDist, tangentBasis } from '../planet/geo.js';
 import { player } from './player.js';
 import { addI } from './interact.js';
-import { BAL, S, airTime, roverPowerCap, suitCap } from './state.js';
+import { BAL, S, airTime, isBase, roverPowerCap, suitCap } from './state.js';
 import { UI, after, clearLog, flashScreen, log, playTime, showOverlay, statusText, toast } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
 import { checkAchievements, connectPathfinder, discover, onQuestEvent } from './story.js';
@@ -413,20 +413,28 @@ addI({
     S.flags.didMath = true;
     Snd.play('terminal');
     // (his own entries go to the journal: the card says all of it, and on the HUD they were two more cards to read)
-    log(`${S.food} rations. Rescue: Sol ${S.rescueSol}. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`, null, { quiet: true });
-    log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the MAV, the only rocket on Mars, in Schiaparelli: it can launch on Sol ${S.rescueSol}.`, null, { quiet: true });
+    const base = isBase();
+    if (base) {
+      log(`${S.food} rations. The next ship that can reach Mars is four years out. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`, null, { quiet: true });
+      log('The plan: don\'t starve. Find a radio, tell Earth I\'m alive. Then make this place somewhere a man can live, because I am going to be living in it.', null, { quiet: true });
+    } else {
+      log(`${S.food} rations. Rescue: Sol ${S.rescueSol}. The numbers say: farm or starve. I'm going to have to science the sh*t out of this.`, null, { quiet: true });
+      log(`The plan: don't starve. Find a radio, tell Earth I'm alive. Then reach the MAV, the only rocket on Mars, in Schiaparelli: it can launch on Sol ${S.rescueSol}.`, null, { quiet: true });
+    }
     // the premise of the whole game: a card he reads and puts down, not a line that scrolls away
     showOverlay({
       kicker: 'The numbers', title: 'Farm or starve',
       // (food is counted in meals, here as on the FOOD bar: a ration is one; and the date is the rescue, in the same
       //  two words wherever it is given)
-      stats: [['Meals left', S.food], ['Rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
+      stats: base ? [['Meals left', S.food], ['Rescue', 'None'], ['Next ship', '4 years']]
+        : [['Meals left', S.food], ['Rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: `${S.food} ration packs, one meal a sol: they run out long before anyone can reach Mars.\n\n` +
         'The Hab has six farm beds. Fill them with regolith, the soil of Mars, from the heaps outside the airlock; plant; and water. <b>A potato bed takes one ration and gives back four potatoes.</b>',
       // (And where it is all going, on the card itself, as the morning's account has it: it used to arrive ten seconds
       //  later as a line of the log, in the slot that carries his jokes, while he stood at a bed with PLANT up.)
-      later: `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}.`,
+      later: base ? 'Find a radio and tell Earth you are alive. Nobody can reach you for years: make this somewhere a man can live.'
+        : `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}.`,
       wide: true,
       buttons: [{ label: 'Get to work', fn: () => {} }],
     });

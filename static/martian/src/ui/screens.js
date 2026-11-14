@@ -7,7 +7,7 @@ import { UI, VOICES, log, logHistory, logText, anyScreenOpen, moveFocus, esc, ch
 import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
-import { DIFFICULTIES, S } from '../game/state.js';
+import { DIFFICULTIES, S, isBase } from '../game/state.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
 import { startDeploy } from '../game/interactables.js';
@@ -364,6 +364,16 @@ function wayHomeHtml() {
     : S.pf.loaded ? 'Pathfinder is aboard the rover: bring it to the uplink ring.'
       : S.flags.pfRevealed ? `Pathfinder’s radio can: Ares Vallis, ${fmtDist(distTo(World.pathfinder.position))} away. Take the rover.`
         : 'An old lander’s radio can. The charts will show where it lies in a few sols.';
+  // (the game with no rescue has the same first two steps, and a third that does not end)
+  if (isBase()) {
+    const stay = [
+      ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
+      [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
+      ['For good', 'Build a base', 'No ship can reach Mars for four years. Make this somewhere a man can live: food, water, air and power that need nothing from Earth.', S.pf.connected ? 'next' : ''],
+    ];
+    return '<div class="pane-hd">The long stay</div><ol class="way">' +
+      stay.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';
+  }
   const steps = [
     ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
     [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
@@ -477,8 +487,8 @@ function achievementsHtml() {
 function statsHtml() {
   const st = S.stats;
   const tile = (v, unit, label) => `<div class="stat"><b class="t-num">${v}${unit ? `<small>${unit}</small>` : ''}</b><span>${label}</span></div>`;
-  return `<div class="pane-hd">This run <span>${esc(DIFFICULTIES[S.diff].name)} · rescue on Sol ${S.rescueSol}</span></div><div class="stat-grid">` +
-    tile(S.sol, '', 'Sols survived') + tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue') +
+  return `<div class="pane-hd">This run <span>${esc(DIFFICULTIES[S.diff].name)} · ${isBase() ? 'no rescue' : `rescue on Sol ${S.rescueSol}`}</span></div><div class="stat-grid">` +
+    tile(S.sol, '', 'Sols survived') + (isBase() ? tile(World.builtMeshes.length, '', 'Things set down') : tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue')) +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes + (st.produce || 0), '', 'Meals grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
     tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +

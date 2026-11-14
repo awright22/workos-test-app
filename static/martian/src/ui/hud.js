@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CROPS, foodTotal } from '../game/farm.js';
-import { BAL, S, suitCap, roverPowerCap } from '../game/state.js';
+import { BAL, S, isBase, suitCap, roverPowerCap } from '../game/state.js';
 import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
 import { player } from '../game/player.js';
@@ -118,7 +118,15 @@ export const OBJECTIVES = [
   // (its reason says what the day brings: with "the Hermes is coming back" alone, nothing on the card said that a
   //  drive stands between him and the rescue)
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
-    shown: () => S.pf.connected, done: () => S.sol >= S.rescueSol },
+    shown: () => !isBase() && S.pf.connected, done: () => S.sol >= S.rescueSol },
+  // ---- The game with no rescue: what a base is made of, a thing at a time. (The first of them, with what the
+  //      story's game already has to build with; the list grows as Base mode gets its own materials and buildings.)
+  { id: 'b-dome', place: 'Fabricator', text: () => 'Raise a greenhouse dome', why: 'Four more beds. Build the kit at the fabricator and set it down outside.',
+    pos: () => habPoint(-4.75, 1.3, 4.2), shown: () => isBase() && (S.stats.potatoes >= 4 || S.stats.produce > 0), done: () => World.builtMeshes.some((b) => b.kind === 'greenhouse') },
+  { id: 'b-larder', text: () => `Lay in forty meals (${Math.min(foodTotal(), 40)} of 40)`, why: 'A larder that outlasts a bad month.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'greenhouse'), done: () => foodTotal() >= 40 },
+  { id: 'b-ice', text: () => `Mine ice for the tank (${Math.min(S.stats.mined, 6)} of 6)`, why: 'The hydrazine runs out. An ice drill and an outcrop do not.',
+    shown: () => isBase() && S.pf.connected, done: () => S.stats.mined >= 6 },
   { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on Mars.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
@@ -385,7 +393,8 @@ export const BAR_UNLOCKS = [
   { id: 'o2', flag: 'barO2', when: () => !!S.checkedSystems.oxy || S.o2 < 40 },
   { id: 'water', flag: 'barWater', when: () => !!S.checkedSystems.rec || S.water < 26 },
   { id: 'food', flag: 'barFood', when: () => !!S.flags.didMath || foodTotal() < 4,
-    card: () => ['Food', 'Meals left: breakfast takes one each dawn, two with a side. The bar is full when there is enough to reach the rescue.', 'Meals left. Full means enough to reach the rescue.'] },
+    card: () => (isBase() ? ['Food', 'Meals left: breakfast takes one each dawn, two with a side. The bar is full at twenty sols of meals.', 'Meals left. Full means twenty sols of them.']
+      : ['Food', 'Meals left: breakfast takes one each dawn, two with a side. The bar is full when there is enough to reach the rescue.', 'Meals left. Full means enough to reach the rescue.']) },
   { id: 'power', flag: 'barPower', when: () => plantedPlots() > 0 || S.stats.panels > 0 || S.power < 55,
     card: () => ['Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night drain it.', 'The Hab’s battery. Clean panels fill it by day.'] },
   { id: 'health', flag: 'barHealth', when: () => S.health < 96 || bedtime(),
@@ -929,7 +938,8 @@ export function updateHud() {
   //  rescue. Against a fixed sixteen it was two thirds full on ten meals with twenty-four sols to go, and stood full
   //  from twenty-two up, which read as "enough" whether it was or not. It turns amber under four meals and red under
   //  two, whatever the wait. Morale is a score out of 100 and carries no unit, here or anywhere.)
-  const food = foodTotal(), wait = Math.max(3, S.rescueSol - S.sol);
+  // (with no rescue to reach, the food bar is full at twenty sols of meals)
+  const food = foodTotal(), wait = isBase() ? 20 : Math.max(3, S.rescueSol - S.sol);
   const rows = [
     ['o2', S.o2 / 100, `${Math.round(S.o2)}<small class="pc">%</small>`, S.o2],
     ['water', S.water / BAL.waterMax, `${Math.round(S.water)}<small>L</small>`, S.water],
@@ -972,7 +982,7 @@ export function updateHud() {
   setText('sol', UI.clockSol, String(S.sol));
   // (The second figure says what it is, and is not there before he knows of it: "SOL 1 / 25" stood on the screen from
   //  the first second, and nothing ever said that 25 was the rescue.)
-  const knows = !!S.flags.didMath || S.sol > 1;
+  const knows = (!!S.flags.didMath || S.sol > 1) && !isBase();
   setText('of', UI.clockOf, knows ? `<i>Rescue</i> ${S.rescueSol}` : '');
   // (on a wide screen the clock's line has no room for it beside the time and the temperature: it heads the mission list)
   if (objHead) setText('ofHd', objHead.lastChild, knows ? `Rescue Sol ${S.rescueSol}` : '');

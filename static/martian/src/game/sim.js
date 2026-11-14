@@ -1,7 +1,7 @@
 import { comfortCheer } from './comforts.js';
 import { CROPS, MORALE_WORD, breakfast, breakfastsLeft, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
-import { BAL, S, machineEff, roverPowerCap, suitCap } from './state.js';
+import { BAL, S, isBase, machineEff, roverPowerCap, suitCap } from './state.js';
 import { dawnFaults, wearMachines } from './machines.js';
 import { bindWorld, deliverMail } from './mail.js';
 import { ctx } from './ctx.js';
@@ -453,13 +453,17 @@ export function sleepToDawn(inRover) {
     // (the wait has its unit: "the rescue is in 12" was read as a date)
     // (one line on a phone: the first morning's sheet had six rows, this one two lines of them, and its last row,
     //  the day's task, was under the fold)
-    rows.push(['Food', short <= 0 ? `${lasts}; rescue in ${sols(wait)}`
+    // (with no rescue there is no wait to count the larder against: it says what there is and what is coming)
+    if (isBase()) rows.push(['Food', coming > 0 ? `${lasts}, ${coming} more in the beds` : lasts]);
+    else rows.push(['Food', short <= 0 ? `${lasts}; rescue in ${sols(wait)}`
       : coming >= short ? `${lasts}, ${coming} more in the beds; rescue in ${sols(wait)}`
         : coming > 0 ? `${lasts}, ${coming} more in the beds; rescue in ${sols(wait)}: ${sols(short - coming)} with nothing to eat`
           : `${lasts}; rescue in ${sols(wait)}: ${sols(short)} with nothing to eat`]); }
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
-  const later = rolled && S.sol === 2 && !S.pf.connected
+  const later = rolled && S.sol === 2 && !S.pf.connected && isBase()
+    ? 'Find a radio and tell Earth you are alive. The next ship is four years out: make this somewhere a man can live.'
+    : rolled && S.sol === 2 && !S.pf.connected
     ? `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}` : '';
   if (inRover) rows.push(['Night', 'Slept curled around the driver seat. The chiropractor is 225 million km away.']);
   const summary = {

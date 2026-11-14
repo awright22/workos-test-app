@@ -24,8 +24,8 @@ What follows from it:
 2. **Story mode is finished first.** It is finished when the picture and interface bars below are
    met on the phone and the owner has played it on the iPhone.
 3. **Base mode comes after.** The same opening, no rescue and no end: gather far more kinds of
-   resource and build a whole base from them. Not started. Keep story-mode systems (crafting,
-   deployables, pads, saves) general enough that a second mode can reuse them.
+   resource and build a whole base from them. Begun on 14 November, once Story mode's bars were
+   reached (see "Base mode" below for its plan and state).
 
 The owner has since agreed to this being added to the repository's `CLAUDE.md`, and it is there.
 
@@ -810,6 +810,47 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
 | N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
+## Base mode
+
+The owner's second mode: "a build-a-base mode where you never get rescued", "sorta like
+valheim-style game (but no enemies I guess)", "you start basically at the beginning of the book but
+can build a whole mars base (lots more resources things to build etc)". It was begun on 14 November,
+when the eleventh picture review and the ninth interface review put every Story bar at NEARLY or
+better.
+
+**What it is.** The same storm, the same holed suit, the same Hab and the same first sols as the
+story. What differs is that nobody is coming: the next ship that could reach Mars is four years out.
+So the long game is not a drive to the ascent vehicle but a base that can keep one man alive for
+good, built from what the planet itself holds. The loop is Valheim's without the fighting: go out
+and find a material, bring it home, build the station that works it, and what that station makes
+opens the next thing to build.
+
+**Where the materials are is real.** Each is found where orbiters and rovers found it: hematite on
+Meridiani, silica in Gusev and Nili Patera, clays at Mawrth Vallis, Jezero and Gale, sulfates in the
+floor of Valles Marineris, basalt on the volcanic provinces, ice at the poles and the mid-latitude
+scarps. A base anywhere has the common ones near it; the rare ones are a rover journey, which is
+what the whole explorable planet is for.
+
+**The plan, in four parts.** Each is built, tested, reviewed at phone size and published to the
+preview before the next.
+
+| Part | What | State |
+| --- | --- | --- |
+| A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built; `tools/tests/base.mjs` (14 checks) |
+| B | **Materials.** Basalt, iron ore, silica, clay, sulfate and perchlorate beside the scrap, ice and soil the story has; deposits placed by real region and shown on the map once found; a way to break and carry them. | next |
+| C | **Stations.** A kiln (bricks from clay and soil), a smelter (iron), a glassworks (panes from silica), an electrolyser and a Sabatier reactor (oxygen and methane from water and the air). Each a Blender model, each with a recipe sheet on the Colony screen. | not started |
+| D | **Buildings and milestones.** A solar field, a battery bank, a water tank, a large greenhouse, a second living module, a garage, a comms tower, a landing pad; set down where the player chooses. Milestones in the journal in place of the story's steps (a larder that lasts a season, water that closes its own loop, power through a dust storm). | not started |
+
+**While it is being built it is not on the title.** New Game goes straight to the story unless the
+address ends in `?base` (or a base has already been saved in that browser). The card for it says
+"Being built". The gate comes off when part D has been reviewed.
+
+**Its bar.** Story mode's bars hold for it unchanged (it is the same world, drawn the same way). Its
+own: an hour of things to do past the story's opening before the player runs out of new things to
+build; every new sheet inside the iPhone's safe area at both phone sizes; a base saved in one build
+loads in the next; and the story plays exactly as it did (the whole suite, which is the story's,
+passes with the base's code in it).
+
 ## Open items
 
 | # | Item | State |
@@ -825,7 +866,7 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | 33 | Act on the sixth interface review (K1–K20 above) | open: a helper next |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
-| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | after story mode is finished |
+| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | begun: the first of four parts is built (see "Base mode" above) |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | measured on the owner's iPhone on an older build (60 fps average at a dynamic scale of 0.64; see the bar); to be measured again on the current build. Laptop: not measured |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |

@@ -13,7 +13,7 @@ import { syncAllVisuals } from './visuals.js';
 // Checkpoints and the saved game.
 export function serializeState() {
   return {
-    v: SAVE_VERSION, diff: S.diff, spawn: { lat: World.spawn.lat, lon: World.spawn.lon },
+    v: SAVE_VERSION, kind: S.kind, diff: S.diff, spawn: { lat: World.spawn.lat, lon: World.spawn.lon },
     sol: S.sol, tod: S.tod,
     o2: S.o2, water: S.water, food: S.food, potatoes: S.potatoes, power: S.power,
     health: Math.max(S.health, 50), suit: suitCap(), roverPower: S.roverPower, roverO2: S.roverO2,
@@ -109,9 +109,11 @@ export function restoreCheckpoint() {
   log(`Woke at dawn, Sol ${S.sol}. Bad dream. Probably prophetic. Let's not test it.`);
 }
 export const SAVE_KEY = 'stranded2-save';
+/** Each kind of game has a save of its own: a story run and a base can both be kept. */
+export const saveKey = (kind) => (kind === 'base' ? SAVE_KEY + '-base' : SAVE_KEY);
 export function saveGame() {
   if (S.over || !S.started) return;
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(serializeState())); } catch (e) {}
+  try { localStorage.setItem(saveKey(S.kind), JSON.stringify(serializeState())); } catch (e) {}
 }
 /** Save format history:
  *    2  the first full-planet version (analytic terrain)
@@ -129,15 +131,17 @@ export function migrateSave(d) {
   }
   return d.v === SAVE_VERSION ? d : null;
 }
-export function loadSavedData() {
+export function loadSavedData(kind = 'story') {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(saveKey(kind));
     if (!raw) return null;
-    return migrateSave(JSON.parse(raw));
+    const d = migrateSave(JSON.parse(raw));
+    if (d) d.kind = kind;                // (the slot says which game it is: saves from before there were two have no word for it)
+    return d;
   } catch (e) { return null; }
 }
 /** True when a save exists but this version of the game cannot read it (say so on the title). */
 export function unreadableSaveExists() {
-  try { return !!localStorage.getItem(SAVE_KEY) && !loadSavedData(); } catch (e) { return false; }
+  try { return ['story', 'base'].some((k) => !!localStorage.getItem(saveKey(k)) && !loadSavedData(k)); } catch (e) { return false; }
 }
-export function wipeSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+export function wipeSave(kind = S.kind) { try { localStorage.removeItem(saveKey(kind)); } catch (e) {} }

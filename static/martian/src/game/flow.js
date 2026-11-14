@@ -1,6 +1,6 @@
 import { canPhoto, enterPhoto } from './photo.js';
 import { log, showOverlay, toast, uiHooks } from '../ui/dom.js';
-import { DIFFICULTIES, S } from './state.js';
+import { DIFFICULTIES, S, isBase, rescueSolFor } from './state.js';
 import { Snd } from '../audio/sound.js';
 import { Save, applyState, checkpoint, loadSavedData, restoreCheckpoint, saveGame, unreadableSaveExists, wipeSave } from './save.js';
 import { tryLock } from './input.js';
@@ -48,7 +48,7 @@ export function showPause() {
   if (S.uiOpen || S.over || !S.started || S.mode === 'cutscene') return;
   saveGame();
   showPauseMenu({
-    sol: S.sol, time: fmtClock(), diffName: DIFFICULTIES[S.diff].name, rescueSol: S.rescueSol,
+    sol: S.sol, time: fmtClock(), diffName: DIFFICULTIES[S.diff].name, rescueSol: S.rescueSol, base: isBase(),
     region: regionName(_v1.copy(player.pos).normalize()), uplink: !!S.pf.connected,
     onResume: () => tryLock(),
     onPhoto: canPhoto() ? () => { enterPhoto(); } : null,
@@ -64,9 +64,10 @@ menuHooks.save = saveGame;
 // 33. BOOT & START
 // ============================================================
 export let bootPhase = 'init';
-export function newGame(diffKey) {
+export function newGame(diffKey, kind = 'story') {
+  S.kind = kind === 'base' ? 'base' : 'story';
   S.diff = diffKey;
-  S.rescueSol = DIFFICULTIES[diffKey].rescueSol;
+  S.rescueSol = rescueSolFor(diffKey, S.kind);
   S.drainMult = DIFFICULTIES[diffKey].drain;
   initStorms();                                   // before pickSpawn: it rejects storm cells
   World.spawn = pickSpawn(Math.random);
@@ -89,8 +90,9 @@ export function newGame(diffKey) {
   checkpoint();
 }
 export function continueGame(saved) {
+  S.kind = saved.kind === 'base' ? 'base' : 'story';
   S.diff = saved.diff || 'survival';
-  S.rescueSol = DIFFICULTIES[S.diff].rescueSol;
+  S.rescueSol = rescueSolFor(S.diff, S.kind);
   S.drainMult = DIFFICULTIES[S.diff].drain;
   World.spawn = { lat: saved.spawn.lat, lon: saved.spawn.lon, v: llToVec(saved.spawn.lat, saved.spawn.lon) };
   buildWorldAtSpawn();
@@ -108,6 +110,8 @@ export function continueGame(saved) {
     setTimeout(() => log('Survey update: the planet is now built from real orbital elevation data. Same Mars, truer ground — your colony has been re-seated on it.', 'nasa'), 2500);
   }
 }
+/** Whether the game with no rescue is offered on the title (see showStart). */
+export function baseOffered() { try { return new URLSearchParams(location.search).has('base'); } catch (e) { return false; } }
 export let worldBuilt = false;
 export function buildWorldAtSpawn() {
   if (worldBuilt) return;
@@ -119,15 +123,16 @@ export function buildWorldAtSpawn() {
 }
 
 export function showStart() {
-  const saved = loadSavedData();
+  const saved = loadSavedData('story'), savedBase = loadSavedData('base');
   const audio = () => { Snd.init(); Snd.resume(); applyAudioSettings(); };
+  const card = (d) => (d ? { sol: d.sol, diffName: DIFFICULTIES[d.diff || 'survival'].name, region: regionName(llToVec(d.spawn.lat, d.spawn.lon)) } : null);
   showTitle({
-    saved: saved ? {
-      sol: saved.sol, diffName: DIFFICULTIES[saved.diff || 'survival'].name,
-      region: regionName(llToVec(saved.spawn.lat, saved.spawn.lon)),
-    } : null,
+    saved: card(saved), savedBase: card(savedBase),
+    // (Base mode is being built. Until it has its own things to gather and build it is offered only to a player who
+    //  asks for it with "?base" on the address, or who already has a base saved.)
+    base: baseOffered() || !!savedBase,
     unreadable: unreadableSaveExists(),
-    onContinue: () => { audio(); continueGame(saved); },
-    onNewGame: (diffKey) => { audio(); newGame(diffKey); },
+    onContinue: (kind) => { audio(); continueGame(kind === 'base' ? savedBase : saved); },
+    onNewGame: (diffKey, kind) => { audio(); newGame(diffKey, kind); },
   });
 }

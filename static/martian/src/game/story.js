@@ -1,4 +1,4 @@
-import { DIFFICULTIES, S } from './state.js';
+import { DIFFICULTIES, S, isBase } from './state.js';
 import { syncAllVisuals } from './visuals.js';
 import { Snd } from '../audio/sound.js';
 import { checkpoint, saveGame, wipeSave } from './save.js';
@@ -24,10 +24,16 @@ export function connectPathfinder() {
     // (it was signed "— JPL" under the name HOUSTON)
     ['n', 'MARK? MARK, IS THAT YOU? This is Houston. We\'re receiving Pathfinder telemetry. The whole world is watching, Mark.'],
     ['w', 'Alive and well. Ish. Growing potatoes on a dead planet. Air holds, food\'s tight, morale is potato-based.'],
-    ['n', `Copy. New plan: the MAV, Ares 4\'s rocket, is fuelled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
-    ['w', S.sol >= S.rescueSol
-      ? `So the plan is "drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`
-      : `So the plan is "don\'t die for ${S.rescueSol - S.sol} more sol${S.rescueSol - S.sol === 1 ? '' : 's'}, then drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`],
+    ...(isBase() ? [
+      // (the game with no rescue: the same call, and the other answer)
+      ['n', `Copy. I will not dress this up, Mark. The Hermes cannot come back, and the next ship that can reach you is four years out. The MAV in Schiaparelli, ${mavDist} from you, has no one to meet it. We can drop you supplies. We cannot lift you off.`],
+      ['w', 'So the plan is not "survive on Mars." It is "live on Mars." Fine. I am going to need a bigger farm.'],
+    ] : [
+      ['n', `Copy. New plan: the MAV, Ares 4\'s rocket, is fuelled and standing in Schiaparelli crater, ${mavDist} from your position. Hermes swings back for a Sol ${S.rescueSol} intercept. Survive, drive, launch. We\'ll be there.`],
+      ['w', S.sol >= S.rescueSol
+        ? `So the plan is "drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`
+        : `So the plan is "don\'t die for ${S.rescueSol - S.sol} more sol${S.rescueSol - S.sol === 1 ? '' : 's'}, then drive ${mavDist} and ride a rocket somebody else parked." I\'ve had worse weekends.`],
+    ]),
     ['n', 'We\'re also uploading survey tasks — old landers with parts worth salvaging. Help us close some files, we drop supplies. And Mark: everything you type is broadcast live on Earth. Language.'],
     ['w', 'Acknowledged. [REDACTED BY NASA]. [ALSO REDACTED]. Boy, am I glad you warned me.'],
   ];
