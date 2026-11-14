@@ -309,7 +309,8 @@ export class Vfx {
         void main() {
           float a = texture2D(uMap, gl_PointCoord).a * vA;
           if (a < 0.004) discard;
-          gl_FragColor = vec4(uLight * mix(vec3(0.62, 0.34, 0.20), vec3(1.0, 0.9, 0.8), vTone), a);
+          // (dust in the air is paler than the ground it rose from: darker, the rover's tail was a brown smudge)
+          gl_FragColor = vec4(uLight * mix(vec3(0.80, 0.52, 0.34), vec3(1.0, 0.9, 0.8), vTone), a);
           #include <fog_fragment>
         }`,
     });

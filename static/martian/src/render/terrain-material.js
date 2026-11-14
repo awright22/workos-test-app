@@ -32,7 +32,10 @@ const F = (x) => x.toFixed(6);
 export const GLSL_GROUND_GRADE = /* glsl */`
   vec3 groundGrade(vec3 alb) {
     float lum = max(dot(alb, vec3(0.3, 0.55, 0.15)), 0.004);
-    vec3 hue = mix(vec3(1.0), alb / lum, 0.74) * vec3(1.20, 0.97, 0.76);
+    // (the dark ground of Mars is basalt sand, greyer than the bright dust and not a deeper red: graded as the dust
+    // is, the dark regions came out a murky maroon that turned purple in shade)
+    float dark = 1.0 - smoothstep(0.10, 0.24, lum);
+    vec3 hue = mix(vec3(1.0), alb / lum, mix(0.74, 0.46, dark)) * mix(vec3(1.20, 0.97, 0.76), vec3(1.08, 0.98, 0.88), dark);
     return hue * (0.40 * pow(lum, 0.55));
   }
   // polar ice: in the orbital map it is the only ground that is both bright and nearly colourless
@@ -427,6 +430,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain38' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain39' + (o.fine !== false ? 'F' : '');
   return mat;
 }

@@ -3397,7 +3397,7 @@ def build_schiaparelli_wreck():
     a torn edge (bright, fresh metal). Every sheet has thickness and both its faces."""
     weathered()
     mat('carbon', color=(0.035, 0.035, 0.04), metallic=0.3, roughness=0.5)             # carbon-fibre skins of the deck and walls
-    mat('ejecta', color=(0.60, 0.44, 0.33), metallic=0.0, roughness=1.0)               # soil from under the dust, thrown out in rays
+    mat('ejecta', color=(0.50, 0.36, 0.265), metallic=0.0, roughness=1.0)              # soil from under the dust, thrown out in rays
     mat('aluminium_bare', color=(0.70, 0.71, 0.74), metallic=0.6, roughness=0.5)       # torn structure: brighter than a lander that has only stood in the dust
     root = part('schiaparelli_wreck')
     k, w = Kit(root), Wound(root)
@@ -3717,10 +3717,10 @@ def build_schiaparelli_wreck():
             # little pyramid, and twenty-eight of them were a board game)
             n, a0 = (7 if m < 2 else 6), rng.uniform(0.0, TAU)
             lean = Vector((rng.uniform(-0.25, 0.25) * sz, rng.uniform(-0.25, 0.25) * sz, 0.0))
-            hgt = sz * rng.uniform(0.55, 0.9)
+            hgt = sz * rng.uniform(0.28, 0.6)                                # (low and spread: taller, they were gumdrops)
 
             def ring(rad, z, half=0.0, shift=1.0):
-                return [ej.verts.new(c + lean * shift + Vector((cos(a0 + TAU * (q + half) / n), sin(a0 + TAU * (q + half) / n), 0.0)) * (rad * rng.uniform(0.78, 1.15))
+                return [ej.verts.new(c + lean * shift + Vector((cos(a0 + TAU * (q + half) / n), sin(a0 + TAU * (q + half) / n), 0.0)) * (rad * rng.uniform(0.6, 1.3))
                                      + Vector((0, 0, z * rng.uniform(0.85, 1.1)))) for q in range(n)]
             crown, waist, foot = ring(sz * 0.38, hgt, 0.5), ring(sz * 0.82, hgt * 0.55, 0.0, 0.5), ring(sz * 1.2, -0.02, 0.5, 0.0)
             top = ej.verts.new(c + lean + Vector((0, 0, hgt * 1.08)))

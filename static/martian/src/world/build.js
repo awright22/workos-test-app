@@ -580,7 +580,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) drape(groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft'), 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) drape(groundStain(g, o.stain, o.blast ? 0x24170f : 0x20150d, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft'), 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -619,7 +619,7 @@ export function buildStorySites() {
     // those that came down on engines left their blast in the dust; those that bounced in on airbags, a scuffed patch
     // (the rovers drove away from where they were set down, and the airbag landers rolled to where they lie)
     const engines = /Viking|Mars 3|Mars 6|Phoenix|InSight/.test(L.name);
-    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 5.2 : 3.4, blast: engines, stainOpacity: engines ? 0.3 : 0.2 });
+    addSiteModel(g, LANDER_MODEL[L.name], { stain: L.name === 'Schiaparelli EDM' ? 0 : engines ? 5.2 : 3.4, blast: engines, stainOpacity: engines ? 0.24 : 0.16 });
     if (L.name === 'Perseverance') addSiteModel(g, 'ingenuity', { at: [3.2, 2.1], yaw: 0.7 });     // it brought a helicopter
     World.landers.push({ data: L, group: g });
   }
