@@ -212,7 +212,16 @@ export class Planet {
       if (d >= p.r + p.blend) continue;
       let w = d <= p.r ? 1 : 1 - (d - p.r) / p.blend;
       w = w * w * (3 - 2 * w);
-      if (w > _padW) _padW = w;
+      // How trodden the ground is here, which is what the shader is told: on a big site that is its middle, fading
+      // out along a ragged edge well inside the level ground. (It was told the pad's own weight, so the whole level
+      // disc was smooth dark soil with no ripples in it, and where it met the land a low sun drew a ruled line:
+      // dark flat ground on one side, bright rippled sand on the other. Four review rounds had that line.)
+      let wear = w;
+      if (p.r >= 12) {
+        const t = (d * (1 + 0.3 * gnoise3(x * R / 19 + 7.7, y * R / 19 - 2.1, z * R / 19 + 4.3)) - p.r * 0.34) / (p.r * 0.46);
+        wear = t <= 0 ? 1 : t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
+      }
+      if (wear > _padW) _padW = wear;
       r0 += (p.h - r0) * w;
     }
     return r0;

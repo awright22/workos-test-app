@@ -220,7 +220,8 @@ function buildColumn(scene, smokeU) {
         vec2 d = vec2(cos(a), sin(a));
         // it swells fast and then slowly; wider where the air is thin; and at the ground it splashes
         float rad = (1.2 + 5.0 * (1.0 - exp(-age * 0.9)) + 2.2 * pow(age, 0.75)) * (1.0 + 1.3 * smoothstep(200.0, 900.0, hgt));
-        rad += 9.0 * exp(-hgt / 7.0) * min(1.0, age * 0.45);
+        // (no skirt at its foot: the pad's dust is the skirt. Flared at the ground it was a draped bell between the
+        // flame and the ground, with folds in it.)
         vec3 q = vec3(d * 1.9, hgt / 9.0 - age * 0.10);
         float n = (vnoise(q) - 0.5) * 1.2 + (vnoise(q * 2.3 + 7.1) - 0.5) * 0.8;
         float r = rad * (1.0 + 0.55 * n) * smoothstep(0.0, 0.4, age + 0.04);
@@ -240,7 +241,7 @@ function buildColumn(scene, smokeU) {
         // (and it does not reach the ground as a solid: its foot is the dust the skirt throws out. A wide foot to the
         // tube, seen from the pad, was a tent of cloth with fold lines.)
         // (and it does not hang for half a minute as a thing with an edge: in this thin air it is gone in a dozen seconds)
-        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(6.0, 17.0, age)) * smoothstep(0.0, 0.25, age) * smoothstep(1.0, 9.0, hgt);
+        vAlpha = (1.0 - smoothstep(260.0, 950.0, hgt)) * (1.0 - smoothstep(5.0, 14.0, age)) * smoothstep(0.0, 0.25, age) * smoothstep(4.0, 22.0, hgt);
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
@@ -255,15 +256,16 @@ function buildColumn(scene, smokeU) {
         float fine = vnoise(vP * 0.5 + vec3(0.0, vAge * 0.15, 0.0)) * 0.6 + vnoise(vP * 1.25 + 3.7) * 0.4;
         // (soft where it turns away from the eye: a cloud has no outline)
         // (torn, with thin places in it: evenly thick it was a ribbon of cloth, and from far off a white stalagmite)
-        float a = vAlpha * smoothstep(0.02, 0.20 + 0.24 * fine, facing) * (0.30 + 0.95 * smoothstep(0.25, 0.75, fine));
+        float a = vAlpha * smoothstep(0.03, 0.42 + 0.30 * fine, facing) * (0.22 + 0.95 * smoothstep(0.25, 0.75, fine));
         if (a < 0.004) discard;
-        float lit = smoothstep(-0.5, 0.85, dot(n, uSunV)) * (0.66 + 0.68 * fine);
+        // (lit softly, as smoke is, light going some way through it: lit as a solid its billows were lumps of wax)
+        float lit = mix(0.55, smoothstep(-0.5, 0.85, dot(n, uSunV)), 0.5) * (0.74 + 0.52 * fine);
         // (pale, and of the dust it rose through, not white: nothing in this engine's breath makes a white cloud)
         vec3 base = mix(vec3(0.52, 0.31, 0.17), vec3(0.88, 0.78, 0.66), smoothstep(3.0, 40.0, vHgt));
         vec3 col = base * (uAmb * (0.72 + 0.28 * dot(n, uUpV)) + uSunCol * lit);
         vec3 gd = vP - uGlowPos;
         col += uGlowCol * (uGlow * 0.5 / (1.0 + dot(gd, gd) / 260.0));
-        gl_FragColor = vec4(col, a * 0.86);
+        gl_FragColor = vec4(col, a * 0.62);
         #include <fog_fragment>
       }`,
   });
