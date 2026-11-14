@@ -9,7 +9,7 @@ import path from 'node:path';
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const phone = process.argv.includes('--phone');
 const [W, H] = (phone ? '844x390' : arg('--size', '1280x720')).split('x').map(Number);
-const times = arg('--at', '4.9,5.9,6.8,8.4,10.6,12.5,15.5,19.6,20.6,22.6,27.5,30.0').split(',').map(Number);
+const times = arg('--at', '4.9,5.9,7.4,9.4,10.4,12.5,15.5,18.4,20.2,21.2,22.6,24.4,25.6,27.6,29.0,30.4,33.0').split(',').map(Number);
 const hour = Number(arg('--hour', '9'));
 const dir = path.join(outDir, phone ? 'film-phone' : 'film');
 await mkdir(dir, { recursive: true });

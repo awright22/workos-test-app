@@ -227,6 +227,7 @@ function tick(dt) {
   { const sk = ctx.engine.sky; setStainLight(Math.min(1, 0.05 + sk.sunIntensity / 2.6 + sk.ambientSky.r * 0.9)); }
   setGlowLight();
   roverLights(dt);
+  if (World.mavNose && !S.won) World.mavNose.visible = !S.flags.mavStripped;     // (a loaded run had its nose cone back on)
   if (World.habViewMats) setGlow(World.habViewMats, Math.max(0.02, ctx.engine.sky.day * (1 - 0.75 * (S.started ? S.storm.i : 0))));
   const strobe = Math.sin(blinkT * 6) > 0.7 ? 1 : 0;
   for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }

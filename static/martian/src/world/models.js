@@ -471,10 +471,11 @@ function prepare(gltf, name) {
         o.castShadow = false;                     // cells lie on a backing sheet that already casts
         if (dust >= 0.45) { m.color.lerp(_dustTint, dust * 0.75); m.roughness = Math.max(m.roughness, 0.7); m.metalness *= 0.4; }   // decades of dust on the old landers
       } else if (name === 'ice') {
-        // water ice: cold, a little glossy, and never quite as dark as rock in shadow
-        // (blue enough to read as ice under a butterscotch sky, which turns anything white to cream)
-        m.color.setRGB(0.52, 0.74, 1.0); m.roughness = 0.14; m.metalness = 0; m.envMapIntensity = 2.2;
-        m.emissive.setRGB(0.03, 0.075, 0.15); m.emissiveIntensity = 1;
+        // water ice: cold, with a soft sheen, and never quite as dark as rock in shadow
+        // (blue enough to read as ice under a butterscotch sky, which turns anything white to cream; and not a
+        // mirror: old ice on Mars is frosted by its own wasting, and polished it was cut glass)
+        m.color.setRGB(0.80, 0.90, 1.0); m.roughness = 0.42; m.metalness = 0; m.envMapIntensity = 1.1;
+        m.emissive.setRGB(0.012, 0.03, 0.06); m.emissiveIntensity = 1;
       } else if (name.startsWith('visor')) {
         // the gold visor is a mirror: it shows the sky, the horizon and the sun
         m.color.setRGB(0.80, 0.50, 0.14); m.metalness = 1; m.roughness = 0.07; m.envMapIntensity = 1.9;

@@ -42,6 +42,20 @@ const model = (where, dist, bearing, hours, o = {}) => g.page.evaluate(`(async (
   G.ctx.engine.camera.position.copy(pos);
   await G.settle();
 })()`);
+// an ice outcrop from in front of its face, a little to one side (each site is turned its own way: the face looks down the model's +Z)
+const iceFace = (pick, hours) => g.page.evaluate(`(async () => {
+  const G = window.__MG;
+  const site = (${pick.toString()})(G), pos = site.group.position;
+  const up = pos.clone().normalize(), e = up.clone().set(-up.z, 0, up.x).normalize(), n = up.clone().cross(e);
+  const d = up.clone().set(0, 0, 1).applyQuaternion(site.group.quaternion);
+  const b = Math.atan2(d.dot(e), d.dot(n)) * 180 / Math.PI;
+  G.tpAround(pos, 4.6, b + 78);
+  G.setLocalTime(${hours});
+  G.tick(0.05, 40);
+  G.photo(pos, 8.2, b + 24, 1.9, 0.6);
+  G.ctx.engine.camera.position.copy(pos);
+  await G.settle();
+})()`);
 // each scene: set the state through the debug hook, let the terrain settle, take the picture
 const scenes = {
   'hab-morning': async () => ev(async (G) => { G.S.firstPerson = false; G.tpLocal(7, 24, 0); G.setLocalTime(8.2); G.look(-0.06); G.tick(0.05, 40); await G.settle(); }),
@@ -112,6 +126,9 @@ const scenes = {
   'pod': () => model((G) => { if (!G.World._shotPod) G.World._shotPod = G.dropSupplyPod({ scrap: 1 }, 'Open supply pod'); return G.World._shotPod.group.position; }, 5.5, 60, 9, { stand: [2.8, 140] }),
   'pod-open': () => model((G) => { const p = G.World._shotPod; p.taken = true; G.syncAllVisuals(); return p.group.position; }, 4.8, 150, 9, { stand: [2.6, 70], height: 2.2 }),
   'ice': () => model((G) => G.World.iceSites[0].group.position, 10, 40, 11, { stand: [4.6, 110], height: 2.4 }),
+  // ... and one out on the northern plain, on red ground, from in front of its face
+  'ice-plain': () => iceFace((G) => G.World.iceSites.find((x) => !x.korolev) || G.World.iceSites[0], 13.5),
+  'ice-face': () => iceFace((G) => G.World.iceSites[0], 11),
   ...Object.fromEntries([['Pathfinder', 6.5, 30], ['Viking 1', 6.5, 60], ['Mars 3', 5.5, 100], ['Beagle 2', 4.5, 20], ['Spirit', 5.5, 130], ['Phoenix', 6.5, 70], ['Curiosity', 7, 50],
     ['Perseverance', 8.5, 110], ['InSight', 7, 40], ['Zhurong', 6.5, 140], ['Schiaparelli EDM', 6, 80]].map(([name, dist, bearing]) => [
     'lander-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
