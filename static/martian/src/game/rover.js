@@ -109,7 +109,16 @@ export function roverLights(dt) {
   if (!rv) return;
   const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5, driven = S.mode === 'rover';
   rv.headlight.intensity = lerp(rv.headlight.intensity, driven && dim ? 11 : 0, damp(0.15, dt));
-  for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (dim && (driven || m.userData.marker) ? 1.6 : 0.12);
+  // (The headlamps are seen from in front of the rover, not through it: from the chase camera their lit lenses showed
+  //  through the cab's glass as two haloed dots, with the road ahead dark between them.)
+  let ahead = 1;
+  const cam = ctx.engine && ctx.engine.camera;
+  if (cam && rv.model && rv.model.inner) {
+    _fw.set(0, 0, 1).transformDirection(rv.model.inner.matrixWorld);
+    _w.copy(cam.position).sub(rv.group.position).normalize();
+    ahead = clamp((_fw.dot(_w) + 0.1) / 0.35, 0, 1);
+  }
+  for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (dim && (driven || m.userData.marker) ? 1.6 * (m.userData.marker ? 1 : 0.04 + 0.96 * ahead) : 0.12);
   rv.markers = lerp(rv.markers, dim ? 1 : 0, damp(0.15, dt));
 }
 
