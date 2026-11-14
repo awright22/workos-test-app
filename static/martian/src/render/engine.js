@@ -437,10 +437,16 @@ function airHaze() {
     // rim has a far floor, not a pit with its bottom as sharp as its lip. (Not from the air: from there all is below.)
     float fogDeep = 1.0 + 1.3 * smoothstep(18.0, 120.0, fogHigh - vFogAlt) * (1.0 - smoothstep(500.0, 2000.0, fogHigh));
     float fogThick = fogNear * fogAir * fogDeep * vFogDepth;
-    float fogFactor = 1.0 - exp(-fogThick * fogThick);
+    // (it gathers from the start and not all at once: with the square alone the ground was clear red to the first
+    // ridge and cream beyond it, along one line)
+    float fogFactor = 1.0 - exp(-(0.3 * fogThick + 0.8 * fogThick * fogThick));
     // (from sixty metres: on a plain that swells a little the skyline is a crest a hundred metres off, nearer than
     // the true horizon, and it stayed a ruler's edge with stones standing on it)
-    float fogBand = (1.0 - smoothstep(0.012, 0.05, abs(vFogEl - fogFar))) * smoothstep(60.0, 170.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
+    // (what stands up from the horizon is in that haze too, to a dozen degrees above the line: boulders out there
+    // stood dark and sharp on a horizon that had itself melted away)
+    float fogLine = vFogEl - fogFar;
+    float fogNearLine = fogLine > 0.0 ? 1.0 - smoothstep(0.05, 0.22, fogLine) : 1.0 - smoothstep(0.012, 0.05, -fogLine);
+    float fogBand = fogNearLine * smoothstep(60.0, 170.0, vFogDepth) * 0.72 * (1.0 - smoothstep(1500.0, 9000.0, fogHigh));
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - (1.0 - fogFactor) * (1.0 - fogBand));
   #endif`;
 }

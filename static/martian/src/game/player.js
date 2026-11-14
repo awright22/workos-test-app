@@ -286,11 +286,13 @@ export function updateAstronaut(dt) {
     }
   }
   // look where the camera looks: a little through the chest, more through the head
-  const look = clamp(player.pitch + 0.1, -0.7, 0.6);
+  // (It is the head that looks, and the chest hardly at all: with a fifth of the camera's tilt in his chest, and a
+  // little added when the camera was level, he stood rocked back on his heels five degrees whenever it looked up.)
+  const look = clamp(player.pitch, -0.7, 0.6);
   if (!driving && !working && !S.over) {
     const yawTo = clamp(-wrap(player.face), -1.1, 1.1);          // head turns toward the camera's heading
-    if (anim.bones.chest) anim.bones.chest.rotateX(-look * 0.18);
-    if (anim.bones.head) { anim.bones.head.rotateX(-look * 0.4); anim.bones.head.rotateY(yawTo * 0.55); }
+    if (anim.bones.chest) anim.bones.chest.rotateX(-look * 0.06);
+    if (anim.bones.head) { anim.bones.head.rotateX(-look * 0.5); anim.bones.head.rotateY(yawTo * 0.55); }
   }
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);

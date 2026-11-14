@@ -36,6 +36,7 @@ const model = (where, dist, bearing, hours, o = {}) => g.page.evaluate(`(async (
   const G = window.__MG;
   const pos = (${where.toString()})(G);
   G.tpAround(pos, ${(o.stand || [3, bearing + 75])[0]}, ${(o.stand || [3, bearing + 75])[1]});
+  G.look(0);                 // (he stands as he stands, not looking wherever the scene before left the camera)
   G.setLocalTime(${hours});
   G.tick(0.05, 40);
   G.photo(pos, ${dist}, ${bearing}, ${o.height || 1.7}, ${o.aim || 0.9});
@@ -50,6 +51,7 @@ const iceFace = (pick, hours) => g.page.evaluate(`(async () => {
   const d = up.clone().set(0, 0, 1).applyQuaternion(site.group.quaternion);
   const b = Math.atan2(d.dot(e), d.dot(n)) * 180 / Math.PI;
   G.tpAround(pos, 4.6, b + 78);
+  G.look(0);
   G.setLocalTime(${hours});
   G.tick(0.05, 40);
   G.photo(pos, 8.2, b + 24, 1.9, 0.6);
