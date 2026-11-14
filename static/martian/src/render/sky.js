@@ -74,7 +74,9 @@ const GLSL_SKY = /* glsl */`
     // the air seen edge-on from above: a thin band of haze along the limb, lit only where the
     // sun reaches that part of the planet
     vec3 nearest = normalize(uUp * camR - v * (camR * mu));
-    float limbLit = smoothstep(-0.12, 0.30, dot(nearest, uSun));
+    // (it dies away over half the way round to midnight, as the air's own twilight does: ended in a dozen degrees,
+    // the glow stopped at a visible corner in the planet's outline)
+    float limbLit = pow(smoothstep(-0.55, 0.30, dot(nearest, uSun)), 1.6);
     // (thin: a line of haze, tan against the planet and bluer where it thins into space)
     float above = max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.16).toFixed(1)};
     float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-above);

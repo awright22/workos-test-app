@@ -29,6 +29,8 @@ const FINAL_FRAGMENT = /* glsl */`
   uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil;
   uniform vec3 uTint, uVeilCol;
   uniform vec2 uVeilDir;
+  uniform vec4 uHero;
+  uniform float uAspect;
   varying vec2 vUv;
   float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   float vn(vec2 p) {
@@ -60,7 +62,12 @@ const FINAL_FRAGMENT = /* glsl */`
       near = smoothstep(0.38, 0.78, near) * (0.5 + 0.5 * smoothstep(0.85, 0.1, vUv.y));
       float sheet = far * 0.40 + mid * 0.34 + near * 0.42;
       float thick = smoothstep(0.42, 0.8, mid * 0.55 + near * 0.6);
-      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread));
+      // The veil is drawn over the whole picture, but the man is five metres from the eye and the Hab fifty: there is
+      // little dust between the eye and him. So it thins over where he stands, and its streamers pass behind him.
+      // (Drawn across him at full strength they were stripes on his legs.)
+      vec2 hd = (vUv - uHero.xy) * vec2(uAspect, 0.52) / max(uHero.z, 0.001);
+      float clearHere = uHero.w * (1.0 - smoothstep(0.55, 1.25, length(hd)));
+      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread) * (1.0 - 0.72 * clearHere));
       // ... and grains caught by the light as they pass the visor: a flicker of specks, thickest where the dust is
       float speck = hash12(floor(gl_FragCoord.xy * 0.5) + floor(uTime * 30.0) * 7.3);
       col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick));
@@ -113,7 +120,7 @@ class FinalPass extends Pass {
       tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
-      uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) },
+      uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,

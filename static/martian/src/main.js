@@ -36,7 +36,7 @@ import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
-import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
+import { player, astro, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, roverLights, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
@@ -49,6 +49,7 @@ import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } f
 import { showStart, newGame, continueGame } from './game/flow.js';
 import { syncAllVisuals } from './game/visuals.js';
 import { showLoading as loading } from './ui/menus.js';
+const _hero = new THREE.Vector3(), _heroCam = new THREE.Vector3();
 
 /** Set when the graphics preset was neither asked for in the address nor chosen in Settings: the game may then step
  *  a phone down by itself (see frame()). */
@@ -169,6 +170,19 @@ function draw(dt, focus) {
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
   dustUniforms.uRim.value = e.modelRim || 0;
+  // where he stands on the screen, and how large: the storm's veil thins over him (see the final pass)
+  {
+    const hero = e.final.uniforms.uHero.value, a = astro;
+    hero.w = 0;
+    if (a && a.visible && S.started && !S.firstPerson && S.mode !== 'cutscene') {
+      a.updateWorldMatrix(true, false);
+      _hero.set(0, 1.0, 0).applyMatrix4(a.matrixWorld);
+      const dist = _hero.distanceTo(_heroCam.setFromMatrixPosition(e.camera.matrixWorld));
+      _hero.project(e.camera);
+      if (_hero.z < 1 && dist > 0.5) hero.set(_hero.x * 0.5 + 0.5, _hero.y * 0.5 + 0.5, 1.3 / (dist * Math.tan(e.camera.fov * Math.PI / 360)) * 0.5, 1);
+    }
+    e.final.uniforms.uAspect.value = e.camera.aspect;
+  }
   mirrorUniforms.uSkyHor.value.copy(e.sky.fogColor); mirrorUniforms.uSkyTop.value.copy(e.sky.ambientSky);
   if (e.envGround) mirrorUniforms.uGroundLit.value.copy(e.envGround.material.color);
   if (ctx.terrainUniforms) {
