@@ -343,12 +343,17 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // (in the hard beds, the dark ones, that stand as ledges; the soft beds between weather smooth and lie back. One
         //  even net of cracks over the whole wall was dried mud.)
         float hardBed = 1.0 - smoothstep(0.36, 0.60, beds * 0.68 + band.a * 0.32);
-        float faceW = rock * (1.0 - lava) * (1.0 - ice) * (1.0 - smoothstep(380.0, 800.0, viewDist)) * mix(0.22, 1.0, hardBed);
+        // (And only where the land itself stands steep, as the elevation data has it: a dune's slip face is steep
+        //  enough to count as "rock" by its slope, and the joints lay across loose sand as a net of cracks.)
+        float faceW = smoothstep(0.30, 0.75, rock) * smoothstep(0.045, 0.12, landSlope) * (1.0 - lava) * (1.0 - ice) * (1.0 - smoothstep(380.0, 800.0, viewDist)) * mix(0.22, 1.0, hardBed);
         if (faceW > 0.004) {
           vec3 tw = abs(geoN * DETAIL_T);
           tw *= tw; tw *= tw; tw /= tw.x + tw.y + tw.z;
-          float k1 = smoothstep(5.0, 16.0, viewDist) * (1.0 - smoothstep(60.0, 160.0, viewDist));
-          float k2 = smoothstep(40.0, 120.0, viewDist);
+          // (the two sizes together over most of their range, one or the other the stronger from place to place: at
+          //  one cell size a whole wall was one net)
+          float sizeMix = clamp(nMid.a * 1.6 - 0.3, 0.0, 1.0);
+          float k1 = smoothstep(5.0, 16.0, viewDist) * (1.0 - smoothstep(90.0, 220.0, viewDist)) * (0.35 + 0.9 * sizeMix);
+          float k2 = smoothstep(12.0, 45.0, viewDist) * (1.25 - 0.9 * sizeMix);
           // (a face is read from the side or two it is turned to, and each size only over its own range: two to four
           //  reads on most of a wall, not twelve)
           vec4 fx = vec4(0.0), fy = vec4(0.0), fz = vec4(0.0);
@@ -527,6 +532,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain50' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain51' + (o.fine !== false ? 'F' : '');
   return mat;
 }

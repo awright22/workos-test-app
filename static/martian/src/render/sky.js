@@ -56,11 +56,13 @@ const GLSL_SKY = /* glsl */`
       // (and not long: low in the sky a long streak runs to the horizon, and several of them fan out of one point like
       // rays from a lamp behind the hill. So they are drawn out by half, not by more than double, bent more, and
       // are gone below a quarter of the way up.)
-      vec3 c = (q - wAx * (dot(q, wAx) * 0.34)) * 2.6 + vec3(uTime * 0.0016, 0.0, uTime * 0.0011);
-      c += (vnoise(c * 0.7 + 9.3) - 0.5) * 1.7;
-      float wn = vnoise(c) * 0.58 + vnoise(c * 2.4 + 5.1) * 0.42;
+      // (nor round: bent that hard and that short they were pale blots, which a reviewer took for dirt on the lens. Drawn
+      //  out by nearly two to one, bent a little, with a finer grain in them, and fainter.)
+      vec3 c = (q - wAx * (dot(q, wAx) * 0.46)) * 2.6 + vec3(uTime * 0.0016, 0.0, uTime * 0.0011);
+      c += (vnoise(c * 0.7 + 9.3) - 0.5) * 1.2;
+      float wn = vnoise(c) * 0.50 + vnoise(c * 2.4 + 5.1) * 0.32 + vnoise(c * 6.1 + 2.7) * 0.18;
       float wisp = smoothstep(0.52, 0.84, wn) * smoothstep(0.12, 0.46, mu) * (1.0 - smoothstep(0.55, 0.95, mu) * 0.6) * (1.0 - uDust) * day;
-      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * 1.26, 0.22 * wisp) * (1.0 + 0.06 * wisp);
+      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * 1.26, 0.17 * wisp) * (1.0 + 0.05 * wisp);
     }
     // night: the faint cool light of a dusty sky under the stars, a little brighter at the horizon
     col += mix(vec3(0.0110, 0.0140, 0.0235), vec3(0.0260, 0.0290, 0.0400), h) * (1.0 - day);
