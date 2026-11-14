@@ -152,7 +152,7 @@ export async function walk(size, o = {}) {
   await ui((U) => {
     U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.');
     U.log('Hab power low. Life support idles at zero. Wipe the panels.', 'alarm');
-    U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
+    U.log('Forecast: a dust cell is drifting near the Hab. Panels will hate it.', 'nasa');
   });
   await sleep(5200);                                              // (past the moment the skipped intro's last objective stays ticked on the list)
   await ev((G) => { G.tick(0.05, 8); });
@@ -216,7 +216,7 @@ export async function walk(size, o = {}) {
   // toasts (each fired once nothing else is showing or queued: fired blind, it was photographed one picture late,
   // and the made-up achievement was one that cannot be earned on Sol 1)
   await toastsDone();
-  await ui((U) => U.toast('ACHIEVEMENT', 'Storm Rider', 'Spend 60 seconds outside in a dust storm'));
+  await ui((U) => U.toast('ACHIEVEMENT', 'Storm Rider', 'Spent 60 seconds outside in a dust storm'));
   await shot('hud-toast-achievement', 700);
   await toastsDone();
   await ui((U) => U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'));

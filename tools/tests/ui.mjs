@@ -180,7 +180,8 @@ if (!onlySize || onlySize === 'play') {
   const jrn = await g.eval(() => ({ lit: window.__lit(), card: window.__card(), btns: window.__btns() }));
   check('first minute: the reclaimer brings WATER, and the numbers bring FOOD and then the Journal, each lit with its own card',
     rec.bars.join() === 'o2,water' && rec.lit.join() === 'water' && food.bars.join() === 'o2,water,food' && food.lit.join() === 'food' && /food/i.test(food.card) &&
-    jrn.lit.join() === 'journal' && /journal/i.test(jrn.card) && jrn.btns.join() === 'journal', { rec, food, jrn });
+    // (the Journal's button comes with the Journal's card: while the card about food is up it is not there yet)
+    food.btns.length === 0 && jrn.lit.join() === 'journal' && /journal/i.test(jrn.card) && jrn.btns.join() === 'journal', { rec, food, jrn });
   // (the plan is on the card he puts down himself, not on a line of the log that passes while he is at a bed)
   check('the numbers: the card says where it all leads (a radio, the rocket in Schiaparelli, the sol), in meals, and the clock then names the rescue',
     /meals left/i.test(sheet.text) && /radio/.test(sheet.later) && /Schiaparelli/.test(sheet.later) && /Sol \d+/.test(sheet.later) && /rescue\s*\d+/i.test(food.clock), { later: sheet.later, clock: food.clock });
@@ -247,7 +248,7 @@ if (!onlySize || onlySize === 'play') {
     Object.assign(G.S.breach, JSON.parse(keep)); G.tick(0.05, 40);
     return out;
   });
-  check('compass: in a breach indoors its one label is where the breach is, and the mission line has the distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0].trim() === 'far wall' && /\d+ m/.test(br.line), br);
+  check('compass: in a breach indoors its one label is where the breach is, and the mission line has the distance', /breach/i.test(br.lead) && br.labels.length === 1 && br.labels[0].trim() === 'desk wall' && /\d+ m/.test(br.line), br);
   // inside, a thing outside is marked at the door with the whole walk; the marker's number is still the line's
   // (forty frames, as for the breach above: the compass looks again at what there is to do every dozen or so, and after
   // two it could still be naming the last place)
@@ -458,7 +459,7 @@ if (!onlySize || onlySize === 'play') {
   //  what morale's change is made of there for the asking, where it was a bracketed sum the length of the screen)
   check('night: the account is headed with the new sol, and says what breakfast took, how long the food lasts, and, asked, why morale moved',
     acct.sol === sol0 + 1 && new RegExp(`\\D${sol0 + 1}\\s*$`).test(acct.head) && acct.notes.some((n) => /^Breakfast: .+\(\d+ meals?, \d+ left\)/.test(n)) &&
-    acct.notes.some((n) => new RegExp(`^Morale: ${Math.round(acct.morale)} of 100`).test(n)) && acct.notes.some((n) => new RegExp(`^Food: (Enough for ${acct.days} sols?\\b|\\d+ meals make ${acct.days} breakfasts?\\b)`).test(n)) &&
+    acct.notes.some((n) => new RegExp(`^Morale: ${Math.round(acct.morale)} of 100`).test(n)) && acct.notes.some((n) => new RegExp(`^Food: (Breakfast for ${acct.days} sols?\\b|\\d+ meals: breakfast for ${acct.days} sols?\\b)`).test(n)) &&
     /another sol alone.*a night in the bunk/i.test(acct.why) && acct.whyHidden && whyShown && acct.tiles.every((t) => !/morale.*%/i.test(t)) && acct.tiles.some((t) => /now \d+\smeals?/.test(t)), { acct, whyShown });
   await g.eval(() => document.querySelector('#mg-panel .sleep .wake').click());
   await sleep(300);
@@ -600,7 +601,7 @@ for (const size of SIZES) {
       G.skipIntro(); G.S.flags.uiBars = true; G.S.inv.candle = 2; G.S.flags.pfRevealed = true; G.S.quests = { viking1: 'active', spirit: 'active' };      // (uiBars: a run with every bar met)
       G.tpNear(G.World.rover.group.position, 3.2); G.setStorm(0.9); G.S.suit = 9; G.tick(0.05, 6);
     });
-    await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the colony. Panels will hate it.', 'nasa');
+    await page.evaluate(() => { const U = window.__UI; U.log('Wiped a panel. Immediately covered in dust myself. The circle of Mars.'); U.log('Hab battery low. Life support idles at zero. Wipe the panels.', 'sys'); U.log('Forecast: a dust cell is drifting near the Hab. Panels will hate it.', 'nasa');
       U.toast('SITE DISCOVERED', 'VIKING 1', 'First American on Mars. Worked for six years. Its biology experiments are still being argued about at conferences.'); });
     await sleep(1500);
     await g.eval((G) => { G.tick(0.05, 2); });

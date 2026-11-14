@@ -35,7 +35,8 @@ export function die(cause) {
     kind: 'death',
     kicker: `Sol ${S.sol} · ${DIFFICULTIES[S.diff].name}` + (iron ? ' · save deleted' : ''),
     title: 'You died on Mars',
-    stats: [['Sols survived', S.sol], ['Driven', `${(S.stats.driven / 1000).toFixed(1)}<small>km</small>`], ['Meals grown', S.stats.potatoes + (S.stats.produce || 0)]],
+    // (the sol he reached, not "13 sols survived" for a death on Sol 13: he saw twelve of them out)
+    stats: [['Sol reached', S.sol], ['Driven', `${(S.stats.driven / 1000).toFixed(1)}<small>km</small>`], ['Meals grown', S.stats.potatoes + (S.stats.produce || 0)]],
     // (what waking at dawn costs is said: it was a button with a sol in it and nothing about what is lost)
     body: cause + (iron ? '\n\nYou knew the deal.' : '\n\nNobody plants the flag on the first try.') +
       (back ? `\n\n<b>Wake at dawn</b> takes you back to the last dawn you saw, on Sol ${back}: what you have done since is undone.` : ''),

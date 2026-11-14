@@ -177,7 +177,8 @@
 .sleep.done .sum { display: block; animation: mg-fade-in .5s both; }
 .sleep .solbig { display: flex; align-items: baseline; justify-content: center; gap: .75rem; font: 600 5rem/1 var(--f-cond); letter-spacing: .04em; }
 .sleep .solbig span { font-size: 1.125rem; letter-spacing: .4em; color: var(--accent); }
-.sleep .deltas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin-top: 1.75rem; background: var(--line-2); border: 1px solid var(--line-2); }
+/* (as many equal columns as there are tiles: the morale tile is not there until its bar is) */
+.sleep .deltas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 1px; margin-top: 1.75rem; background: var(--line-2); border: 1px solid var(--line-2); }
 .sleep .delta { display: flex; flex-direction: column; align-items: center; gap: .375rem; padding: .75rem .5rem .6875rem; background: #0b0a09; }
 .sleep .delta b { font: 600 1.375rem/1 var(--f-cond); letter-spacing: .02em; }
 .sleep .delta b.up { color: var(--ok); }

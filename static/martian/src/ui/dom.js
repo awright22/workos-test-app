@@ -86,6 +86,8 @@ for (const [key, ic, label] of BARS) {
   w.dataset.k = key;
   UI.bars[key] = { wrap: w, fill: w.querySelector('.fl'), val: w.querySelector('.val'), trend: w.querySelector('.tr') };
 }
+// (the guide's mark again, under the bars: it stands there while few bars have arrived, where the panel was an empty box)
+el('span', null, 'help alt', UI.res, '<i>?</i>Guide').setAttribute('aria-hidden', 'true');
 
 UI.compass = el('div', 'mg-compass', null, UI.hud,
   '<div class="strip"><div class="tape"></div><div class="cards"></div><div class="marks"></div></div><div class="caret"></div><div class="dists"></div>');
@@ -395,6 +397,7 @@ function nextToast() {
   //  its own, the Colony button shone while the card beside it was about the oxygenator, and had gone dark by the
   //  time its own card came)
   if (t.lit) t.lit.classList.add('fresh');
+  if (t.shown) t.shown();
   const cur = toastNow = { node, yields: !!t.yields, timer: 0, point: !!t.point, soft: t.soft || 0, since: performance.now(), lit: t.lit || null };
   cur.life = life;
   cur.timer = cardsHeld ? 0 : setTimeout(() => closeToast(cur, false), life);
@@ -421,12 +424,14 @@ export function dropPointer() { if (toastNow && toastNow.point) closeToast(toast
  * up the screen at once if news arrives while it is up. `o.life` is the least time it stays, in milliseconds;
  * `o.soft` is how long it stays when something else is waiting behind it (a long-lived pointer must not hold up
  * the news). `o.point` draws it as a pointer at the panel it stands under on a phone (the bars). `o.lit` is an
- * element (a button, a bar) that is lit while the card is up and not a moment longer.
+ * element (a button, a bar) that is lit while the card is up and not a moment longer. `o.shown` is called when the
+ * card comes up (it may wait its turn behind others). Returns false if the notice was not taken (his life is in the
+ * balance and it does not bear on that).
  */
 export function toast(kicker, title, note, o) {
   // while his life is in the balance (the banner at the top says how), only what bears on it is said
-  if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return;
-  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0, lit: (o && o.lit) || null });
+  if (UI.critical && !/^(next|warning)$/i.test(kicker || '')) return false;
+  toastQueue.push({ kicker, title, note, yields: !!(o && o.yields), life: (o && o.life) || 0, point: !!(o && o.point), soft: (o && o.soft) || 0, lit: (o && o.lit) || null, shown: (o && o.shown) || null });
   if (!toastBusy) nextToast();
   else if (toastNow && toastNow.yields) closeToast(toastNow, true);
   else if (toastNow && toastNow.soft) {
@@ -435,6 +440,7 @@ export function toast(kicker, title, note, o) {
     cur.soft = 0;
     cur.timer = setTimeout(() => closeToast(cur, false), left);
   }
+  return true;
 }
 
 // ------------------------------------------------------------------------------------------

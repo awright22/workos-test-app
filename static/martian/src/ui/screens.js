@@ -89,7 +89,7 @@ const itemName = (k, n) => (ITEM_NAMES[k] || LOOT_NAMES[k] || k) + (/^seed/.test
 const KIT_ICON = { kitSolar: 'solar', kitGreenhouse: 'dome', kitBeacon: 'beacon', kitCache: 'cache' };
 /** Morale a thing gives each dawn, as it is written: whole numbers and halves ("+½", "+1½": "+0.5" sat beside a gauge in whole numbers). */
 const halves = (n) => { const w = Math.floor(n + 1e-6), h = n - w > 0.25; return `${w || !h ? w : ''}${h ? '½' : ''}`; };
-let colonyTab = 'craft';
+let colonyTab = 'craft', colonyChosen = false;
 
 /**
  * Cost as chips: how many of a thing it takes, then how many you have; the missing ones stand out.
@@ -203,7 +203,8 @@ export function renderColony() {
   const craftCards = [];
   for (const r of RECIPES) {
     // (a tab's figure is what he has the materials for, at the Hab or away from it: out of range the figures used to
-    //  go from the tabs, as if what he carried had gone with them. The cards say "Only at the Hab".)
+    //  go from the tabs, as if what he carried had gone with them. The line under the tabs and the page's heading
+    //  say "only at the Hab": every card said it again, four times on one screen.)
     const can = hasCost(r.cost), ok = atHome && can;
     if (can) ready++;
     const have = r.gives ? (S.inv[Object.keys(r.gives)[0]] || 0) : null;
@@ -213,7 +214,7 @@ export function renderColony() {
       `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-r="${r.id}"${ok ? '' : ' disabled'}>Fabricate</button>` +
       // a kit he is carrying can be set down from here too, without a trip to the Inventory tab
       (/^kit/.test(r.id) && have > 0 ? `<button type="button" class="mg-btn small" data-deploy="${r.id.slice(3).toLowerCase()}">Deploy</button>` : '') +
-      `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`]);
+      `<span class="why${can ? '' : ' bad'}">${!can ? chem(esc(missingText(r.cost))) : ''}</span></div></article>`]);
   }
   craft = ranked(craftCards);
   // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
@@ -239,7 +240,7 @@ export function renderColony() {
       `<p class="ds">${chem(esc(u.desc))}</p><div class="cost">${costChips(u.cost, !!gate)}</div>` +
       (gate ? `<div class="rcp-ft"><span class="why gate">${esc(gate)}</span></div></article>`
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-u="${u.id}"${ok ? '' : ' disabled'}>Install</button>` +
-          `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div></article>`)]);
+          `<span class="why${!can ? ' bad' : ''}">${!can ? chem(esc(missingText(u.cost))) : ''}</span></div></article>`)]);
   }
   up = ranked(upCards);
   // (a tab's figure is how many things on its page can be made now, and its page's heading says that figure first:
@@ -261,7 +262,7 @@ export function renderColony() {
         `<span class="badge mood">${icon('mood')}+${halves(c.cheer)} a sol</span>`) + `</div><p class="ds">${esc(c.desc)}</p>` +
       (made ? '' : `<div class="cost">${costHtml}</div>` + (locked ? `<div class="rcp-ft"><span class="why gate">${esc(c.why)}</span></div>`
         : `<div class="rcp-ft"><button type="button" class="mg-btn small${ok ? ' primary' : ''}" data-comfort="${c.id}"${ok ? '' : ' disabled'}>Make</button>` +
-          `<span class="why${block && block !== 'Made' ? ' bad' : ''}">${block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : !atHome ? 'Only at the Hab' : ''}</span></div>`)) +
+          `<span class="why${block && block !== 'Made' ? ' bad' : ''}">${block === 'Not enough materials' ? chem(esc(missingText(c.cost))) : ''}</span></div>`)) +
       '</article>';
     if (made) homeDone += card; else homeCards.push([ok ? 0 : locked ? 2 : 1, card]);
   }
@@ -273,6 +274,10 @@ export function renderColony() {
   // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
   //  this screen and of the journal carries its count the same way, a figure in a pill: there were three styles, a
   //  filled "6 READY", round badges and bare numerals.)
+  // (Until he has picked a tab himself, the screen opens on the fabricator when there is something to build and on
+  //  what he carries when there is not. Its card says "What you carry, and the fabricator", and a first visit opened
+  //  on a fabricator with nothing to build.)
+  if (!colonyChosen) colonyTab = ready ? 'craft' : 'inv';
   const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${colonyTab === id}" data-tab="${id}"${colonyTab === id ? ' data-autofocus' : ''}` +
     `${n ? ` aria-label="${label}: ${n} ready"` : ''}>${icon(ic)}${label}${n ? `<em class="t-num">${n}</em>` : ''}</button>`;
   // (The tabs come first and stay where they are. Away from the Hab a line under them says the fabricator is out of
@@ -289,7 +294,7 @@ export function renderColony() {
     '</div></div>';
   body.querySelectorAll('.pane').forEach((p) => { if (keep[p.id]) p.scrollTop = keep[p.id]; });
 
-  body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { colonyTab = b.dataset.tab; Snd.click(); renderColony(); }));
+  body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { colonyTab = b.dataset.tab; colonyChosen = true; Snd.click(); renderColony(); }));
   body.querySelectorAll('[data-deploy]').forEach((b) => b.addEventListener('click', () => startDeploy(b.dataset.deploy)));
   const bump = (id) => { const c = UI.colonyScreen.querySelector(`[data-card="${id}"]`); if (c) c.classList.add('bump'); };
   body.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {

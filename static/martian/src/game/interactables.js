@@ -85,7 +85,8 @@ addI({
       case 'growing':
         if (pl.watered < cropOf(pl).waterings && pl.growth >= 0.42) return S.water >= BAL.waterPerDose ? true : 'Needs water (5 L): burn hydrazine at the rig';
         // (a reading, not a lock: there is nothing to do to it yet)
-        return statusText(`${cropOf(pl).name}: ${Math.round(pl.growth * 100)}% grown${pl.watered < cropOf(pl).waterings ? ', water again at 50%' : ''}`);
+        // (a bed sown a moment ago is "just planted": "4% grown" on a bed he had only just filled read as a slip)
+        return statusText(`${cropOf(pl).name}: ${pl.growth < 0.08 ? 'just planted' : `${Math.round(pl.growth * 100)}% grown`}${pl.watered < cropOf(pl).waterings ? ', water again at 50%' : ''}`);
       case 'ready': case 'dead': return true;
     }
     return false;
@@ -141,7 +142,7 @@ addI({
               return { label: c.name, icon: id, sub: `Ready in ${c.growSols.toFixed(1)} sols · ${c.waterings} watering${c.waterings > 1 ? 's' : ''} · yields ${c.yield} meal${c.yield === 1 ? '' : 's'}`,
                 // (every crop says what it would be planted from: lettuce alone, with packets and nothing in the pantry, said only that it crunched)
                 note: id === 'potato' ? potatoNote : packets && kept ? `${packets} seed packet${packets > 1 ? 's' : ''} and ${kept} from the pantry.`
-                  : packets ? `${plural(packets, 'seed packet')}. ${c.note}` : `${kept} from the pantry. ${c.note}`,
+                  : packets ? `${plural(packets, 'seed packet')}. ${c.pick || c.note}` : `${kept} from the pantry. ${c.pick || c.note}`,
                 count: `Seed for ${plural(n, 'bed')}`, fn: () => plant(pl, id) };
             }),
           });
@@ -325,7 +326,7 @@ addI({
   // (the first burn takes some of the Hab's air with it. The later ones do not, and say so: with the warning simply
   //  gone, nothing said whether the second would cost air again. "Untried indoors" was the warning's old wording:
   //  untried by whom, and risking what?)
-  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
+  sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'no Hab air lost now' : 'the first may cost Hab air') : ''),
   use: () => {
     S.hydrazine--;
     S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);

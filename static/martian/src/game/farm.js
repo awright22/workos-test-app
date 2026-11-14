@@ -22,7 +22,8 @@ export const CROPS = {
   potato: { name: 'Potatoes', one: 'potato', growSols: BAL.growSols, waterings: BAL.waterings, yield: BAL.potatoYield, model: null, staple: true, cheer: 0,
     note: 'The staple. Planted from a potato or a ration pack.' },
   radish: { name: 'Radishes', one: 'radish', growSols: 1.1, waterings: 1, yield: 3, model: 'crop_radish', cheer: 2,
-    note: 'Quick: ready in about a sol on one watering.' },
+    // (`pick`: what the planting card says of it, where the line above already gives its sols and waterings)
+    note: 'Quick: ready in about a sol on one watering.', pick: 'Something to eat while the potatoes grow.' },
   lettuce: { name: 'Lettuce', one: 'lettuce', growSols: 1.6, waterings: 2, yield: 3, model: 'crop_lettuce', cheer: 3,
     note: 'Something green that crunches.' },
   soy: { name: 'Soybeans', one: 'soy', growSols: 3.0, waterings: 2, yield: 4, model: 'crop_soy', staple: true, cheer: 3,

@@ -750,3 +750,22 @@
    with no plate behind them. (As a second plate under the target's it read as a second destination.) */
 .mg-compact #mg-region { background: none; color: var(--ink-2); text-shadow: 0 1px 2px rgba(0, 0, 0, .85), 0 0 6px rgba(0, 0, 0, .5); }
 .mg-compact #mg-region.enter { animation: none; }
+
+/* Two banners, one above the other, are one width (the wider one's): 112 px over 132 px was two notices that had
+   not been set together. On the small phone every banner is the one width the gap between the gauges and the task
+   card allows, so the slot does not change size from one alarm to the next. */
+.mg-compact #mg-alerts { align-items: stretch; }
+@media (max-width: 760px) { .mg-compact .alert { width: 8.25rem; max-width: 8.25rem; box-sizing: border-box; } }
+
+/* The guide's mark is a caption, not a chip. The whole panel is what is pressed (it is framed as the touch buttons
+   are); a 59 x 28 px box drawn as a button was measured as a button too small to press by three reviews running.
+   While fewer than four bars have arrived it stands under them, where the panel was an empty dark box through the
+   first sol; from the fourth bar it stands under the dial. */
+.res .help { display: none; }
+.mg-touch.mg-compact .suit .help, .mg-touch.mg-compact .res .help { align-self: flex-start; justify-content: flex-start; height: auto; padding: .125rem 0 0; border: 0; border-radius: 0; background: none;
+  color: var(--ink-2); font: 600 var(--tcap)/1 var(--f-cond); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.mg-touch.mg-compact .suit .help { align-self: center; }
+.mg-touch.mg-compact.few-bars .suit .help { display: none; }
+.mg-touch.mg-compact.few-bars .res .help { display: inline-flex; align-items: center; gap: .25rem; margin-top: .3125rem; }
+.mg-touch.mg-compact .res .help i { font-style: normal; color: var(--accent); font-size: var(--t14); }
+.mg-touch.is-cold .res .help, .mg-touch.no-bars .res .help { display: none; }

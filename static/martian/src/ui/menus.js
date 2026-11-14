@@ -104,8 +104,9 @@ export function showNewGame(o, back) {
     // The whole card is the button, and Begin is its foot: a thumb-high bar that always stands inside the card.
     return `<button type="button" class="diff${k === 'survival' ? ' rec' : k === 'iron' ? ' hard' : ''}" data-diff="${k}"${k === 'survival' ? ' data-autofocus' : ''} aria-label="${d.name}: rescue on Sol ${d.rescueSol}. Begin">` +
       `<div class="dx"><span>0${i + 1}</span><em>${DIFF_TAG[k]}</em></div><div class="dn">${d.name}</div><div class="dp" aria-hidden="true">${pips}</div>` +
-      // ("Rescue on Sol 35" did not say that a later rescue is the harder game, nor "Wake at dawn" what it costs)
-      `<dl><dt>To last</dt><dd>${d.rescueSol} sols</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Start that sol again'}</dd></dl>` +
+      // ("Rescue on Sol 35" did not say that a later rescue is the harder game, nor "Wake at dawn" what it costs; and
+      //  "To last: 35 sols" did not say what lasts, him or his supplies. It is how long he must hold out.)
+      `<dl><dt>Hold out</dt><dd>${d.rescueSol} sols to rescue</dd><dt>Supplies</dt><dd>${drain}</dd><dt>If you die</dt><dd>${k === 'iron' ? 'Save deleted' : 'Start that sol again'}</dd></dl>` +
       `<p>${esc(d.desc.replace(/^Rescue: Sol \d+\.\s*/, '').replace(/\n/g, ' '))}</p><div class="go">Begin ${icon('next')}</div></button>`;
   }).join('');
   const p = openOverlay('sheet',
@@ -246,7 +247,10 @@ function sw(id, label, onNow) {
 }
 const pct = (v) => Math.round(v * 100) + '%';
 
-const SET_TABS = [['graphics', 'Graphics'], ['controls', 'Controls'], ['sound', 'Sound'], ['interface', 'Interface']];
+// (The first page is the display: picture quality, and how large the interface is drawn on it. Under "Graphics" the
+//  interface's size looked misfiled beside a tab called Interface, which holds motion and colour: on a display it
+//  belongs.)
+const SET_TABS = [['graphics', 'Display'], ['controls', 'Controls'], ['sound', 'Sound'], ['interface', 'Interface']];
 let setTab = 'graphics';
 export function showSettings(back, overTitle) {
   const running = ctx.engine ? ctx.engine.qualityName : null;
@@ -258,7 +262,7 @@ export function showSettings(back, overTitle) {
     `<div class="sheet settings${tabbed ? ' tabbed' : ''}"><header class="sheet-hd"><h1>Settings</h1>${tabbed ? seg('settab', 'Settings group', SET_TABS, setTab) : ''}</header>` +
     '<div class="sheet-bd mg-scroll"><div class="set-grid">' +
     // graphics
-    `<section class="set-sec" data-sec="graphics" style="grid-column:1/-1"><h3>${icon('monitor')}Graphics</h3>` +
+    `<section class="set-sec" data-sec="graphics" style="grid-column:1/-1"><h3>${icon('monitor')}Display</h3>` +
     `<div class="set-row"><span class="lbl">Quality</span><div class="ctl">${seg('quality', 'Graphics quality', QUALITIES, quality)}</div>` +
     '<p class="hint" id="set-q-hint"></p></div>' +
     // (the size of the interface is a matter of the display: here, the Graphics page of a phone is two rows on its
@@ -454,7 +458,8 @@ export function showSleepSummary(d, onDone) {
   // the first thing still to do, as the mission list has it
   const todo = missionList().find((e) => !e.done);
   const rows = (d.rows || []).slice();
-  if (todo) rows.push(['Today', todo.o.text(), '', 'today']);
+  // (what today is for: a task for today. "Today: survive to Sol 25" was the whole game set down as a morning's job.)
+  if (todo && todo.o.id !== 'survive') rows.push(['Today', todo.o.text(), '', 'today']);
   if (d.later) rows.push(['Later', d.later, '', 'later']);
   const more = rows.find((r) => r[2]);
   box.querySelector('.sum').innerHTML =

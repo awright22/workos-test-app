@@ -133,3 +133,9 @@
 .mg-touch .choice:active { border-color: var(--accent); }
 .mg-touch .mg-range:hover::-webkit-slider-thumb, .mg-touch .mg-range:focus-visible::-webkit-slider-thumb { background-color: var(--ink); }
 .mg-touch .mg-range:active::-webkit-slider-thumb { background-color: var(--accent); }
+
+/* The cold open: RUN is the button that saves him, and nothing marked it. Ringed in amber, breathing, until he has run. */
+.mg-tbtn.nudge { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-wash), 0 0 0 3px var(--accent); animation: mg-nudge 1.3s ease-in-out infinite; }
+.mg-tbtn.nudge span, .mg-tbtn.nudge .ic { color: var(--accent); }
+@keyframes mg-nudge { 50% { box-shadow: 0 0 0 5px var(--accent-wash), 0 0 0 6px rgba(255, 180, 84, .55); } }
+.mg-still .mg-tbtn.nudge, .mg-reduced .mg-tbtn.nudge { animation: none; }

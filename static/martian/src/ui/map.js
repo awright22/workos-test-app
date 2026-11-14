@@ -135,7 +135,7 @@ function buildMarkers() {
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
   // (the rocket says what it is from the first sol: it stood on the map as "Ares 4 MAV" with nothing to say it was the way home)
-  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 3, main: !!S.flags.mavRevealed,
+  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : 2, main: !!S.flags.mavRevealed,
     title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : 'The way home · Schiaparelli crater',
     note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
@@ -191,7 +191,14 @@ function placeLabels(you, storms, stormBoxes) {
     //  been tried, or "HAB & 6 MORE" was written across the lander next to it.)
     // (inside it top and bottom as well: at the head of the map a name was cut in half by the screen's header)
     let at = spots.findIndex(([x, y], k) => x >= 2 && x + w <= W - 2 && y >= 2 && y + h <= H - 2 && free(x, y, w, h) && owned(x, y) && (k < 2 || apart(x, y, w, h)));
-    if (at < 0 && m.pri <= 2 && m.y - h / 2 >= 2 && m.y + h / 2 <= H - 2) at = 0;
+    // (The Hab, the way home and the objective are named at every zoom: where no place is clear of the others' claims,
+    //  the first place inside the map that nothing is drawn on, and failing that the first inside the map. Zoomed in
+    //  with a card open, "MAV: THE WAY HOME" became a white dot, and the key said a dot wants zooming in.)
+    if (at < 0 && m.pri <= 2) {
+      const inside = ([x, y]) => x >= 2 && x + w <= W - 2 && y >= 2 && y + h <= H - 2;
+      at = spots.findIndex((sp) => inside(sp) && free(sp[0], sp[1], w, h));
+      if (at < 0) at = spots.findIndex(inside);
+    }
     if (at < 0) continue;
     const [x, y] = spots[at];
     m.named = true;

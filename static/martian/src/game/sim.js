@@ -377,6 +377,7 @@ export function sleepToDawn(inRover) {
   if (S.sleeping) return;
   S.sleeping = true;
   const before = { o2: S.o2, water: S.water, power: S.power, sol: S.sol, morale: S.morale, food: foodTotal() };
+  const moraleKnown = !!S.flags.barMorale;
   showSleep();
   // advance until the LOCAL sun crosses the horizon rising (max 1.3 sols for polar nights)
   const u = _v1.copy(inRover ? World.rover.group.position : player.pos).normalize().clone();
@@ -445,12 +446,15 @@ export function sleepToDawn(inRover) {
     const short = wait - days, sols = (k) => `${k} sol${k === 1 ? '' : 's'}`;
     // ("eating as today" it used to say, on a morning he had eaten two meals of a larder that could do that five
     //  more times: the count was right and the words were not)
-    const lasts = days === have ? `Enough for ${sols(days)}` : `${have} meals make ${days} breakfast${days === 1 ? '' : 's'}`;
+    // (and then "20 meals make 15 breakfasts", which left the reader to work out why not twenty or ten: a side goes
+    //  with breakfast while there are sides. It says so.)
+    const lasts = days === have ? `Breakfast for ${sols(days)}` : `${have} meals: breakfast for ${sols(days)}, some with a side`;
     // (in the words of the card at the comms desk, "sols with nothing to eat", so the two can be set side by side)
-    rows.push(['Food', short <= 0 ? `${lasts}; the rescue is in ${wait}`
-      : coming >= short ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${wait}`
-        : coming > 0 ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${wait}: ${sols(short - coming)} still with nothing to eat`
-          : `${lasts}; the rescue is in ${wait}: ${sols(short)} with nothing to eat`]); }
+    // (the wait has its unit: "the rescue is in 12" was read as a date)
+    rows.push(['Food', short <= 0 ? `${lasts}; the rescue is in ${sols(wait)}`
+      : coming >= short ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${sols(wait)}`
+        : coming > 0 ? `${lasts}, and the beds hold ${coming} more; the rescue is in ${sols(wait)}: ${sols(short - coming)} still with nothing to eat`
+          : `${lasts}; the rescue is in ${sols(wait)}: ${sols(short)} with nothing to eat`]); }
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
   const later = rolled && S.sol === 2 && !S.pf.connected
@@ -466,7 +470,9 @@ export function sleepToDawn(inRover) {
       { icon: 'power', label: 'Power', from: before.power, to: S.power, unit: '%', low: S.power < 25 },
       { icon: 'food', label: 'Food', from: before.food, to: foodTotal(), unit: 'meals', low: breakfastsLeft() < 4 },
       { icon: 'mood', label: 'Morale', from: before.morale, to: S.morale, unit: '', low: S.morale < 40 },
-    ],
+      // (a figure for a bar he has not met is a figure out of nowhere: on the first morning morale is the row below,
+      //  which says what it is, and the tile comes with the bar)
+    ].filter((d) => d.icon !== 'mood' || moraleKnown),
   };
   // The night's account stays up until he starts the day. (It used to go by itself after a quarter of a minute,
   // read or not; the clock is stopped while he sleeps, so there is nothing to hurry for.)
