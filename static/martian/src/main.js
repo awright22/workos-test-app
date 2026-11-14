@@ -37,7 +37,7 @@ import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
 import { input, initInput } from './game/input.js';
 import { player, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
-import { roverF, updateRover, initRoverAt } from './game/rover.js';
+import { roverF, updateRover, roverLights, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
@@ -226,6 +226,7 @@ function tick(dt) {
   if (World.habLampMats) setGlow(World.habLampMats, S.power > 0.5 ? 0.04 + 0.96 * World.dark : 0.02);
   { const sk = ctx.engine.sky; setStainLight(Math.min(1, 0.05 + sk.sunIntensity / 2.6 + sk.ambientSky.r * 0.9)); }
   setGlowLight();
+  roverLights(dt);
   if (World.habViewMats) setGlow(World.habViewMats, Math.max(0.02, ctx.engine.sky.day * (1 - 0.75 * (S.started ? S.storm.i : 0))));
   const strobe = Math.sin(blinkT * 6) > 0.7 ? 1 : 0;
   for (const p of World.pods) { p.pulse = strobe; if (p.strobe && !p.taken && p.group.visible) setGlow(p.strobe, strobe ? 1.8 : 0.03); }

@@ -147,6 +147,27 @@ export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value:
 /** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
 export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { value: new THREE.Color(0.76, 0.47, 0.235) }, uSkyTop: { value: new THREE.Color(0.52, 0.32, 0.16) }, uGroundLit: { value: new THREE.Color(0.3, 0.15, 0.08) } };
 
+/*
+ * No lamp lights a surface past what the picture can hold. A helmet lamp a pace from white paint, or its glint on a
+ * smooth panel, otherwise goes many times over white, and the bloom turns that into a four-pointed star: the dome at
+ * night had one burning in it wherever he stood. The cap is on the lamps alone (point and spot lights, which three
+ * adds up first); the sun is added after it and keeps its glints. (Sunlit white is about 0.9 on this scale.)
+ */
+const LIGHTS_BEGIN = (() => {
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  const cap = `#if ( NUM_POINT_LIGHTS > 0 || NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )
+	reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( 0.9 ) );
+	reflectedLight.directDiffuse = min( reflectedLight.directDiffuse, vec3( 1.25 ) );
+#endif
+`;
+  for (const mark of ['#if ( NUM_SUN_LIGHTS > 0 ) && defined( RE_Direct )', '#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )']) {
+    const i = chunk.indexOf(mark);
+    if (i >= 0) return chunk.slice(0, i) + cap + chunk.slice(i);
+  }
+  return chunk;      // (a three that orders its lights otherwise: leave it alone)
+})();
+export const capLocalLights = (fragmentShader) => fragmentShader.replace('#include <lights_fragment_begin>', LIGHTS_BEGIN);
+
 let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in
  *  the vertices and every such surface of a part can be one mesh with one shared material.
@@ -167,7 +188,7 @@ function setUpPlain(plain, ground) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 aPbr;\nvarying vec3 vPbr;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;' + (ground ? '\nattribute float aHem;\nvarying float vHem;' : ''))
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = aPbr; vObjPos = position; vObjN = normal;' + (ground ? ' vHem = aHem;' : ''));
-    shader.fragmentShader = shader.fragmentShader
+    shader.fragmentShader = capLocalLights(shader.fragmentShader)
       .replace('#include <common>', `#include <common>
         varying vec3 vPbr; varying vec3 vObjPos; varying vec3 vObjN;
         uniform highp sampler3D uDustGrain;
@@ -242,7 +263,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust9' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust10' + (ground ? 'G' : '');
   return plain;
 }
 

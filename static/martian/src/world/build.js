@@ -112,6 +112,45 @@ function trodden(base) {
   return c;
 }
 
+/*
+ * A stain or a pool of light is a flat square patch, and the land is not flat: past the levelled middle of a site it
+ * rises through the patch and cuts it along a hard line, or falls away and leaves it hanging. So a patch that lies
+ * outdoors is draped: cut into a grid, each corner set on the ground as it is drawn there. It is laid when first
+ * needed (its maker moves it into place after making it) and laid again when a site is levelled.
+ */
+const drapes = [];
+let drapedPads = -1;
+const _dm = new THREE.Matrix4(), _di = new THREE.Matrix4(), _dv = new THREE.Vector3();
+export function drape(mesh, lift = 0.04) {
+  const w = mesh.geometry.parameters.width, n = Math.max(4, Math.min(26, Math.ceil(w / 0.9)));
+  mesh.geometry.dispose();
+  mesh.geometry = new THREE.PlaneGeometry(w, w, n, n);
+  mesh.geometry.rotateX(-Math.PI / 2);
+  drapes.push({ mesh, lift, done: false });
+  return mesh;
+}
+function layDrapes() {
+  const pads = ctx.planet.pads.length;
+  if (pads !== drapedPads) { drapedPads = pads; for (const d of drapes) d.done = false; }
+  for (const d of drapes) {
+    if (d.done || !d.mesh.parent) continue;
+    d.done = true;
+    // (the patch's place on the planet, by its own chain of parents: the world's root moves every frame)
+    _dm.identity();
+    for (let o = d.mesh; o && o !== ctx.world; o = o.parent) { o.updateMatrix(); _dm.premultiply(o.matrix); }
+    _di.copy(_dm).invert();
+    const pos = d.mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      _dv.set(pos.getX(i), 0, pos.getZ(i)).applyMatrix4(_dm);
+      const r = surfaceAt(_dv) + d.lift;
+      _dv.normalize().multiplyScalar(r).applyMatrix4(_di);
+      pos.setXYZ(i, _dv.x, _dv.y, _dv.z);
+    }
+    pos.needsUpdate = true;
+    d.mesh.geometry.computeBoundingSphere();
+  }
+}
+
 export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'soft') {
   if (!stainTextures[kind]) {
     const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -169,8 +208,8 @@ export function groundGlow(parent, radius, color, strength, kind = 'pool', level
       let v;
       if (kind === 'dome') {
         // nothing under the dome (its floor has the real lamps); brightest at the foot of the wall, gone by the edge
-        const wall = 0.58, out = Math.max(0, (d - wall) / (1 - wall));      // (the dome's base ring, as a share of the patch's radius)
-        const fall = d < wall - 0.03 ? 0 : Math.min(1, (d - wall + 0.03) / 0.05) * Math.pow(Math.max(0, 1 - out), 1.7);
+        const wall = 0.447, out = Math.max(0, (d - wall) / (1 - wall));      // (the dome's base ring, as a share of the patch's radius)
+        const fall = d < wall - 0.03 ? 0 : Math.min(1, (d - wall + 0.03) / 0.05) * Math.pow(Math.max(0, 1 - out), 2.3);
         // the frame's uprights stand between the lamps and the ground: fifteen dark spokes that widen as they run out
         const turn = ((a / (Math.PI * 2)) * 15 + 0.5) % 1, off = Math.abs((turn < 0 ? turn + 1 : turn) - 0.5) * 2;      // 0 on a spoke, 1 between
         const width = 0.16 + 0.34 * out;
@@ -198,6 +237,7 @@ export function groundGlow(parent, radius, color, strength, kind = 'pool', level
 }
 /** Bring each pool of spilt light up or down with its lamps (call each frame). */
 export function setGlowLight() {
+  layDrapes();
   for (const gl of glows) { const k = gl.strength * Math.max(0, Math.min(1, gl.level())); gl.mat.opacity = k; gl.mesh.visible = k > 0.004; }
 }
 
@@ -237,8 +277,8 @@ export function buildHabColony(spawn) {
   });
   World.hab.userData.reach = 6000;                 // home is visible from a long way off
   // the yard is trodden and driven on: darker, packed soil in front of the airlock and round the rover's place
-  groundStain(World.hab, 15, 0x24120a, 0.26, HAB_FLOOR + 0.03, 'trodden').position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
-  groundStain(World.hab, 13.5, 0x1e0f08, 0.30, HAB_FLOOR + 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
+  drape(groundStain(World.hab, 15, 0x24120a, 0.26, HAB_FLOOR + 0.03, 'trodden'), 0.03).position.set(5, HAB_FLOOR + 0.03, 15);       // (one patch for the door and the rover's place: each is a draw call)
+  drape(groundStain(World.hab, 13.5, 0x1e0f08, 0.30, HAB_FLOOR + 0.02), 0.02).position.set(0, HAB_FLOOR + 0.02, 0);          // the skirt of packed soil round the Hab itself
   World.habFurnishings = new THREE.Group();        // farm trays and other things only seen from inside
   World.hab.add(World.habFurnishings);
   World.doors = ['door_outer_L', 'door_outer_R', 'door_inner_L', 'door_inner_R'].map((n) => {
@@ -496,15 +536,19 @@ export function buildRover(group) {
   const wheels = ['wheel_FL', 'wheel_ML', 'wheel_RL', 'wheel_FR', 'wheel_MR', 'wheel_RR'].map((n) => m.part(n)).filter(Boolean);
   const steer = { FL: m.part('steer_FL'), FR: m.part('steer_FR'), RL: m.part('steer_RL'), RR: m.part('steer_RR') };
   // one spotlight between the two headlamps, aimed down the road (the model's front is its +Z)
-  const hl = new THREE.SpotLight(0xfff2d8, 0, 110, 0.6, 0.9, 1.5);           // (a wide soft edge: the pool ended on a hard arc)
+  // (A lamp a metre and a half up lights the ground at its own wheels a hundred times harder than the ground thirty
+  // metres on: at a true fall-off the pool was a white blot under the bumper and the road ahead was dark. So its
+  // light hardly falls off with distance, and its soft edge is the whole of the cone. And it is wide: the camera
+  // rides behind the rover, which hides the ground straight ahead of it, so a narrow beam lit a road nobody saw.)
+  const hl = new THREE.SpotLight(0xfff2d8, 0, 70, 0.60, 1.0, 0.35);
   const a = m.part('headlight_L'), b = m.part('headlight_R');
   const at = new THREE.Vector3(0, 1.4, 2.6);
   if (a && b) { m.inner.updateWorldMatrix(true, true); at.copy(a.getWorldPosition(new THREE.Vector3())).add(b.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5); m.inner.worldToLocal(at); }
   hl.position.copy(at);
-  const hlT = new THREE.Object3D(); hlT.position.set(at.x, at.y - 1.2, at.z + 16);
+  const hlT = new THREE.Object3D(); hlT.position.set(at.x, at.y - 1.4, at.z + 16);
   m.inner.add(hl, hlT); hl.target = hlT;
   const lamps = [];
-  m.inner.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && /^light_(white|red|amber)/.test(o.material.name)) { o.material = o.material.clone(); o.material.userData.baseEmissive = o.material.emissiveIntensity || 1; lamps.push(o.material); } });
+  m.inner.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && /^light_(white|red|amber)/.test(o.material.name)) { o.material = o.material.clone(); o.material.userData.baseEmissive = o.material.emissiveIntensity || 1; o.material.userData.marker = !/^light_white/.test(o.material.name); lamps.push(o.material); } });
   World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish') };
   World.roverCollider = { v: group.position.clone().normalize(), r: 2.6 };
   colliders.push(World.roverCollider);
@@ -533,7 +577,7 @@ export function addSiteModel(g, name, o = {}) {
   g.add(m.root);
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
-  if (o.stain) groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft').position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  if (o.stain) drape(groundStain(g, o.stain, o.blast ? 0x241410 : 0x1e0f08, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft'), 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -560,7 +604,7 @@ export function buildStorySites() {
   World.mavNose = mm.part('nose');
   World.mavStrobeMats = ownMaterials(mm.part('strobe'));
   World.mavFlameAt = mm.part('flame');             // the nozzle: the launch hangs its flame here (game/launch.js)
-  groundStain(mav, 13, 0x0c0706, 0.72, 0.03, 'scorch');   // what four descent engines left: burnt ground, years old and still black
+  drape(groundStain(mav, 13, 0x0c0706, 0.72, 0.03, 'scorch'), 0.03);   // what four descent engines left: burnt ground, years old and still black
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
   colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
@@ -632,8 +676,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     addLamp(gm.part('light_apex') || g, { color: 0xfff0dc, power: 9, range: 20, decay: 1.25, level: lit });
     addLamp(g, { offset: new THREE.Vector3(0, 2.4, 0), color: 0xff5cc0, power: 6, range: 12, decay: 1.3, level: lit });
     // what the dome spills on the ground round it after dark, cut by the shadows of its frame (drawn: see groundGlow)
-    // (no wider than the ground levelled for the dome: beyond it the land rises and falls through the patch, and cuts it in straight lines)
-    groundGlow(g, 7.4, 0xffb8a8, 0.28, 'dome', () => World.dark || 0, GREENHOUSE.floor + 0.04);
+    // (it runs out past the ground levelled for the dome and dies away there, laid on the land as it lies: flat, the
+    // land rose through it and cut it along a clean oval)
+    drape(groundGlow(g, 9.6, 0xffb8a8, 0.30, 'dome', () => World.dark || 0, GREENHOUSE.floor + 0.04), 0.04);
     // (its strip lights are lamps too: full at night, a glimmer by day, when the sun through the panes does the work.
     // Burning white at noon they were the brightest thing in the dome.)
     b.glow = ownMaterials(gm.root, /^light_/);

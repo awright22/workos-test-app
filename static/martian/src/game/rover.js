@@ -99,6 +99,19 @@ export function exitRover() {
   emit('rover-exit', {});
 }
 
+/**
+ * The rover's lamps, every frame, driven or parked. The headlamps burn only with a driver in the seat: parked, their
+ * bars are dark and only the red and amber markers show, enough to find it by. (They were set while driving and at
+ * no other time, so a rover that had never been driven at night stood with its bars alight and no light on the ground.)
+ */
+export function roverLights(dt) {
+  const rv = World.rover;
+  if (!rv) return;
+  const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5, driven = S.mode === 'rover';
+  rv.headlight.intensity = lerp(rv.headlight.intensity, driven && dim ? 11 : 0, damp(0.15, dt));
+  for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (dim && (driven || m.userData.marker) ? 1.6 : 0.12);
+}
+
 export function updateRover(dt) {
   const RV = roverF, k = input.keys, t = input.touch;
   // --- driver input ----------------------------------------------------------------------
@@ -172,9 +185,6 @@ export function updateRover(dt) {
   for (const w of rv.wheels) w.rotation.x += spin;
   if (rv.steer.FL) { rv.steer.FL.rotation.y = RV.steer; rv.steer.FR.rotation.y = RV.steer; }
   if (rv.steer.RL) { rv.steer.RL.rotation.y = -RV.steer * 0.45; rv.steer.RR.rotation.y = -RV.steer * 0.45; }
-  const lightsOn = night || S.storm.i > 0.5;
-  rv.headlight.intensity = lerp(rv.headlight.intensity, lightsOn ? 320 : 0, damp(0.15, dt));
-  for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (lightsOn ? 1.6 : 0.12);
   if (rv.dish) rv.dish.rotation.y += dt * 0.15;
 
   // --- chase camera -----------------------------------------------------------------------

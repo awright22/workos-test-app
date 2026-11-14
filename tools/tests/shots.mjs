@@ -58,7 +58,8 @@ const scenes = {
   'rover-park': async () => ev(async (G) => { G.setLocalTime(15.5); G.tpNear(G.World.rover.group.position, 4.6); G.look(-0.16); G.tick(0.05, 40); await G.settle(); }),
   // (on the open plain, so that it is driving when the picture is taken: among the Hab's boulders it was often stopped against one)
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.roverLocal(44, 122, 0.4); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); await G.settle(); G.tick(0.05, 6); G.input.keys['w'] = false; }),
-  'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.tick(0.05, 30); await G.settle(); }),
+  // (it sets itself up: taken alone, it used to be whatever the scene before it had left, often a man on foot by the Hab)
+  'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.roverLocal(44, 122, 0.4); if (G.S.mode !== 'rover') { G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); } G.input.keys['w'] = true; G.tick(0.05, 70); await G.settle(); G.tick(0.05, 6); G.input.keys['w'] = false; }),
   'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'storm-sun': async () => ev(async (G) => { G.setLocalTime(16.6); G.faceSun(); G.look(0.2); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
