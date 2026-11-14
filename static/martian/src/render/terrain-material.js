@@ -80,6 +80,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     uSand: { value: flat.sand },
     uCrust: { value: flat.crust },
     uClinker: { value: flat.clinker },
+    uSastrugi: { value: flat.sastrugi },
     uField: { value: flat.field },
     uDust: { value: 0 },                       // storm dusting 0..1 (brightens and flattens)
     uDay: { value: 1 },                        // 0 at night .. 1 by day (what glows by daylight must not glow in the dark)
@@ -127,6 +128,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform sampler2D uSand;
         uniform sampler2D uCrust;
         uniform sampler2D uClinker;
+        uniform sampler2D uSastrugi;
         uniform sampler2D uField;
         uniform float uDust;
         uniform float uDay;
@@ -200,6 +202,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         vec2 flatSlope = vec2(0.0);
         float stone = 0.0, gravelHere = 0.0, crack = 0.0;
         float clinkTone = 0.0, clinkDust = 0.0;
+        float snowLie = 0.35, snowTone = 0.0;
         // (for the clinker layer, read inside a branch: there a texture has no mip level of its own, so it is handed these)
         vec2 uvDx = dFdx(vUv3.xy), uvDy = dFdy(vUv3.xy);
         float iceGlow = 0.0;
@@ -250,6 +253,18 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
             flatSlope += ((c1.rg - 0.5) * f1 + vec2(-(c2.g - 0.5), c2.r - 0.5) * f2 + (c3.rg - 0.5) * f3) * (4.0 * clinkW);
             clinkTone = ((c1.b - 0.5) * f1 + (c2.b - 0.5) * f2 + (c3.b - 0.5) * f3) * clinkW;
             clinkDust = max(max(c1.a * f1, c2.a * f2), c3.a * f3) * clinkW;
+          }
+          // Sastrugi. A polar cap is not a smooth white field: the wind packs its snow into hard drifts, each with a
+          // blunt nose into the wind and a long tail, and scours the ice bare between them. The drifts near, and the
+          // same shapes eight times the size as the long drifts seen from far off. (Read only on ice, as the clinker.)
+          if (ice > 0.004) {
+            float g1 = (0.45 + 0.55 * smoothstep(2.5, 9.0, viewDist)) * (1.0 - smoothstep(45.0, 130.0, viewDist)) * level;
+            float g2 = smoothstep(35.0, 120.0, viewDist) * (1.0 - smoothstep(900.0, 2000.0, viewDist)) * level;
+            vec4 w1 = textureGrad(uSastrugi, uv / 8.0, uvDx / 8.0, uvDy / 8.0);
+            vec4 w2 = textureGrad(uSastrugi, uv / 64.0 + vec2(0.41, 0.23), uvDx / 64.0, uvDy / 64.0);
+            flatSlope += ((w1.rg - 0.5) * g1 + (w2.rg - 0.5) * g2) * (4.0 * ice);
+            snowTone = ((w1.b - 0.5) * g1 + (w2.b - 0.5) * g2) * ice;
+            snowLie = clamp(0.35 + (w1.a - 0.35) * g1 + (w2.a - 0.35) * g2 * (1.0 - 0.5 * g1), 0.0, 1.0);
           }
           #ifdef TERRAIN_FINE
             // (pebbles do not survive being stretched down a steep face: there the field layer and the rock carry it)
@@ -407,10 +422,17 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         // old ice is blue where it is clean and deep, tan where a season's dust was laid into it, white only where frost lies
         float dusty = smoothstep(0.50, 0.70, iceBand + hFar * 0.5) * 0.6;
         // (kept well under white: lit by a low sun at an exposure set for red ground, pale ice burnt out and lost its blue)
-        vec3 iceCol = mix(vec3(0.19, 0.34, 0.60), vec3(0.42, 0.36, 0.30), dusty) * (1.0 + tone * 0.30 + coarse * 0.08);
-        // (a crack shows the ice's depth: darker and bluer than its face, not a pale scar)
-        iceCol = mix(iceCol, vec3(0.09, 0.22, 0.48), clamp(crack * 0.9, 0.0, 1.0) * (1.0 - dusty));
-        iceCol = mix(iceCol, vec3(0.78, 0.85, 0.94), smoothstep(0.12, 0.36, hMid * fMid + hFar * 0.5) * 0.3 * (1.0 - crack));
+        // Two surfaces. Most of a cap is wind-packed snow: white, matt, cut into drifts. In broad windows the wind
+        // has scoured it to the old ice: blue, hard, glassy enough to throw the sun back, and cracked. (One pale blue
+        // surface with soft dark lines on it was a lilac snowfield drawn on with a marker.)
+        float open = smoothstep(-0.03, 0.07, hFar * 0.7 + hMid * 0.35 * fMid + (nAir.a - 0.5) * 0.5);
+        float firn = max(snowLie, 1.0 - 0.92 * open);
+        vec3 bare = mix(vec3(0.15, 0.31, 0.58), vec3(0.42, 0.36, 0.30), dusty * 0.55) * (1.0 + tone * 0.30 + coarse * 0.08);
+        // (a crack shows the ice's depth: darker and bluer than its face, a thin line, and the snow covers it)
+        float crk = smoothstep(0.42, 0.80, crack) * (1.0 - dusty) * (1.0 - 0.9 * firn);
+        bare = mix(bare, vec3(0.05, 0.15, 0.40), crk);
+        vec3 packed = mix(vec3(0.70, 0.77, 0.88), vec3(0.62, 0.57, 0.52), dusty * 0.8) * (1.0 + snowTone * 1.3 + tone * 0.16);
+        vec3 iceCol = mix(bare, packed, firn);
         // (by night the ice is grey under the stars, not blue: blue ice under the night's blue light was a cobalt floor)
         iceCol = mix(vec3(dot(iceCol, vec3(0.3, 0.5, 0.2))) * vec3(0.96, 1.0, 1.05), iceCol, 0.35 + 0.65 * uDay);
         col = mix(col, iceCol, ice);
@@ -422,7 +444,7 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           col = mix(col, vec3(0.62, 0.50, 0.40), uSpace * 0.7 * pow(graze, 3.5));
         }
         diffuseColor.rgb = col;
-        float terrainRough = mix(0.98, 0.90, max(max(rock, stone), basalt)) - ice * 0.78 - pond * (1.0 - drift) * 0.16;
+        float terrainRough = mix(0.98, 0.90, max(max(rock, stone), basalt)) - ice * mix(0.84, 0.40, firn) - pond * (1.0 - drift) * 0.16;
         // light that has passed through ice comes back blue: it fills the shadows the warm sky would leave tan
         iceGlow = ice * (0.5 + 0.5 * crack);
         vec3 terrainGrad = grad * (1.0 - ice * 0.5);
@@ -459,6 +481,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain43' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain46' + (o.fine !== false ? 'F' : '');
   return mat;
 }

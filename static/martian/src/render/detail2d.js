@@ -10,6 +10,7 @@
  *          gravel lies
  *   crust  12.8 m across: the polygons of patterned ground, laid only at high latitudes and on ice
  *   clinker  8 m across: the broken top of a lava flow, laid only on the volcanoes' bare lava
+ *   sastrugi  8 m across: wind-packed drifts on scoured ice, laid only on the polar ice
  *
  * Each stores the surface's slope in RG (for the shading normal), a brightness in B, and a mask
  * in A (sand: stone, as opposed to dust; field: gravel patches).
@@ -204,9 +205,50 @@ function clinkerTexture(size, anisotropy) {
   return pack(size, h, bright, mask, 1, SPAN, anisotropy);
 }
 
+/** Sastrugi: what the wind makes of a snowfield. Hard-packed drifts drawn out downwind (+x), each with a blunt
+ *  nose into the wind and a long tail, standing a hand or two above scoured ice. A is where the packed snow
+ *  lies, as opposed to the bare ice between. (Laid at 8 m a tile near, and at 64 m as the long drifts seen from far.) */
+function sastrugiTexture(size, anisotropy) {
+  const SPAN = 8;
+  const N = size * size, px = size / SPAN;
+  const grain = fbm(size, 40, 3, 251, 0.6), swell = fbm(size, 3, 3, 257), tone = fbm(size, 6, 3, 263, 0.55), warp = fbm(size, 5, 2, 269);
+  const h = new Float32Array(N), snow = new Float32Array(N), bright = new Float32Array(N), mask = new Float32Array(N);
+  const rnd = rng(277);
+  // (rounded backs, uneven outlines, most of them small: straight-flanked and close-packed they were a field of
+  //  folded paper darts)
+  for (let n = 0; n < 150; n++) {
+    const cx = rnd() * size, cy = rnd() * size;
+    const big = Math.pow(rnd(), 2.6);
+    const len = (0.45 + 3.0 * big) * px, wid = (0.12 + 0.30 * big + 0.1 * rnd()) * px, tall = 0.03 + 0.13 * big + 0.025 * rnd();      // metres
+    const yaw = (rnd() - 0.5) * 0.5, ca = Math.cos(yaw), sa = Math.sin(yaw), nose = 0.12 + 0.1 * rnd();
+    const R2 = Math.ceil(len + wid);
+    for (let dj = -R2; dj <= R2; dj++) for (let di = -R2; di <= R2; di++) {
+      const i = ((Math.round(cx) + di) % size + size) % size, j = ((Math.round(cy) + dj) % size + size) % size, k = j * size + i;
+      const a = (di * ca + dj * sa) / len + warp[k] * 0.10, b = (-di * sa + dj * ca) / wid + grain[k] * 0.22 + warp[k] * 0.5;
+      if (a <= 0 || a >= 1) continue;
+      // along the wind: a steep nose, then a long falling tail; across it: a rounded back, narrowing down the tail
+      const along = a < nose ? Math.pow(a / nose, 0.7) : Math.pow(1 - (a - nose) / (1 - nose), 1.6);
+      const half = 0.35 + 0.65 * (a < nose ? a / nose : 1 - 0.7 * (a - nose) / (1 - nose));
+      const t = Math.abs(b) / half;
+      if (t >= 1) continue;
+      const hh = tall * along * Math.pow(1 - t * t, 0.8);
+      if (hh > snow[k]) snow[k] = hh;
+    }
+  }
+  for (let j = 0, k = 0; j < size; j++) for (let i = 0; i < size; i++, k++) {
+    // the scoured ice between: nearly flat, with close-set flutes along the wind
+    const flute = Math.sin(((j / size) * 46 + warp[k] * 2.2) * 2 * Math.PI) * 0.0035;
+    const lie0 = Math.max(0, Math.min(1, snow[k] / 0.03)), lie = lie0 * lie0 * (3 - 2 * lie0);      // (a feathered edge: cut sharp, the drifts were paper shapes)
+    h[k] = swell[k] * 0.05 + snow[k] + flute * (1 - lie) + grain[k] * 0.003 * lie;
+    bright[k] = 0.5 + tone[k] * 0.1 + lie * (0.1 + Math.min(0.12, snow[k] * 1.1)) + grain[k] * 0.05 * lie + flute * 6 * (1 - lie);
+    mask[k] = lie;
+  }
+  return pack(size, h, bright, mask, 1, SPAN, anisotropy);
+}
+
 let cache = null;
 /** @param {number} anisotropy  the renderer's limit, capped by the quality preset */
 export function groundTextures(anisotropy = 8) {
-  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy), crust: crustTexture(512, anisotropy), clinker: clinkerTexture(512, anisotropy) };
+  if (!cache) cache = { sand: sandTexture(512, anisotropy), field: fieldTexture(512, anisotropy), crust: crustTexture(512, anisotropy), clinker: clinkerTexture(512, anisotropy), sastrugi: sastrugiTexture(512, anisotropy) };
   return cache;
 }

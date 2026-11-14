@@ -397,6 +397,12 @@ function mergeSkinned(scene, dust) {
     const geos = ones.map((o) => {
       const g = floatGeometry(o.geometry, o.material.color, o.material.roughness, o.material.metalness, group === 'head' ? 0 : dust);
       g.applyMatrix4(unpack);
+      // He walks in the dust and kneels in it: his boots and shins carry far more of it than his shoulders. (Dusted
+      // evenly and lightly, the suit was spotless on a planet where nothing else is.)
+      if (group === 'body') {
+        const P = g.attributes.position, B = g.attributes.aPbr;
+        for (let i = 0; i < P.count; i++) { const y = P.getY(i); B.setZ(i, B.getZ(i) * (y < 0.5 ? 2.1 : y < 1.05 ? 2.1 - 1.3 * (y - 0.5) / 0.55 : 0.8)); }
+      }
       const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
       const idx = new Uint16Array(si.count * 4), wgt = new Float32Array(si.count * 4);
       for (let i = 0; i < si.count; i++) {
