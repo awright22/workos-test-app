@@ -139,3 +139,15 @@
 .mg-tbtn.nudge span, .mg-tbtn.nudge .ic { color: var(--accent); }
 @keyframes mg-nudge { 50% { box-shadow: 0 0 0 5px var(--accent-wash), 0 0 0 6px rgba(255, 180, 84, .55); } }
 .mg-still .mg-tbtn.nudge, .mg-reduced .mg-tbtn.nudge { animation: none; }
+
+/* A slider's handle is still a thumb each way to press, and is drawn as a round knob a little over half that size:
+   as a solid 44 px block it was the largest thing on the sheet, four of them in a column on the Sound page. */
+.mg-touch .mg-range { --knob: var(--ink); }
+.mg-touch .mg-range:active { --knob: var(--accent); }
+.mg-touch .mg-range::-webkit-slider-thumb, .mg-touch .mg-range:hover::-webkit-slider-thumb, .mg-touch .mg-range:focus-visible::-webkit-slider-thumb, .mg-touch .mg-range:active::-webkit-slider-thumb {
+  border-radius: 50%; background: radial-gradient(circle, var(--knob) 0 .75rem, rgba(11, 10, 9, .55) .78rem .875rem, transparent .9rem); }
+.mg-touch .mg-range::-moz-range-thumb { border-radius: 50%; background: radial-gradient(circle, var(--knob) 0 .75rem, rgba(11, 10, 9, .55) .78rem .875rem, transparent .9rem); }
+/* (and its track runs between the two places the knob's middle can stand, and is filled as far as the knob: drawn the
+   full width of the 44 px handle's travel, a stub of track stood out past the knob at 100%) */
+.mg-touch .mg-range::-webkit-slider-runnable-track { background: linear-gradient(to right, transparent calc(var(--th) / 2), var(--ink) calc(var(--th) / 2),
+  var(--ink) calc(var(--th) / 2 + (100% - var(--th)) * var(--f, .5)), var(--line) calc(var(--th) / 2 + (100% - var(--th)) * var(--f, .5)), var(--line) calc(100% - var(--th) / 2), transparent calc(100% - var(--th) / 2)); }

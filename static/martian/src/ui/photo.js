@@ -69,6 +69,7 @@ export function sync() {
     const v = Math.max(min, Math.min(max, photo[id]));
     if (document.activeElement !== inp) inp.value = v;
     inp.style.setProperty('--fill', `${((v - min) / (max - min) * 100).toFixed(1)}%`);
+    inp.style.setProperty('--f', ((v - min) / (max - min)).toFixed(3));
     inp.nextElementSibling.textContent = fmt(v);
   }
   bar.querySelectorAll('[data-look]').forEach((b) => { b.setAttribute('aria-checked', b.dataset.look === photo.look); });

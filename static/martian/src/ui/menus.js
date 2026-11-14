@@ -240,7 +240,7 @@ function range(id, label, min, max, step, value, fmt, mark) {
   const at = (v) => ((v - min) / (max - min) * 100).toFixed(1), ends = mark !== undefined;
   return (ends ? `<span class="range-end">${fmt(min)}</span>` : '') +
     `<span class="mg-rangewrap"${ends ? ` style="--mark:${((mark - min) / (max - min)).toFixed(4)}" data-mark="${fmt(mark)}"` : ''}><input class="mg-range" type="range" id="set-${id}" data-range="${id}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}" ` +
-    `style="--fill:${at(value)}%"></span>` + (ends ? `<span class="range-end">${fmt(max)}</span>` : '') + `<output for="set-${id}">${fmt(value)}</output>`;
+    `style="--fill:${at(value)}%;--f:${((value - min) / (max - min)).toFixed(3)}"></span>` + (ends ? `<span class="range-end">${fmt(max)}</span>` : '') + `<output for="set-${id}">${fmt(value)}</output>`;
 }
 function sw(id, label, onNow) {
   return `<button type="button" class="mg-switch" role="switch" aria-checked="${!!onNow}" aria-label="${label}" data-switch="${id}"></button>`;
@@ -340,6 +340,7 @@ export function showSettings(back, overTitle) {
     const key = r.dataset.range;
     const show = () => {
       r.style.setProperty('--fill', ((r.value - r.min) / (r.max - r.min) * 100).toFixed(1) + '%');
+      r.style.setProperty('--f', ((r.value - r.min) / (r.max - r.min)).toFixed(3));      // (the same as a plain fraction: the touch track is drawn between its handle's two end positions)
       out.textContent = pct(+r.value);
     };
     // the interface size re-lays-out the slider itself, so it is applied when the slider is released

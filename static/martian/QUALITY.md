@@ -394,6 +394,57 @@ pebbles and the cracked bun (S15), the visor, the mound's facets, the rover's du
 | T11 | Interiors: legs cut by the frame; panes with no tint or reflection; a blown faceted funnel; props flat and clean; the contact shadow faint | part (the camera tip and the drawn shadow went in after these pictures) |
 | T12 | Smaller: an empty gradient sky in every day picture; pebbles one colour and size; the cracked bun; a dot lattice on a slab (`astronaut-front`); the mound's facets (`hab-noon`); the rover's dust a dark smudge with a square edge; the greenhouse's top cap a faceted cylinder; a dark-red patch in `debris-a`; the tank in `debris-c` with no furrow; `day-sun` dim for noon | part: thin high cloud in the day sky (and it no longer fans out of one point like lamp beams); the rover's dust paler than the ground; the dark-red patch regraded with T8; the greenhouse's top vent is round (28 sides, smooth), not a 14-sided drum. the soil heap is shaded smooth, its spade cuts scoops with edges and not flat cards. Pebbles, the cracked bun, the dot lattice, the tank's furrow and `day-sun` open |
 
+### Round 10 (iPhone size, "medium"; 72 stills and a 17-frame strip of the launch, all seen)
+
+A different reviewer again, given the bar and round 9's findings but not what had been done. The stills are of the
+build with clinker lava, the caps' drifts, jointed cliffs and the canyon's real rim; the wreck, the soil heap in two
+pictures and the launch are of the build after (smooth-shaded wreck and heap).
+
+| Area | Verdict | What decided it |
+|---|---|---|
+| Day | NEARLY | `hab-morning`, `walk-plain`, `debris-a`, `lander-curiosity` read as Mars at a glance; `hab-noon`, `pile`, two lander sites flat and dim with ruler horizons |
+| Dawn and dusk | NEARLY | `dawn` and `dusk` meet the letter of the bar; `dawn-light` split by a hard line; no rim light on him |
+| Night | NEARLY | `hab-night`, `greenhouse-night` good; the helmet pool a puddle; headlamp dots through the cab; `south-pole` as bright as blue hour |
+| Dust storm | NEARLY | visibility collapses and the sun is a disc, but the dust is static streaks and he stays crisp: gloomy, not dangerous (round 9's reviewer had this MET) |
+| Poles | NOT MET | no artefacts, and `pole-90` close; but `north-pole` sandy matte snow with tan shadows, `south-pole` an indigo carpet, the outcrop a toy |
+| Orbit | NEARLY | a real globe; the limb's halo fat; Olympus a near-black thumbprint |
+| The launch | NEARLY | `05.9`, `20.2`, `22.6` work and the ship reads as a ship at distance; thin spectacle at lift-off, a beige ball at `09.4` to `10.4`, the ship flat-shaded close up, weak framing in orbit |
+| Landmarks | NEARLY | Valles Marineris MET (`canyon-rim`, `canyon-floor`, `canyon-gully`); Olympus not: a cracked hillside, crusted dough, a dappled quarry |
+| Terrain | NEARLY | no saw-teeth, zigzags or seams anywhere; stretched textures on steep faces, a dot lattice on a slab, one crack net everywhere |
+| Models | NEARLY | rover, MAV, landers, pod, beacon, RTG good; the wreck, the ice outcrop, the soil heap and the ship close up not; everything spotless and on the ground, not in it |
+| Astronaut | NEARLY | a well-detailed suit; a stiff idle, a blob of a shadow, no rim or fill on the shaded side |
+| Interiors | NEARLY | the greenhouse has a sense of place; the Hab richly dressed but evenly lit, disc shadows, floating furniture |
+| Overall | NOT MET | "about a third would pass for a good stylised indie or mobile release, none for AAA, about one in six plainly unfinished" (29 pass, 45 competent, 15 unfinished, of 89) |
+
+Landmarks and Terrain moved up from NOT MET (the canyon from its real rim, the seam fix, the crack lines). Round 9's
+list, re-checked by this reviewer: gone are the canyon as a pit (T2, from the rim), the ice's ghost shell, floating
+pebbles and white plate (T4), the beam (T6), the raised welts (T7), nothing from the parked rover (T10), legs cut
+by the frame and the blown funnel (T11), a dim `day-sun` (T12), the crewman's size and the missing ship in the last
+frames (T5), and no seam was seen in any picture. Still there: Olympus's forms (T1), bands on smooth hills
+(T2), the colour break (T3, strong in `dawn-light`), the outcrop and tan shadows on ice (T4), most of the launch
+(T5), the wreck (T8: "unchanged"), his shade, rim and stance (T9), the headlamp dots (T10), pebbles, the lattice,
+the heap's facets (T12).
+
+| # | Finding (most damaging first) | State |
+|---|---|---|
+| U1 | His shadow is a lumpy blob with a dithered edge and no head, pack or legs, in every frame; no rim or fill on his shaded side (one dull brown in `dawn`, `dusk`; a stipple of pixels on his outline); a disc under him indoors | open |
+| U2 | Near and far ground do not join: a near-straight line between maroon and orange sand (`dawn-light`, and at `hab-noon`, `hab-morning`, `hab-dusk`, `walk-plain`, `lander-perseverance`); ruler horizons with dark unhazed boulders on the line at ten sites | open |
+| U3 | The ending is uneven: the flame a white tube; the exhaust a cloth bell; the rocket 25 x 45 px two seconds after lift-off; `launch-wide` a white stalagmite with no rocket; a beige ball at `09.4` to `10.4`; a ribbon trail; the ship faceted cream cylinders close up; the tether a hairline across his boots; `27.6` and `launch-orbit` cropped to a sliver; both figures from behind at the catch | open |
+| U4 | Ice: the outcrop a clam-shell with a smeared face and soap blocks, a dark hexagon on one block (`ice-face`); his shadow on ice a thin tan line (blue in `pole-90`); lilac blotches with crisp edges and no caster (`ice`, `ice-face`); `south-pole` a uniform lily-pad carpet, blurred near the camera and too bright for night; `north-pole` matte with wedges | open |
+| U5 | Olympus: a platy crust now, but smooth lobes with no blocky fronts, levees or rubble; the left third of `olympus-flows` untextured dough, an olive patch; the caldera's dapples, a maroon mass, tile lines underfoot | open |
+| U6 | The Schiaparelli wreck: paper shards, tan gumdrops, a black airbrushed scorch, murky ground, a smooth blob of land beside it | open |
+| U7 | One polygon crack net everywhere: on cliffs at one cell size (`canyon-wall`, `canyon`, `canyon-gully`), on loose dunes where it cannot be (`rover-drive`, `debris-c`, `rtg`); pen lines across Mars 3's mesa; white twig scribbles in `dawn-light` | open |
+| U8 | The storm is painted, not moving: flat streaks with hard edges, no dust near the camera, him at full contrast, a pure white disc | open |
+| U9 | Night lights: the helmet pool small with a hard far edge; two haloed headlamp dots seen from behind the rover (a bug); him a black cut-out | open |
+| U10 | Rocks: pebbles one colour, evenly sprinkled; a dot lattice on a slab's top (`astronaut-front`) and dot rows in ripples (`canyon-wall`); stretched stripes on blocks (`pod`); a bun with drawn cracks; white streaks (`day-sun`); cubes (`dawn`) | open |
+| U11 | The Hab inside: even light, furniture with almost no shadow, clean flat props, paper plants, a small head on a bulky suit, half the screen bare floor | open |
+| U12 | Props spotless and on the ground, not in it; no furrow under the tank (`debris-c`); no footprints or tracks round the Hab | open |
+| U13 | Sky and globe: round blurred smudges like dirt on the lens (`launch`, `deployables`, `rover-drive`); an empty gradient in most frames; a fat limb halo; Olympus a black oval | open |
+| U14 | The rover: its dust a soot blob with a thin rectangle on the ground beside it (a bug); no glass feel to its windows | open |
+| U15 | The canyon's finish: the rim 90% one beige with no cast shadow; the wall thirty-degree lobes; a flat sheet of fog in `canyon-climb` | open |
+| U16 | The greenhouse: a dark diagonal band on the ground outside its door; a plain cap, chunky struts, no glass seen from above; an octagon fan and paper plants | open |
+| U17 | Smaller: the heap faceted (`hab-noon`, `hab-dusk`); noon flat; Beagle 2 dim; one idle pose in every prop picture | open |
+
 ## Independent interface and onboarding review
 
 A reviewer was given every interface state at 1280x720 and at iPhone landscape (844x390), and a
@@ -651,7 +702,7 @@ card ahead of ready ones (L14: fixed after these pictures).
 | M9 | The direction arrow floats mid-picture with no distance | fixed: for a place off the screen the arrow keeps to the screen's edge, within fifty degrees of the true way, or is not drawn |
 | M10 | Onboarding order: JOURNAL's button a step before its card; five NEW cards in 38 game minutes; arrows seen ten pictures before they are explained; COLONY opens on an empty fabricator; POWER and MORALE introduced with no consequence; VIEW, JUMP, the rover never mentioned | part: a screen's button arrives with its card; the colony opens on what he carries until something can be built; the POWER and MORALE cards say what moves them. The rest open |
 | M11 | Vocabulary: six names for air; "the colony" in a forecast; the breach "behind the comms desk" and at the "FAR WALL"; "3 left"; an earned achievement as an order; speeds that disagree; three verbs for making | part: the breach is at the "desk wall" in both places; "3 burns left". The forecast and the achievement were stale sample text in the picture script (the game already had them right). The rest open |
-| M12 | Settings: text size under GRAPHICS; three slider origins; a 44 px white knob; half-empty sheets | part: the first tab is "Display" (picture quality and the interface's size). The rest open |
+| M12 | Settings: text size under GRAPHICS; three slider origins; a 44 px white knob; half-empty sheets | part: the first tab is "Display" (picture quality and the interface's size); a slider's handle is drawn as a round knob inside its 44 px hit area and its track runs between the knob's end positions. Three slider origins and half-empty sheets open |
 | M13 | The destination named three times and its distance twice; the status strip's left edge moves; the region's name reads as the chip's subtitle | open |
 | M14 | The difficulty sheet: "TO LAST 25 sols" could be the supplies; nothing says longer is harder; unlabelled pips | part: "Hold out: 25 sols to rescue". The pips open |
 | M15 | Planting cards: "meals" orphaned; the footer hint wrapped in a narrow column; the radish says the same thing twice; no RECOMMENDED on potatoes | part: the radish's own line. The rest open |

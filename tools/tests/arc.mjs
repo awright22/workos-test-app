@@ -78,8 +78,9 @@ const still = await ev(() => !!document.querySelector('#mg-panel .sleep .wake'))
 await ev(() => document.querySelector('#mg-panel .sleep .wake').click());
 await sleep(300);
 s = await ev((G) => ({ sol: G.S.sol, sleeping: G.S.sleeping, ui: G.S.uiOpen, over: G.S.over }));
+// (the first night's account has four tiles: morale's comes with its bar, and until then the Morale row says what it is)
 check('sleeping until dawn advances the sol; the night\'s account waits to be read, then Start the day wakes him',
-  s.sol === sol0 + 1 && !s.sleeping && !s.ui && !s.over && held.sleeping && held.cells === 5 && held.notes.some((n) => /^Breakfast/.test(n)) && held.notes.some((n) => /^Morale/.test(n)) && still, { ...s, sol0, held, still });
+  s.sol === sol0 + 1 && !s.sleeping && !s.ui && !s.over && held.sleeping && held.cells === 4 && held.notes.some((n) => /^Breakfast/.test(n)) && held.notes.some((n) => /^Morale/.test(n)) && still, { ...s, sol0, held, still });
 
 s = await ev((G) => {
   G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8);
