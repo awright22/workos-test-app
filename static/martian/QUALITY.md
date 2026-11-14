@@ -565,26 +565,58 @@ button (J7), new-player hesitations (J17).
 
 | # | Finding | State |
 | --- | --- | --- |
-| K1 | A dig prompt and an 84 px DIG button are on screen every second outdoors, even at 0:27 of air, in a breach and at night: the prompt slot no longer means "something is here" (both sizes: 09, 14–20, 26) | open |
-| K2 | The HUD covers about 45% of the small screen, and one distance is printed three times (compass tag, task card, world marker or edge arrow) | open |
-| K3 | Text under 11 px: the task card's detail (10 px grey, on a translucent card), banner sub-lines, gauge units "%", "L", "meals" (8–9 px), the HUD buttons' labels, CANDLE / NEEDS REGOLITH / BREACH FIRST, tile labels on the numbers, statistics, dawn, death and win sheets, the marker card's labels, the map's latitude and longitude | open |
-| K4 | The help chip "? GUIDE" is 54 x 18 px, and once its first card has gone nothing else shows that the gauges can be pressed | open |
-| K5 | Six bars still arrive at once, explained by an optional sheet of 150 to 250 words under three names (GUIDE, WHAT THE BARS MEAN, WHAT KEEPS YOU ALIVE); VITALS and the trend arrows are never explained in play | open |
-| K6 | The map's "SCALE 1:282" beside "10 KM" under the whole planet reads as a bug | open |
-| K7 | Cards for new buttons and the buttons' lights are out of step (COLONY lit with no card, JOURNAL's card with no light), COLONY is never explained in the first ten minutes, and the buttons shift left as each new one arrives | open |
-| K8 | "HAB" in red labels neutral lines (a dust devil, a placing hint); "LOG Log, Sol 1"; control hints are kept in the log | open |
-| K9 | Tab badges do not match the headers under them (UPGRADES 4 over "2 OF 10 INSTALLED", HOME 6 over "2 OF 9 MADE", DISCOVERIES 9 over "5 OF 14 FOUND") | open |
-| K10 | Prompt pills: three-line prompts at 667; a pill wider than its text; "untried" is cryptic | open |
-| K11 | Names and numbers that disagree: suit oxygen as "100%", "5:56 OF AIR", "+40 suit O2" and "150 → 200"; BATTERY against "Rover power"; "EVA O2 drain"; food as meals, rations and food; morale as a percentage and as points; KEY against LEGEND; fractions written four ways; "He plays both sides"; MAV against "Ares 4 rocket"; "(−2 food, 20 left)" then "Food for 20 sols"; the FOOD bar full at 22 with no stated maximum; "+0.5 A SOL" | open |
-| K12 | The dawn sheet is dense: five tiles and five to seven centred lines with a long bracketed morale sum | open |
-| K13 | Compass: an unlabelled 12 px door glyph and dots; its tag sometimes names something other than the task (HAB 29 m with the task at HEAP 1 m); "SOL 1 / 25" never says 25 is the rescue, which is worded three ways ("earliest rescue", "by Sol 25", "on Sol 25") | open |
-| K14 | Nothing says how to leave the Hab: the heap's distance is a straight line through the wall | open |
-| K15 | The right-thumb cluster is crowded: the candle 6 px from RUN, JUMP 9 px from the action button | open |
-| K16 | Indoors a breach is said six times; the prompt repeats the task; the refused button "BREACH FIRST" does not say what is refused | open |
-| K17 | The plan arrives as a passing log card while PLANT is up, in the slot that carries jokes | open |
-| K18 | Map details: a name over a storm's hatching; labels 5 to 11 px apart; an unlabelled grey dot and the MAV's icon missing from the key; the key's panel translucent and cutting the longitude labels; the hint touching PHOENIX; a ring cut by the top edge; Mars 3 and Mars 6 drawn as different kinds | open |
-| K19 | Colony: four rows of headers leave about 210 px for cards; second-row titles sliced by the fade; the out-of-range banner pushes the tabs down and drops their badges; a first visit is a screen of red "Missing"; MAKE buttons at different heights; ragged inventory columns | open |
-| K20 | Smaller: no count of carried loads on the HUD; the crop chooser's rows do not look pressable; a red WATER row with no task; the win sheet's wrapped tile and run-on attribution; nothing says what WAKE AT DAWN costs; comms has no way out but NEXT six times; a KEYBOARD tab on a phone; pills that linger (the bunk after 20 s); the outside temperature shown indoors; "100%" a third of the way along two sliders; sub-tab strips 42 px tall; dismissal at the bottom right on four sheets; the lead task unchanged through other chores | open |
+| K1 | A dig prompt and an 84 px DIG button are on screen every second outdoors, even at 0:27 of air, in a breach and at night: the prompt slot no longer means "something is here" (both sizes: 09, 14–20, 26) | acted on; re-checked in the seventh review (see there for what is left) |
+| K2 | The HUD covers about 45% of the small screen, and one distance is printed three times (compass tag, task card, world marker or edge arrow) | acted on; re-checked in the seventh review (see there for what is left) |
+| K3 | Text under 11 px: the task card's detail (10 px grey, on a translucent card), banner sub-lines, gauge units "%", "L", "meals" (8–9 px), the HUD buttons' labels, CANDLE / NEEDS REGOLITH / BREACH FIRST, tile labels on the numbers, statistics, dawn, death and win sheets, the marker card's labels, the map's latitude and longitude | acted on; re-checked in the seventh review (see there for what is left) |
+| K4 | The help chip "? GUIDE" is 54 x 18 px, and once its first card has gone nothing else shows that the gauges can be pressed | acted on; re-checked in the seventh review (see there for what is left) |
+| K5 | Six bars still arrive at once, explained by an optional sheet of 150 to 250 words under three names (GUIDE, WHAT THE BARS MEAN, WHAT KEEPS YOU ALIVE); VITALS and the trend arrows are never explained in play | acted on; re-checked in the seventh review (see there for what is left) |
+| K6 | The map's "SCALE 1:282" beside "10 KM" under the whole planet reads as a bug | acted on; re-checked in the seventh review (see there for what is left) |
+| K7 | Cards for new buttons and the buttons' lights are out of step (COLONY lit with no card, JOURNAL's card with no light), COLONY is never explained in the first ten minutes, and the buttons shift left as each new one arrives | acted on; re-checked in the seventh review (see there for what is left) |
+| K8 | "HAB" in red labels neutral lines (a dust devil, a placing hint); "LOG Log, Sol 1"; control hints are kept in the log | acted on; re-checked in the seventh review (see there for what is left) |
+| K9 | Tab badges do not match the headers under them (UPGRADES 4 over "2 OF 10 INSTALLED", HOME 6 over "2 OF 9 MADE", DISCOVERIES 9 over "5 OF 14 FOUND") | acted on; re-checked in the seventh review (see there for what is left) |
+| K10 | Prompt pills: three-line prompts at 667; a pill wider than its text; "untried" is cryptic | acted on; re-checked in the seventh review (see there for what is left) |
+| K11 | Names and numbers that disagree: suit oxygen as "100%", "5:56 OF AIR", "+40 suit O2" and "150 → 200"; BATTERY against "Rover power"; "EVA O2 drain"; food as meals, rations and food; morale as a percentage and as points; KEY against LEGEND; fractions written four ways; "He plays both sides"; MAV against "Ares 4 rocket"; "(−2 food, 20 left)" then "Food for 20 sols"; the FOOD bar full at 22 with no stated maximum; "+0.5 A SOL" | acted on; re-checked in the seventh review (see there for what is left) |
+| K12 | The dawn sheet is dense: five tiles and five to seven centred lines with a long bracketed morale sum | acted on; re-checked in the seventh review (see there for what is left) |
+| K13 | Compass: an unlabelled 12 px door glyph and dots; its tag sometimes names something other than the task (HAB 29 m with the task at HEAP 1 m); "SOL 1 / 25" never says 25 is the rescue, which is worded three ways ("earliest rescue", "by Sol 25", "on Sol 25") | acted on; re-checked in the seventh review (see there for what is left) |
+| K14 | Nothing says how to leave the Hab: the heap's distance is a straight line through the wall | acted on; re-checked in the seventh review (see there for what is left) |
+| K15 | The right-thumb cluster is crowded: the candle 6 px from RUN, JUMP 9 px from the action button | acted on; re-checked in the seventh review (see there for what is left) |
+| K16 | Indoors a breach is said six times; the prompt repeats the task; the refused button "BREACH FIRST" does not say what is refused | acted on; re-checked in the seventh review (see there for what is left) |
+| K17 | The plan arrives as a passing log card while PLANT is up, in the slot that carries jokes | acted on; re-checked in the seventh review (see there for what is left) |
+| K18 | Map details: a name over a storm's hatching; labels 5 to 11 px apart; an unlabelled grey dot and the MAV's icon missing from the key; the key's panel translucent and cutting the longitude labels; the hint touching PHOENIX; a ring cut by the top edge; Mars 3 and Mars 6 drawn as different kinds | acted on; re-checked in the seventh review (see there for what is left) |
+| K19 | Colony: four rows of headers leave about 210 px for cards; second-row titles sliced by the fade; the out-of-range banner pushes the tabs down and drops their badges; a first visit is a screen of red "Missing"; MAKE buttons at different heights; ragged inventory columns | acted on; re-checked in the seventh review (see there for what is left) |
+| K20 | Smaller: no count of carried loads on the HUD; the crop chooser's rows do not look pressable; a red WATER row with no task; the win sheet's wrapped tile and run-on attribution; nothing says what WAKE AT DAWN costs; comms has no way out but NEXT six times; a KEYBOARD tab on a phone; pills that linger (the bunk after 20 s); the outside temperature shown indoors; "100%" a third of the way along two sliders; sub-tab strips 42 px tall; dismissal at the bottom right on four sheets; the lead task unchanged through other chores | acted on; re-checked in the seventh review (see there for what is left) |
+
+### Seventh review (phone only; two reviewers, one a size, every picture opened: 94 each)
+
+After the sixth review's list (K1 to K20). Pictures: 66 interface states and a 28-step first ten minutes at each
+size. Verdicts: interface NEARLY at 844 x 390 and at 667 x 375; first ten minutes NEARLY at 844, NEARLY and "close
+to MET" at 667. Both said the type, colour and layout hold together as one product, nothing sits under the notch
+or home indicator, and no text is under about 12 px.
+
+Of the sixth review's twenty: gone are the ever-present dig prompt (K1), text under 11 px (K3), the map's scale
+that read as a bug (K6), cards and lights out of step (K7), "HAB" in red (K8), three-line prompts (K10), the way out
+of the Hab (K14), the plan as a passing card (K17); mostly gone are six bars at once (K5), badges against headers
+(K9, one left), names and numbers (K11), the compass (K13), the breach said six times (K16), the small items (K20).
+Partly: HUD weight (K2: about 30% settled, 40% at worst), the GUIDE chip (K4: 59 x 27 px), the dawn sheet (K12),
+the thumb cluster (K15), map details (K18), the colony (K19).
+
+| # | Finding | State |
+|---|---|---|
+| L1 | Numbers that contradict each other on one screen: the TASKS badge 9 over "3 TO DO"; "Inspect both machines (0 of 2)" with one inspected; a dinner in the win timeline and "0 DINNERS COOKED"; "20 left" then "enough for 15 sols, eating as today"; a rising arrow on a full bar; "100 %" beside "100%" | part: the food line now says what it counts ("20 meals make 15 breakfasts"); the dinner count was the picture script's own state, corrected. The rest open |
+| L2 | The lead task follows the player's feet: planting, then panels at the panels, then water at the rig, then planting again; "Make water" listed before hydrazine has been explained | open |
+| L3 | Touch targets: the GUIDE chip 59 x 27 px; gauge rows on a 20 px pitch if they are pressed singly; top-right buttons 6 px apart; map markers 24 px with "tap again for the next" | open |
+| L4 | List screens show one and a half cards: three to five header rows leave 150 to 210 px, and the fade slices the next row (colony, journal, guide, statistics); the win and Sol 2 dawn sheets scroll at 667 | open |
+| L5 | Map: graticule labels under region names and storm hatching, a name over the longitude row, the key cutting an icon; at 667 the player's own coordinates truncated ("303...."), markers cut by the left and right edges, grey dots against the key's white | open |
+| L6 | Introduced out of order: morale scored on the first dawn sheet before it has a bar; JOURNAL unlit a step before its card; COLONY opened on a fabricator where nothing can be built; four NEW cards in 31 game minutes; the trend arrows shown ten steps before they are explained | part: the first dawn sheet now says what morale is. The rest open |
+| L7 | The cold open: 1:26 of air and 74 m to go, and nothing says run; the off-screen arrow floats inside the picture with no distance | open |
+| L8 | HUD rough edges: the gauge panel at full size from the first bar (an empty dark box through Sol 1); a card touching the joystick ring; the region's name as a second chip that reads as a destination; two banners of different widths; one distance printed two or three times; bottom pills with almost no backing and twice as wide as their text (667) | open |
+| L9 | The dawn sheet on Sol 2: five tiles and six lines, a 25-word FOOD sentence, a red "-10% POWER" with nothing saying a night's drain is normal | open |
+| L10 | Wording: "the colony" for the Hab; the breach "behind the comms desk" outdoors and "FAR WALL" indoors; "3 left", "yields 4", "25 FOOD GROWN" with no noun or unit; the candle under three names; O2 TANK and ROVER AIR in one picture; an earned achievement worded as an order; "warm afternoons" at 09:19; "160 to 200 km/h" on a planet 75 km round | open |
+| L11 | Settings: text size under GRAPHICS; slider tracks starting at different places on two tabs; a 44 px white block for a thumb; half-empty sheets | open |
+| L12 | New game: "Wake at dawn" not explained; nothing says a later rescue is harder | open |
+| L13 | Emergencies said too many ways: seven signals for a breach; the NIGHT card and the sleep task 60 px apart | open |
+| L14 | Colony: a first visit still mostly red chips with no pointer to debris; a LOCKED card ahead of READY ones; "6 READY" over cards none of which shows READY out of range | open |
+| L15 | Smaller: the status strip's left edge moving as the temperature comes and goes; ragged inventory columns with one icon for every crop; "LOG" stacked three times; win tiles wrapping; amber POWER at 18% with no task; nothing in the first ten minutes mentions VIEW, JUMP or the rover | open |
 
 ## Open items
 
@@ -616,6 +648,8 @@ button (J7), new-player hesitations (J17).
 | 24 | The interface tests are sensitive to how busy the machine is: a long test lets the suit drain and the log fill, and two layout checks then fail on overlaps that a short test does not reach. The overlaps are real (fix in hand); the tests should also set their own state instead of inheriting elapsed time | open |
 
 35. **Round 9's picture list (T1 to T12)**, above: bugs first (T4's shell, T3's shadows, T6), then the launch (T5), the astronaut's shade (T9), then the landmarks (T1, T2), which need content the height model does not yet make.
+
+36. **The seventh interface review's list (L1 to L15)**, above: the number bugs first (L1), then the cold open (L7), wording (L10), then the layout of list screens at small heights (L4) and the task card's lead (L2).
 
 ## Decisions worth knowing
 
