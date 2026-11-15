@@ -60,7 +60,8 @@ const lab = await g.eval(async (G) => {
   out.back = run((f) => [rock(f, 3.2, 0, 1.0, 1.5)], 2, 1 / 60, 's');
   // ---- on foot: a rock a little to one side of his way; he slides past it, at 30 frames a second as at 120
   G.input.keys.f = false;
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4);
+  // (parked first: asked to get out of a moving rover, it pulls up before he can; that is tested below)
+  G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4);
   out.afoot = G.S.mode;
   const walk = (dt) => {
     G.tpNear(G.World.rover.group.position, 30); G.tick(0.05, 2);
@@ -121,6 +122,30 @@ const field = await g.eval(async (G, sites) => {
   return { seen, site: best.name, mode, worst: +worst.toFixed(1), total: Math.round(total), slow, steep, jolts: G.roverF.jolts, hits: G.roverF.hits };
 }, sites);
 check(`a real boulder field (${field.site}) at full throttle for a minute: it never stops making progress`, field.mode === 'rover' && field.slow === 0 && field.total > 400 && field.jolts + field.hits >= 3, field);
+
+// ---- asked to get out at speed: it pulls up first, and the throttle takes the asking back -----------------------
+const leave = await g.eval(async (G) => {
+  const frames = (ms) => new Promise((r) => setTimeout(r, ms));
+  G.paused = false; await frames(800); G.paused = true;
+  G.rockColliders.length = 0; G.S.roverPower = 100;
+  const upTo = () => { G.input.keys.w = true; G.tick(1 / 30, 150); G.input.keys.w = false; return Math.abs(G.roverF.speed); };
+  const ask = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+  const out = { v0: upTo() };
+  ask();
+  out.still = G.S.mode;                                   // (at speed he is still in the seat)
+  let t = 0;
+  while (G.S.mode === 'rover' && t < 8) { out.vOut = Math.abs(G.roverF.speed); G.tick(1 / 30, 1); t += 1 / 30; }
+  out.t = +t.toFixed(2); out.mode = G.S.mode;
+  // back in, up to speed, asked again, and the throttle pressed: he stays in and it drives on
+  G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 4); G.hold(0.8);
+  out.again = G.S.mode;
+  upTo(); ask();
+  G.input.keys.w = true; G.tick(1 / 30, 60); G.input.keys.w = false;
+  out.kept = G.S.mode; out.vKept = +Math.abs(G.roverF.speed).toFixed(1);
+  return out;
+});
+check('asked to get out at speed, the rover pulls up and he is out as it stops; the throttle takes the asking back',
+  leave.v0 > 15 && leave.still === 'rover' && leave.mode === 'walk' && leave.t < 4 && leave.vOut < 3 && leave.again === 'rover' && leave.kept === 'rover' && leave.vKept > 15, leave);
 
 console.log(`\n${fails.length ? 'FAILED: ' + fails.length : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));
 await g.close();

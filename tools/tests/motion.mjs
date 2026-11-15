@@ -189,19 +189,63 @@ async function strip(g, route, file, n = 12, gap = 0.4) {
     shots.push((await page.screenshot({ type: 'jpeg', quality: 80, timeout: 120000 })).toString('base64'));
   }
   await g.eval((G) => { for (const k of ['w', 'a', 'd', 'shift']) G.input.keys[k] = false; G.tick(1 / 30, 20); });
-  // one picture: four frames across, numbered, read left to right and down
+  // (on foot the sheet is of the middle of the picture, where he is, at twice the size)
+  await sheetOf(page, shots, gap, `${route.name}: ${route.what}. ${n} frames, ${gap} s apart, left to right and down${route.mode === 'walk' ? '; the middle of each frame' : ''}.`, file, route.mode === 'walk' ? FOOT : null);
+}
+/** Frames as one picture: four across, numbered, read left to right and down. */
+async function sheetOf(page, shots, gap, title, file, crop = null) {
   const sheet = await page.context().newPage();
-  const data = await sheet.evaluate(async ({ shots, gap, title }) => {
+  const data = await sheet.evaluate(async ({ shots, gap, title, crop }) => {
     const imgs = await Promise.all(shots.map((b) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.src = 'data:image/jpeg;base64,' + b; })));
-    const cols = 4, w = 633, h = Math.round(w * imgs[0].height / imgs[0].width), rows = Math.ceil(imgs.length / cols), pad = 6, top = 30;
+    // (`crop`: the part of each frame that is kept, as shares of its width and height: [left, top, right, bottom])
+    const k = crop || [0, 0, 1, 1], sw = imgs[0].width * (k[2] - k[0]), sh = imgs[0].height * (k[3] - k[1]);
+    const cols = 4, w = 633, h = Math.round(w * sh / sw), rows = Math.ceil(imgs.length / cols), pad = 6, top = 30;
     const c = document.createElement('canvas'); c.width = cols * (w + pad) + pad; c.height = top + rows * (h + pad) + pad;
     const x = c.getContext('2d'); x.fillStyle = '#111'; x.fillRect(0, 0, c.width, c.height);
     x.fillStyle = '#eee'; x.font = '600 16px sans-serif'; x.fillText(title, pad, 21);
-    imgs.forEach((im, i) => { const cx = pad + (i % cols) * (w + pad), cy = top + Math.floor(i / cols) * (h + pad); x.drawImage(im, cx, cy, w, h); x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(cx, cy, 84, 20); x.fillStyle = '#fff'; x.font = '600 13px sans-serif'; x.fillText(`${i + 1}  +${(i * gap).toFixed(1)} s`, cx + 5, cy + 15); });
+    imgs.forEach((im, i) => { const cx = pad + (i % cols) * (w + pad), cy = top + Math.floor(i / cols) * (h + pad); x.drawImage(im, im.width * k[0], im.height * k[1], sw, sh, cx, cy, w, h); x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(cx, cy, 84, 20); x.fillStyle = '#fff'; x.font = '600 13px sans-serif'; x.fillText(`${i + 1}  +${(i * gap).toFixed(1)} s`, cx + 5, cy + 15); });
     return c.toDataURL('image/jpeg', 0.86).split(',')[1];
-  }, { shots, gap, title: `${route.name}: ${route.what}. ${n} frames, ${gap} s apart, left to right and down.` });
+  }, { shots, gap, title, crop });
   await sheet.close();
   await writeFile(file, Buffer.from(data, 'base64'));
+}
+
+/**
+ * Strips that are not routes: the camera turned about him, and each thing he does. `setup` and `each` run in the
+ * page; `each` is given the frame's number and plays the stretch before that frame.
+ */
+const FOOT = [0.24, 0.22, 0.76, 1];
+const EXTRAS = [
+  { name: 'turn-on-foot', foot: true, what: 'the camera turned once round him on foot, standing', n: 12, gap: 0.25,
+    setup: async (G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.tpLocal(8, 36, 3.3); await G.settle(); G.setLocalTime(13); G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 30); },
+    each: (G) => { for (let k = 0; k < 8; k++) { G.input.yaw = Math.PI * 2 / 12 / 8; G.tick(1 / 30, 1); } } },
+  { name: 'jump', foot: true, what: 'a jump from a walk: off, up, down, landed (he is in the air 1.8 s: Mars)', n: 12, gap: 0.2,
+    setup: async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.tpLocal(8, 44, 3.3); await G.settle(); G.setLocalTime(13); G.input.keys.w = true; G.tick(1 / 30, 30); },
+    each: (G, a) => { G.input.keys[' '] = a.i === 1; G.tick(1 / 30, 6); if (a.i === 11) { G.input.keys.w = false; G.input.keys[' '] = false; G.tick(1 / 30, 20); } } },
+  { name: 'kneeling-work', foot: true, what: 'digging at the heap: down on a knee, the work, up again', n: 12, gap: 0.33,
+    setup: async (G) => { G.S.inv.regolith = 0; G.tpNear(G.World.soilPiles[0].group.position, 1.5); await G.settle(); G.tick(1 / 30, 20); },
+    each: (G, a) => { G.input.eHeld = a.i < 9; if (!G.input.eHeld) G.S.holdT = 0; G.tick(1 / 30, 10); if (a.i === 11) { G.input.eHeld = false; G.tick(1 / 30, 20); } } },
+  { name: 'standing-work', foot: true, what: 'wiping a dusty solar panel: the work done standing', n: 8, gap: 0.3,
+    setup: async (G) => { const p = G.World.panels[0]; p.dust = 0.9; G.syncAllVisuals(); G.tpNear(p.group.position, 1.7); await G.settle(); G.tick(1 / 30, 20); },
+    each: (G, a) => { G.input.eHeld = a.i < 6; if (!G.input.eHeld) G.S.holdT = 0; G.tick(1 / 30, 9); if (a.i === 7) { G.input.eHeld = false; G.tick(1 / 30, 20); } } },
+  { name: 'getting-in', what: 'getting into the rover and setting off', n: 12, gap: 0.3,
+    setup: async (G) => { G.roverLocal(10, 70, 0); G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.tick(1 / 30, 20); },
+    each: (G, a) => { G.input.eHeld = a.i < 4 && G.S.mode !== 'rover'; if (!G.input.eHeld) G.S.holdT = 0; G.input.keys.w = a.i >= 5 && a.i < 11; G.tick(1 / 30, 9); if (a.i === 11) { G.input.keys.w = false; G.tick(1 / 30, 30); } } },
+  { name: 'turn-in-rover', what: 'the camera swung once round the parked rover', n: 12, gap: 0.25,
+    setup: async (G) => { G.roverF.speed = 0; G.tick(1 / 30, 30); },
+    each: (G) => { for (let k = 0; k < 8; k++) { G.input.yaw = Math.PI * 2 / 12 / 8; G.tick(1 / 30, 1); } } },
+];
+async function extra(g, x, file) {
+  const page = g.page, shots = [];
+  await g.eval(x.setup);
+  const said = await page.evaluate(() => (document.querySelector('#mg-tE .vb') || { textContent: '' }).textContent);
+  for (let i = 0; i < x.n; i++) {
+    await g.eval(x.each, { i });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await sleep(350);
+    shots.push((await page.screenshot({ type: 'jpeg', quality: 80, timeout: 120000 })).toString('base64'));
+  }
+  await sheetOf(page, shots, x.gap, `${x.name}: ${x.what}${said ? ' (the button said ' + said + ')' : ''}. ${x.n} frames, ${x.gap} s apart, left to right and down${x.foot ? '; the middle of each frame' : ''}.`, file, x.foot ? FOOT : null);
 }
 
 const list = ROUTES.filter((r) => !only || only.split(',').some((x) => r.name.includes(x)));
@@ -221,7 +265,15 @@ for (const route of list) {
     (wrong ? `  [mode ${r.mode}, wanted ${route.mode}]` : '') + `\n         left for the collector: ${r.garbage === null ? 'not measured' : r.garbage + ' MB a second of play'}${r.heavy.length ? ' (by part, kB a second: ' + r.heavy.map((q) => q[0] + ' ' + q[1]).join(', ') + ')' : ''}; the main thread's share of a frame, over ${r.frames.n} frames: ${r.frames.usual} ms as a rule, ${r.frames.worst} ms at worst` +
     `\n         the slowest parts of a step (worst ms, usual ms): ${r.parts.map((q) => `${q[0]} ${q[1]} / ${q[2]}`).join(', ')}` + (kinds ? `\n         ${kinds}` : ''));
   for (const f of r.flags) console.log('         ' + JSON.stringify(f));
-  if (strips) { const file = path.join(outDir, 'motion', route.name + '.jpg'); await strip(g, route, file); console.log('         strip: ' + file); }
+  // (a walk's step is under half a second: on foot the frames are an eighth of a second apart, so a sheet is two strides)
+  if (strips) { const file = path.join(outDir, 'motion', route.name + '.jpg'); await strip(g, route, file, 12, route.mode === 'walk' ? 0.13 : 0.4); console.log('         strip: ' + file); }
+}
+if (strips) {
+  for (const x of EXTRAS) {
+    if (only && !only.split(',').some((q) => x.name.includes(q))) continue;
+    const file = path.join(outDir, 'motion', x.name + '.jpg');
+    try { await extra(g, x, file); console.log(`  strip ${x.name}: ${file}`); } catch (e) { bad++; console.log(`  FAIL strip ${x.name}: ${e.message}`); }
+  }
 }
 if (g.errors.length) { bad += g.errors.length; console.log('  console errors: ' + JSON.stringify(g.errors.slice(0, 4))); }
 await g.close();

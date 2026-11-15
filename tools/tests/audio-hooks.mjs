@@ -117,7 +117,7 @@ await g.eval((G) => { G.S.suit = 100; });
 
 r = await act(async (G) => { G.tpNear(G.World.rover.group.position, 3.2); await window.__run(0.8, true); G.input.keys.w = true; await window.__run(3); G.input.keys.w = false; });
 check('boarding and driving the rover', has(r, 'roverEnter') && r.p.place === 'rover' && r.p.roverSpeed > 5, { h: r.h, speed: r.p.roverSpeed, throttle: r.p.throttle, rough: +(+r.p.rough).toFixed(3) });
-r = await act(async (G) => { await window.__run(2.5); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); await window.__run(0.3); });
+r = await act(async (G) => { await window.__run(2.5); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); await window.__run(2.5); });      // (if it is still rolling it pulls up first)
 check('stepping out', has(r, 'roverExit') && r.p.place !== 'rover', r.h);
 
 r = await act(async (G) => { G.S.sol++; await window.__run(0.3); G.checkAchievements(); await window.__run(0.2); });

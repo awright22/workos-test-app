@@ -254,7 +254,7 @@ export async function walk(size, o = {}) {
   // (parked means stopped: left to coast, it was photographed "parked" at 56 km/h)
   await ev((G) => { G.input.keys['w'] = false; G.tick(0.05, 30); G.roverF.speed = 0; G.tick(0.05, 6); });
   await shot('hud-rover-parked', 200);
-  await ev((G) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); });
+  await ev((G) => { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); });
 
   // ---------------------------------------------------------------- Pathfinder: the NASA conversation
   // (the run is on Sol 12 from here on, as the later pictures say: set afterwards, the conversation spoke of "24 more sols")

@@ -24,7 +24,7 @@ export const roverF = {
   q: new THREE.Quaternion(), speed: 0, steer: 0,
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
-  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0,
+  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, leaving: false,
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 const _down = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -151,9 +151,20 @@ export function enterRover() {
   Snd.play('roverEnter');
   emit('rover-enter', {});
 }
+/**
+ * The driver asks to get out. Standing, or at a crawl, he does. At speed the rover pulls up first and he gets out as
+ * it stops. (EXIT took one tap at a hundred kilometres an hour and put him on the ground beside a rover stopped dead;
+ * three reviewers asked what a stray thumb would do.) Any throttle takes the asking back.
+ */
+export function leaveRover() {
+  if (S.mode !== 'rover') return;
+  if (Math.abs(roverF.speed) < 2.5) exitRover(); else roverF.leaving = true;
+}
+
 export function exitRover() {
   S.mode = 'walk';
   roverF.speed = 0;
+  roverF.leaving = false;
   player.q.copy(roverF.q);
   frameMove(player.q, 1, 0, 3.4, R);                // step out to the side
   collideUnit(player.q, 0.42);
@@ -193,6 +204,11 @@ export function updateRover(dt) {
   if (Math.abs(t.joyY) > 0.2) throttle = clamp(-t.joyY * 1.2, -1, 1);
   let steerIn = (k['a'] || k['arrowleft'] ? 1 : 0) - (k['d'] || k['arrowright'] ? 1 : 0);
   if (Math.abs(t.joyX) > 0.15) steerIn = clamp(-t.joyX * 1.2, -1, 1);
+  // (asked to stop and let him out: it brakes, and he is out as it comes to a crawl; the throttle takes it back)
+  if (RV.leaving) {
+    if (throttle !== 0) RV.leaving = false;
+    else if (Math.abs(RV.speed) < 2.5) { exitRover(); return; }
+  }
   RV.throttle = throttle;
   const dead = S.roverPower <= 0.5;
   const top = dead ? 5 : roverTopSpeed();            // a dead battery leaves an emergency crawl
@@ -212,6 +228,7 @@ export function updateRover(dt) {
   acc -= g * grade / Math.sqrt(1 + grade * grade);                                            // weight along the slope
   acc -= dir * (0.35 + Math.abs(RV.speed) * 0.045);                                           // rolling drag
   if (throttle === 0 && Math.abs(RV.speed) < 3) acc -= RV.speed * 2.2;                        // parking brake
+  if (RV.leaving) acc -= Math.sign(RV.speed) * 17;                                            // pulling up to let him out
   RV.speed += acc * dt;
   // too steep for the wheels to hold: it will not climb, and slides back
   const limit = clamp(1.25 - grade * 1.55, 0, 1);

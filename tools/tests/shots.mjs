@@ -76,10 +76,10 @@ const scenes = {
   'rover-drive': async () => ev(async (G) => { G.setLocalTime(10.5); G.roverLocal(44, 122, 0.4); G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); G.input.keys['w'] = true; G.tick(0.05, 120); await G.settle(); G.tick(0.05, 6); G.input.keys['w'] = false; }),
   // (it sets itself up: taken alone, it used to be whatever the scene before it had left, often a man on foot by the Hab)
   'rover-night': async () => ev(async (G) => { G.setLocalTime(22.5); G.roverLocal(44, 122, 0.4); if (G.S.mode !== 'rover') { G.tpNear(G.World.rover.group.position, 3.2); G.hold(0.8); } G.input.keys['w'] = true; G.tick(0.05, 70); await G.settle(); G.tick(0.05, 6); G.input.keys['w'] = false; }),
-  'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
+  'storm': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); G.tpLocal(8, 30, 0); G.setLocalTime(13); G.setStorm(1); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'storm-sun': async () => ev(async (G) => { G.setLocalTime(16.6); G.faceSun(); G.look(0.2); G.tick(0.05, 40); await G.settle(); }),
   'storm-over': async () => ev((G) => { G.setStorm(0); }),
-  'mav': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 14); G.setLocalTime(9);
+  'mav': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); G.tpNear(G.World.mav.position, 14); G.setLocalTime(9);
     { const up = G.player.pos.clone().normalize(), d = G.World.mav.position.clone().sub(G.player.pos); d.addScaledVector(up, -d.dot(up)).normalize(); const side = up.clone().cross(d); G.lookAt({ x: d.x + side.x * 0.3, y: d.y + side.y * 0.3, z: d.z + side.z * 0.3 }); }      // (the rocket beside him, not behind him)
     G.look(0.26); G.tick(0.05, 40); await G.settle(); }),
   'canyon': async () => ev(async (G) => { await G.tp(-11.5, 293, 3.14); G.setLocalTime(15.5); G.look(0.12); G.tick(0.05, 40); await G.settle(); }),
@@ -142,8 +142,8 @@ const scenes = {
   ])),
   'free-camera-off': async () => ev((G) => { G.photo(null); }),
   // gaps the second review named: the sun in a clear sky, the astronaut from the front, the pole itself
-  'day-sun': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tpHab(40, 120, 0); G.setLocalTime(15.6); G.faceSun(); G.look(0.34); G.tick(0.05, 40); await G.settle(); }),
-  'astronaut-front': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tpHab(30, 70, 2.2); G.setLocalTime(9.5); G.look(-0.1); G.tick(0.05, 40); await G.settle();
+  'day-sun': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); await G.tpHab(40, 120, 0); G.setLocalTime(15.6); G.faceSun(); G.look(0.34); G.tick(0.05, 40); await G.settle(); }),
+  'astronaut-front': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); await G.tpHab(30, 70, 2.2); G.setLocalTime(9.5); G.look(-0.1); G.tick(0.05, 40); await G.settle();
     const P = G.photoMode; P.enterPhoto(); P.photo.yaw += Math.PI; P.photo.dist = 3.1; P.photo.pitch = 0.04; P.photo.rise = 0.15; P.photo.fov = 40; }),
   'photo-off': async () => ev((G) => { G.photoMode.exitPhoto(); }),
   // the figure himself, close, from the side and from behind (he stands at the spot and the camera goes round him)
@@ -151,7 +151,7 @@ const scenes = {
   // (he faces south as he is stood here: his back is seen from the north. From bearing 200 this picture was a second front view.)
   'astronaut-back': async () => ev(async (G) => { G.photo(G.player.pos.clone(), 3.4, 20, 1.4, 0.95); G.tick(0.05, 2); await G.settle(); }),
   '-camera-back-2': async () => ev(async (G) => { G.photo(null); G.tick(0.05, 2); await G.settle(); }),
-  'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
+  'pole-90': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); await G.tp(89.93, 0, 2.2); G.setLocalTime(12); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   'dawn': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(6.75); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
   'dawn-light': async () => ev(async (G) => { G.tpHab(8, -40, 0); G.setLocalTime(6.9); G.look(-0.03); G.tick(0.05, 40); await G.settle(); }),
   'dusk': async () => ev(async (G) => { await G.tp(-14.6, 175.5, 0); G.setLocalTime(17.95); G.faceSun(); G.look(0.06); G.tick(0.05, 40); await G.settle(); }),
@@ -159,7 +159,7 @@ const scenes = {
   'night-plain': async () => ev(async (G) => { G.setLocalTime(23); G.look(-0.05); G.tick(0.05, 40); await G.settle(); }),
   // the last act, and so the last pictures (the game is won at the end of it): the pad as the engine lights, the column
   // from far off, the climb into a black sky, and the Hermes over the day-night line (tests/film.mjs takes the whole strip)
-  'launch': async () => ev(async (G) => { if (G.S.mode === 'rover') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 130); await G.settle(); }),
+  'launch': async () => ev(async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); } G.tick(0.05, 2); G.tpNear(G.World.mav.position, 26); G.setLocalTime(9); G.tick(0.05, 20); await G.settle(); G.startLaunch(); G.tick(0.05, 130); await G.settle(); }),
   'launch-wide': async () => ev(async (G) => { G.tick(0.05, 50); await G.settle(); }),
   'launch-climb': async () => ev(async (G) => { G.tick(0.05, 120); await G.settle(); }),
   'launch-orbit': async () => ev(async (G) => { G.tick(0.05, 250); await G.settle(); }),
@@ -171,7 +171,7 @@ for (const [name, setup] of Object.entries(scenes)) {
   await ev((G) => { G.S.suit = 100; G.S.health = 100; G.S.o2 = 100; G.S.water = 80; G.S.food = 10; G.S.power = 90; });   // nobody suffocates mid-shoot
   // (a scene that is not about the rover starts on foot, whatever ran before it: with --only, the scenes after
   // `rover-drive` were taken from the driver's seat)
-  if (!name.startsWith('rover')) await ev((G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); } });
+  if (!name.startsWith('rover')) await ev((G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); } });
   await setup();
   await ev((G) => { G.paused = false; });
   await sleep(700);

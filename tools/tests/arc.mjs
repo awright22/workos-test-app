@@ -96,8 +96,9 @@ s = await ev((G) => {
   return out;
 });
 check('driving the rover', s.mode1 === 'rover' && s.speed > 20 && s.driven > 100 && s.drained > 0, s);
-s = await ev((G) => { G.input.keys['f'] = false; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); return { mode: G.S.mode }; });
-check('F steps out of the rover', s.mode === 'walk', s);
+// (at speed it pulls up first: two and a half seconds is time enough from its top speed)
+s = await ev((G) => { G.input.keys['f'] = false; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 2); const still = G.S.mode; G.tick(0.05, 50); return { still, mode: G.S.mode }; });
+check('F pulls the rover up and steps out of it', s.mode === 'walk', s);
 
 s = await ev((G) => {
   G.S.flags.pfRevealed = true;

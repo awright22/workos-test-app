@@ -750,7 +750,7 @@ for (const size of SIZES) {
     }, size.safe);
     check(`${size.name}: the pause menu stays inside the safe area`, inside.length === 0, inside);
     await page.locator('[data-act="resume"]').tap();
-    await g.eval((G) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); });
+    await g.eval((G) => { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); });
     await page.locator('#mg-trow [data-t="map"]').tap();
     check(`${size.name}: the touch map button opens the map`, await page.evaluate(() => document.getElementById('mg-map').style.display === 'block'));
     const hd = await page.evaluate(([st, sr, sb, sl]) => { const r = document.querySelector('#mg-map .close').getBoundingClientRect(); return r.right <= innerWidth - sr && r.top >= st && r.width >= 40 && r.height >= 40; }, size.safe);
@@ -909,7 +909,7 @@ for (const size of SIZES) {
     await page.locator('#mg-journal .close').tap();
   }
   // the largest interface size the player can ask for is held to what this window has room for
-  await g.eval((G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); } });
+  await g.eval((G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 3); } });
   const cap = await page.evaluate(() => { window.__UI.setSetting('hudScale', 1.4); return { scale: window.__UI.layout.scale, max: window.__UI.layout.maxScale }; });
   const badBusy = await busy(), badDrive = await driving(), badCrowd = await crowded();
   check(`${size.name}: at the largest interface size (${Math.round(cap.scale * 100)}% here), still nothing overlaps, with a long log and a long mission line too`, cap.scale <= cap.max && badBusy.length === 0 && badDrive.length === 0 && badCrowd.length === 0, { cap, badBusy, badDrive, badCrowd });

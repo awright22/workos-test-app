@@ -8,7 +8,7 @@ import { screenOpen, closeScreens, toggleScreen } from '../ui/screens.js';
 import { showBarsGuide } from '../ui/menus.js';
 import { screenUnlocked, gaugesOpen, openGauges } from '../ui/hud.js';
 import { showPause } from './flow.js';
-import { exitRover } from './rover.js';
+import { leaveRover } from './rover.js';
 import { useCandle } from './inventory.js';
 import { settings, onSettingsChange } from '../ui/settings.js';
 import { layout } from '../ui/layout.js';
@@ -79,7 +79,7 @@ export function initInput() {
       if (screenOpen()) { closeScreens(); tryLock(); }
       else if (!S.uiOpen) showPause();
     }
-    if (k === 'f' && S.mode === 'rover' && !S.uiOpen && !screenOpen()) exitRover();
+    if (k === 'f' && S.mode === 'rover' && !S.uiOpen && !screenOpen()) leaveRover();
     if (k === 'v' && !S.uiOpen && !screenOpen()) {
       S.firstPerson = !S.firstPerson;
       log(S.firstPerson ? 'Helmet cam. Just you and the visor.' : 'Suit cam deployed. Looking good, Watney. Ish.', 'sys');
@@ -211,7 +211,7 @@ function initTouch(canvas) {
     UI.tSprint.classList.toggle('on', touchIn.sprint);
     UI.tSprint.setAttribute('aria-pressed', touchIn.sprint);
   });
-  press(UI.tExit, () => { if (S.mode === 'rover') exitRover(); });
+  press(UI.tExit, () => { if (S.mode === 'rover') leaveRover(); });
   press(UI.tCam, () => { if (playing()) S.firstPerson = !S.firstPerson; });
   press(UI.tCandle, () => { if (playing()) useCandle(); });
   press(UI.tPause, () => { if (screenOpen()) closeScreens(); showPause(); });
