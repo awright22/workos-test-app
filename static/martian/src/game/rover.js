@@ -24,7 +24,7 @@ export const roverF = {
   q: new THREE.Quaternion(), speed: 0, steer: 0,
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
-  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, leaving: false,
+  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, leaving: false, accel: 0, lat: 0, camBlend: 1, camFromQ: null,
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 const _down = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -112,15 +112,22 @@ export function syncRoverVisual(dt) {
   const hB = surfaceAt(_pv.copy(G.position).addScaledVector(_fw, -1.9));
   const hR = surfaceAt(_pv.copy(G.position).addScaledVector(_rt, 1.25));
   const hL = surfaceAt(_pv.copy(G.position).addScaledVector(_rt, -1.25));
-  const tPitch = Math.atan2(hF - hB, 3.8), tRoll = Math.atan2(hL - hR, 2.5), tHeave = (hF + hB + hR + hL) / 4 - ground;
+  // Its weight shows: the nose lifts as it gathers way and dips as it brakes, and it leans out of a turn. (It rode
+  // as the ground lay and nothing else: a box on rails, braking and cornering flat.)
+  const squat = clamp(RV.accel * 0.006, -0.075, 0.05), lean = clamp(RV.lat * 0.004, -0.09, 0.09);
+  // Over a crest the ground under its middle stands above its wheels: the body rides up on it, not down into it.
+  // (Its belly, half a metre up, touched the crest of the canyon's rim at speed: tests/motion.mjs measured it.)
+  const tPitch = Math.atan2(hF - hB, 3.8) + squat, tRoll = Math.atan2(hL - hR, 2.5) + lean, tHeave = Math.max(-0.28, (hF + hB + hR + hL) / 4 - ground);
   if (dt <= 0) { RV.pitch = tPitch; RV.roll = tRoll; RV.heave = tHeave; RV.pitchV = RV.rollV = RV.heaveV = 0; }
   else {
     // a stiff, well-damped spring toward the terrain's attitude: the body lags and settles
-    const k = 110, c = 15;
+    // (damped a little under half of critical: it rocks once after a bump and settles. At seven tenths it took a
+    //  bump without a sign, and rode a boulder field level.)
+    const k = 110, c = 10;
     RV.pitchV += ((tPitch - RV.pitch) * k - RV.pitchV * c) * dt; RV.pitch += RV.pitchV * dt;
     RV.rollV += ((tRoll - RV.roll) * k - RV.rollV * c) * dt; RV.roll += RV.rollV * dt;
-    RV.heaveV += ((tHeave - RV.heave) * 160 - RV.heaveV * 18) * dt; RV.heave += RV.heaveV * dt;
-    RV.pitch = clamp(RV.pitch, -0.9, 0.9); RV.roll = clamp(RV.roll, -0.8, 0.8); RV.heave = clamp(RV.heave, -0.6, 0.6);
+    RV.heaveV += ((tHeave - RV.heave) * 160 - RV.heaveV * 12) * dt; RV.heave += RV.heaveV * dt;
+    RV.pitch = clamp(RV.pitch, -0.9, 0.9); RV.roll = clamp(RV.roll, -0.8, 0.8); RV.heave = clamp(RV.heave, -0.34, 0.6);
   }
   G.position.addScaledVector(_up, RV.heave);
   G.quaternion.copy(RV.q)
@@ -165,6 +172,7 @@ export function exitRover() {
   S.mode = 'walk';
   roverF.speed = 0;
   roverF.leaving = false;
+  roverF.accel = 0; roverF.lat = 0;                      // (parked, it sits level on its springs)
   player.q.copy(roverF.q);
   frameMove(player.q, 1, 0, 3.4, R);                // step out to the side
   collideUnit(player.q, 0.42);
@@ -230,6 +238,7 @@ export function updateRover(dt) {
   if (throttle === 0 && Math.abs(RV.speed) < 3) acc -= RV.speed * 2.2;                        // parking brake
   if (RV.leaving) acc -= Math.sign(RV.speed) * 17;                                            // pulling up to let him out
   RV.speed += acc * dt;
+  RV.accel = acc * (RV.speed < -0.5 ? -1 : 1);            // (as the body feels it: forward is nose up)
   // too steep for the wheels to hold: it will not climb, and slides back
   const limit = clamp(1.25 - grade * 1.55, 0, 1);
   if (grade > 0.2 && RV.speed > top * limit) RV.speed = lerp(RV.speed, top * limit, damp(0.25, dt));
@@ -240,6 +249,7 @@ export function updateRover(dt) {
   const maxSteer = lerp(0.55, 0.16, clamp(Math.abs(RV.speed) / 40, 0, 1));
   RV.steer = lerp(RV.steer, steerIn * maxSteer, damp(steerIn ? 0.12 : 0.08, dt));
   if (Math.abs(RV.speed) > 0.05) frameYaw(RV.q, (RV.speed * Math.tan(RV.steer) / 3.8) * dt);
+  RV.lat = RV.speed * RV.speed * Math.tan(RV.steer) / 3.8;      // (sideways pull in a turn: the body leans out of it)
   // sideways slip on a cross slope, noticeable only when it is steep
   _rt.set(1, 0, 0).applyQuaternion(RV.q);
   const cross = _down.dot(_rt) * RV.slope;
@@ -265,6 +275,12 @@ export function updateRover(dt) {
     if (into > 0) {
       if (!RV.touching) RV.hits++;
       if (!RV.touching && Math.abs(RV.speed) > 6) { S.shake = Math.max(S.shake, 0.35 * into); emit('rover-bump', { speed: Math.abs(RV.speed) * into }); }
+      // ... and the body takes it: the nose goes down, it rolls off the side that struck, and it lifts. (A strike was a
+      // number on the dial and a sound: the body rode on level.)
+      if (!RV.touching) {
+        const hard = into * clamp(Math.abs(RV.speed) / 14, 0.25, 1), sideHit = Math.sign(_hitN.dot(_rt)) || 1;
+        RV.pitchV -= 1.5 * hard * way; RV.rollV += 1.1 * hard * sideHit; RV.heaveV += 1.2 * hard;
+      }
       RV.speed *= Math.exp(-dt * (1 - Math.sqrt(1 - into * into)) / 0.12);
       if (throttle * way > 0.1) {
         const side = Math.abs(_hitN.dot(_rt)) > 0.04 ? Math.sign(_hitN.dot(_rt)) : (Math.sign(steerIn) ? -Math.sign(steerIn) : 1);
@@ -312,8 +328,15 @@ export function updateRover(dt) {
   const back = 9.8 + Math.abs(RV.speed) * 0.07, lift = 4.3 + RV.camPitch * 5;
   _v2.set(0, 0, 1).applyQuaternion(_q1);
   _pv.copy(World.rover.group.position).addScaledVector(_v2, back * Math.cos(RV.camPitch * 0.6)).addScaledVector(_up, lift);
-  if (!RV.camInit) { RV.camPos.copy(_pv); RV.camInit = true; }
-  RV.camPos.lerp(_pv, damp(0.12, dt));
+  // Getting in, the camera goes from where it stood behind him to its place behind the rover, and turns as it goes:
+  // it does not cut. (From further off than a getting-in can be, a saved game opened in the seat, it starts in place.)
+  if (!RV.camInit) {
+    const c0 = ctx.engine.camera;
+    if (c0.position.distanceTo(_pv) < 30) { RV.camPos.copy(c0.position); RV.camFromQ = (RV.camFromQ || new THREE.Quaternion()).copy(c0.quaternion); RV.camBlend = 0; }
+    else { RV.camPos.copy(_pv); RV.camBlend = 1; }
+    RV.camInit = true;
+  }
+  RV.camPos.lerp(_pv, damp(RV.camBlend < 1 ? 0.045 : 0.12, dt));      // (slower while it comes round from where it stood behind him)
   // It keeps a metre over the ground, and rides over a boulder that comes under it: the lift comes on over the last
   // metre and a half to the rock's edge, and eases, so the picture rises and does not jump. (It went straight
   // through a three-metre rock on the canyon's rim: tests/motion.mjs found the camera inside it.)
@@ -333,7 +356,14 @@ export function updateRover(dt) {
     S.shake = Math.max(0, S.shake - dt * 1.6);
     if (!input.reducedMotion) c.position.addScaledVector(_v1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.4);
   }
-  camLookAt(_v3.copy(World.rover.group.position).addScaledVector(roverUp(_v1), 1.9).addScaledVector(_fw.set(0, 0, -1).applyQuaternion(RV.q), 2.5 + Math.abs(RV.speed) * 0.1), roverUp(_v1));
+  // (aimed a little lower than its roof: the rover stands higher in the picture, clear of the panel at the foot of
+  //  a phone's screen, which lay over its wheels)
+  camLookAt(_v3.copy(World.rover.group.position).addScaledVector(roverUp(_v1), 1.4).addScaledVector(_fw.set(0, 0, -1).applyQuaternion(RV.q), 2.5 + Math.abs(RV.speed) * 0.1), roverUp(_v1));
+  if (RV.camBlend < 1) {
+    RV.camBlend = Math.min(1, RV.camBlend + dt / 0.8);
+    const e = RV.camBlend * RV.camBlend * (3 - 2 * RV.camBlend);
+    _q1.copy(c.quaternion); c.quaternion.copy(RV.camFromQ).slerp(_q1, e);
+  }
   c.fov = lerp(c.fov, ctx.engine.baseFov + 4 + Math.abs(RV.speed) * 0.22, damp(0.3, dt));
   c.updateProjectionMatrix();
   S.inside = false;

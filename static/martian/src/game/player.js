@@ -158,6 +158,8 @@ export function collideUnit(q, radius, rocks = 0) {
 // The astronaut model and its animation
 // ------------------------------------------------------------------------------------------
 export let astro = null;
+/** Which way the thigh's own X turns it forward (the rig's convention; set by looking at a jump). */
+const AIR_SIGN = 1;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, blob: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
 const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
@@ -198,7 +200,7 @@ export function buildAstronaut() {
     if (['JumpStart', 'Land', 'Collapse', 'Wave', 'KneelDown', 'KneelUp'].includes(clip.name)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     anim.actions[clip.name] = a;
   }
-  for (const n of ['hips', 'spine', 'chest', 'neck', 'head']) anim.bones[n] = m.part(n);
+  for (const n of ['hips', 'spine', 'chest', 'neck', 'head', 'thigh_L', 'thigh_R', 'shin_L', 'shin_R']) anim.bones[n] = m.part(n);
   anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
   // helmet lamps: one spotlight at the visor, switched on in the dark
   // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
@@ -328,6 +330,18 @@ export function updateAstronaut(dt) {
       if (half !== anim.stepPhase) { anim.stepPhase = half; emit('footstep', { run: anim.name === 'Run', inside: S.inside, foot: half }); }
     }
   }
+  // In the air he is not one held pose. He draws his knees up as he tops out, and as the ground comes back his legs
+  // go down for it and he leans into the landing. (The flight was one clip held for the 1.8 s a jump lasts here:
+  // "hanging on a wire", said both reviewers of the frame strips.) The clip sets these bones every frame, so what is
+  // added here is added to the clip's pose and to nothing left over.
+  if (!driving && !player.onGround && anim.bones.thigh_L && anim.bones.shin_L) {
+    anim.air = Math.min(1, (anim.air || 0) + dt * 5);
+    const top = clamp(1 - Math.abs(player.vy) / 2.4, 0, 1), fall = clamp((-player.vy - 0.6) / 2.4, 0, 1);
+    const hip = (0.6 * top + 0.22 * fall) * anim.air * AIR_SIGN, knee = (1.0 * top + 0.1 * fall) * anim.air * AIR_SIGN;
+    anim.bones.thigh_L.rotateX(-hip); anim.bones.thigh_R.rotateX(-hip * 0.75);
+    anim.bones.shin_L.rotateX(knee); anim.bones.shin_R.rotateX(knee * 0.8);
+    anim.bones.chest.rotateX(0.16 * fall * anim.air);
+  } else anim.air = 0;
   // look where the camera looks: a little through the chest, more through the head
   // (It is the head that looks, and the chest hardly at all: with a fifth of the camera's tilt in his chest, and a
   // little added when the camera was level, he stood rocked back on his heels five degrees whenever it looked up.)
@@ -572,7 +586,10 @@ function cameraSees(at, boots) {
 
 function updateWalkCamera(dt, running) {
   const c = ctx.engine.camera;
-  const landDip = cam.land * 0.22;
+  // (the dip of a landing comes on over a tenth of a second and goes over a quarter: put on all at once, it was a
+  //  step in the picture)
+  cam.dip = (cam.dip || 0) + (cam.land * 0.22 - (cam.dip || 0)) * Math.min(1, dt * 16);
+  const landDip = cam.dip;
   cam.land = Math.max(0, cam.land - dt * 4);
   if (S.firstPerson) {
     const bobY = (player.speed > 0.5 && player.onGround) ? Math.sin(player.bob) * 0.045 : 0;
@@ -582,7 +599,10 @@ function updateWalkCamera(dt, running) {
   } else {
     // the pivot trails the astronaut slightly, so the camera has weight
     const indoors = S.inside || S.inAirlock;
-    _p.copy(player.pos).addScaledVector(player.up, (indoors ? 1.5 : 1.62) - landDip);
+    // (The camera goes up with a jump by two fifths of it and no more: he rises in the picture, which is how a jump
+    //  is seen, and the camera has that much less to come down at the landing. Following all of it, the ground
+    //  jumped a quarter of the picture's height in the fifth of a second he took to land.)
+    _p.copy(player.pos).addScaledVector(player.up, (indoors ? 1.5 : 1.62) - landDip - (player.onGround ? 0 : player.alt * 0.6));
     const jumped = !cam.init || cam.pivot.distanceTo(_p) > 6;
     if (jumped) { cam.pivot.copy(_p); cam.init = true; }
     else cam.pivot.lerp(_p, damp(0.045, dt));

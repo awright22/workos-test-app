@@ -7,12 +7,13 @@ import { on } from '../core/events.js';
 import { Snd } from '../audio/sound.js';
 import { player } from './player.js';
 import { roverF } from './rover.js';
+import { interaction } from './interact.js';
 import { World } from '../world/build.js';
 import { surfaceAt } from '../planet/surface.js';
 import { Y_AXIS } from '../core/scratch.js';
 
 const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _q = new THREE.Quaternion(), _d = new THREE.Vector3();
-let trackDist = 0, plumeT = 0;
+let trackDist = 0, plumeT = 0, digT = 0.3;
 
 function onGround(pos) { return pos.normalize().multiplyScalar(surfaceAt(pos)); }
 const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tn = new THREE.Vector3();
@@ -50,6 +51,20 @@ export function initEffects() {
 
 /** Per-frame effects that follow continuous motion (the rover's wheels, the rocket's exhaust). */
 export function updateEffects(dt) {
+  // Work on his knees moves dirt: a little is thrown up at the place he works, twice a second, while he is at it out
+  // of doors. (Digging was a held crouch over ground that did not stir.)
+  const it = interaction.active;
+  if (S.mode === 'walk' && it && it.pose !== 'stand' && S.holdT > 0.45 && !S.inside && !S.inAirlock) {
+    digT += dt;
+    if (digT > 0.42) {
+      digT = 0;
+      const at = typeof it.pos === 'function' ? it.pos() : null;
+      // (between him and the thing, on the ground: the thing's own place is often its middle)
+      _p.copy(player.pos);
+      if (at && at.distanceTo(player.pos) > 0.2 && at.distanceTo(player.pos) < 3) _p.lerp(at, 0.55);
+      ctx.vfx.puff(onGround(_p), { count: 3, speed: 0.9, up: 1.3, spread: 0.3, size: 0.34, life: 0.9 });
+    }
+  } else digT = 0.3;
   if (S.mode === 'rover' && World.rover) {
     const v = Math.abs(roverF.speed);
     if (v > 0.8) {
@@ -75,7 +90,8 @@ export function updateEffects(dt) {
       }
       if (laid >= 24) trackDist = 0;
       // dust plumes off the rear wheels, heavier with speed
-      plumeT += dt * Math.min(40, 6 + v * 1.2);
+      // (and more as it gets away from rest with the throttle down: wheels that bite throw dirt)
+      plumeT += dt * Math.min(40, 6 + v * 1.2) * (roverF.throttle > 0.5 && v < 9 ? 2.6 : 1);
       while (plumeT > 1) {
         plumeT -= 1;
         // (both rear wheels throw it, in a tail that hangs behind: from the driving camera one thin puff a side was

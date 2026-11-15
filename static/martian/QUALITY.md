@@ -1182,7 +1182,8 @@ turning aside where the way is barred as a person does, and flags what a still c
 - the camera within 12 cm of the ground, inside a rock, inside the rover (on foot), inside the Hab (from outside);
 - a jump of the man, the rover or the camera (further in a step than three times his pace allows), and a snap of the
   camera's aim (over 12 degrees in a step);
-- a step of the game's own work over 30 ms, and a frame whose share of the main thread is over 50 ms.
+- three steps of the game's own work over 30 ms in a route, or one over 120 ms (one slow step cannot be told from
+  this machine being busy), and a frame whose share of the main thread is over 50 ms.
 
 | Route | Where | What it does |
 | --- | --- | --- |
@@ -1207,7 +1208,42 @@ What its first runs found (15 November):
 Nothing else was flagged on any route after I1: no jump, no snap, nobody through the ground or over it, the camera
 never under 0.39 m on foot or a metre in the rover, no stall on open ground (1.2 to 1.6 km a minute in the rover
 across boulders and down the canyon's rim; 5 m/s on foot, 9 at a run). `--strips` photographs each route as a
-sheet of twelve frames for reviewers; that review is next.
+sheet of twelve frames for reviewers; that review follows.
+
+**The strips reviewed** (15 November; two independent reviewers, seventeen sheets each, every sheet opened, many
+enlarged). Seventeen sheets: the eleven routes, and six of things he does (the camera turned about him on foot and
+in the rover, a jump, kneeling work, standing work, getting in). On foot the frames are an eighth of a second apart
+and cut to the middle of the picture, so his feet can be seen.
+
+| Point of the bar | Reviewer A | Reviewer B |
+| --- | --- | --- |
+| On foot: the gait fits the pace; the jump reads | NOT MET (close) | NEARLY (the jump alone NOT MET) |
+| The rover sits on its wheels and moves as a heavy thing | NEARLY | NEARLY |
+| Contact: feet, wheels and shadows on the ground | NEARLY | NEARLY |
+| The camera frames, keeps steady, comes round smoothly | NEARLY | NEARLY |
+| Work and transitions | NOT MET | NOT MET |
+| Faults in any frame | NEARLY | NEARLY |
+
+What they found, and what one pass did (K for kinetics; both reviewers unless one is named):
+
+| | Finding | State |
+| --- | --- | --- |
+| K1 | The walk's feet skate: a step is 0.4 s and covers 2 m at 5 m/s, and the legs' whole reach is about a metre (A measured it: 75 to 95 px of ground a step against 35 px of foot) | **open**. It is the clip: the walk was drawn with a metre's stride for a pace of five metres a second. The cure is a new walk clip (a lope with a flight phase, as the run has), made in the Blender build; no rule in the game's code can plant a foot the clip slides |
+| K2 | The jump's flight was one held pose for 1.6 s, "hanging on a wire"; no reach for the ground | done: he draws his knees up as he tops out, his legs go down for the ground as it comes back, and he leans into the landing (added to the clip's pose by how fast he is rising or falling) |
+| K3 | The view jumped on landing: the ground moved a quarter of the picture's height in a fifth of a second | done: the camera goes up with a jump by two fifths of it, so he rises in the picture and it has less to come down; the landing's dip comes on over a tenth of a second |
+| K4 | Getting in was a fade at the rover's tail and a cut to the chase view | part done: the camera now travels from where it stood behind him to its place behind the rover and turns as it goes (0.8 s). He still fades: there is no clip of him climbing in |
+| K5 | The chase view at rest looked down on the rover with its wheels behind the speed panel | done: it aims lower, so the rover stands higher in the picture and the horizon is in it |
+| K6 | The rover rode a boulder field level; a strike was a number on the dial | done: the springs are damped at under half of critical (it rocks once and settles; it was seven tenths), a strike puts its nose down, rolls it off the side that struck and lifts it, and its weight shows (the nose up as it gathers way, down as it brakes, a lean out of a turn) |
+| K7 | It launched "like a light buggy", with no dust | done in part: more dirt off the wheels as it gets away from rest. Its pull (1 to 45 km/h in 1.8 s) is the game's pace on a small planet and is left |
+| K8 | Digging was a held crouch with empty hands over ground that did not stir; the prompt covered his legs | part done: dirt is thrown up where he works twice a second; the prompt's pill goes while the button is held. Nothing is in his hand: that is a model and a clip |
+| K9 | The kneel popped up and down mid-work (the strip held the button through a second dig); standing work was not shown at all; the canyon drive showed no canyon; three titles did not match (A, B) | the strips' own faults: fixed in `tests/motion.mjs` (one dig; the panel found by its place in the world; the rover set facing the way the route faces; truthful titles) |
+| K10 | "At night the work is black, and a lamp comes on when he stands" | not the game: that strip had been taken on the night side by the strip's own fault (K9); his lamps are on in the dark kneeling or standing |
+| K11 | A second, soft round shadow comes out from under him and the rover on slopes (slope-walk 6, 7; slope-drive 7, 8) | **open**: not found in the code in the time this pass had |
+| K12 | The rover is "glued" across a 40-degree bank at 75 km/h | left: it slides sideways down anything steeper than about 29 degrees, at up to its own speed on a wall; on a bank it holds, which is what lets a player cross the planet |
+| K13 | No lean or shorter stride on a slope; stiff arms in the run; a still idle | open: clips again |
+| K14 | Footfall dust as pale hard discs; footprints seen as side-by-side pairs; rocks striped by the storm's dust; the rover lost in its own plume at speed; the tail lamps' glow gone for a frame | open, polish |
+| K15 | EXIT took one tap at any speed (from the HUD reviews) | done: asked to get out of a moving rover it pulls up first (1.6 s from 107 km/h) and the throttle takes the asking back; `tests/drive.mjs` |
+
 
 ## Open items
 

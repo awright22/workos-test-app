@@ -676,7 +676,8 @@ export function setPrompt(p) {
   // reason, a reading. ("HOLD Drive the rover" stood beside a button marked DRIVE / HOLD: one thing said twice.)
   const bare = layout.calm && state === 'hold' && !sub;
   const restAfter = layout.calm ? (state === 'hold' ? 5 : PROMPT_REST) : (state === 'info' || (pr.minor && layout.touch && state === 'hold')) ? PROMPT_REST : Infinity;
-  const rest = bare || (pct === 0 && playT - pr.since > restAfter);
+  // (and while he holds it the button's ring is the progress: the pill, which stood over his knees as he knelt, goes)
+  const rest = bare || (layout.calm && state === 'hold' && pct > 0) || (pct === 0 && playT - pr.since > restAfter);
   if (rest !== pr.rest) { pr.rest = rest; UI.prompt.classList.toggle('rest', rest); }
 }
 
