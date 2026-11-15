@@ -17,7 +17,7 @@
  * face's coordinates run another way. Bright colourless ground near the poles is ice.
  */
 import * as THREE from 'three';
-import { DETAIL_FRAME, R } from '../planet/constants.js';
+import { DETAIL_FRAME, R, WEAR_SPAN } from '../planet/constants.js';
 import { LAVA_FIELDS } from '../planet/volcanoes.js';
 import { detailTextures } from './noise3d.js';
 import { groundTextures } from './detail2d.js';
@@ -71,6 +71,12 @@ export const GLSL_DETAIL_T = `mat3(${DETAIL_FRAME.map(F).join(', ')})`;
  * @param {boolean} [o.fine]  include the finest layers (off on low quality)
  * @param {number} [o.anisotropy]  anisotropic filtering for the level-ground textures
  */
+/** No paths yet: one cell of untrodden ground (a sampler must have something bound to it). */
+function blankWear() {
+  const t = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat, THREE.UnsignedByteType);
+  t.needsUpdate = true;
+  return t;
+}
 export function makeTerrainMaterial(albedoCube, o = {}) {
   const tex = detailTextures(), flat = groundTextures(o.anisotropy || 8);
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
@@ -89,6 +95,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
     uCamSpace: { value: 0 },                        // how far out of the air the camera is, 0..1 (the ground then needs that light given back: see below)
     uSpace: { value: 0 },                      // 0 on the ground .. 1 from orbit: the air seen edge-on hazes the planet's rim
     uRelief: { value: 1 },                     // how much of the (exaggerated) relief is drawn: all of it on the ground, a third from orbit
+    // the paths he has worn round the Hab (game/wear.js): a map of them, and where it lies (its middle, and the world
+    // directions of its two axes)
+    uWear: { value: blankWear() }, uWearO: { value: new THREE.Vector3(0, 1e9, 0) }, uWearX: { value: new THREE.Vector3(1, 0, 0) }, uWearZ: { value: new THREE.Vector3(0, 0, 1) },
   };
   mat.defines = mat.defines || {};
   if (o.fine !== false) mat.defines.TERRAIN_FINE = '';
@@ -130,6 +139,8 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         uniform sampler2D uClinker;
         uniform sampler2D uSastrugi;
         uniform sampler2D uField;
+        uniform sampler2D uWear;
+        uniform vec3 uWearO, uWearX, uWearZ;
         uniform float uDust;
         uniform float uDay;
         uniform vec3 uSunW, uSkyLit;
@@ -162,6 +173,11 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float landRise = vGeo.x * 2.0;
         float landSlope = 1.0 - inversesqrt(1.0 + landRise * landRise);
         float flowTop = vGeo.y, worn = vGeo.w;
+        // ... and where he has walked and driven since (game/wear.js): the first crossings show, a dozen make a path
+        vec3 wearAt = vPlanetPos - uWearO;
+        float trod = texture2D(uWear, vec2(dot(wearAt, uWearX), dot(wearAt, uWearZ)) / ${F(WEAR_SPAN)} + 0.5).r * step(dot(wearAt, wearAt), ${F(WEAR_SPAN * WEAR_SPAN)});
+        float trodK = 1.0 - exp(-3.0 * trod);
+        worn = max(worn, trodK);
 
         // ---- how much of this fragment is level ground (2D layers) and how much slope (3D) ----
         // (laid from above, a 2D texture stretches down a slope: on scree that passes, on a cliff it is corduroy,
@@ -420,6 +436,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         grad += (nLump.rgb - 0.5) * (0.7 * nearLump * basalt * level) + (nMid.rgb - 0.5) * (0.7 * fMid * basalt * (1.0 - pond));
         // trodden, driven-over ground round the things men have put here: darker, packed, its ripples gone
         col = mix(col, col * vec3(0.80, 0.78, 0.78) * (1.0 + clamp(tone, -0.4, 0.4) * 0.35), worn * 0.75);
+        // (a path is darker than a yard: the bright dust is trodden off it, and what is under the dust on Mars is dark.
+        //  Rover tracks seen from orbit are dark lines. As a yard is drawn, a path forty crossings old could hardly be seen.)
+        col *= 1.0 - 0.27 * trodK;
         // Crags. Past a hundred metres a wall had only the broadest relief to shade it and hung like drapery; a lava
         // field from the air was a smooth hump. The grain volume again at twelve metres a period, strong, on bare rock
         // and on the tops of flows, from sixty metres out to a kilometre and a half (nearer, the lumps take over).

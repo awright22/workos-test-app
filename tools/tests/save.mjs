@@ -48,6 +48,28 @@ await g.page.locator('#mg-journal [data-tab="log"]').click();
 const jl = await g.page.locator('#mg-journal .jr-body').innerText();
 check('a continued run has its log in the journal', kept && /A line from yesterday\./.test(jl) && /SOL 6/i.test(jl), jl.slice(0, 120));
 await g.page.keyboard.press('Escape');
+// The paths he wears round the Hab (game/wear.js): a save from before has none; walking a line wears it, walking it
+// again wears it more; the save keeps the map and gives it back.
+const wear = await g.eval((G) => {
+  G.paused = true; G.setStorm(0); G.S.storm.i = 0;
+  const old = G.serializeWear();
+  const walk = () => { G.tpLocal(30, 55, 0); const from = G.player.pos.clone(); G.input.keys.w = true; G.tick(1 / 30, 150); G.input.keys.w = false; G.tick(1 / 30, 10); return from.lerp(G.player.pos, 0.5); };
+  const mid = walk(), far = G.player.pos.clone().sub(mid).length() * 2;
+  // (the most worn of the places along the middle of the line: a footfall lands beside the line, not on it)
+  const at = () => { let m = 0; for (let i = -4; i <= 4; i++) for (let j = -2; j <= 2; j++) m = Math.max(m, G.wearAt(mid.clone().add(new mid.constructor(i * 0.3, 0, j * 0.3)))); return m; };
+  const once = at();
+  for (let i = 0; i < 7; i++) walk();
+  const many = at();
+  G.saveGame();
+  const d = JSON.parse(localStorage.getItem('stranded2-save'));
+  G.tread(mid, 255); G.tread(mid, 255);
+  const spoilt = at();
+  G.applyState(d);
+  return { old, far: +far.toFixed(1), once: +once.toFixed(3), many: +many.toFixed(3), saved: (d.wear || '').length, spoilt: +spoilt.toFixed(2), back: +at().toFixed(3) };
+});
+check('an older save has no worn paths, and loads', wear.old === '', wear.old.length);
+check('walking a line wears the ground, and walking it again wears it more', wear.far > 15 && wear.once > 0.01 && wear.many > wear.once * 2.5, wear);
+check('the save keeps the paths and gives them back', wear.saved > 0 && wear.saved < 20000 && wear.spoilt > 0.5 && Math.abs(wear.back - wear.many) < 0.07, wear);
 // an unreadable save is reported on the title screen
 await g.page.evaluate(() => localStorage.setItem('stranded2-save', JSON.stringify({ v: 99, nonsense: true })));
 await g.page.reload({ waitUntil: 'load' });

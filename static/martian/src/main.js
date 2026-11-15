@@ -27,7 +27,7 @@ import { devils, spawnDevil, updateDevils } from './game/devils.js';
 import { SIGHTS, sights, updateSights } from './game/sights.js';
 import { MACHINES, dawnFaults, service, serviceCost, wearMachines, wearRover } from './game/machines.js';
 import { machineEff } from './game/state.js';
-import { initDiag } from './ui/diag.js';
+import { initDiag, noteFrame, noteResize, screenHz } from './ui/diag.js';
 import { LampPool } from './world/lamps.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { setStainLight, setGlowLight, World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
@@ -35,9 +35,11 @@ import { dustUniforms, mirrorUniforms, setGlow, preloadModels } from './world/mo
 import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
+import { updateWear, tread, wearAt, serializeWear, dustAge } from './game/wear.js';
 import { input, initInput } from './game/input.js';
 import { player, astro, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
-import { roverF, updateRover, roverLights, initRoverAt } from './game/rover.js';
+import { settings } from './ui/settings.js';
+import { roverF, updateRover, updateBoarding, roverLights, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
 import { updateBuildGhost } from './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
@@ -172,6 +174,7 @@ function draw(dt, focus) {
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
   dustUniforms.uRim.value = e.modelRim || 0;
+  dustUniforms.uDustAge.value = S.started ? dustAge() : 0;
   // where he stands on the screen, and how large: the storm's veil thins over him (see the final pass)
   {
     const hero = e.final.uniforms.uHero.value, a = astro;
@@ -242,11 +245,11 @@ function tick(dt) {
   }
   if (!S.sleeping) {
     part('clock', () => { advanceTime(dt); applyRates(dt, false); });
-    part('move', () => { if (S.mode === 'walk') updateWalk(dt); else if (S.mode === 'rover') updateRover(dt); });
+    part('move', () => { if (S.boarding) updateBoarding(dt); if (S.mode === 'walk') updateWalk(dt); else if (S.mode === 'rover') updateRover(dt); });
     part('astronaut', () => updateAstronaut(dt));
     part('interact', () => { updateInteract(dt); updateBuildGhost(); });
     part('discover', () => { updateDiscoveries(dt); updatePing(); });
-    part('effects', () => updateEffects(dt));
+    part('effects', () => { updateEffects(dt); updateWear(dt, S.storm.i); });
     part('devils', () => updateDevils(dt));
     part('sights', () => updateSights(dt));
   }
@@ -306,20 +309,44 @@ function tick(dt) {
 }
 
 let lastFocus = null;
+const secMs = new Float32Array(256);     // this second's frame times (ms), for the resolution's judge
+let secN = 0;
 function frame() {
   requestAnimationFrame(frame);
   const now = perf();
+  // The picture is held to the rate asked for in the settings. At 30 frames a second (or 40) the frames between
+  // are not drawn, and the resolution has their time (render/engine.js, setRate). A screen's own frame is 16.7 ms
+  // or 8.3 ms, so "due" is taken a little early: a frame that came half a millisecond soon is not put off a whole one.
+  // 40 is only for a screen that gives 100 or more: on a 60 Hz screen it could only be made of one-frame and two-frame
+  // holds turn about, which judders, and the short one leaves no more time than 60 does. There, 40 means 30.
+  const rate = settings.fps === 40 && screenHz() < 100 ? 30 : settings.fps;
+  if (ctx.engine && ctx.engine.rate !== rate) ctx.engine.setRate(rate);
+  if (rate < 60 && now - lastT < 1 / rate - 0.004) return;
   const rawDt = now - lastT;
   const dt = Math.min(rawDt, 0.05);
   lastT = now;
   // hold the frame rate by trading resolution (checked about once a second)
   fpsAcc += rawDt; fpsN++;
+  if (secN < secMs.length) secMs[secN++] = rawDt * 1000;
   if (fpsAcc > 1) {
-    if (!window.__MG.fixedResolution) ctx.engine.adaptResolution((fpsAcc / fpsN) * 1000, 1000 / 55);
+    // What the resolution is judged on is this second's frames without its worst few (one in twenty, two at least):
+    // a hitch (a shader compiled, ground built, the collector) is not a load, and fewer pixels would not have saved
+    // it. With the plain mean, each hitch cost the picture a step of resolution and the steps back came far slower.
+    // (The owner's phone, on an older build with an older rule, sat at the lowest resolution; its report works out
+    // at about 57 frames a second between a handful of long frames.)
+    const lot = secMs.subarray(0, secN).sort();
+    const keep = secN >= 20 ? secN - Math.max(2, Math.ceil(secN * 0.05)) : secN;
+    let sum = 0;
+    for (let i = 0; i < keep; i++) sum += lot[i];
+    const was = ctx.engine.dynScale;
+    // (held to 30 or 40, a frame is never early: "in time" is the period itself, give or take a late frame or two)
+    if (!window.__MG.fixedResolution) ctx.engine.adaptResolution(sum / Math.max(1, keep), rate < 60 ? 940 / rate : 1000 / 55);
+    if (ctx.engine.dynScale !== was) noteResize();
+    secN = 0;
     window.__MG.fps = fpsN / fpsAcc;
     // ten seconds in a row under 27 frames a second at the lowest resolution, in play: this phone wants the lighter preset
     if (autoQuality && S.started && !S.over && !window.__MG.paused && !document.hidden) {
-      slowFrames = window.__MG.fps < 27 && ctx.engine.dynScale <= 0.56 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
+      slowFrames = window.__MG.fps < Math.min(27, rate * 0.8) && ctx.engine.dynScale <= 0.56 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
       if (slowFrames >= 10) {
         autoQuality = false;
         try { localStorage.setItem(AUTO_KEY, 'low'); } catch (e) { /* private mode */ }
@@ -333,6 +360,7 @@ function frame() {
     if (!window.__MG.paused) lastFocus = tick(dt);
     draw(window.__MG.paused ? 0 : dt, lastFocus);
   });
+  noteFrame(rawDt * 1000, (perf() - now) * 1000, rate);
 }
 
 // pathfinder proximity ping
@@ -351,6 +379,7 @@ function updatePing() {
 function installDebug() {
   window.__MG = {
     ctx, S, World, player, roverF, BAL, DIFFICULTIES, interactables, input, interaction,
+    tread, wearAt, serializeWear,
     llToVec, surfaceAt, groundDist,
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod, startLaunch,
@@ -464,6 +493,8 @@ function installDebug() {
       input.eHeld = true;
       for (let i = 0; i < Math.ceil(sec / 0.05); i++) lastFocus = tick(0.05);
       input.eHeld = false;
+      // (what the hold set going is seen through: getting into the rover takes three quarters of a second more)
+      for (let i = 0; i < 20 && S.boarding; i++) lastFocus = tick(0.05);
       lastFocus = tick(0.05);
     },
     /** Pin the storm strength where the astronaut is (0..1); setStorm(null) gives the weather back to the game. */

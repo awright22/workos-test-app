@@ -148,7 +148,9 @@ const GROUND = /^ground_dust/;
 /** Parts that are indoors, whatever their model's dust. */
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
-export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 } };
+export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 },
+  // (how much more dust lies on things than when the game began, 0..1: game/wear.js, dustAge)
+  uDustAge: { value: 0 } };
 /** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
 export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { value: new THREE.Color(0.76, 0.47, 0.235) }, uSkyTop: { value: new THREE.Color(0.52, 0.32, 0.16) }, uGroundLit: { value: new THREE.Color(0.3, 0.15, 0.08) } };
 
@@ -201,6 +203,7 @@ function setUpPlain(plain, ground) {
         uniform vec3 uDustHere;
         uniform float uFill;
         uniform float uRim;
+        uniform float uDustAge;
         #ifndef USE_NORMALMAP_OBJECTSPACE
         uniform mat3 normalMatrix;
         #endif
@@ -230,7 +233,10 @@ function setUpPlain(plain, ground) {
           } else {
             // (laid unevenly: drifts and clean patches, heavy on what faces up, a skirt of it thrown up near the ground)
             float low2 = 1.0 - smoothstep(0.1, 1.5, vObjPos.y);
-            dustAmount = clamp(vPbr.z * (0.05 + 1.25 * facing * facing + 0.55 * low + 0.45 * low2) * (0.15 + 1.9 * patchy * patchy) * 1.25 + vPbr.z * (fine - 0.5) * 0.3, 0.0, 0.94);
+// (and more of it as the sols go by and after each storm: game/wear.js, dustAge)
+            // (his own things: a lander that has stood for decades has all the dust it will ever have)
+            float laid = vPbr.z + uDustAge * 0.16 * step(0.01, vPbr.z) * (1.0 - smoothstep(0.42, 0.62, vPbr.z));
+            dustAmount = clamp(laid * (0.05 + 1.25 * facing * facing + 0.55 * low + 0.45 * low2) * (0.15 + 1.9 * patchy * patchy) * 1.25 + laid * (fine - 0.5) * 0.3, 0.0, 0.94);
             dust *= 0.86;
             // no real surface is one flat colour: a broad mottle and a fine grain, fixed in the model's own space
             diffuseColor.rgb *= 0.925 + 0.11 * patchy + (fine - 0.5) * 0.09;

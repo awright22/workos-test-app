@@ -12,6 +12,7 @@ export const DEFAULTS = {
   reducedMotion: null,   // null = follow the system setting
   colorBlind: false,
   fullHud: false,        // a phone's HUD: false = the quiet one (what is not needed just now is put away), true = everything, always
+  fps: 60,               // the frame rate the picture is held to: 60 (smooth), 40 or 30 (sharper: the resolution rises to what that rate leaves room for)
 };
 
 function read() {
@@ -22,6 +23,7 @@ function read() {
     out.sensitivity = Math.min(2.5, Math.max(0.3, +out.sensitivity || 1));
     out.volume = Math.min(1, Math.max(0, +out.volume));
     out.hudScale = Math.min(1.4, Math.max(0.8, +out.hudScale || 1));
+    if (out.fps !== 40 && out.fps !== 30) out.fps = 60;
     return out;
   } catch (e) { return { ...DEFAULTS }; }
 }

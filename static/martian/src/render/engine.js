@@ -27,6 +27,8 @@ const FINAL_FRAGMENT = /* glsl */`
   #include <tonemapping_pars_fragment>
   uniform sampler2D tDiffuse;
   uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil;
+  uniform float uSharp;
+  uniform vec2 uTexel;
   uniform vec3 uTint, uVeilCol;
   uniform vec2 uVeilDir;
   uniform vec4 uHero;
@@ -39,6 +41,15 @@ const FINAL_FRAGMENT = /* glsl */`
   }
   void main() {
     vec3 col = texture2D(tDiffuse, vUv).rgb;
+    // A picture drawn at fewer pixels than the screen has is stretched over it, and stretched it is soft. So each
+    // pixel is pushed away from the mean of its four neighbours, and held to the range those five already span: edges
+    // firm up and nothing overshoots into a halo. The smaller the picture is drawn, the more of it.
+    if (uSharp > 0.001) {
+      vec3 n1 = texture2D(tDiffuse, vUv + vec2(0.0, -uTexel.y)).rgb, n2 = texture2D(tDiffuse, vUv + vec2(-uTexel.x, 0.0)).rgb;
+      vec3 n3 = texture2D(tDiffuse, vUv + vec2(uTexel.x, 0.0)).rgb, n4 = texture2D(tDiffuse, vUv + vec2(0.0, uTexel.y)).rgb;
+      vec3 lo = min(col, min(min(n1, n2), min(n3, n4))), hi = max(col, max(max(n1, n2), max(n3, n4)));
+      col = clamp(col + (col - (n1 + n2 + n3 + n4) * 0.25) * uSharp, lo, hi);
+    }
     // A dust storm is between the eye and everything, the nearest things too: sheets of it blow across the
     // visor, thicker and thinner, and the whole frame dims and clears with the gusts. (Fog alone leaves a man
     // five metres off as crisp as on a clear day.)
@@ -121,6 +132,7 @@ class FinalPass extends Pass {
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
       uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
+      uSharp: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -153,6 +165,8 @@ export class Engine {
     container.insertBefore(r.domElement, container.firstChild);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.dynScale = 1;
+    /** The frame rate the picture is held to (see setRate), and how far the scale may rise for it. */
+    this.rate = 60; this.maxDyn = 1;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.12, 60000);
@@ -224,6 +238,8 @@ export class Engine {
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     const ratio = this.dpr * this.q.scale * this.dynScale;
+    // (how much the stretched picture is firmed up: little at two pixels to the point, most under one)
+    if (this.final) { this.final.uniforms.uSharp.value = clamp(0.95 - 0.35 * ratio, 0.2, 0.6); this.final.uniforms.uTexel.value.set(1 / Math.max(1, Math.round(w * ratio)), 1 / Math.max(1, Math.round(h * ratio))); }
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h);
     this.composer.setPixelRatio(ratio);
@@ -244,19 +260,37 @@ export class Engine {
    * of seconds with nothing late, a step up is tried. If it holds, the next try comes as soon; if it brings late
    * frames, it is undone and the wait before the next try doubles, up to about a minute.
    */
+  /**
+   * Hold the picture to `rate` frames a second: 60, 40 or 30. At the lower rates a frame has twice the time or more,
+   * and the resolution may rise past the preset's own, up to the screen's two pixels to the point: a sharper picture
+   * for a slower one. (The owner's phone held 60 by drawing under one pixel to the point.)
+   */
+  setRate(rate) {
+    const was = this.rate;
+    this.rate = rate === 30 || rate === 40 ? rate : 60;
+    this.maxDyn = this.rate < 60 ? Math.max(1, 1 / this.q.scale) : 1;
+    // (a slower rate asked for: start again from the preset's own resolution and find the level from there, a step
+    //  a second down if it is too much, and not a step every four seconds up from the lowest)
+    let s = Math.min(this.dynScale, this.maxDyn);
+    if (this.rate < was) s = Math.max(s, 1);
+    if (Math.abs(s - this.dynScale) > 0.001) { this.dynScale = s; this.resize(); }
+    this._adapt = null;
+  }
+
   adaptResolution(frameMs, targetMs) {
     let s = this.dynScale;
+    const top = this.maxDyn;
     const a = this._adapt || (this._adapt = { calm: 0, wait: 4, trial: 0 });
     if (frameMs > targetMs * 1.18) {
       s = Math.max(0.55, s - 0.05);
       if (a.trial > 0) a.wait = Math.min(64, a.wait * 2);
       a.calm = 0; a.trial = 0;
     } else if (frameMs < targetMs * 0.82) {
-      s = Math.min(1, s + 0.03);                  // (a faster screen, or no vertical sync: there is room, plainly)
+      s = Math.min(top, s + 0.03);                // (a faster screen, or no vertical sync: there is room, plainly)
       a.calm = 0;
     } else if (frameMs <= targetMs * 1.08) {
       if (a.trial > 0 && --a.trial === 0) a.wait = 4;
-      if (++a.calm >= a.wait && s < 1) { s = Math.min(1, s + 0.05); a.calm = 0; a.trial = 3; }
+      if (++a.calm >= a.wait && s < top) { s = Math.min(top, s + 0.05); a.calm = 0; a.trial = 3; }
     } else a.calm = 0;
     if (Math.abs(s - this.dynScale) > 0.001) { this.dynScale = s; this.resize(); }
   }

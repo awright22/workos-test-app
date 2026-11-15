@@ -6,7 +6,10 @@
  */
 const errors = [];
 let panel = null, body = null, open = false, getInfo = () => ({}), build = '?';
-const frames = [];                       // recent frame times, ms
+const frames = [];                       // the game's recent frames: the time from each drawn frame to the next, ms
+const work = [];                         // and the main thread's share of each (the game's step and the picture's orders), ms
+const raw = [];                          // the screen's own recent frames (every animation frame, drawn in or not), ms
+let hz = 0, hzAt = 0, held = 60, resized = 0;
 
 function note(text) { errors.push(String(text).slice(0, 300)); if (errors.length > 12) errors.shift(); }
 function gpu() {
@@ -22,13 +25,42 @@ function numbers() {
   const n = frames.length || 1;
   const sorted = [...frames].sort((a, b) => a - b);
   const avg = frames.reduce((a, b) => a + b, 0) / n;
-  return { fps: 1000 / (avg || 16.7), low: 1000 / (sorted[Math.floor(n * 0.99)] || avg || 16.7), worst: sorted[n - 1] || 0 };
+  const w = [...work].sort((a, b) => a - b);
+  return {
+    fps: 1000 / (avg || 16.7), low: 1000 / (sorted[Math.floor(n * 0.99)] || avg || 16.7), worst: sorted[n - 1] || 0,
+    // (frames that took twice the usual one or more: the hitches, as against a rate that is low all the time)
+    hitches: frames.filter((f) => f > 2.2 * (sorted[Math.floor(n * 0.5)] || 16.7)).length,
+    work: w.length ? work.reduce((a, b) => a + b, 0) / w.length : 0, workWorst: w.length ? w[w.length - 1] : 0,
+  };
 }
+/**
+ * How many frames a second the screen gives a page, as near as can be told: from the shortest tenth of its recent
+ * animation frames (a slow frame makes a long gap and never a short one). 60 on most phones, 120 on some screens,
+ * 30 on an iPhone in Low Power Mode. The highest reading stands: a screen does not get slower because the game did.
+ */
+export function screenHz() {
+  const now = performance.now();
+  if (raw.length >= 40 && now - hzAt > 1000) {
+    hzAt = now;
+    const p10 = [...raw].sort((a, b) => a - b)[Math.floor(raw.length * 0.1)];
+    const est = p10 < 7.6 ? 144 : p10 < 9.6 ? 120 : p10 < 12.6 ? 90 : p10 < 21 ? 60 : 30;
+    if (est > hz) hz = est;
+  }
+  return hz || 60;
+}
+/** One frame of the game, drawn: how long since the one before, and how long the main thread took over it (ms). */
+export function noteFrame(ms, workMs, rate) {
+  held = rate;
+  if (ms < 1000) { frames.push(ms); work.push(workMs); if (frames.length > 600) { frames.shift(); work.shift(); } }
+}
+/** The picture's resolution was changed (a new set of render targets: on some phones a frame is lost to it). */
+export function noteResize() { resized++; }
 export function diagReport() {
   const i = getInfo() || {}, f = numbers(), c = document.querySelector('canvas.mg-three');
   return [
     `Stranded II · build ${build} · quality ${i.quality || '?'} · scale ${i.scale === undefined ? '?' : i.scale}`,
     `frame rate ${f.fps.toFixed(0)} fps average, ${f.low.toFixed(0)} fps at the slowest 1%, worst frame ${f.worst.toFixed(0)} ms (over the last ${frames.length} frames)`,
+    `held to ${held} · screen gives ${screenHz()} · ${f.hitches} long frames · main thread ${f.work.toFixed(1)} ms a frame, worst ${f.workWorst.toFixed(0)} ms · resolution changed ${resized} times`,
     `canvas ${c ? c.width + 'x' + c.height : '?'} · screen ${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}`,
     `draw calls ${i.calls === undefined ? '?' : i.calls} (${i.shadowCalls || 0} shadow) · triangles ${i.triangles === undefined ? '?' : Math.round(i.triangles / 1000) + 'k'}`,
     `GPU ${gpu()}`,
@@ -87,7 +119,7 @@ export function initDiag(info) {
   const tick = (now) => {
     requestAnimationFrame(tick);
     const dt = now - last; last = now;
-    if (dt < 1000) { frames.push(dt); if (frames.length > 600) frames.shift(); }
+    if (dt > 2 && dt < 1000) { raw.push(dt); if (raw.length > 240) raw.shift(); }
   };
   requestAnimationFrame(tick);
   setInterval(render, 500);

@@ -17,7 +17,7 @@ import { syncAllVisuals, syncIce, syncPod } from './visuals.js';
 import { clamp } from '../core/math.js';
 import { localSunEl, sleepTime, sleepToDawn } from './sim.js';
 import { closeScreens, missingText, toggleScreen } from '../ui/screens.js';
-import { enterRover, exitRover, roverF } from './rover.js';
+import { boardRover, exitRover, roverF } from './rover.js';
 import { ITEM_NAMES, RECIPES, gainLoot } from './inventory.js';
 import { COMFORTS, comforts } from './comforts.js';
 import { canSample, scienceSummary } from './science.js';
@@ -499,7 +499,7 @@ addI({
   visible: () => !S.flags.coldOpen,
   label: () => 'Drive the rover',
   sub: () => `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}% · O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%`,
-  use: () => enterRover(),
+  use: () => boardRover(),
 });
 addI({
   pos: () => World.rover.group.position, r: 1e9, hold: 0.4, mode: 'rover',

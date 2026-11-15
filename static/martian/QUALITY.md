@@ -1203,7 +1203,7 @@ What its first runs found (15 November):
 | I3 | Against the Hab's wall with the throttle held the rover slides round it at about a metre a second: not pinned, but slow to come off a wall that size | open, for the driving pass |
 | I4 | A step of the game's own work is 0.2 to 1.1 ms as a rule on this machine (5 to 8 ms at the 99th centile, 8 to 13 ms at worst, once 64 ms). No part of the step owns the slow ones: every part's worst is about 8 ms, which is this machine's software renderer taking the processor, not the game. So step times here say nothing under about 20 ms | the bar is 30 ms for a step and 50 ms for a frame's share of the main thread (4 to 10 ms as a rule, 18 ms at worst) |
 | I5 | The heap grows by 2 to 3 MB a second of play in this browser: moving makes most of it (22 kB a step on foot, 60 kB in the rover), then the prompt's lines (about 320 kB a second on foot at the base), the compass (200), the gauges (140), the marker (100) | not chased. Most of the moving's share is V8 keeping every fraction the terrain code stores in a shared variable as an object of its own; Safari's engine does not, and Safari is what the owner's phone runs. The figure is printed to be compared with itself |
-| I6 | The phone's own report (51 fps average, 14 fps at the slowest 1%) is one slow frame a second, more or less: the game looks at its resolution once a second and changes it by steps, and a change re-makes the picture's buffers | a guess from the numbers, not measured: for the sharpness item (g), where the resolution's rule is to be looked at |
+| I6 | The phone's own report (51 fps average, 14 fps at the slowest 1%) is one slow frame a second, more or less: the game looks at its resolution once a second and changes it by steps, and a change re-makes the picture's buffers | a guess from the numbers, not measured. Taken up under "Sharpness and the frame rate" (G2: a hitch no longer costs a step of resolution; G4: the diagnostics now count the changes) |
 
 Nothing else was flagged on any route after I1: no jump, no snap, nobody through the ground or over it, the camera
 never under 0.39 m on foot or a metre in the rover, no stall on open ground (1.2 to 1.6 km a minute in the rover
@@ -1244,6 +1244,95 @@ What they found, and what one pass did (K for kinetics; both reviewers unless on
 | K14 | Footfall dust as pale hard discs; footprints seen as side-by-side pairs; rocks striped by the storm's dust; the rover lost in its own plume at speed; the tail lamps' glow gone for a frame | open, polish |
 | K15 | EXIT took one tap at any speed (from the HUD reviews) | done: asked to get out of a moving rover it pulls up first (1.6 s from 107 km/h) and the throttle takes the asking back; `tests/drive.mjs` |
 
+**The re-check** (15 November; the same seventeen sheets photographed again after that pass: reviewer A, asked which
+of its findings were gone, and a fresh reviewer C, given the bar and the sheets alone; every sheet opened). In the
+rover the frames are now a fifth of a second apart and cut to the middle of the picture, as on foot.
+
+| Point of the bar | Reviewer A, again | Reviewer C, fresh |
+| --- | --- | --- |
+| On foot: the gait fits the pace; the jump reads | NEARLY (was NOT MET) | NEARLY |
+| The rover sits on its wheels and moves as a heavy thing | NEARLY | NEARLY, weak |
+| Contact: feet, wheels and shadows on the ground | NEARLY | **MET** |
+| The camera frames, keeps steady, comes round smoothly | NOT MET (was NEARLY) | NOT MET |
+| Work and transitions | NOT MET, close | NOT MET |
+| Faults in any frame | NEARLY | NEARLY |
+
+A's count of its own eighteen: three gone (the skating feet: a planted foot now goes back 21 to 23 px against 29
+to 30 px of ground, where it was 3 against 60; the kneel that popped; the last frame of getting in), one better (the
+jump has poses), two mixed, twelve still there, of which three could not be seen in the new sheets. The camera went
+down a grade on new evidence: the canyon drive now really goes down the canyon's wall, and the turn about him now
+stands beside the rover. Both are faults a player meets, and the kind the owner asked the scripted player to flag.
+
+What the re-check found, and what was done about it afterwards. These fixes are checked by the scripted player and by
+my own look at new sheets, and by no reviewer: the owner's bound is one pass and one re-check an item.
+
+| | Finding | State |
+| --- | --- | --- |
+| K16 | Down the canyon's wall the chase camera lost the rover: its lower half behind a crest, then the whole of it behind a dune at 96 to 99 km/h; the rover a third of its usual size; the view lurching from side-on to above to behind in three frames (A, C) | **fixed, checked by the player.** The camera stood level with the rover, so ten metres behind it on a slope it was under the ground and was lifted onto it; and it was eased toward its place with nothing to stop it trailing a dozen metres at speed. It now stands behind the rover along the slope the rover is on, is never more than 2.4 m behind its place nor more than 17.5 m from the rover, and rises (six metres at most, quickly up and slowly down) when a crest comes between it and the rover's roof. The player has two new flags for it, `rover-hidden` and `camera-far` |
+| K17 | Turned about him beside the rover, the camera went behind the rover and then through it: the cab's roof filled the picture and he was not in it (A, C) | **fixed, checked by the player.** The camera could not stand inside a thing; it could stand behind one. A place from which something standing on the ground (the rover, a lander, a row of panels) lies between the camera and his waist is now refused, and the place the eased boom is about to take is tried as well as the place the search found. The player turns the camera once round him beside the rover on every run (`orbit`) |
+| K18 | Getting in is still a disappearance and a cut (K4 again; A, C) | **second attempt, not reviewed.** Getting in now takes three quarters of a second and has him in it: he steps to the hull and, over the last third of a second, goes up and in; then he is in the seat. There is still no clip of a man climbing a ladder: if this does not read on the phone it is a plateau, and what would lift it is an animation |
+| K19 | The jump "hangs over one spot": in the air from 0.2 s to past 2.0 s, the ground standing still under him (A, C) | **the strip's fault, not the game's.** It set off from the edge of the levelled yard, outward: measured, the ground fell 5.1 m in the 15 m he flew (a slope of up to 0.47), and he was in the air 2.9 s over ground falling away as fast as he was. On level ground the same jump is 1.8 s and 1.55 m high. The strip is now taken across the yard |
+| K20 | At night the red glow behind the rover is cut by hard-edged wedges that change every frame (A, C) | **fixed.** The glow was a flat patch carried behind the rover and cut by every ripple it crossed; it is now laid on the ground afresh each frame it is lit |
+| K21 | The parked rover creeps: 1, then 2 km/h on the dial, the Hab a metre further off (A, C) | **fixed.** The drag that slowed it to rest only slowed it. Left alone under 3 km/h on anything it could climb, its brakes now hold it |
+| K22 | Wiping a panel: the whole panel went from dusty to clean in one frame; the camera stood behind the next panel, which filled the lower half of the picture (A, C) | the first **fixed** (it comes clean under his hand over the time the wiping takes); the second helped by K17's rule where a panel's own circle is large enough to count (0.9 m), not otherwise |
+| K23 | The rover still does not feel heavy: level as a table at 80 km/h over rippled sand, the same pull on a volcano's flank as on a plain, no squat seen (K6 and K7 again; A, C) | **second attempt, not reviewed.** Over the ground at speed the body now works on its springs (a degree or two of rocking and a few centimetres of lift, by the distance covered, most near the pace its springs answer); it squats half as much again as it pulls away; and a climb costs it pace from one in twelve up (a fifth of its top speed at one in five, half at two in five). If the phone says it is still light, this is a plateau by the owner's rule |
+| K24 | The arrow to the task flips from one side of him to the other between frames, and lies over his boots (A, C; K14's last line, and the HUD reviews) | **fixed.** With the place straight behind him the edge arrow stood at the foot of the middle of the screen and changed sides with every small turn. Behind him it now keeps to a side, the one it is on, until the place is well round to the other |
+| K25 | Nothing shows the rover or the man meeting a rock; no frame shows the front wheels steered; the stroll, a sharp turn, starting and stopping are in no sheet (A, C) | the sheets' limits, noted. Rocks are covered by `tests/drive.mjs` and `tests/rocks.mjs` in numbers, not in pictures |
+| K26 | Still there from the first review and left: the second soft shadow on slopes (K11, looked for once and not found); no lean or change of stride on a slope and a run that differs from the lope mostly by pace (K13: clips); footfall dust as pale discs and footprints in side-by-side pairs (K14); the storm changes nothing in how he moves; a prompt over his shins wherever he stands by something usable; the staircase line where a boulder meets sand (terrain item 27) | open, polish; K11 and K13 are **plateaued** for code |
+
+
+## Sharpness and the frame rate (the owner's item g)
+
+The owner: "on the older build it held 60 fps by drawing at about 64% resolution. Show me what a 30 or 40 fps
+target with a sharper picture looks like, and make it a setting if it isn't one."
+
+**What a phone draws.** The picture is drawn at fewer pixels than the screen has and stretched over it by the
+browser. On the owner's phone (932 x 430 points, three pixels to the point, of which the game uses two at most) the
+preset it starts on, "medium", draws 1.6 pixels to the point when it can (1491 x 688), and steps down toward 0.88
+(820 x 378) to hold its frame rate. The second report from that phone was at 0.88.
+
+**What was built** (one pass):
+
+| | What | Where |
+| --- | --- | --- |
+| G1 | **A frame rate setting**: Settings, Display, "Frame rate": 60 or 30. At 30 the frames between are not drawn, the judge of the resolution is given the longer frame to fill, and the resolution may rise past the preset's own to the screen's two pixels to the point (1864 x 860 on that phone). 40 is offered only where the screen gives a page 100 frames a second or more: on a 60 Hz screen 40 can only be made of one-frame and two-frame holds turn about, which judders, and its short frame leaves no more time than 60 does, so there it would be a worse 60. iPhones give a page 60 (Safari holds pages to 60 even on a 120 Hz screen, as far as I know: the diagnostics now say what the screen gives, so the phone will settle it) | `ui/settings.js` (`fps`), `ui/menus.js`, `main.js` (`frame`), `render/engine.js` (`setRate`) |
+| G2 | **A hitch no longer costs resolution.** The judge looked at the mean frame time of each second. One long frame (a shader compiled, ground built, a collection) put a second over the line and took a step of resolution off; steps back up came every four seconds at best. It now looks at the second's frames without its worst few (one in twenty, two at least). The phone's report (51 frames a second on average, 14 at the slowest 1%, a worst frame of 765 ms, over 600 frames) works out at about 57 a second between half a dozen long frames: on that evidence most of what drove it to the lowest resolution was hitches, not load. That is an inference from one report of an older build, not a measurement | `main.js` (`frame`) |
+| G3 | **The stretched picture is firmed up**: in the final pass each pixel is pushed away from the mean of its four neighbours and held to the range the five already span, so edges firm and nothing rings; more the smaller the picture is drawn (0.6 at 0.88 pixels to the point, 0.25 at two). A first setting of 0.75 made thin things (the rover's rack, the dish) crunchy at 0.88 and was taken down | `render/engine.js` (`uSharp`) |
+| G4 | **The diagnostics say more** (four taps top left): the frames it counts are now the game's own (it counted the screen's, and would have said 60 with the game held to 30), and a new line gives the rate held to, what the screen gives, how many long frames were in the last 600, the main thread's share of a frame, and how many times the resolution was changed | `ui/diag.js` |
+
+**What the pictures show** (`tools/tests/sharp-shots.mjs`: the same three views at 0.88 as it was, 0.88 firmed, 1.2,
+1.6 and 2.0 pixels to the point, photographed as the phone's screen shows them; software rendering, so they say what
+each looks like and nothing of how fast a phone draws it). At 0.88 the rover's rack and the suit's pack are a blur;
+firmed, edges are crisp and fine things show their pixels; at 1.6 the rack's bars, the pack's vents and the dish's
+ribs are drawn; 2.0 is a little cleaner again. The step that matters is from 0.88 to 1.6.
+
+**What is not known.** Which resolution the phone reaches at 30, and whether it now holds 1.6 at 60: both need its
+own report (a new one is asked for). If the main thread's share turns out to be most of a frame, the next work is
+the game's step, not the picture.
+
+Tests: `tests/ui.mjs` (the setting is offered, saved and obeyed; held to 30 the resolution steps up when frames are
+in time, down when they are late, and stops at two pixels to the point).
+
+## Wear (the owner's item f)
+
+"Wear by code: dust and dirt on props and buildings, and tracks and trodden ground that build up where I walk and
+drive."
+
+| | What | Where |
+| --- | --- | --- |
+| W1 | **Paths.** Boot prints and tyre marks were the last few hundred of each and gone when the game was closed. Now the ground round the Hab is mapped (160 m square, five eighths of a metre a cell, a byte a cell): every metre walked and every metre of rut adds to the cells it crosses, and the ground's shader draws worn ground darker, packed, without its ripples. One crossing on foot hardly shows; six show faintly; twenty are a path; the rover's ruts show after one pass and are plain after three. A dust storm at its height fills them in again, slowly. The map goes in the save, run-length coded at sixteen levels (282 characters for one line walked eight times; a base's worth of paths is a few thousand). Older saves have none and load as they did | `game/wear.js`, `render/terrain-material.js` (`uWear`), `game/effects.js`, `game/save.js` |
+| W2 | **Dust that deepens.** The dust on his own things (the Hab, the rover, the panels, what he builds, his suit) is no longer the same on Sol 30 as on Sol 1: it settles over the first thirty sols, and a storm lays a coat of its own that the wind takes off again over the next four. A lander that has stood for decades has all it will ever have and does not change | `game/wear.js` (`dustAge`), `world/models.js` (`uDustAge`) |
+
+Seen (my own look, phone size, "medium"): a line walked six times is a faint darker band; twenty times, a soft path
+from his feet to the horizon; three passes of the rover, two ruts with packed ground between and under them. On Sol
+31 after a storm the rover's flanks and wheels and his suit are plainly browner than on Sol 1; the Hab a little.
+Not reviewed by anyone else yet: for the next picture review, with the base's props "showroom clean" (V13) in mind.
+
+Tests: `tests/save.mjs` (an older save has no paths and loads; walking a line wears it and walking it again wears
+it more; the save keeps the map and gives it back).
+
+Left: dirt in the creases of props from their baked occlusion, a furrow behind a dragged thing, and paths away
+from the Hab (the map is the base's; elsewhere the last few hundred marks are all there is).
 
 ## Open items
 

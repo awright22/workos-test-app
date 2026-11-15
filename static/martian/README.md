@@ -133,6 +133,15 @@ tank is under half, and the view (helmet or behind) is a switch in Settings, Con
 into the rover shows its battery and tank for a few seconds. Alarms take the room they always did. **Settings, Interface, Full HUD** brings back everything, always on.
 Four quick taps in the top-left corner open the diagnostics.
 
+**Settings, Display, Frame rate**: 60 is smoothest; 30 draws a sharper picture (the frames between
+are not drawn and the resolution rises to what the longer frame leaves time for, up to two pixels
+to the point). 40 is offered where the screen gives a page 100 frames a second or more. The
+diagnostics say what rate the picture is held to, what the screen gives, and the resolution drawn.
+
+The ground round the Hab remembers where he has walked and driven: a path wears in after a dozen
+crossings and stays in the save; a dust storm slowly fills it in. His own gear gets dustier as the
+sols go by, and after a storm.
+
 ## Interface
 
 The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `tools/build.mjs`.
@@ -152,6 +161,13 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   (standing, walking, at the rover, driving) at three phone sizes and holds it to its bar: 15% of
   the screen, the middle clear, 35% of the top third. `--shoot` photographs each state.
   `tools/tests/ui-audit.mjs` runs it as its last part.
+- `node tools/tests/motion.mjs` walks and drives eleven real routes with the stick held and
+  flags what a still cannot show: no progress, a jump of the man or the camera, the man or the
+  rover in the ground or over it, the camera in a rock, the rover hidden from the camera by the
+  ground or left far behind, slow steps. It also turns the camera once round him beside the rover.
+  `--strips` photographs each route and each thing he does as a sheet of frames for reviewers.
+- `node tools/tests/sharp-shots.mjs` photographs three views at five resolutions side by side
+  (what a phone shows at 60 and what 30 leaves room for).
 - Third-party fonts and data are credited in `CREDITS.md`. App icons: `tools/build_icons.py`.
 
 ## How it is built

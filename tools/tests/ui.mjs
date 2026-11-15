@@ -42,6 +42,32 @@ if (!onlySize || onlySize === 'keys') {
   const q = await page.evaluate(() => ({ q: localStorage.getItem('stranded2-quality'), reload: !document.querySelector('[data-act="reload"]').hidden }));
   check('settings: a new quality is saved and offers a reload', q.q === 'high' && q.reload, q);
   await page.locator('[data-seg="quality"] [data-v="auto"]').click();
+  // The frame rate: 60 or 30 on a screen that gives 60 (40 is offered only where the screen gives 100 or more). At 30
+  // the frames between are not drawn and the resolution may rise past the preset's own; the judge of the resolution
+  // steps it up after seconds in time and down after a late one.
+  const fpsOpts = await page.locator('[data-seg="fps"] button').evaluateAll((bs) => bs.map((b) => b.dataset.v + (b.getAttribute('aria-checked') === 'true' ? '*' : '')));
+  await page.locator('[data-seg="fps"] [data-v="30"]').click();
+  await sleep(2600);
+  const f30 = await page.evaluate(() => { const e = window.__MG.ctx.engine; return { saved: JSON.parse(localStorage.getItem('stranded2-settings') || '{}').fps, rate: e.rate, top: +e.maxDyn.toFixed(2), preset: e.q.scale, drawn: +window.__MG.fps.toFixed(1) }; });
+  const judged = await page.evaluate(() => {
+    const e = window.__MG.ctx.engine, was = e.dynScale, T = 940 / 30;
+    e._adapt = null;
+    for (let i = 0; i < 5; i++) e.adaptResolution(33.4, T);            // five seconds of frames in time
+    const up = e.dynScale;
+    e.adaptResolution(45, T);                                          // a second of late ones
+    const down = e.dynScale;
+    for (let i = 0; i < 80; i++) e.adaptResolution(33.4, T);           // and time enough to climb as far as it may
+    const most = e.dynScale;
+    e.dynScale = was; e.resize();
+    return { was, up: +up.toFixed(2), down: +down.toFixed(2), most: +most.toFixed(2), top: +e.maxDyn.toFixed(2) };
+  });
+  await page.locator('[data-seg="fps"] [data-v="60"]').click();
+  await sleep(300);
+  const f60 = await page.evaluate(() => { const e = window.__MG.ctx.engine; return { rate: e.rate, top: e.maxDyn }; });
+  check('settings: frame rate offers 60 and 30 on a 60 Hz screen, 60 chosen', fpsOpts.join(',') === '60*,30', fpsOpts);
+  check('settings: at 30 the picture is held to 30 frames a second and may be drawn larger', f30.saved === 30 && f30.rate === 30 && f30.drawn <= 33 && f30.top > 1.2, f30);
+  check('settings: held to 30, the resolution steps up when frames are in time and down when they are late, and stops at two pixels to the point', judged.up > judged.was && judged.down < judged.up && Math.abs(judged.most - judged.top) < 0.001, judged);
+  check('settings: back at 60 the resolution keeps to the preset', f60.rate === 60 && f60.top === 1, f60);
   await page.locator('[data-act="reset"]').click();
   const st2 = await page.evaluate(() => ({ cls: document.getElementById('mg-root').className, saved: localStorage.getItem('stranded2-settings'), q: localStorage.getItem('stranded2-quality') }));
   check('settings: reset restores the defaults', !/mg-cb/.test(st2.cls) && st2.saved === null && st2.q === null, st2);

@@ -80,7 +80,7 @@ async function play(G, o) {
   const ticks = [];
   let t = 0, dist = 0, stalls = 0, stuck = 0, steep = 0, turnSign = 1, extraTurn = 0, air = 0, garbage = 0, gsecs = 0;
   let prev = body().clone(), prevCam = cam.position.clone(), prevFwd = new V(0, 0, -1).applyQuaternion(cam.quaternion);
-  let hMin = 1e9, hMax = -1e9, camMin = 1e9;
+  let hMin = 1e9, hMax = -1e9, camMin = 1e9, hid = 0;
   const key = (k, on) => { G.input.keys[k] = on; };
   for (let b = 0; b < o.bursts; b++) {
     // frames between bursts, the game standing still: the ground and the rocks round him are brought up to date
@@ -128,6 +128,18 @@ async function play(G, o) {
       }
       if (!rover && !S.firstPerson && cam.position.distanceTo(G.World.rover.group.position) < 1.2) flag('camera-in-rover', t, { at: ll() });
       if (!S.inside && !S.inAirlock) { const hp = G.World.hab.position, hu = hp.length(); const hd = Math.hypot(cu.x - hp.x / hu, cu.y - hp.y / hu, cu.z - hp.z / hu) * R; if (hd < HAB_R - 0.5 && ch < 3) flag('camera-in-hab', t, { d: +hd.toFixed(1), at: ll() }); }
+      // driving: the rover hidden from the camera by the ground (the line from the camera to its roof under the ground,
+      // for a fifth of a second running), or the camera left far behind it
+      if (rover) {
+        const up = fwd.copy(p).normalize(), roof = p.clone().addScaledVector(up, 1.7);
+        let under = false;
+        // (over the three quarters of the line nearest the camera: the last of it is the ground the rover stands on)
+        for (let k = 1; k <= 6 && !under; k++) { const q = cam.position.clone().lerp(roof, k / 8); under = G.surfaceAt(q) + 0.15 > q.length(); }
+        hid = under ? hid + 1 : 0;
+        if (hid === 6) flag('rover-hidden', t, { at: ll() });
+        const far = cam.position.distanceTo(p);
+        if (far > 19) flag('camera-far', t, { m: +far.toFixed(1), at: ll() });
+      }
       // a jump or a snap of the camera
       const cstep = cam.position.distanceTo(prevCam);
       if (cstep > speed * dt * 3 + 1.4) flag('camera-jump', t, { step: +cstep.toFixed(2), at: ll() });
@@ -174,6 +186,30 @@ async function play(G, o) {
   if (frames.worst > 50) flag('slow-frame', t, { ms: frames.worst, usual: frames.usual });
   return { mode: S.mode, flags, count, dist: Math.round(dist), secs: Math.round(t), stalls, steep, ground: [+hMin.toFixed(2), +hMax.toFixed(2)], camMin: +camMin.toFixed(2),
     step: { usual: +med.toFixed(2), p99: +p99.toFixed(2), worst: +worst.toFixed(1), slow }, parts, heavy, frames, garbage: gsecs ? +(garbage / gsecs / 1048576).toFixed(2) : null, end: ll() };
+}
+
+/**
+ * Runs in the page: he stands beside the rover and the camera is turned once round him. The rover must not come
+ * between the camera and him (the line from the camera to his chest through the rover's body), and the camera must
+ * not be in it.
+ */
+async function orbit(G) {
+  const S = G.S, cam = G.ctx.engine.camera;
+  if (S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); }
+  for (const k of ['w', 'a', 's', 'd', 'shift']) G.input.keys[k] = false;
+  G.roverLocal(10, 70, 0); G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.setLocalTime(13); G.setStorm(0); S.storm.i = 0; G.tick(1 / 30, 30);
+  const rp = G.World.rover.group.position, up = rp.clone().normalize(), body = rp.clone().addScaledVector(up, 1.3);
+  let run = 0, hidden = 0, inside = 0, nearest = 1e9;
+  for (let i = 0; i < 180; i++) {
+    G.input.yaw = Math.PI * 2 / 180; G.tick(1 / 30, 1);
+    const a = G.player.pos.clone().addScaledVector(up, 1.2), ab = cam.position.clone().sub(a);
+    const t = Math.min(1, Math.max(0, body.clone().sub(a).dot(ab) / Math.max(1e-6, ab.lengthSq())));
+    const d = a.addScaledVector(ab, t).distanceTo(body);
+    nearest = Math.min(nearest, d);
+    run = d < 1.1 ? run + 1 : 0; hidden = Math.max(hidden, run);
+    if (cam.position.distanceTo(body) < 1.6) inside++;
+  }
+  return { hidden, inside, nearest: +nearest.toFixed(2) };
 }
 
 /** A strip of frames of a route, as one picture: `n` frames `gap` seconds apart, HUD and all, at phone size. */
@@ -227,12 +263,15 @@ async function sheetOf(page, shots, gap, title, file, crop = null) {
  */
 const FOOT = [0.24, 0.22, 0.76, 1], ROVER = [0.14, 0.1, 0.86, 1], WIDE = [0.08, 0.1, 0.74, 1];
 const EXTRAS = [
-  { name: 'turn-on-foot', foot: true, what: 'the camera turned once round him on foot, standing', n: 12, gap: 0.25,
-    setup: async (G) => { if (G.S.mode === 'rover') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.tpLocal(8, 36, 3.3); await G.settle(); G.setLocalTime(13); G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 30); },
+  // (beside the rover: that is where a camera turned about him has something to go behind)
+  { name: 'turn-on-foot', foot: true, what: 'the camera turned once round him on foot, standing beside the rover', n: 12, gap: 0.25,
+    setup: async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.roverLocal(10, 70, 0); G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.setLocalTime(13); G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 30); },
     each: (G) => { for (let k = 0; k < 8; k++) { G.input.yaw = Math.PI * 2 / 12 / 8; G.tick(1 / 30, 1); } } },
-  { name: 'jump', crop: WIDE, what: 'a jump from a walk: off, up, down, landed (he is in the air 1.8 s: Mars)', n: 12, gap: 0.2,
-    setup: async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.tpLocal(8, 44, 3.3); await G.settle(); G.setLocalTime(13); G.input.keys.w = true; G.tick(1 / 30, 30); },
-    each: (G, a) => { G.input.keys[' '] = a.i === 1; G.tick(1 / 30, 6); if (a.i === 11) { G.input.keys.w = false; G.input.keys[' '] = false; G.tick(1 / 30, 20); } } },
+  // (on the level yard, across it: set off from its edge and outward, as this strip was, he jumped down a slope of one
+  //  in two, was in the air for 2.9 s over ground that fell away as fast as he did, and two reviewers saw a man hanging)
+  { name: 'jump', crop: WIDE, what: 'a jump from a walk on level ground: off, up, down, landed (he is in the air 1.8 s: Mars)', n: 12, gap: 0.2,
+    setup: async (G) => { if (G.S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); } G.tpLocal(-16, 30, 1.57); await G.settle(); G.setLocalTime(13); G.input.keys.w = true; G.tick(1 / 30, 30); },
+    each: (G, a) => { G.input.keys[' '] = a.i === 1; G.tick(1 / 30, 6); if (a.i === 11) { G.input.keys.w = false; G.input.keys[' '] = false; } } },
   { name: 'kneeling-work', foot: true, what: 'digging at the heap: down on a knee, the work, up again', n: 12, gap: 0.33,
     setup: async (G) => { const V = G.player.pos.constructor; G.S.inv.regolith = 0; G.World.soilPiles[0].left = 2; G.tpNear(G.World.soilPiles[0].group.getWorldPosition(new V()), 1.5); await G.settle(); G.setLocalTime(13); G.tick(1 / 30, 20); },
     each: (G, a) => { G.input.eHeld = a.i < 9 && !G.S.inv.regolith; if (!G.input.eHeld) G.S.holdT = 0; G.tick(1 / 30, 10); } },
@@ -283,6 +322,12 @@ for (const route of list) {
   for (const f of r.flags) console.log('         ' + JSON.stringify(f));
   // (a walk's step is under half a second: on foot the frames are an eighth of a second apart, so a sheet is two strides)
   if (strips) { const file = path.join(outDir, 'motion', route.name + '.jpg'); await strip(g, route, file, 12, route.mode === 'walk' ? 0.13 : 0.2); console.log('         strip: ' + file); }
+}
+if (!only || only.includes('orbit')) {
+  const ob = await g.eval(orbit);
+  const wrong = ob.hidden >= 3 || ob.inside > 0;
+  if (wrong) bad++;
+  console.log(`  ${wrong ? 'FLAG' : 'ok  '} orbit           the camera turned once round him beside the rover: the rover between it and him for ${ob.hidden} steps running at most, the camera in the rover for ${ob.inside}; the line to his chest never nearer the rover's middle than ${ob.nearest} m`);
 }
 if (strips) {
   for (const x of EXTRAS) {

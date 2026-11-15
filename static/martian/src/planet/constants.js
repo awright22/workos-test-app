@@ -31,3 +31,6 @@ export const DETAIL_FRAME = (() => {
     -cx * sy * cz + sx * sz, cx * sy * sz + sx * cz, cx * cy,
   ];
 })();
+
+/** The map of worn ground round the Hab (game/wear.js, render/terrain-material.js): cells a side, and metres a side. */
+export const WEAR_N = 256, WEAR_SPAN = 160;

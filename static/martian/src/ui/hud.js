@@ -285,7 +285,7 @@ function objRow(key) {
 // ============================================================
 // WAYPOINT: where the current objective is
 // ============================================================
-let wayEl = null, wayShown = false, wayKey = '', waySide = 1, zonesAt = -1, zoneAge = 0;
+let wayEl = null, wayShown = false, wayKey = '', waySide = 1, wayBack = 1, zonesAt = -1, zoneAge = 0;
 const zones = [];                    // what the marker keeps clear of: [left, top, right, bottom, kind] in px
 onLayout(() => { zonesAt = -1; });
 // Where the panel of gauges ends. On a phone the log and the cards stand a fixed gap under it; the style sheet used to
@@ -331,6 +331,13 @@ export function updateWaypoint(camera) {
   _wv.copy(at.pos).project(camera);
   let nx = _wv.x, ny = _wv.y;
   if (behind) { nx = -nx; ny = -ny; const m = Math.max(Math.abs(nx), Math.abs(ny), 1e-3); nx /= m; ny = Math.min(ny / m, -0.2); }
+  // Straight behind him the arrow would stand at the foot of the middle of the screen, on his boots, and jump from
+  // one side of him to the other with every small turn (the strips of walking: two reviewers). It keeps to a side:
+  // the one it is on, until the place is well round to the other.
+  if (behind) {
+    if (nx > 0.3) wayBack = 1; else if (nx < -0.3) wayBack = -1;
+    if (Math.abs(nx) < 0.45) nx = wayBack * 0.45;
+  }
   const px = (nx * 0.5 + 0.5) * w, py = (-ny * 0.5 + 0.5) * h;
   // the marker's own box about its point (the diamond above, the distance under it), and the ring it keeps to
   // (below it there is room for the distance under a dart as well as under the diamond: the dart stands lower in the

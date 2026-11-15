@@ -7,6 +7,7 @@ import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
 import { OBJECTIVES, missionList, suitTimeLeft, openGauges, gaugesOpen } from './hud.js';
 import { layout } from './layout.js';
+import { screenHz } from './diag.js';
 import { DIFFICULTIES, isBase } from '../game/state.js';
 import { regionName } from '../planet/features.js';
 import { llToVec } from '../planet/geo.js';
@@ -259,6 +260,8 @@ export function showPauseMenu(o) {
 // Settings
 // ------------------------------------------------------------------------------------------
 const QUALITIES = [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']];
+// (40 is offered where the screen gives 100 frames a second or more: main.js, frame)
+const FPS = [['60', '60'], ['40', '40'], ['30', '30']];
 function seg(id, label, options, value) {
   return `<div class="mg-seg" role="radiogroup" aria-label="${label}" data-seg="${id}">` +
     options.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === value}" tabindex="${v === value ? 0 : -1}" data-v="${v}">${l}</button>`).join('') + '</div>';
@@ -289,6 +292,7 @@ let setTab = 'graphics';
 export function showSettings(back, overTitle) {
   const running = ctx.engine ? ctx.engine.qualityName : null;
   const quality = savedQuality() || 'auto';
+  const fast = screenHz() >= 100;
   // On a phone the four groups are four tabs, each of which fits the screen. (As one scrolling sheet, Sound
   // and the colour-blind switch were below the fold with nothing to say they were there.)
   const tabbed = layout.compact;
@@ -300,6 +304,9 @@ export function showSettings(back, overTitle) {
     `<section class="set-sec" data-sec="graphics" style="grid-column:1/-1"><h3>${icon('monitor')}Display</h3>` +
     `<div class="set-row"><span class="lbl">Quality</span><div class="ctl">${seg('quality', 'Graphics quality', QUALITIES, quality)}</div>` +
     '<p class="hint" id="set-q-hint"></p></div>' +
+    // (smooth or sharp: at 40 or 30 the picture is drawn at more pixels, as many as that rate leaves time for)
+    `<div class="set-row"><span class="lbl">Frame rate</span><div class="ctl">${seg('fps', 'Frame rate', fast ? FPS : FPS.filter((f) => f[0] !== '40'), String(!fast && settings.fps === 40 ? 30 : settings.fps))}</div>` +
+    `<p class="hint">60 is smoothest. ${fast ? '40 and 30 draw' : '30 draws'} a sharper picture.</p></div>` +
     // (the size of the interface is a matter of the display: here, the Graphics page of a phone is two rows on its
     //  sheet where it was one over an empty sheet, and the Interface page the two switches)
     `<div class="set-row"><label for="set-hudScale">Interface and text size</label><div class="ctl">${range('hudScale', 'Interface and text size', 0.8, 1.4, 0.05, settings.hudScale, pct, 1)}</div>` +
@@ -365,6 +372,7 @@ export function showSettings(back, overTitle) {
       Snd.click();
       if (g.dataset.seg === 'quality') { saveQuality(btn.dataset.v === 'auto' ? null : btn.dataset.v); qNote(); }
       if (g.dataset.seg === 'settab') { setTab = btn.dataset.v; showTab(); }
+      if (g.dataset.seg === 'fps') setSetting('fps', +btn.dataset.v);
     };
     g.addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b) pick(b); });
     g.addEventListener('keydown', (ev) => {

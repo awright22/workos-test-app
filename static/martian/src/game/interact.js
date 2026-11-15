@@ -24,6 +24,8 @@ export let lastActiveI = null;
 export function updateInteract(dt) {
   interaction.active = null;
   if (S.uiOpen || screenOpen() || S.over || S.mode === 'cutscene') { setPrompt(null); return; }
+  // (getting into the rover: nothing else is on offer for that moment, and the button he is still holding starts nothing)
+  if (S.boarding) { setPrompt(null); S.holdT = 0; return; }
   let best = null, bestD = 1e9, bestP = 1e9;
   const pp = S.mode === 'rover' ? World.rover.group.position : player.pos;
   for (const it of interactables) {

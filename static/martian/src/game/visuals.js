@@ -25,20 +25,21 @@ export function syncPod(rec) {
 export function syncIce(site) {
   site.blocks.forEach((b, i) => { const on = i < site.left; b.node.visible = on; b.col.r = on ? b.col.r0 : 0.001; });
 }
+/** Dust on a panel dulls and reddens its cells: show `dust` of it (0..1) on this one. */
+export function showPanelDust(p, dust) {
+  const d = clamp(dust, 0, 1);
+  for (const m of p.cells) {
+    if (!m.userData.clean) m.userData.clean = { color: m.color.clone(), rough: m.roughness, metal: m.metalness };
+    const c = m.userData.clean;
+    m.color.copy(c.color).lerp(_dust, d * 0.9);
+    m.roughness = c.rough + (0.95 - c.rough) * d;
+    m.metalness = c.metal * (1 - d);
+  }
+}
 // Make the world's objects match the game state (safe to call after any change or load).
 export function syncAllVisuals() {
   for (const pl of World.plots) syncPlot(pl);
-  // dust on a panel dulls and reddens its cells
-  for (const p of World.panels) {
-    const d = clamp(p.dust, 0, 1);
-    for (const m of p.cells) {
-      if (!m.userData.clean) m.userData.clean = { color: m.color.clone(), rough: m.roughness, metal: m.metalness };
-      const c = m.userData.clean;
-      m.color.copy(c.color).lerp(_dust, d * 0.9);
-      m.roughness = c.rough + (0.95 - c.rough) * d;
-      m.metalness = c.metal * (1 - d);
-    }
-  }
+  for (const p of World.panels) showPanelDust(p, p.dust);
   for (const sp of World.soilPiles) {                   // the heap shrinks as it is dug; the last load takes the shovel with it
     setSiteShown(sp.group, sp.left > 0);
     setColliders(sp.cols, sp.left > 0);

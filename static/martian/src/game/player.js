@@ -140,7 +140,7 @@ export function collideUnit(q, radius, rocks = 0) {
     }
   };
   for (const c of colliders) {
-    if (S.mode === 'rover' && c === World.roverCollider) continue;
+    if ((S.mode === 'rover' || S.boarding) && c === World.roverCollider) continue;
     test(c.v, c.r);
   }
   if (rocks !== Infinity) for (const c of rockColliders) if (c.h === undefined || c.h >= rocks) test(c.v, c.r);
@@ -267,7 +267,7 @@ export function updateAstronaut(dt) {
   if (driving !== anim.seated) {
     anim.seated = driving;
     const seat = World.rover && World.rover.seat;
-    if (driving && seat) { seat.add(astro); astro.position.set(0, -0.52, 0); astro.quaternion.identity(); anim.inner.rotation.y = 0; }
+    if (driving && seat) { seat.add(astro); astro.position.set(0, -0.52, 0); astro.quaternion.identity(); astro.scale.setScalar(1); anim.inner.rotation.y = 0; }
     else { ctx.world.add(astro); anim.inner.rotation.y = Math.PI; }
   }
   astro.visible = driving ? !!(World.rover && World.rover.seat) : (!S.firstPerson && !S.sleeping && !(cam.init && cam.dist < 1.0)) || S.over;
@@ -327,6 +327,8 @@ export function updateAstronaut(dt) {
   player.bones = anim.bones;
   if (!driving) {
     astro.position.copy(player.pos);
+    // (going up and in, over the last third of a second of getting into the rover)
+    { const b = S.boarding, k = b ? clamp((b.t - (b.dur - 0.32)) / 0.32, 0, 1) : 0; astro.scale.setScalar(1 - 0.4 * k * k); if (k > 0) astro.position.addScaledVector(player.up, 0.7 * k); }
     astro.quaternion.copy(player.q).multiply(_q2.setFromAxisAngle(Y_AXIS, player.face));
     // footsteps: the Walk and Run clips plant a foot at the start and the middle of the cycle
     if ((anim.name === 'Walk' || anim.name === 'Run') && player.onGround) {
@@ -405,6 +407,14 @@ export function updateWalk(dt) {
   if (hurt) top *= 0.55;
   let tx = 0, tz = 0;
   if (mv.mag > 0.12 && !working) { const l = Math.hypot(mv.mx, mv.mz); tx = (mv.mx / l) * top * mv.mag; tz = (mv.mz / l) * top * mv.mag; }
+  // getting into the rover: his feet are not the player's for that moment. He steps to its hull (game/rover.js).
+  if (S.boarding && World.rover) {
+    _p.copy(World.rover.group.position).sub(player.pos);
+    _fw.set(0, 0, -1).applyQuaternion(player.q); _rt.set(1, 0, 0).applyQuaternion(player.q);
+    const bx = _p.dot(_rt), bz = -_p.dot(_fw), bl = Math.hypot(bx, bz);
+    const pace = bl > 1.5 ? 1.9 : 0;
+    tx = bl > 0.01 ? (bx / bl) * pace : 0; tz = bl > 0.01 ? (bz / bl) * pace : 0;
+  }
 
   // --- slopes: slow uphill, refuse cliffs, slide when it is too steep to stand ------------------
   player.slope = groundSlope(player.pos, 1.3, _down);
@@ -474,7 +484,7 @@ export function updateWalk(dt) {
     const drop = before - ground;
     if (drop > 0.45 + 6 * dt) { player.onGround = false; player.alt = drop; player.vy = 0; player.airT = 0; }
     else player.alt = 0;
-    if (player.onGround && (input.keys[' '] || touchJumpFresh()) && !working && player.slope < 1.1) {
+    if (player.onGround && (input.keys[' '] || touchJumpFresh()) && !working && !S.boarding && player.slope < 1.1) {
       player.vy = BAL.jumpV; player.onGround = false; player.airT = 0; player.alt = 0.001;
       emit('jump', {});
     }
@@ -590,6 +600,32 @@ function cameraSees(at, boots) {
   return true;
 }
 
+/**
+ * Is something that stands on the ground (the rover, a lander, a row of panels) between a camera at `at` and his
+ * knees? Each is a circle on the ground and so tall (`tall`: a man's chest if it does not say). The camera could not
+ * stand inside one; it could stand behind one, and turned beside the rover the picture was the rover's roof and he
+ * was not in it (tests/motion.mjs, the strip of the camera turned about him).
+ */
+function thingInTheWay(at) {
+  _cf.copy(player.pos).addScaledVector(player.up, 0.45);
+  const ax = at.x - _cf.x, ay = at.y - _cf.y, az = at.z - _cf.z, len2 = ax * ax + ay * ay + az * az;
+  if (len2 < 1.5) return false;
+  const feet = player.pos.length();
+  for (const c of colliders) {
+    if (c.off || c.r < 0.9) continue;
+    // the thing's foot, at the height of his feet; the place on the line nearest it
+    const cx = c.v.x * feet - _cf.x, cy = c.v.y * feet - _cf.y, cz = c.v.z * feet - _cf.z;
+    if (cx * cx + cy * cy + cz * cz > 200) continue;
+    const t = (cx * ax + cy * ay + cz * az) / len2;
+    if (t < 0.06 || t > 0.98) continue;
+    _cl.set(ax * t - cx, ay * t - cy, az * t - cz);
+    const high = _cl.dot(player.up);                       // (how far above his feet the line passes it)
+    _cl.addScaledVector(player.up, -high);
+    if (_cl.lengthSq() < c.r * c.r * 0.6 && high < (c.tall || 1.5)) return true;
+  }
+  return false;
+}
+
 function updateWalkCamera(dt, running) {
   const c = ctx.engine.camera;
   // (the dip of a landing comes on over a tenth of a second and goes over a quarter: put on all at once, it was a
@@ -642,7 +678,7 @@ function updateWalkCamera(dt, running) {
           if (swing > most * (1 + 0.25 * i)) { if (k < 4) { k = 3; continue; } break; }      // (no more swing allowed: on to "clear at all")
           _q2.setFromAxisAngle(X_AXIS, -swing);
           c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, dist / 3), rise, dist).applyQuaternion(_q1.copy(_cq).multiply(_q2)));
-          if (cameraSees(c.position, k < 4) && cameraClear(c.position, null)) break search;
+          if (cameraSees(c.position, k < 4) && cameraClear(c.position, null) && !thingInTheWay(c.position)) break search;
         }
         swing = 0;
       }
@@ -652,6 +688,16 @@ function updateWalkCamera(dt, running) {
     cam.swing = room ? 0 : jumped ? swing : lerp(cam.swing || 0, swing, damp(swing > (cam.swing || 0) ? 0.3 : 0.05, dt));
     if (cam.swing > 0.002) _cq.multiply(_q2.setFromAxisAngle(X_AXIS, -cam.swing));
     c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, cam.dist / 3), rise, cam.dist).applyQuaternion(_cq));
+    // The boom and the swing ease toward what the search found, each at its own pace, and a place between two good
+    // places need not be good: turned beside the rover, the camera went through its cab on the way from one side of
+    // it to the other. So the place it is about to take is tried too, and the boom comes in until it will do.
+    if (!room) {
+      // (by tenths: in big steps the picture pumped while the swing caught up)
+      for (let i = 0; i < 16 && cam.dist > 0.8 && !(cameraClear(c.position, null) && !thingInTheWay(c.position)); i++) {
+        cam.dist *= 0.9;
+        c.position.copy(cam.pivot).add(_v1.set(0.55 * Math.min(1, cam.dist / 3), rise, cam.dist).applyQuaternion(_cq));
+      }
+    }
     // indoors, duck under whatever hangs from the roof rather than zooming in
     if (room) {
       siteWorldToLocal(room.group, c.position, _v3);

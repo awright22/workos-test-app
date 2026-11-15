@@ -10,6 +10,7 @@ import { initScience } from './science.js';
 import { initMachines } from './machines.js';
 import { farm } from './farm.js';
 import { syncAllVisuals } from './visuals.js';
+import { serializeWear, restoreWear } from './wear.js';
 // Checkpoints and the saved game.
 export function serializeState() {
   return {
@@ -41,6 +42,7 @@ export function serializeState() {
     built: World.builtMeshes.map(b => ({ kind: b.kind, charges: b.charges, yaw: b.yaw || 0,
       ll: vecToLl(_v1.copy(b.group.position).normalize()), ...(b.job ? { job: { ...b.job } } : {}) })),
     playerQ: player.q.toArray(), roverQ: roverF.q.toArray(),
+    wear: serializeWear(),               // (optional: the paths worn round the Hab; older saves have none)
     log: logSnapshot(),                  // (optional: the last lines of the log, for the journal; older saves have none)
   };
 }
@@ -97,6 +99,7 @@ export function applyState(d) {
   S.over = false; S.dead = null; S.sleeping = false; S.mode = 'walk'; S.uiOpen = false;
   Snd.alarm(false); Snd.disco(false); S.disco = false;
   syncPlayerPos();
+  restoreWear(d.wear);
   syncRoverVisual(0);
   syncAllVisuals();
   hideOverlay();

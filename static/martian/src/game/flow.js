@@ -15,6 +15,7 @@ import { bearingTo, fmtClock } from '../ui/hud.js';
 import { regionName } from '../planet/features.js';
 import { llToVec } from '../planet/geo.js';
 import { initRoverAt } from './rover.js';
+import { initWear } from './wear.js';
 import { _v1 } from '../core/scratch.js';
 import { applyAudioSettings, menuHooks, showPauseMenu, showTitle } from '../ui/menus.js';
 // Starting, continuing, pausing, dying.
@@ -121,6 +122,7 @@ export function buildWorldAtSpawn() {
   if (isBase()) addDepositPads();                 // (before the pads are handed to the terrain, which addSitePads does)
   addSitePads(World.spawn);
   buildHabColony(World.spawn);
+  initWear();                                     // (the paths he wears are mapped in the Hab's own frame)
   initRoverAt(_v1.copy(World.rover.group.position).normalize(), 0.8);
   buildStorySites();
   if (isBase()) buildBaseSites();

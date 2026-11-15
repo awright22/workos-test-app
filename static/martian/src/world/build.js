@@ -31,10 +31,10 @@ export function placeAt(latOrVec, lon, yaw) {
   ctx.world.add(g);
   return g;
 }
-export function addColliderAt(group, lx, lz, r) {
+export function addColliderAt(group, lx, lz, r, tall) {
   // math-space transform: never rely on matrixWorld (ctx.world shifts each frame)
   const w = new THREE.Vector3(lx, 0, lz).applyQuaternion(group.quaternion).add(group.position);
-  colliders.push({ v: w.normalize().clone(), r });
+  colliders.push(tall ? { v: w.normalize().clone(), r, tall } : { v: w.normalize().clone(), r });
 }
 export const HAB_R = 8.4;
 export const HAB_FLOOR = 0.06;
@@ -123,19 +123,20 @@ function trodden(base) {
 const drapes = [];
 let drapedPads = -1;
 const _dm = new THREE.Matrix4(), _di = new THREE.Matrix4(), _dv = new THREE.Vector3();
-export function drape(mesh, lift = 0.04) {
+/** `live`: laid afresh every frame it is drawn, for a patch on something that moves (the glow behind the rover). */
+export function drape(mesh, lift = 0.04, live = false) {
   const w = mesh.geometry.parameters.width, n = Math.max(4, Math.min(26, Math.ceil(w / 0.9)));
   mesh.geometry.dispose();
   mesh.geometry = new THREE.PlaneGeometry(w, w, n, n);
   mesh.geometry.rotateX(-Math.PI / 2);
-  drapes.push({ mesh, lift, done: false });
+  drapes.push({ mesh, lift, done: false, live });
   return mesh;
 }
 function layDrapes() {
   const pads = ctx.planet.pads.length;
   if (pads !== drapedPads) { drapedPads = pads; for (const d of drapes) d.done = false; }
   for (const d of drapes) {
-    if (d.done || !d.mesh.parent) continue;
+    if ((d.live ? !d.mesh.visible : d.done) || !d.mesh.parent) continue;
     d.done = true;
     // (the patch's place on the planet, by its own chain of parents: the world's root moves every frame)
     _dm.identity();
@@ -378,7 +379,7 @@ export function buildHabColony(spawn) {
     g.add(m.root);
     const cells = ownMaterials(m.part('panel') || m.root).filter((x) => x.name === 'solar_cell');
     const rec = { mesh: m.part('panel') || m.root, cells, dust: 0.22 + i * 0.05, group: g };
-    addColliderAt(solar, px, pz, 1.0);
+    addColliderAt(solar, px, pz, 1.0, 2.4);        // (a tilted panel stands over two metres at its top edge: the camera does not look at him through one)
     World.panels.push(rec);
   }
   World.solarGroup = solar;
@@ -557,8 +558,10 @@ export function buildRover(group) {
   World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish'), markers: 0 };
   // what its red and amber markers put on the ground behind it after dark (drawn, as the buildings' pools are: lamps
   // that glowed and lit nothing looked painted on)
-  groundGlow(group, 2.8, 0xff6a3a, 0.13, 'pool', () => World.rover.markers, 0.06).position.set(0, 0.06, 2.9);
-  World.roverCollider = { v: group.position.clone().normalize(), r: 2.6 };
+// (laid on the ground afresh as it goes: a flat patch carried behind a rover on rough ground was cut by every ripple
+  //  it crossed, in hard-edged wedges that changed each frame: tests/motion.mjs, the night drive)
+  drape(groundGlow(group, 2.8, 0xff6a3a, 0.13, 'pool', () => World.rover.markers, 0.06), 0.06, true).position.set(0, 0.06, 2.9);
+  World.roverCollider = { v: group.position.clone().normalize(), r: 2.6, tall: 3.1 };      // (`tall`: what the camera may not look through, game/player.js)
   colliders.push(World.roverCollider);
 }
 
@@ -615,7 +618,7 @@ export function buildStorySites() {
   drape(groundStain(mav, 13, 0x0c0706, 0.72, 0.03, 'scorch'), 0.03);   // what four descent engines left: burnt ground, years old and still black
   World.mav = mav;
   mav.userData.reach = 9000;                       // a 15 m rocket shows from far off
-  colliders.push({ v: mav.position.clone().normalize(), r: 3.4 });
+  colliders.push({ v: mav.position.clone().normalize(), r: 3.4, tall: 9 });
 
   // every real lander, at its real coordinates, as the machine it really was
   for (const L of LANDERS) {
