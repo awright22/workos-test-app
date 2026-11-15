@@ -13,6 +13,8 @@ import { LANDERS } from '../planet/features.js';
 import { Snd } from '../audio/sound.js';
 import { log } from '../ui/dom.js';
 import { WORK_BY_ID } from '../game/base.js';
+import { asset } from '../planet/load.js';
+import CONTACT from './contact.json';
 // Builds everything that stands on the planet: the Hab colony, the rover, story sites,
 // historic landers, ice, deployables and supply pods; and the collider list.
 export const World = { plots: [], panels: [], soilPiles: [], landers: [], iceSites: [], builtMeshes: [],
@@ -193,6 +195,46 @@ export function groundStain(parent, radius, color, opacity, y = 0.03, kind = 'so
   m.position.y = y; m.renderOrder = 1;
   parent.add(m);
   return m;
+}
+
+/*
+ * The ground's side of ambient occlusion: under and round whatever stands on it the ground sees less of the sky.
+ * Each model that stands out of doors has a tile, baked from the model by tools/build_contact.mjs (the share of
+ * the sky it hides from each place on the ground under it), all in one picture; this lays a model's tile on the
+ * ground under it, draped as a stain is. With it a lander in its own shade, or a crate at dusk, stands on the
+ * ground; without it they were on it only where the sun drew their shadow.
+ */
+let contactMat = null;
+function contactMaterial() {
+  if (contactMat) return contactMat;
+  contactMat = new THREE.MeshBasicMaterial({ color: 0x160b06, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3.5, polygonOffsetUnits: -3.5 });
+  // (nothing is drawn until the picture has come: without its map a patch is a dark square)
+  contactMat.visible = false;
+  new THREE.TextureLoader().load(asset('assets/models/contact.png'), (t) => {
+    t.colorSpace = THREE.NoColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
+    contactMat.alphaMap = t; contactMat.needsUpdate = true; contactMat.visible = true;
+  });
+  return contactMat;
+}
+/**
+ * Lay a model's contact patch under it. `m` is what model() gave. `live`: the thing moves (the rover), so the patch
+ * is laid on the ground afresh each frame.
+ * @returns {THREE.Mesh | null}  null for a model with no tile
+ */
+export function contactPatch(m, live = false) {
+  const t = CONTACT.models[m.root.name];
+  if (!t) return null;
+  const n = Math.max(4, Math.min(12, Math.ceil(t.size / 1.1)));
+  const geo = new THREE.PlaneGeometry(t.size, t.size, n, n);
+  geo.rotateX(-Math.PI / 2);
+  // its tile in the picture (a tile's first row is its least z, which is the top of a flat plane's own map)
+  const uv = geo.attributes.uv, col = t.i % CONTACT.cols, row = Math.floor(t.i / CONTACT.cols), rows = CONTACT.rows;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + uv.getX(i)) / CONTACT.cols, 1 - (row + (1 - uv.getY(i))) / rows);
+  const mesh = new THREE.Mesh(geo, contactMaterial());
+  mesh.position.set(t.cx, 0.02, t.cz); mesh.renderOrder = 1;
+  m.inner.add(mesh);
+  drapes.push({ mesh, lift: 0.02, done: false, live });
+  return mesh;
 }
 
 /*
@@ -377,6 +419,7 @@ export function buildHabColony(spawn) {
     const g = new THREE.Group(); g.position.set(px, 0, pz); solar.add(g);
     const m = model('solar_panel');
     g.add(m.root);
+    if (ctx.engine.qualityName !== 'low') contactPatch(m);      // (eight more things to draw: not on the lightest preset)
     const cells = ownMaterials(m.part('panel') || m.root).filter((x) => x.name === 'solar_cell');
     const rec = { mesh: m.part('panel') || m.root, cells, dust: 0.22 + i * 0.05, group: g };
     addColliderAt(solar, px, pz, 1.0, 2.4);        // (a tilted panel stands over two metres at its top edge: the camera does not look at him through one)
@@ -396,7 +439,7 @@ export function buildHabColony(spawn) {
 
   // uplink dish + pathfinder parking ring
   const up = placeOffset(World.hab, 11.5, 7.5, 0);
-  up.add(model('uplink_dish').root);
+  { const dish = model('uplink_dish'); up.add(dish.root); contactPatch(dish); }
   World.uplink = up;
   colliders.push({ v: up.position.clone().normalize(), r: 1.3 });        // the dish's tripod is wider than its mast
   const ringG = placeOffset(World.hab, 7.0, 9.5, 0);
@@ -539,6 +582,7 @@ export const WHEEL_RADIUS = 0.62;
 export function buildRover(group) {
   const m = model('rover', { face: true });
   group.add(m.root);
+  contactPatch(m, true);
   const wheels = ['wheel_FL', 'wheel_ML', 'wheel_RL', 'wheel_FR', 'wheel_MR', 'wheel_RR'].map((n) => m.part(n)).filter(Boolean);
   const steer = { FL: m.part('steer_FL'), FR: m.part('steer_FR'), RL: m.part('steer_RL'), RR: m.part('steer_RR') };
   // one spotlight between the two headlamps, aimed down the road (the model's front is its +Z)
@@ -589,6 +633,8 @@ export function addSiteModel(g, name, o = {}) {
   m.cols = [];
   // whatever stands on Mars has disturbed the ground it stands on: a patch of darker, packed soil under it
   if (o.stain) drape(groundStain(g, o.stain, o.blast ? 0x24170f : 0x20150d, o.stainOpacity || 0.3, 0.025, o.blast ? 'blast' : 'soft'), 0.025).position.set(o.at ? o.at[0] : 0, 0.025, o.at ? o.at[1] : 0);
+  // ... and it hides the sky from the ground under it
+  contactPatch(m);
   for (const c of colliderAnchors(m)) {
     c.node.updateWorldMatrix(true, false);
     g.worldToLocal(c.node.getWorldPosition(_aw));          // into the group's frame: the world origin floats
@@ -602,6 +648,7 @@ export function buildStorySites() {
   const pf = placeAt(19.13, 326.79, 0.7);
   World.pfModel = model('pathfinder');
   pf.add(World.pfModel.root);
+  contactPatch(World.pfModel);
   World.pathfinder = pf;
   World.pfCollider = { v: pf.position.clone().normalize(), r: 2.0 };
   colliders.push(World.pfCollider);

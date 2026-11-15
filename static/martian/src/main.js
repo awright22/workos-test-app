@@ -31,7 +31,7 @@ import { initDiag, noteFrame, noteResize, screenHz } from './ui/diag.js';
 import { LampPool } from './world/lamps.js';
 import { MAIL, deliverMail, nextMail } from './game/mail.js';
 import { setStainLight, setGlowLight, World, buildDeployable, dropSupplyPod, siteLocalToWorld, updateDoors, updateSites } from './world/build.js';
-import { dustUniforms, mirrorUniforms, setGlow, preloadModels } from './world/models.js';
+import { dustUniforms, mirrorUniforms, setGlow, preloadModels, model } from './world/models.js';
 import { RockField, rockColliders } from './world/rocks.js';
 import { Vfx } from './render/vfx.js';
 import { initEffects, updateEffects } from './game/effects.js';
@@ -380,6 +380,11 @@ function installDebug() {
   window.__MG = {
     ctx, S, World, player, roverF, BAL, DIFFICULTIES, interactables, input, interaction,
     tread, wearAt, serializeWear,
+    // (for tools/build_contact.mjs, which bakes with the game's own renderer and loader: the few classes it uses, by
+    //  name. All of three.js handed over here was 150 kB more for every player to fetch.)
+    THREE: { WebGLRenderTarget: THREE.WebGLRenderTarget, Scene: THREE.Scene, ShaderMaterial: THREE.ShaderMaterial, Vector3: THREE.Vector3,
+      OrthographicCamera: THREE.OrthographicCamera, Box3: THREE.Box3, DoubleSide: THREE.DoubleSide },
+    model, preloadModels,
     llToVec, surfaceAt, groundDist,
     applyRates, advanceTime, newSol, sleepToDawn, checkpoint, restoreCheckpoint, serializeState, applyState, saveGame,
     syncAllVisuals, initPlayerAt, initRoverAt, newGame, continueGame, checkAchievements, buildDeployable, dropSupplyPod, startLaunch,
