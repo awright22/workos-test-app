@@ -47,7 +47,14 @@ if (!onlySize || onlySize === 'keys') {
   check('settings: reset restores the defaults', !/mg-cb/.test(st2.cls) && st2.saved === null && st2.q === null, st2);
   await key('Escape');
   check('settings: Escape returns to the title', /k-title/.test(await kind()));
-  // new game from the keyboard
+  // new game from the keyboard: which game (the story is the one focused), then its difficulties
+  await key('Enter');
+  const which = await page.evaluate(() => ({ cards: document.querySelectorAll('#mg-panel .diff').length, on: (document.activeElement && document.activeElement.dataset.kind) || '' }));
+  check('new game: two games offered, the story focused', which.cards === 2 && which.on === 'story', which);
+  await key('ArrowRight');
+  const other = await page.evaluate(() => (document.activeElement && document.activeElement.dataset.kind) || '');
+  check('new game: arrows move between the two games', other === 'base', other);
+  await key('ArrowLeft');
   await key('Enter');
   check('new game: three difficulty cards, Engineer focused', (await page.locator('.diff').count()) === 3 && (await focused()) === 'survival', await focused());
   await key('ArrowRight');

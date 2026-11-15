@@ -30,10 +30,11 @@ import { ROCK_STRIDE, ROCK_ANGULAR, ROCK_SLAB, ROCK_COBBLE, bareLava, meshPoint,
 import { rockAtlas } from './rock-shapes.js';
 import { ballMesh, ballSnap } from './rock-ball.js';
 
-/** Colliders for large rocks near the player: { v: unit direction, r: metres }. */
+/** Colliders for large rocks near the player: { v: unit direction, r: metres, h: how high it stands, metres }. */
 export const rockColliders = [];
-/** A rock that stands this high (metres) or more out of the ground is in the way; the rover's wheels and a man's
- *  boots go over anything lower. */
+/** A rock that stands this high (metres) or more out of the ground is in a man's way: his boots go over anything
+ *  lower. (The rover's wheels go over a good deal more: each collider says how high its rock stands, and game/rover.js
+ *  decides what stops a rover. One rule for both had a knee-high rock stop it like a wall.) */
 const ROCK_SOLID = 0.4;
 /** No stone that can be walked through stands higher than this: one that would is seated deeper. */
 const STONE_HIGH = 0.22;
@@ -735,7 +736,7 @@ export class RockField {
       aux[a + 5] = (0.7 + 0.6 * fr(rnd * 5.3)) * (1 - lava) * (solid || !big ? 1 : 0.5);
       if (solid) {
         const x = o[0] + d[i], y = o[1] + d[i + 1], z = o[2] + d[i + 2], l = 1 / Math.hypot(x, y, z);
-        set.colliders.push({ v: new THREE.Vector3(x * l, y * l, z * l), r: radius * 0.88, x, y, z });
+        set.colliders.push({ v: new THREE.Vector3(x * l, y * l, z * l), r: radius * 0.88, x, y, z, h: stands });
       }
     }
   }

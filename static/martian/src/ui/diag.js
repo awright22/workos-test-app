@@ -77,8 +77,12 @@ export function initDiag(info) {
   window.addEventListener('unhandledrejection', (e) => note('promise: ' + (e.reason && e.reason.message || e.reason)));
   const original = console.error.bind(console);
   console.error = (...a) => { note(a.map((x) => (x && x.message) || String(x)).join(' ')); original(...a); };
-  // which build is this? the service worker's cache name is a hash of every shipped file
-  fetch(new URL('sw.js', document.baseURI)).then((r) => r.text()).then((t) => { const m = /stranded2?-([0-9a-f]{6,})/.exec(t); if (m) build = m[1]; }).catch(() => {});
+  // Which build is this? The page says (index.html is stamped with it). And which build is the offline copy? If
+  // the two differ, the report says both: an installed copy that has not taken a new build shows here.
+  build = window.__BUILD || '?';
+  if (window.caches) caches.keys().then((keys) => { const k = keys.filter((x) => x.startsWith('stranded2-')).map((x) => x.slice(10)); if (k.length && (k.length > 1 || k[0] !== build)) build += ` (offline copy ${k.join(', ')})`; }).catch(() => {});
+  // (a page from before the stamp, or a plain file server: ask the worker's script, as it used to)
+  if (build === '?') fetch(new URL('sw.js', document.baseURI)).then((r) => r.text()).then((t) => { const m = /stranded2?-([0-9a-f]{6,})/.exec(t); if (m) build = m[1]; }).catch(() => {});
   let last = performance.now();
   const tick = (now) => {
     requestAnimationFrame(tick);

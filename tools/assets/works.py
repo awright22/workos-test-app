@@ -44,7 +44,8 @@ def masonry():
     # what glows dull: iron cooling in a mould, the mouth of a glass furnace (the game drives it with `light_amber`)
     mat('light_ember', color=(1.0, 0.42, 0.08), metallic=0.0, roughness=0.5, emissive=(1.0, 0.36, 0.05), strength=1.5)
     # (bright in itself: as a true mirror it showed this renderer's dim surroundings, and a "dark matte copper-brown" dish)
-    mat('mirror', color=(0.80, 0.85, 0.92), metallic=0.3, roughness=0.2)
+    # (... and now that it faces the sky it is a true mirror again: what it shows is the sky, bright by day and dark by night)
+    mat('mirror', color=(0.93, 0.95, 0.97), metallic=1.0, roughness=0.1)
 
 
 def joints(K, face, w, h0, h1, course=0.112, pitch=0.24, skip=None):

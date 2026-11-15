@@ -253,7 +253,11 @@ function tick(dt) {
     if (b.glow && b.group.visible) setGlow(b.glow, 0.16 + 0.44 * (World.dark || 0));      // (not full even at night: at full the apex fitting burnt a star through the glass)
     if (b.fire) {
       b.heat += ((b.working ? 1 : 0) - b.heat) * Math.min(1, dt * 0.8);                  // (a fire takes a moment to draw, and a while to die)
-      if (b.group.visible) setGlow(b.fire, b.heat * (0.8 + 0.2 * Math.sin(blinkT * 9 + b.yaw * 7) * Math.sin(blinkT * 3.3)));
+      if (b.group.visible) {
+        setGlow(b.fire, b.heat * (0.8 + 0.2 * Math.sin(blinkT * 9 + b.yaw * 7) * Math.sin(blinkT * 3.3)));
+        // (... and a fire that is out is black: unlit, the mouth of an idle kiln was still its own bright orange in the sun)
+        for (const m of b.fire) { if (!m.userData.lit) m.userData.lit = m.color.clone(); m.color.copy(m.userData.lit).multiplyScalar(0.05 + 0.95 * b.heat); }
+      }
       // (and it smokes: a works at work was a glow and nothing else)
       if (b.flue && b.heat > 0.4 && b.group.visible && !S.sleeping) {
         b.smokeT = (b.smokeT || 0) - dt;

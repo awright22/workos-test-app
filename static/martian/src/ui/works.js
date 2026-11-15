@@ -21,7 +21,10 @@ export function showWork(b, after) {
   const close = () => { clearInterval(timer); hideOverlay(); };
   const draw = () => {
     const cur = jobOf(b);
-    const cards = b.def.jobs.map((j) => {
+    // (the jobs he can run now come first: on a phone the sheet shows two cards, and the one job a new kiln can do
+    //  was the one whose buttons were under the fold)
+    const rank = (j) => (cur === j ? 2 : batchesInHand(j) >= 1 ? 1 : 0);          // (the job that is on, then what could be run, then the rest)
+    const cards = b.def.jobs.slice().sort((x, y) => rank(y) - rank(x)).map((j) => {
       const have = batchesInHand(j), mine = cur === j;
       // one batch, a handful, or all the stores will cover
       const runs = [1];
@@ -33,11 +36,13 @@ export function showWork(b, after) {
         `<p class="ds">A batch makes ${made(j.out)}, in ${hoursText(j.hours)}, for ${j.power}% of the Hab’s power.</p>` +
         (mine ? `<div class="work-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>`
           : `<div class="cost">${costChips(j.in)}</div>`) +
+        // (what is missing is said over the buttons, not beside them: beside, it stood the dead button of one card
+        //  higher than the live ones of its neighbours)
+        (!mine && !cur && have < 1 ? `<p class="why bad work-miss">${chem(esc(missingText(j.in)))}</p>` : '') +
         '<div class="rcp-ft">' +
         (mine ? '<button type="button" class="mg-btn small" data-stop="1">Stop</button><span class="why">What is in the fire is lost. The rest comes back.</span>'
           : cur ? '<span class="why">One job at a time.</span>'
-            : runs.map((n, i) => `<button type="button" class="mg-btn small${i === 0 && have >= 1 ? ' primary' : ''}" data-run="${j.id}" data-n="${n}"${have >= 1 ? '' : ' disabled'}>${n === 1 ? 'Run 1' : `Run ${n}`}</button>`).join('') +
-              `<span class="why${have >= 1 ? '' : ' bad'}">${have >= 1 ? '' : chem(esc(missingText(j.in)))}</span>`) +
+            : runs.map((n, i) => `<button type="button" class="mg-btn small${i === 0 && have >= 1 ? ' primary' : ''}" data-run="${j.id}" data-n="${n}"${have >= 1 ? '' : ' disabled'}>${n === 1 ? 'Run 1' : `Run ${n}`}</button>`).join('')) +
         '</div></article>';
     }).join('');
     const low = S.power < WORKS_POWER_FLOOR;

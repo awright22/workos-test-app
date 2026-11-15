@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { ctx } from './ctx.js';
-import { frameQuat } from '../planet/geo.js';
+import { angDist, frameQuat } from '../planet/geo.js';
 import { X_AXIS, _pv, _q1, _q2, _v1, _v2, _v3 } from '../core/scratch.js';
 import { surfaceAt, groundSlope } from '../planet/surface.js';
 import { R } from '../planet/constants.js';
@@ -14,7 +14,8 @@ import { WHEEL_RADIUS, World } from '../world/build.js';
 import { BAL, S, machineEff, roverPowerCap, roverTopSpeed } from './state.js';
 import { wearRover } from './machines.js';
 import { input } from './input.js';
-import { player, frameMove, frameYaw, collideUnit, syncPlayerPos, camLookAt } from './player.js';
+import { player, frameMove, frameYaw, collideUnit, contact, syncPlayerPos, camLookAt } from './player.js';
+import { rockColliders } from '../world/rocks.js';
 import { Snd } from '../audio/sound.js';
 import { clamp, lerp, damp } from '../core/math.js';
 import { emit } from '../core/events.js';
@@ -23,10 +24,73 @@ export const roverF = {
   q: new THREE.Quaternion(), speed: 0, steer: 0,
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
-  slope: 0, slip: 0, throttle: 0,
+  slope: 0, slip: 0, throttle: 0, touching: false,
+  jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 const _down = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _w = new THREE.Vector3();
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+/**
+ * What stops a rover, and what it only feels. Its wheels are 1.24 m across on a rocker: a rock that stands under
+ * ROVER_CLEAR goes under them with a jolt and a little speed lost, and only a boulder is in its way. (It used the
+ * astronaut's rule, 0.4 m, and a circle of 2 m: a knee-high rock a metre off its flank stopped it like a wall, and
+ * every frame of touching one took two thirds of its speed, so it could not build the speed to get away.)
+ */
+export const ROVER_CLEAR = 0.9;
+/** Its body, for what it runs into: three circles down its length, [metres ahead of its middle, radius]. */
+const BODY = [[1.45, 1.2], [0, 1.25], [-1.45, 1.2]];
+let under = new Set(), underNow = new Set();
+const _bp = new THREE.Vector3(), _bn = new THREE.Vector3(), _bc = new THREE.Vector3(), _hitN = new THREE.Vector3();
+/**
+ * The rover against the rocks round it. A boulder pushes its body out, and the push is all it does to where the
+ * rover stands: it slides along the boulder. Returns how far in the deepest boulder had it (0: none), with the way
+ * out of that one in _hitN. A rock it clears jolts it once, as it comes under.
+ */
+function roverRocks() {
+  const RV = roverF;
+  let deep = 0;
+  underNow.clear();
+  for (const c of rockColliders) {
+    const tall = c.h === undefined || c.h >= ROVER_CLEAR;
+    for (const [ahead, br] of BODY) {
+      roverUp(_up); _fw.set(0, 0, -1).applyQuaternion(RV.q);
+      _bp.copy(_up).multiplyScalar(R).addScaledVector(_fw, ahead).normalize();
+      const sep = angDist(_bp.x, _bp.y, _bp.z, c.v.x, c.v.y, c.v.z) * R;
+      if (!tall) {
+        // under the wheels: once, as it comes under, the body is kicked up at the end and the side the rock is on
+        if (sep < c.r * 0.6 + br * 0.75 && !underNow.has(c)) {
+          underNow.add(c);
+          if (!under.has(c) && Math.abs(RV.speed) > 0.5) {
+            const k = clamp(c.h / ROVER_CLEAR, 0.35, 1) * clamp(Math.abs(RV.speed) / 9, 0.25, 1);
+            _rt.set(1, 0, 0).applyQuaternion(RV.q);
+            _bn.copy(c.v).sub(_up);
+            RV.heaveV += 1.5 * k;
+            RV.pitchV += Math.sign(_bn.dot(_fw) || 1) * 0.9 * k;
+            RV.rollV -= Math.sign(_bn.dot(_rt) || 1) * 0.7 * k;
+            RV.speed *= 1 - 0.05 * k;
+            S.shake = Math.max(S.shake, 0.14 * k);
+            RV.jolts++;
+            emit('rover-jolt', { k });
+          }
+        }
+        continue;
+      }
+      const min = c.r + br;
+      if (sep >= min || sep < 0.01) continue;
+      // the way out: along the ground, from the boulder to this part of the body
+      _bn.copy(_bp).sub(_bc.copy(c.v).multiplyScalar(_bp.dot(c.v)));
+      if (_bn.lengthSq() < 1e-12) continue;
+      _bn.normalize();
+      const d = min - sep;
+      _rt.set(1, 0, 0).applyQuaternion(RV.q);
+      const px = _bn.dot(_rt), pz = -_bn.dot(_fw), pl = Math.hypot(px, pz);
+      if (pl > 1e-6) frameMove(RV.q, px / pl, pz / pl, d, R);
+      if (d > deep) { deep = d; _hitN.copy(_bn); }
+    }
+  }
+  const t = under; under = underNow; underNow = t;
+  return deep;
+}
 
 export function initRoverAt(unitVec, yaw) {
   frameQuat(_v1.copy(unitVec).normalize(), yaw || 0, roverF.q);
@@ -168,7 +232,30 @@ export function updateRover(dt) {
   const dist = RV.speed * dt;
   if (Math.abs(dist) > 1e-5) { frameMove(RV.q, 0, -Math.sign(dist), Math.abs(dist), R); S.stats.driven += Math.abs(dist); }
   if (RV.slip) frameMove(RV.q, Math.sign(RV.slip), 0, Math.abs(RV.slip) * dt, R);
-  if (collideUnit(RV.q, 2.0)) { if (Math.abs(RV.speed) > 6) { S.shake = Math.max(S.shake, 0.35); emit('rover-bump', { speed: Math.abs(RV.speed) }); } RV.speed *= 0.35; }
+  // --- what it runs into -----------------------------------------------------------------------
+  // Things built and landed (a circle a little wider than its body: they have corners), then the boulders.
+  let hit = collideUnit(RV.q, 1.7, Infinity) && contact.disc ? 1 : 0;
+  if (hit) _hitN.copy(contact.n);
+  const deep = roverRocks();
+  if (deep > 0) hit = 1;
+  if (hit) {
+    // What it loses is what was carrying it into the thing: head on it stops, a glancing touch costs it little, and
+    // backing off costs nothing. By the clock, not by the frame. And the nose is turned off the thing while the
+    // throttle holds it there, so it comes round a boulder by itself and is never pinned on one.
+    _fw.set(0, 0, -1).applyQuaternion(RV.q); _rt.set(1, 0, 0).applyQuaternion(RV.q);
+    const way = Math.sign(RV.speed) || Math.sign(throttle) || 1;
+    const into = clamp(-way * _fw.dot(_hitN), 0, 1);
+    if (into > 0) {
+      if (!RV.touching) RV.hits++;
+      if (!RV.touching && Math.abs(RV.speed) > 6) { S.shake = Math.max(S.shake, 0.35 * into); emit('rover-bump', { speed: Math.abs(RV.speed) * into }); }
+      RV.speed *= Math.exp(-dt * (1 - Math.sqrt(1 - into * into)) / 0.12);
+      if (throttle * way > 0.1) {
+        const side = Math.abs(_hitN.dot(_rt)) > 0.04 ? Math.sign(_hitN.dot(_rt)) : (Math.sign(steerIn) ? -Math.sign(steerIn) : 1);
+        frameYaw(RV.q, -side * way * into * 0.9 * dt);
+      }
+    }
+    RV.touching = true;
+  } else RV.touching = false;
   RV.q.normalize();
   syncRoverVisual(dt);
 

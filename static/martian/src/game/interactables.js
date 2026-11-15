@@ -16,7 +16,7 @@ import { SOL_LOGS } from './text.js';
 import { syncAllVisuals, syncIce, syncPod } from './visuals.js';
 import { clamp } from '../core/math.js';
 import { localSunEl, sleepTime, sleepToDawn } from './sim.js';
-import { closeScreens, toggleScreen } from '../ui/screens.js';
+import { closeScreens, missingText, toggleScreen } from '../ui/screens.js';
 import { enterRover, exitRover, roverF } from './rover.js';
 import { ITEM_NAMES, RECIPES, gainLoot } from './inventory.js';
 import { COMFORTS, comforts } from './comforts.js';
@@ -304,7 +304,8 @@ function digReason() {
   const carried = S.inv.regolith || 0;
   // (a base's works run on soil where there is nothing better: while one stands and the stores are low, the open
   //  ground is worth digging anywhere, three loads to a turn)
-  if (isBase() && carried < 12 && works().some((w) => !w.job && w.def.jobs.some((j) => j.in.regolith)))
+  // (not on the Hab's own doorstep: at the airlock at nightfall the button said DIG where the task said sleep)
+  if (isBase() && carried < 12 && groundDist(player.pos, World.hab.position) > HAB_R + 9 && works().some((w) => !w.job && w.def.jobs.some((j) => j.in.regolith)))
     return { label: 'Dig regolith here', sub: `+${BASE_DIG} for the works · ${carried} in the stores` };
   if (!World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 400)) {
     const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · no heap near` });
@@ -440,7 +441,7 @@ addI({
       kicker: 'The numbers', title: 'Farm or starve',
       // (food is counted in meals, here as on the FOOD bar: a ration is one; and the date is the rescue, in the same
       //  two words wherever it is given)
-      stats: base ? [['Meals left', S.food], ['Rescue', 'None'], ['Next ship', '4 years']]
+      stats: base ? [['Meals left', S.food], ['Rescue', 'None'], ['No ship for', '4 years']]      // ("Next ship: 4 years" beside "Rescue: none" read as a ship that is coming)
         : [['Meals left', S.food], ['Rescue', `Sol ${S.rescueSol}`], ['Sols with nothing to eat', Math.max(0, S.rescueSol - 1 - S.food)]],
       // (short enough to show whole, with its button, on a phone held sideways)
       body: `${S.food} ration packs, one meal a sol: they run out long before anyone can reach Mars.\n\n` +
@@ -773,19 +774,20 @@ function buildSpot(def, out) {
 /** Why a works cannot be built where he stands, or true. */
 function buildBlock() {
   const def = WORK_BY_ID[buildKind];
-  if (!def) return 'Nothing chosen';
-  if (!hasCost(def.cost)) return 'Not enough materials';
+  if (!def) return true;                                   // (nothing is chosen, so nothing is refused: its prompt is not up)
+  // (each says what is wrong and what to do about it, as every refusal on the prompt does)
+  if (!hasCost(def.cost)) return missingText(def.cost);
   buildSpot(def, _v3).multiplyScalar(R);
   const hab = groundDist(_v3, World.hab.position);
-  if (hab > 150) return 'Too far from the Hab: its power cable will not reach';
-  if (hab < HAB_R + def.r + 5) return 'Too close to the Hab';
-  if (groundDist(_v3, World.rover.group.position) < def.r + 4) return 'The rover is in the way';
+  if (hab > 150) return 'Too far out: build within 150 m of the Hab';
+  if (hab < HAB_R + def.r + 5) return 'Too close: step back from the Hab';
+  if (groundDist(_v3, World.rover.group.position) < def.r + 4) return 'Rover in the way: move a few paces off';
   for (const b of World.builtMeshes) {
     const r = b.def ? b.def.r : b.kind === 'greenhouse' ? 5 : 1.2;
-    if (groundDist(_v3, b.group.position) < def.r + r + 1.5) return 'Too close to what is already built';
+    if (groundDist(_v3, b.group.position) < def.r + r + 1.5) return 'Too close: move off from what is built';
   }
   // (the array, the uplink, a heap, a pod: whatever else stands there)
-  for (const c of colliders) if (c.r > 0.01 && groundDist(_v3, c.v) < def.r + c.r + 0.8) return 'Something is in the way';
+  for (const c of colliders) if (c.r > 0.01 && groundDist(_v3, c.v) < def.r + c.r + 0.8) return 'Something in the way: move a few paces off';
   return true;
 }
 // (the task each of a base's things answers to on the list: see OBJECTIVES in ui/hud.js)

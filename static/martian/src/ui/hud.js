@@ -127,26 +127,30 @@ export const OBJECTIVES = [
   //      thing to the next (stone, kiln, brick, smelter, glass, power, the pad, quarters, the tower), in the order a
   //      base is built; after it the things that can be done at any time. (The greenhouse led this list once, and the
   //      first thing a base's task card said was to spend two circuit boards on a kit, before a word about stone.)
-  { id: 'b-stone', text: () => `Break basalt off boulders (${Math.min(S.inv.stone || 0, 10)} of 10)`, why: 'Building stone. Any boulder will do, once the ground by it has given its sample.',
-    shown: () => isBase() && S.sol >= 2 && S.flags.didMath, done: () => (S.stats.quarried || 0) >= 10 },
-  { id: 'b-kiln', text: () => 'Build a kiln', why: 'Twelve basalt and two scrap: Colony, the Base tab. Brick is what everything else is built of.',
-    shown: () => isBase() && (S.stats.quarried || 0) >= 10, done: () => stands('kiln') },
-  { id: 'b-brick', text: () => `Fire bricks (${Math.min(S.inv.brick || 0, 14)} of 14)`, why: 'Walk up to the kiln and give it a job. A smelter takes fourteen.',
+  // (Each says what it takes and where that comes from. A review of the mode from its start found the gates unsaid:
+  //  ten basalt asked for where the kiln takes twelve, scrap and soil wanted with no word of where they lie, and
+  //  circuit boards, which four things need, explained nowhere.)
+  { id: 'b-stone', text: () => `Break off basalt (${Math.min(S.stats.quarried || 0, 12)} of 12)`, why: 'Building stone: the kiln takes twelve. On new ground a boulder gives NASA a rock sample first.',
+    shown: () => isBase() && S.sol >= 2 && S.flags.didMath, done: () => (S.stats.quarried || 0) >= 12 || stands('kiln') },
+  { id: 'b-kiln', text: () => 'Build a kiln', why: 'Twelve basalt and two scrap (the wreckage by the Hab has scrap). Colony, the Base tab.',
+    shown: () => isBase() && ((S.stats.quarried || 0) >= 12 || stands('kiln')), done: () => stands('kiln') },
+  { id: 'b-brick', text: () => `Fire bricks (${Math.min(S.inv.brick || 0, 14)} of 14)`, why: 'Dig soil on open ground, then give the kiln a job. A smelter takes fourteen bricks.',
     shown: () => isBase() && stands('kiln'), done: () => (S.inv.brick || 0) >= 14 || stands('smelter') },
-  { id: 'b-smelter', text: () => 'Build a smelter', why: 'Iron: out of hematite, out of scrap, or slowly out of the soil.',
+  { id: 'b-smelter', text: () => 'Build a smelter',
+    why: () => ((S.inv.circuit || 0) >= 1 ? 'Fourteen brick, six basalt, four scrap, a circuit board. It makes iron.' : 'It wants a circuit board. NASA sends two for the first samples analysed at the Hab; old landers have them.'),
     shown: () => isBase() && ((S.inv.brick || 0) >= 14 || stands('smelter')), done: () => stands('smelter') },
-  { id: 'b-glass', text: () => 'Build a glassworks', why: 'Twelve brick, four iron and a circuit board. Glass is greenhouses.',
+  { id: 'b-glass', text: () => 'Build a glassworks', why: 'Twelve brick, four iron and a circuit board. Glass is greenhouses and solar panels.',
     shown: () => isBase() && stands('smelter'), done: () => stands('glassworks') },
   { id: 'b-solar', text: () => 'Build a solar field', why: 'Three works draw more than one array gathers. Eight iron, six glass, two circuit boards.',
     shown: () => isBase() && stands('glassworks'), done: () => stands('solarField') },
-  { id: 'b-battery', text: () => 'Build a battery bank', why: 'A reserve for the night and the storm. It wants salt: the map shows where.',
+  { id: 'b-battery', text: () => 'Build a battery bank', why: 'A reserve for the night. Six iron, a circuit board, and six salt: the map shows where salt lies.',
     shown: () => isBase() && stands('solarField'), done: () => stands('battery') },
   // (the pad before the tower: it takes no circuit boards and brings three every ten sols, and the tower takes three)
-  { id: 'b-pad', text: () => 'Lay a landing pad', why: 'Something Earth can hit: a supply drop every ten sols. Circuit boards do not grow here.',
+  { id: 'b-pad', text: () => 'Lay a landing pad', why: 'Something Earth can hit: a drop every ten sols, with circuit boards. Eighteen cement, 24 basalt, four iron.',
     shown: () => isBase() && stands('battery'), done: () => stands('pad') },
-  { id: 'b-quarters', text: () => 'Build living quarters', why: 'A vault of brick and plaster. Cement is burnt gypsum: the kiln makes it.',
+  { id: 'b-quarters', text: () => 'Build living quarters', why: 'Somewhere that is not the Hab. Brick, iron, glass and eight cement: the kiln burns gypsum to cement.',
     shown: () => isBase() && stands('battery'), done: () => stands('quarters') },
-  { id: 'b-tower', text: () => 'Raise a comms tower', why: 'With a dish that high, the orbiters can talk me in to every deposit on the planet.',
+  { id: 'b-tower', text: () => 'Raise a comms tower', why: 'A dish that high, and the orbiters can talk you in to every deposit. Three circuit boards, iron, cement, glass.',
     shown: () => isBase() && stands('pad'), done: () => stands('tower') },
   // ... and what can be done at any time
   { id: 'b-prospect', text: () => 'Find a mineral deposit', why: 'Iron, glass, brick and cement are lying about the planet. The map marks where orbiters saw them.',
@@ -157,7 +161,7 @@ export const OBJECTIVES = [
     shown: () => isBase() && stands('greenhouse'), done: () => foodTotal() >= 40 },
   { id: 'b-ice', text: () => `Mine ice for the tank (${Math.min(S.stats.mined, 6)} of 6)`, why: 'The hydrazine runs out. An ice drill and an outcrop do not.',
     shown: () => isBase() && S.pf.connected, done: () => S.stats.mined >= 6 },
-  { id: 'b-tank', text: () => 'Build a water tank', why: 'The Hab holds 120 L. A drum of iron plate holds twice that again.',
+  { id: 'b-tank', text: () => 'Build a water tank', why: 'The Hab holds 120 L; a drum of iron plate holds 240 more. Eight iron, six brick.',
     shown: () => isBase() && stands('smelter') && S.stats.mined >= 6, done: () => stands('tank') },
   { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on Mars.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
@@ -747,7 +751,7 @@ function compassTargets(pp) {
   if (!S.flags.coldOpen) {
     for (let i = 0; i < World.pods.length; i++) {
       const p = World.pods[i];
-      if (!p.taken && groundDist(pp, p.group.position) < 8000) add('pod' + i, 'cache', /debris/i.test(p.label) ? 'Debris' : 'Cache', p.group.position);
+      if (!p.taken && groundDist(pp, p.group.position) < 8000) add('pod' + i, 'cache', /debris/i.test(p.label) ? 'Debris' : /supply drop/i.test(p.label) ? 'Drop' : 'Cache', p.group.position);      // (the pad's drop is a "drop" on the compass too: its prompt says "supply drop")
     }
   }
   return out;
@@ -974,7 +978,8 @@ export function updateHud() {
   const food = foodTotal(), wait = isBase() ? 20 : Math.max(3, S.rescueSol - S.sol);
   const rows = [
     ['o2', S.o2 / 100, `${Math.round(S.o2)}<small class="pc">%</small>`, S.o2],
-    ['water', S.water / waterCap(), `${Math.round(S.water)}<small>L</small>`, S.water],
+    // (with a tank built the bar is of more than the Hab's 120 L: it says of how much, or 80 L read as two thirds on one sol and a fifth on the next)
+    ['water', S.water / waterCap(), waterCap() > BAL.waterMax ? `${Math.round(S.water)}<small>/${waterCap()} L</small>` : `${Math.round(S.water)}<small>L</small>`, S.water],
     ['food', food / wait, `${food}<small>${food === 1 ? 'meal' : 'meals'}</small>`, null, food / 18],
     ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small class="pc">%</small>`, S.power],
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small class="pc">%</small>`, S.health],

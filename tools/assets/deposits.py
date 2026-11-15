@@ -486,13 +486,22 @@ def build_dep_clay():
     # the joints the slab breaks along (none near the ends, where the face turns to run back: a notch there is a
     # sliver of wall side on to the sun, a bright line down the end of the bank)
     JOINTS = (-1.95, -1.15, -0.5, 0.35, 1.05, 1.9, 2.6)
-    BITES = ((-1.95, -1.15, 0.30), (0.35, 1.05, 0.18), (1.9, 2.6, 0.26))      # between two joints, a block gone from the lip: how far back
+    BITES = ((-1.95, -1.15, 0.30), (1.05, 1.9, 0.22))                         # between two joints, a block gone from the lip: how far back
 
     def yb(x):                                                                # where the cap goes under the sand, behind
         return YB + 0.22 * noise3((x, 3.0, 0.0), 0.7, 4.0) - 0.35 * (x / 3.6) ** 2
 
     def bite(x):                                                              # how far back the lip stands here for a block that has gone
-        return sum(back * _smooth01(x0 - 0.02, x0 + 0.02, x) * (1.0 - _smooth01(x1 - 0.02, x1 + 0.02, x)) for x0, x1, back in BITES)
+        # (one side of the gap is the joint it broke at, sharp; the other has crumbled back over a hand or two. Square
+        #  at both sides, three of them along the lip were "battlements".)
+        return sum(back * _smooth01(x0 - 0.02, x0 + 0.02, x) * (1.0 - _smooth01(x1 - 0.30, x1 + 0.02, x)) for x0, x1, back in BITES)
+
+    def block(x, k):
+        """A number 0..1 for the block of bed k that x lies in (the stretch of it between two joints): what a bed
+        does, it does block by block. On a joint itself, the mean of the two it parts."""
+        def of(xx):
+            return hash01(k * 7.0 + 1.0, sum(1 for xj in JOINTS if xx > xj) * 3.0 + 2.0)
+        return 0.5 * (of(x - 0.01) + of(x + 0.01))
 
     def crest(x):                                                             # the lip: a broken line, swinging back to meet yb at each end
         u = (-x / XL) if x < 0 else (x / XR)
@@ -529,7 +538,12 @@ def build_dep_clay():
             below = BEDS[k + 1][1] if k + 1 < len(BEDS) else UMBER
             rows.append((r + 0.008 + inn, FOOT[k], mix(below, CRACK, 0.6)))   # the joint it sits on: a dark line under every bed
             # (a ledge is wide here and all but gone there: at one even width they were the steps of an amphitheatre)
-            tr = ledge * (0.12 + 1.5 * n1 * n1) + 0.02 * (0.5 + 0.5 * noise3((x, k * 2.3, 1.0), 3.1, 17.0 + k))
+            # (... and it steps in and out at every joint, block by block: one unbroken arc from end to end was still
+            #  a row of seats)
+            tr = ledge * (0.12 + 1.5 * n1 * n1) * (0.35 + 1.3 * block(x, k)) + 0.02 * (0.5 + 0.5 * noise3((x, k * 2.3, 1.0), 3.1, 17.0 + k))
+            # (no wider than leaves the bed under it something to stand up with: a ledge cuts down into that bed as it goes out)
+            if k + 1 < len(BEDS):
+                tr = min(tr, (BEDS[k + 1][0] - 0.05) / (DIP + 0.03))
             # (the ledge is not the bedding plane, which rises toward the front: it is worn level, and falls a little)
             sd = FOOT[k] + (DIP + 0.03) * tr + 0.012
             rows.append((max(r + tr, r + 0.014 + inn), sd, mix(mix(below, DUSTY, 0.55), CRACK, 0.3 * jn)))      # dust lies on every ledge
@@ -607,9 +621,11 @@ def build_dep_clay():
         while True:
             f = foot_y(rng.uniform(-2.9, 3.2))
             if f is not None:
-                return f[0], f[1] - rng.uniform(-0.06, 0.75)
-    for i in range(24):
-        rubble(SCREE, rng, 1, at_foot, PM, bed_col(rng.choice((CAP, CREAM, TAN, PALE, CAP, CREAM))), size=(0.06, 0.16), flat=(0.28, 0.5), subdiv=2, rough=0.34)        # (plates: mudstone breaks flat)
+                return f[0], f[1] - rng.uniform(-0.06, 0.42)
+    # (fewer, nearer the foot, and no paler than the beds they came off: thirty chalk-white stones strewn metres out
+    #  were the brightest things in the picture, and hid the six he takes)
+    for i in range(13):
+        rubble(SCREE, rng, 1, at_foot, PM, bed_col(mix(rng.choice((CAP, CREAM, TAN, PALE, TAN, RUST)), DUSTY, 0.3)), size=(0.06, 0.15), flat=(0.28, 0.5), subdiv=2, rough=0.34)        # (plates: mudstone breaks flat)
     K.finish()
 
     # ---- six pieces lying out in front: the game takes these. Blocks off the cap and the cream bed under it. ----
@@ -617,7 +633,7 @@ def build_dep_clay():
         rk = random.Random(700 + k)
 
         def piece(bm, at, rk=rk, k=k, big=big):
-            base = (CAP, CREAM, PALE, CAP, CREAM, TAN)[k]
+            base = mix((CAP, CREAM, TAN, CAP, PALE, TAN)[k], DUSTY, 0.22)
             chunk(bm, rk, big, rk.uniform(0.42, 0.6), at, PM, bed_col(base), rough=0.3)
             for _ in range(rk.randint(2, 3)):                                  # and what broke off it
                 a, d = rk.uniform(0, TAU), big * 1.5 + rk.uniform(0.04, 0.16)

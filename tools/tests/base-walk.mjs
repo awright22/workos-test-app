@@ -132,19 +132,18 @@ await tap('.sheet.work [data-act="done"]');
 await ev((G) => { G.tpAround(G.World.builtMeshes.find((b) => b.kind === 'kiln').group.position, 7.5, 40); G.tick(0.05, 40); });
 await shot('kiln-firing', 'The kiln at work, from a few paces.', 3500);
 await ev((G) => { G.tick(0.5, 250); G.tpLocal(0, 14, 0); G.tick(0.05, 30); });
-await why();
-await shot('bricks-done', 'Six hours on: the three batches are out, and the log says so (card tapped for its reason).', 1800);
+await shot('bricks-done', 'Six hours on, back at the airlock: the three batches are out, and a note says so. Night has fallen, and the task card leads with sleep.', 1800);
 
 // ---- the smelter (fourteen brick, six basalt, four scrap, a circuit board): the stores are filled to it here
-await ev((G) => { Object.assign(G.S.inv, { brick: 14, stone: 6, scrap: 4, circuit: 1 }); G.tick(0.05, 4); });
+await ev((G) => { G.S.sol = 5; G.setLocalTime(9.5); Object.assign(G.S.inv, { brick: 14, stone: 6, scrap: 4, circuit: 1 }); G.tick(0.05, 4); });
 await tap('#mg-trow [data-t="colony"]');
 await page.waitForSelector('#mg-colony [data-tab="base"]', { timeout: 60000 });
 await tap('#mg-colony [data-tab="base"]');
 await shot('base-tab-smelter-ready', 'Sols later (stores filled for the picture: fourteen brick fired, a circuit board from NASA\'s first science grant): the smelter can be built.', 1200);
 await tap('#mg-base [data-build="smelter"]');
-await ev(async (G) => { G.paused = true; G.tpLocal(37, 30, 0); await G.settle(); G.tick(0.05, 8); G.hold(2.7); G.tick(0.05, 6); G.S.inv.scrap = 6; G.S.inv.regolith = 6; G.hold(0.7); });
+await ev(async (G) => { G.paused = true; G.tpLocal(37, 30, 0); await G.settle(); G.tick(0.05, 8); G.hold(2.7); G.tick(0.05, 6); G.S.inv.scrap = 3; G.S.inv.regolith = 6; G.hold(0.7); });
 await page.waitForSelector('.sheet.work', { timeout: 60000 });
-await shot('smelter-sheet', 'The smelter, built, and its sheet: iron three ways.', 1200);
+await shot('smelter-sheet', 'The smelter is built (it is behind this sheet) and he has walked up to it: iron three ways. (Three scrap and six soil put in the stores for the picture.)', 1200);
 await tap('.sheet.work [data-act="done"]');
 
 // ---- the map: where orbiters saw each mineral
@@ -184,12 +183,28 @@ await ev(async (G) => {
 await page.waitForSelector('.sheet.work', { timeout: 60000 });
 await tap('.sheet.work [data-run="ironOre"]');
 await ev((G) => { G.tick(0.5, 30); });
-await shot('smelter-ore-running', 'Home with the ore: the smelter making iron from hematite.', 1200);
+await shot('smelter-ore-running', 'Home with the ore: the smelter making iron from it.', 1200);
 await tap('.sheet.work [data-act="done"]');
+
+// ---- a building, set down as the kiln was: a water tank (eight iron and six brick put in the stores)
+await ev((G) => { G.S.sol = 9; G.setLocalTime(10.5); Object.assign(G.S.inv, { iron: 8, brick: 6 }); G.tick(0.05, 4); });
+await tap('#mg-trow [data-t="colony"]');
+await page.waitForSelector('#mg-colony [data-tab="base"]', { timeout: 60000 });
+await tap('#mg-colony [data-tab="base"]');
+await page.evaluate(() => { const c = document.querySelector('#mg-base [data-card="tank"]'); if (c) c.scrollIntoView({ block: 'center' }); });
+await shot('base-tab-tank-ready', 'Sols later (eight iron and six brick put in the stores for the picture): the Base tab, scrolled to the water tank.', 1200);
+await tap('#mg-base [data-build="tank"]');
+await ev(async (G) => { G.paused = true; G.tpLocal(29, 43, 0); await G.settle(); G.tick(0.05, 8); });
+expect('the place for the tank is offered', /build the water tank here/i.test(await prompt()), await prompt());
+await shot('tank-where', 'He pressed Build on the water tank and walked out: the ring shows where it will stand.', 1800);
+await hold(2.7);
+await ev((G) => { G.tick(0.05, 6); });
+await shot('tank-built', 'The water tank, built: the water bar now says how much the tanks hold.', 2500);
 
 // ---- the rest of a base: set down for the picture (each is built the way the kiln was)
 await ev(async (G) => {
-  for (const [k, x, z, yaw] of [['glassworks', 46, 15, 2.9], ['solarField', 53, 38, 2.6], ['battery', 40, 39, 2.9], ['tank', 29, 39, 2.4], ['quarters', 63, 23, 2.5], ['pad', 76, 46, 2.6]]) G.build(k, x, z, yaw);
+  G.S.sol = 14;
+  for (const [k, x, z, yaw] of [['glassworks', 46, 15, 2.9], ['solarField', 53, 38, 2.6], ['battery', 40, 39, 2.9], ['quarters', 63, 23, 2.5], ['pad', 76, 46, 2.6]]) G.build(k, x, z, yaw);
   Object.assign(G.S.inv, { regolith: 40, silica: 6, clay: 6, sulfate: 4, salt: 2, brick: 9, iron: 7, glass: 5, cement: 6, stone: 8, circuit: 1 });
   for (const b of G.World.builtMeshes) if (b.def && b.def.jobs && !b.job) G.works.startJob(b, b.def.jobs[0].id, 3);
   G.syncAllVisuals(); G.tick(0.05, 30);
@@ -199,8 +214,13 @@ await tap('#mg-trow [data-t="colony"]');
 await page.waitForSelector('#mg-colony [data-tab="base"]', { timeout: 60000 });
 await tap('#mg-colony [data-tab="base"]');
 await page.evaluate(() => { const h = [...document.querySelectorAll('#mg-base .pane-hd')].find((x) => /buildings/i.test(x.textContent)); if (h) h.scrollIntoView(); });
-await shot('base-tab-buildings', 'Many sols on (the rest set down for the picture: glassworks, solar field, battery bank, water tank, quarters, landing pad): the Base tab\'s buildings.', 1200);
+await shot('base-tab-buildings', 'Many sols on (the rest set down for the picture: glassworks, solar field, battery bank, quarters, landing pad): the Base tab\'s buildings.', 1200);
 await closeScreens();
+// the glassworks' sheet, with a job on
+await ev(async (G) => { const b = G.World.builtMeshes.find((x) => x.kind === 'glassworks'); G.setLocalTime(13); G.tpAround(b.group.position, 3.6, 0); await G.settle(); G.tick(0.05, 10); G.hold(0.7); });
+await page.waitForSelector('.sheet.work', { timeout: 60000 });
+await shot('glassworks-sheet', 'At the glassworks: its sheet, a job on.', 1200);
+await tap('.sheet.work [data-act="done"]');
 await tap('#mg-trow [data-t="journal"]');
 await page.waitForFunction(() => getComputedStyle(document.getElementById('mg-hud')).visibility === 'hidden', null, { timeout: 30000 }).catch(() => {});
 await shot('journal-the-long-stay', 'The journal: where a base stands and what comes next.', 1500);
@@ -220,12 +240,12 @@ await ev(async (G) => {
 await page.addStyleTag({ content: '#mg-root.walk-bare > *:not(canvas) { opacity: 0 !important; }' });
 await shot('whole-base-day', 'The whole base from above and to the south-west, late afternoon (interface hidden; a camera the player does not have).', 3500);
 await ev(async (G) => { G.setLocalTime(21); G.photo(G.at(30, 24), 52, 125, 13, 1.5); G.tick(0.05, 30); await G.settle(); });
-await shot('whole-base-night', 'The same base after dark (interface hidden).', 3500);
+await shot('whole-base-night', 'The base after dark, from over the Hab (interface hidden).', 3500);
 await ev((G) => { G.photo(null); document.getElementById('mg-root').classList.remove('walk-bare'); });
 
 // ---- the landing pad: ten sols after it is laid, the first drop
 const drop = await ev(async (G) => {
-  G.S.base.padSol = G.S.sol - 10;
+  G.S.base.padSol = G.S.sol; G.S.sol += 10;
   const pod = G.works.padDrop();
   G.setLocalTime(8.2);
   const pad = G.World.builtMeshes.find((b) => b.kind === 'pad');
@@ -236,6 +256,15 @@ expect('a supply drop comes down on the pad', drop.pod, drop);
 await shot('supply-drop', 'Ten sols after the pad was laid: the first supply drop stands on it.', 3500);
 await ev((G) => { const p = G.World.pods.filter((x) => !x.taken).pop(); G.tpNear(p.group.position, 2.7); G.tick(0.05, 20); });
 await shot('supply-drop-open', 'At the drop.', 2000);
+await hold(1.8);
+await ev((G) => { G.tick(0.05, 6); });
+await shot('supply-drop-opened', 'Opened: what was in it.', 1800);
+// ---- the comms tower (set down for the picture): every deposit goes on the map
+await ev((G) => { G.build('tower', 58, 54, 2.8); G.tick(0.5, 6); });
+await tap('#mg-trow [data-t="map"]');
+await page.waitForFunction(() => getComputedStyle(document.getElementById('mg-hud')).visibility === 'hidden', null, { timeout: 30000 }).catch(() => {});
+await shot('map-after-tower', 'With a comms tower standing (set down for the picture): the map marks every deposit, not only the fields.', 2500);
+await closeScreens();
 
 await writeFile(path.join(dir, 'steps.txt'), steps.join('\n') + '\n' + (notes.length ? '\nNOT AS EXPECTED:\n' + notes.join('\n') + '\n' : ''));
 console.log('not as expected:', notes.length, notes);

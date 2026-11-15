@@ -37,6 +37,41 @@ is now a solid indie release, not AAA. 'Nearly' on the picture and interface bar
    told the standard is a solid independent release on a phone. What is left to do in Story mode is
    whatever a review still marks NOT MET, and bugs. Findings on a bar that is NEARLY are polish: they
    stay listed, and are done where they are cheap.
+Said on 15 November, after playing on the iPhone (two findings and a direction; the owner's own words are quoted):
+
+6. **A bug, first: "the rover gets stuck on really small rocks."** Fixed (see "In motion" below): its wheels go over
+   what stands under 0.9 m with a jolt, a boulder turns it aside and never pins it, and it loses pace by the clock
+   and not by the frame; so does the astronaut. `tests/drive.mjs`.
+7. **The HUD, second: "too crowded on my iPhone".** "A quiet HUD when nothing is wrong, and detail when I ask for it
+   or when something needs me." Calm state: the suit ring, a one-line task, the compass, the stick, and only the
+   buttons that apply. "Say each fact once." "An emergency must still be impossible to miss." "Measure it": the
+   share of the screen the HUD covers in the calm state, on foot and in the rover, at both phone sizes; "aim for
+   about 15% or less, with the middle of the screen and most of the top third clear". The full HUD kept as a
+   setting if that is cheap.
+8. **Direction for the rest: "put the effort where code can still raise quality, and stop re-attempting what has
+   plateaued."** Plateaued, left as they are unless a fix is cheap: "how ice, lava and rock surfaces look, the
+   Schiaparelli wreck, and the shape of the astronaut's shadow". Worth pushing, in this order: (a) the game checked
+   in motion by a scripted player, with frame strips for reviewers; (b) driving and walking feel; (c) the rest of
+   the interface to MET at both phone sizes; (d) the launch and the rescue as cutscenes; (e) baked lighting from
+   the Blender build; (f) wear by code (dust and dirt, tracks and trodden ground); (g) sharpness on the phone: "a
+   30 or 40 fps target with a sharper picture", as a setting.
+9. **Bounds.** "One pass per item and one re-check, not open-ended rounds. If an item hasn't improved after two
+   attempts, record it in QUALITY.md as plateaued and move on." "Publish to the preview after the rover fix, again
+   after the HUD change, and as later items land."
+
+**The phone had not been getting the builds.** The diagnostics the owner sent with that message name build
+`775c4ab5aec2`: the preview of 13 November, the same build as the phone's first report, and nineteen publishes
+old. So what was played and judged on the phone was that build (its resolution fault included: it drew at a scale
+of 0.44 this time). Why the installed copy stayed there is not known from here; what is known is how it can: a
+service worker that fails to install (one dropped request among fifty failed the whole batch) leaves the old worker
+answering from its own copy for good, and nothing in the page checked. Now the page checks: `index.html` is stamped
+with its build, is fetched from the network whenever there is one, and before it loads the game compares the offline
+copy with its own build; if they differ it drops the old copy and its worker and loads again from the network. The
+worker's install no longer fails for one missing file of the planet's data, and it answers only from its own
+build's cache. The diagnostics name both the page's build and the offline copy's when they differ.
+`tests/update.mjs` shows the fault (a page with no check stays on the old build) and the cure. **The phone has to
+start the game afresh once** (swipe it away and open it again) for the new page to be fetched.
+
 5. **Where that leaves Story mode** (from the tenth picture review and the eighth interface review,
    before the work listed under them): NOT MET were the poles, the interface's finish at 667 x 375,
    and "overall" as judged against AAA. Everything else was NEARLY or MET.
@@ -92,7 +127,7 @@ run of the suite takes an hour and a half.
 
 | Area | Bar | State |
 | --- | --- | --- |
-| Frame rate | 30 fps or better on the owner's iPhone, in landscape, on the preset a phone starts on ("medium"); 60 fps on a mid-range laptop at "high" is a bonus | **MET on the owner's iPhone, on an older build; to be measured again on the current one.** The owner's report from the diagnostics panel (a 6.7-inch iPhone, 932x430 points at 3x, iOS 18.7, Safari, Apple GPU, WebGL2; preview build `775c4ab5aec2`, "medium"): 60 fps average, 37 fps at the slowest 1%, worst frame 55 ms over 600 frames; 60 draw calls (21 shadow), 322k triangles; no errors. The picture was drawn at a scale of 0.64, a canvas of 1192x550 on a 2796x1290 screen, and that turned out to be a fault, not the price of the frame rate: the governor that trades resolution for frames could step down after one busy second (loading is one) and could step up only if frames came faster than the target, which a 60 Hz screen never shows. It now tries a step up after a few seconds with nothing late and backs off if the step cannot be held (`adaptResolution` in `render/engine.js`; `tests/smoke.mjs` checks the rule). Whether this phone then holds the full "medium" resolution (1491x688) at 60 is for its next report to say. That build is from before the launch, the canyon walls' beds, the larger ripples and the new rocks, which all cost more per pixel: the number that counts is the next one. Open choice, once that is known: a sharper 30 fps mode beside the smooth one. Not measured on a laptop GPU (software rendering here gives 0.4–12 fps, which says nothing) |
+| Frame rate | 30 fps or better on the owner's iPhone, in landscape, on the preset a phone starts on ("medium"); 60 fps on a mid-range laptop at "high" is a bonus | **MET on the owner's iPhone, on an older build; to be measured again on the current one.** A second report from the phone (15 November) is of that same old build, `775c4ab5aec2`, which the phone had not left (see "The phone had not been getting the builds"): 51 fps average, 14 fps at the slowest 1%, worst frame 765 ms, at a scale of 0.44 (a canvas of 820x378 on a 932x430 screen at 3x), 94 draw calls (42 shadow), 373k triangles, in the rover at Sol 5. That is the old resolution governor stepping down and never up; it says nothing yet about the builds since. The first report follows. The owner's report from the diagnostics panel (a 6.7-inch iPhone, 932x430 points at 3x, iOS 18.7, Safari, Apple GPU, WebGL2; preview build `775c4ab5aec2`, "medium"): 60 fps average, 37 fps at the slowest 1%, worst frame 55 ms over 600 frames; 60 draw calls (21 shadow), 322k triangles; no errors. The picture was drawn at a scale of 0.64, a canvas of 1192x550 on a 2796x1290 screen, and that turned out to be a fault, not the price of the frame rate: the governor that trades resolution for frames could step down after one busy second (loading is one) and could step up only if frames came faster than the target, which a 60 Hz screen never shows. It now tries a step up after a few seconds with nothing late and backs off if the step cannot be held (`adaptResolution` in `render/engine.js`; `tests/smoke.mjs` checks the rule). Whether this phone then holds the full "medium" resolution (1491x688) at 60 is for its next report to say. That build is from before the launch, the canyon walls' beds, the larger ripples and the new rocks, which all cost more per pixel: the number that counts is the next one. Open choice, once that is known: a sharper 30 fps mode beside the smooth one. Not measured on a laptop GPU (software rendering here gives 0.4–12 fps, which says nothing) |
 | Scene cost | Per frame (`tests/perf.mjs`). "low": 180 draw calls, 340k triangles in the picture, 230k in the shadow passes. "high": 290 / 600k / 400k. These budgets are estimates, not derived from hardware: they exist to catch regressions until a real frame rate is known | Measured (counts, valid on any machine). low: 69–180 calls, 130–251k picture, 47–222k shadow. high: 83–229, 130–389k, 84–266k. "low" outside the Hab sits exactly on its call budget (180): 75 of those calls are shadow passes for the Hab, rover, array and astronaut. "medium", which a phone now starts on, lies between the two and is not measured separately |
 | Load | Title screen interactive in under 5 s on a 20 Mbit connection; total download under 14 MB; works offline after first load | 13.54 MB precached (53 files). Headless load to title: 1.2–5.5 s from localhost. Not measured on a phone network. **On the owner's iPhone the published preview did not start at all** until the loader was fixed (it trusted the stated length of a compressed file); whether it now loads there, and how fast, is the owner's to report |
 | Console | Zero errors or warnings in a full playthrough | Zero errors in every test and screenshot run |
@@ -839,7 +874,7 @@ preview before the next.
 | A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built, tested and on the preview (`tools/tests/base.mjs`) |
 | B | **Materials.** Basalt off any boulder (once the ground by it has given its sample), and five minerals quarried at deposits that stand where each was really found: 47 of them, in 23 fields (hematite pavements, silica beds, clay banks, sulfate ledges, salt pans; `game/base.js`). The map shows from the first sol where each was seen from orbit; a deposit is marked when he has stood at it. Each is a Blender model (`tools/assets/deposits.py`) on level, untrodden ground, with six loose pieces that go as it is worked. The inventory lists them and says where the ones he lacks lie. | built; `base.mjs` covers it; reviewed three times (below): NEARLY as a set |
 | C | **Works.** A kiln (brick from soil or clay, cement from gypsum), a smelter (iron from hematite, scrap or soil) and a glassworks (glass from silica or soil). Each is chosen on the Colony screen's new Base tab, set down outside within reach of the Hab's power (`game/interactables.js`), and given jobs at a sheet of its own (`ui/works.js`): so many batches, each taking hours and Hab power, going on by itself through the night, waiting when the Hab is under 12% (`game/works.js`). Each is a Blender model with a fire that burns while it works and its product stacked beside it (`tools/assets/works.py`). The fuel plant (oxygen and methane) is moved to part D. | built; `base.mjs` covers building one and running its jobs; reviewed twice (below): NEARLY as a set |
-| D | **Buildings and milestones.** First four built: a solar field (gathers as much again as the Hab's array), a battery bank (a reserve the Hab draws on under three tenths and fills over nine), a water tank (240 L more) and a farm dome (the greenhouse, paid for in glass, iron and brick); three of each are as many as are any use (`BUILDINGS` in `game/base.js`, effects in `game/works.js`, models in `tools/assets/buildings.py`). Then living quarters (morale +2 each dawn), a comms tower (every deposit goes on the map) and a landing pad (a supply drop every ten sols, with the circuit boards nothing on Mars makes); these three are where cement goes. The journal's line for the base says what stands and what comes next. The fuel plant is dropped: nothing in the game wants methane. To come: pictures and a review of the buildings, a review of the whole mode played from its start, and then the gate comes off. | all seven built; `base.mjs` covers them; reviewed (below): MET as a set |
+| D | **Buildings and milestones.** First four built: a solar field (gathers as much again as the Hab's array), a battery bank (a reserve the Hab draws on under three tenths and fills over nine), a water tank (240 L more) and a farm dome (the greenhouse, paid for in glass, iron and brick); three of each are as many as are any use (`BUILDINGS` in `game/base.js`, effects in `game/works.js`, models in `tools/assets/buildings.py`). Then living quarters (morale +2 each dawn), a comms tower (every deposit goes on the map) and a landing pad (a supply drop every ten sols, with the circuit boards nothing on Mars makes); these three are where cement goes. The journal's line for the base says what stands and what comes next. The fuel plant is dropped: nothing in the game wants methane. To come: pictures and a review of the buildings, a review of the whole mode played from its start, and then the gate comes off. | all seven built; `base.mjs` covers them; reviewed (below): MET as a set. The mode as a whole, played from its start: NEARLY on all five points (below). The gate is off |
 
 **What is made of what** (the plan for parts C and D; numbers are first guesses, to be tuned by play):
 
@@ -931,6 +966,53 @@ can each be told apart at a glance. What it found, most damaging first, and what
 | F14 | The tower's guy wires hairlines with no anchors | open |
 | F16 | The pad's surface tarmac-dark and uneven in tone, its cross lines hairlines | open |
 
+**The reworked things, looked at again** (15 November; one independent reviewer who had not seen the earlier
+versions, nine pictures at iPhone size on "medium", all opened). **Kiln MET, smelter MET, quarters MET** (by a
+small margin), **glassworks NEARLY, clay NEARLY** ("passes at 9 m, falls short of it at 5 m"). With the third
+review's other verdicts, nothing in Base mode's models is NOT MET. What it found, and what was done:
+
+| # | Finding | State |
+| --- | --- | --- |
+| H1 | The glassworks' mirror still reads as a satellite dish: matte grey, no glint, dark at night while the furnace glows | it is a true mirror again (it faces the sky now, so what it shows is the sky: bright by day, dark by night); not yet looked at again |
+| H2 | Clay close up reads as built: full-width arcs of even ledges "like amphitheatre seating", squared notches in the lip "like battlements" | ledges step in and out block by block at every joint; one side of each gap in the lip is crumbled back; not yet looked at again |
+| H3 | Clay's loose pieces chalk-white, too many, strewn metres out | thirteen, nearer the foot, dusted to the beds' own colours |
+| H4 | At night a pale neutral light falls on each works (probably the astronaut's lamp) | it is his suit lamp; left |
+| H5 | Smelter smoke leaves the tip of the cap, not from under it | open |
+| H6 | Glassworks: cube furnace, pillow of sand, a pane rack that does not read as glass; the glory hole's centre near white at night | open |
+| H7 | Quarters: the vault's bricks two to three times the size of the end wall's; the hatch a flat black disc | open |
+| H8 | Everything built is spotless: no soot at a mouth, no scorch at the tap, ripples run up to the walls | open |
+
+**The mode as a whole, played from its start** (15 November; one independent reviewer; 31 numbered phone pictures
+from `node tests/base-walk.mjs`, New Game to the first supply drop, all opened; the indie standard). **Guidance
+NEARLY, the loop NEARLY, the screens NEARLY, the picture NEARLY, finish NEARLY**: "No point is cleanly MET, and
+none is NOT MET. Guidance is the weakest." What it found, most damaging first, and what was done:
+
+| # | Finding | State |
+| --- | --- | --- |
+| G1 | Circuit boards gate four things and nothing says where they come from beyond "salvage old landers" (it called this a blocker) | the smelter's task says so when he has none ("NASA sends two for the first samples analysed at the Hab; old landers have them"); every card that lacks one lists all three ways (grants, landers, the pad's drops); the pad's and the tower's tasks say what they take and bring |
+| G2 | A "MAV" rocket marker stands on the base's map with nothing to say what it is for (blocker, as misleading) | not on a base's map |
+| G3 | The kiln's sheet: the buttons of the one job he can run are under the fold, below an empty space; a hint cut mid-line | the job that is on comes first, then what can be run; on a phone a card is as tall as what is in it; what is missing is a line over the buttons |
+| G4 | A built kiln's card: "Built", a dead Build button and "Missing 6 Basalt" | a works that stands is "1 standing"; its card offers "Build another" and says what a second one is for |
+| G5 | The first task asks for ten basalt; the kiln takes twelve | twelve |
+| G6 | "Once the ground by it has given its sample" does not tell a new player a boulder is sampled first | "On new ground a boulder gives NASA a rock sample first" |
+| G7 | After dark the kiln stands between the camera and him; the whole base from above is a few glows | the lamp over the quarters' hatch and the pad's rim lamps light the ground; the walk stands elsewhere |
+| G8 | He stands inside the supply drop | the walk's doing (he was put there); it stands further off now |
+| G9 | "Next ship: 4 years" beside "Rescue: none" reads as a ship that is coming | "No ship for: 4 years"; "No ship can reach Mars for four years" |
+| G10 | At the airlock at nightfall the task says sleep and the button says DIG, with no prompt | soil for the works is not offered on the Hab's doorstep |
+| G11 | A storm's circle shows through the map's bottom bar; crowded and detached labels; an unlabelled dot | the bar is opaque; the labels are open |
+| G12 | The journal says "Next: a farm dome" under a task card that says "Raise a comms tower"; the tower's task gives no cost | the journal's "Next" is the task card's lead; each task says what it takes |
+| G13 | Names drift: "Cache" on the compass and "supply drop" on its prompt; "Built" and "standing"; hematite and iron ore | the compass and the map say "Drop"; "standing" for both; the smelter's job is "Smelt iron from ore" |
+| G14 | Gathering leaves no mark on the boulder or the pavement | part: a deposit loses one of its six loose pieces to every five loads; a boulder does not change (open) |
+| G15 | Scrap has no stated source on the kiln's task; nothing says soil must be dug before the kiln can fire | both tasks say so |
+| G16 | A red "Fabricator out of range" banner over the inventory, which he is only reading; a works sheet's dead button higher than its neighbours' live ones | the banner is on the fabricating pages only; see G3 |
+| G17 | The water bar has no capacity; an idle kiln's mouth glows; the water tank is plain | with a tank built the bar reads "80/360 L"; a fire that is out is black; the tank is open |
+| G18 | The voice switches between "me" and "you" | the base's task lines are "you" |
+| G19 | Everything past the first smelter job was set down by the debug hook: no building but the kiln placed, no glassworks sheet, no drop opened, no tower | the walk now places a water tank through the interface, opens the glassworks' sheet and the drop, and shows the map with a tower standing (35 pictures); the sol number moves on |
+
+Not acted on, and why: "one verb" (every gathering act is a hold, every job a timer: that is the game's one-button
+design on a phone, and the story's); "ten buildables in a fixed order" (the order is the task card's suggestion:
+the Base tab offers every one from the start).
+
 **It is on the title.** New Game asks which game: "Get home" (the story) or "Stay" (the base). While it
 was being built it was offered only when the address ended in `?base`; that gate came off on 15 November,
 when its four parts had been built and its models reviewed (`?base` still works, and does nothing now).
@@ -940,6 +1022,51 @@ own: an hour of things to do past the story's opening before the player runs out
 build; every new sheet inside the iPhone's safe area at both phone sizes; a base saved in one build
 loads in the next; and the story plays exactly as it did (the whole suite, which is the story's,
 passes with the base's code in it).
+
+**Where it stands against that bar** (15 November):
+
+| Bar | State |
+| --- | --- |
+| The picture: every deposit, works and building | reached: every one NEARLY or MET (third review and the second look, above) |
+| The mode played from its start: guidance, loop, screens, picture, finish | reached: NEARLY on all five (above); its findings acted on, not yet reviewed again |
+| An hour of things to do | reached by the recipes, **not yet by a played hour**: one of everything takes 62 brick, 54 iron, 22 glass and 30 cement. From soil alone that is 310 hours of the works' time (31 + 54 + 22 + 10 batches), of which the smelter's line is 162 hours: six and a half sols, 52 minutes of play, if it never stands idle, and it does, because those batches draw five and a half times the Hab's battery. From ore, silica and clay it is about 90 hours. Salt and gypsum are a journey each, and eight circuit boards have to be earned or fetched |
+| Every sheet inside the safe area at both phone sizes | `ui-audit.mjs --only=base`: eight states at each size (the choice of game, the difficulties, the inventory, the Base tab, the map, a works' sheet idle and running, the HUD at a works) |
+| A base saved in one build loads in the next | `base.mjs` saves and loads within a build (deposits, what is left, what stands, jobs, the reserve); across builds it rests on the story's save migration, which the base's save goes through; a save from the first preview of Base mode has not been loaded here |
+| The story plays as it did | the whole suite |
+
+## In motion
+
+Reviews were of stills, and a still cannot show a rover held by a rock. What is checked by driving and walking, and
+what that has found, is kept here.
+
+**The rover against rocks** (the owner's playtest, 15 November: "the rover gets stuck on really small rocks").
+Found in the code, as the owner read it: a rock was in the way of everything once it stood 0.4 m high, a rule made
+for a man on foot; the rover met rocks as a circle of 2 m, wider than its body by most of a metre each side; and
+every frame of touching one took two thirds of its speed, so it could not build the speed to leave, the more so the
+faster the frames came. Now each collider carries how high its rock stands. The rover's wheels (1.24 m across) go
+over what stands under 0.9 m: a jolt through its springs, a thud, a twentieth of its speed at most, once a rock. A
+boulder pushes its body (three circles down its length) out along the ground, so it slides along the boulder; it
+loses only what was carrying it into the boulder, by the clock; backing off costs nothing; and while the throttle
+holds it against one its nose is turned off it, so it comes round by itself. The astronaut had the same fault in
+small (four tenths of his pace gone for every frame against a rock): he now keeps his pace along a rock and loses
+only what carried him into it.
+
+`tests/drive.mjs` (in the suite) puts a rock where each rule needs one, then crosses real ground:
+
+| Case | Result |
+| --- | --- |
+| Open ground, six seconds of full throttle | 104 m |
+| A 0.6 m rock under the wheels | driven over: one jolt, 103 m, its line kept |
+| A knee-high rock a metre off its flank (the old circle caught it) | nothing: 104 m |
+| A boulder off its flank | slides past: 34 m out at 3.12 s, against 2.98 s on open ground |
+| A boulder dead ahead | turned aside and round it: 34 m out at 4.2 s (1.2 s later than open ground), never under 3.8 m/s, never still |
+| The same at 30, 60 and 120 frames a second | past the boulder at 3.10, 3.12 and 3.11 s |
+| Nose to a boulder, then reverse | 9 m back in two seconds |
+| On foot past a rock in his way, four seconds | 19.6 m at 30 frames a second, 19.4 m at 120 |
+| The rockiest of six sites (Ares Vallis: 165 rocks in reach, 43 of them boulders), a minute at full throttle | 1.5 km; the slowest two seconds 17 m |
+
+These are the game's own clock stepped by the test, in a browser with software rendering: they say what the rules do,
+not how it feels in the hand. That is for the phone.
 
 ## Open items
 
@@ -956,7 +1083,7 @@ passes with the base's code in it).
 | 33 | Act on the sixth interface review (K1–K20 above) | open: a helper next |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
-| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | begun: the first of four parts is built (see "Base mode" above) |
+| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed (every model NEARLY or better; the mode as a whole NEARLY on all five points) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G11, G14; and an hour of it has not yet been played through by hand |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | measured on the owner's iPhone on an older build (60 fps average at a dynamic scale of 0.64; see the bar); to be measured again on the current build. Laptop: not measured |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |

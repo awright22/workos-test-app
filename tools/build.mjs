@@ -65,15 +65,29 @@ export async function shippedFiles() {
   return present.sort();
 }
 
+// The page carries the build it belongs to (index.html checks the offline copy against it before it loads the game).
+// The stamp is left out of the hash it is made from.
+const STAMP = /\/\*BUILD\*\/'[0-9a-f]*'\/\*END\*\//;
+// What must be in the offline copy for the game to start at all; the rest is fetched as well, but one file that
+// fails to arrive does not fail the whole install.
+const SHELL = /^(game\.js|game\.css|terrain-worker\.js|manifest\.webmanifest|icon-\d+\.png|assets\/fonts\/)/;
+
 async function writeServiceWorker() {
   const files = await shippedFiles();
+  const page = path.join(game, 'index.html');
+  const html = await readFile(page, 'utf8');
   const hash = createHash('sha256');
-  for (const f of files) { hash.update(f); hash.update(await readFile(path.join(game, f))); }
+  for (const f of files) { hash.update(f); hash.update(f === 'index.html' ? html.replace(STAMP, "/*BUILD*/''/*END*/") : await readFile(path.join(game, f))); }
   const version = hash.digest('hex').slice(0, 12);
+  if (!STAMP.test(html)) throw new Error('index.html has no /*BUILD*/ stamp to write the build into');
+  const stamped = html.replace(STAMP, `/*BUILD*/'${version}'/*END*/`);
+  if (stamped !== html) await writeFile(page, stamped);
   const template = await readFile(path.join(src, 'sw.template.js'), 'utf8');
+  const rest = files.filter((f) => f !== 'index.html');
   const sw = template
     .replace('__CACHE_VERSION__', version)
-    .replace('__PRECACHE__', JSON.stringify(['./', ...files.filter((f) => f !== 'index.html')], null, 0));
+    .replace('__SHELL__', JSON.stringify(['./', ...rest.filter((f) => SHELL.test(f))], null, 0))
+    .replace('__PRECACHE__', JSON.stringify(rest.filter((f) => !SHELL.test(f)), null, 0));
   await writeFile(path.join(game, 'sw.js'), sw);
   let bytes = 0;
   for (const f of files) bytes += (await stat(path.join(game, f))).size;

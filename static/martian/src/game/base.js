@@ -63,7 +63,7 @@ export const WORKS = [
     cost: { brick: 14, stone: 6, scrap: 4, circuit: 1 },
     jobs: [
       { id: 'ironSoil', name: 'Smelt iron from soil', verb: 'Smelting soil', in: { regolith: 6 }, out: { iron: 1 }, hours: 3, power: 6 },
-      { id: 'ironOre', name: 'Smelt hematite', verb: 'Smelting hematite', in: { ore: 2 }, out: { iron: 3 }, hours: 2, power: 4 },
+      { id: 'ironOre', name: 'Smelt iron from ore', verb: 'Smelting iron ore', in: { ore: 2 }, out: { iron: 3 }, hours: 2, power: 4 },
       { id: 'ironScrap', name: 'Melt down scrap', verb: 'Melting scrap', in: { scrap: 3 }, out: { iron: 2 }, hours: 1, power: 3 },
     ] },
   { id: 'glassworks', name: 'Glassworks', model: 'bs_glassworks', pad: 3.2, r: 2.1,
@@ -71,7 +71,7 @@ export const WORKS = [
     cost: { brick: 12, iron: 4, circuit: 1 },
     jobs: [
       { id: 'glassSoil', name: 'Cast dark glass from soil', verb: 'Casting dark glass', in: { regolith: 5 }, out: { glass: 1 }, hours: 3, power: 5 },
-      { id: 'glass', name: 'Cast clear glass', verb: 'Casting glass', in: { silica: 2 }, out: { glass: 3 }, hours: 2, power: 4 },
+      { id: 'glass', name: 'Cast clear glass from silica', verb: 'Casting glass', in: { silica: 2 }, out: { glass: 3 }, hours: 2, power: 4 },
     ] },
 ];
 /**

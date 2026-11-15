@@ -34,7 +34,7 @@ const numbers = await g.eval((G) => {
   G.tick(0.05, 10);
   return { sealed: G.S.flags.suitSealed, did: G.S.flags.didMath, text: t };
 });
-check('the numbers at the desk: rescue none, and build to stay', numbers.sealed && numbers.did && /none rescue/i.test(numbers.text) && /4 years next ship/i.test(numbers.text) && /somewhere a man can live/i.test(numbers.text) && !/can launch on sol/i.test(numbers.text), numbers.text.slice(0, 220));
+check('the numbers at the desk: rescue none, and build to stay', numbers.sealed && numbers.did && /none rescue/i.test(numbers.text) && /4 years no ship for/i.test(numbers.text) && /somewhere a man can live/i.test(numbers.text) && !/can launch on sol/i.test(numbers.text), numbers.text.slice(0, 220));
 const clock = await g.eval(async (G) => { G.tick(0.05, 40); await G.settle(); G.S.flags.uiJournal = true; G.tick(0.05, 4); return document.querySelector('#mg-clock .of').innerText.replace(/\s+/g, ' '); });
 // (begun through the menus, the headless browser has no mouse to hold, and the pause card comes up by itself)
 const resume = g.page.locator('#mg-panel button', { hasText: 'RESUME' });
@@ -48,7 +48,7 @@ check('the journal has the long stay, not the way home', /the long stay/i.test(h
 await g.eval((G) => { G.paused = false; G.setLocalTime(21.5); G.tpLocal(-5.0, -4.9); G.sleepToDawn(false); });
 await g.page.waitForFunction(() => { const n = document.querySelector('#mg-panel .sleep .notes'); return n && n.innerText.length > 30; }, null, { timeout: 120000 });
 const dawn = await g.eval((G) => { G.paused = true; const t = document.querySelector('#mg-panel .sleep').innerText.replace(/\s+/g, ' '); const b = document.querySelector('#mg-panel .sleep .wake button, #mg-panel .sleep button'); if (b) b.click(); G.tick(0.05, 6); return { sol: G.S.sol, text: t }; });
-check('the first dawn counts no sols to a rescue', dawn.sol === 2 && !/rescue in/i.test(dawn.text) && /four years out/i.test(dawn.text) && /breakfast for/i.test(dawn.text), dawn);
+check('the first dawn counts no sols to a rescue', dawn.sol === 2 && !/rescue in/i.test(dawn.text) && /for four years/i.test(dawn.text) && /breakfast for/i.test(dawn.text), dawn);
 
 // ---- Houston's first call is the other answer
 const call = await g.eval((G) => {

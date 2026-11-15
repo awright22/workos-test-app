@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { ctx } from './ctx.js';
 import { S } from './state.js';
 import { on } from '../core/events.js';
+import { Snd } from '../audio/sound.js';
 import { player } from './player.js';
 import { roverF } from './rover.js';
 import { World } from '../world/build.js';
@@ -38,6 +39,13 @@ export function initEffects() {
     ctx.vfx.puff(player.pos, { count: Math.min(16, 5 + Math.round(e.speed * 2)), speed: 1.2 + e.speed * 0.25, up: 0.5, spread: 0.25, size: 0.5, life: 1.9 });
   });
   on('dust', (e) => { ctx.vfx.puff(e.pos, e); });
+  // the rover over a rock (a thud, a rattle of the rack) and against a boulder (a harder one, and dust off its nose)
+  on('rover-jolt', (e) => { Snd.play('roverThud', { g: 0.35 + 0.5 * e.k }); if (e.k > 0.6) Snd.play('roverRattle', { g: 0.3 + 0.3 * e.k }); });
+  on('rover-bump', (e) => {
+    const k = Math.min(1, e.speed / 20);
+    Snd.play('roverThud', { g: 0.7 + 0.8 * k }); Snd.play('roverRattle', { g: 0.5 + 0.5 * k });
+    if (World.rover) ctx.vfx.puff(World.rover.group.position, { count: 6 + Math.round(8 * k), speed: 1.4 + 2 * k, up: 0.6, spread: 1.6, size: 0.7, life: 1.8 });
+  });
 }
 
 /** Per-frame effects that follow continuous motion (the rover's wheels, the rocket's exhaust). */

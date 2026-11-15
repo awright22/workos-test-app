@@ -112,7 +112,9 @@ export function costChips(cost, plain) {
 }
 /** Where each material comes from, for the line that says one is missing. */
 const SOURCE = {
-  scrap: 'salvage debris and old landers', circuit: 'salvage old landers', regolith: 'dig it outside',
+  scrap: 'salvage debris and old landers', regolith: 'dig it outside',
+  // (a base wants circuit boards for four things: its card says every way they come)
+  get circuit() { return !isBase() ? 'salvage old landers' : `NASA’s science grants send them (analyse samples at the Hab); old landers have them${World.builtMeshes.some((b) => b.kind === 'pad') ? '; so does each supply drop on the pad' : '; a landing pad brings them every ten sols'}`; },
   ice: 'mine ice deposits', candle: 'fabricate one, or open supply pods',
   ...Object.fromEntries(BULK.concat(MADE).map((b) => [b.id, b.from])),
 };
@@ -293,11 +295,13 @@ export function renderColony() {
       const n = World.builtMeshes.filter((b) => b.kind === w.id).length, can = hasCost(w.cost);
       if (can) baseReady++;
       const makes = [...new Set(w.jobs.flatMap((j) => Object.keys(j.out)))].map((k) => itemName(k).toLowerCase()).join(', ');
-      cards.push([can ? 0 : 1, `<article class="rcp ${can ? 'ready' : ''}" data-card="${w.id}"><div class="rcp-hd"><h4>${esc(w.name)}</h4>` +
-        tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}Built${n > 1 ? ' ' + n : ''}</span>` : '')) + '</div>' +
-        `<p class="ds">${chem(esc(w.desc))} Makes ${esc(makes)}.</p><div class="cost">${costChips(w.cost)}</div>` +
-        (buildKind === w.id ? placing : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
-        `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div>`) + '</article>']);
+      // (one that stands is "standing", as a building is, and what its card then offers is another: a second kiln
+      //  fires a second job. "Built", a dead Build button and "Missing 6 basalt" on one card read as a contradiction.)
+      cards.push([can ? 0 : n ? 2 : 1, `<article class="rcp ${can ? 'ready' : n ? 'done' : ''}" data-card="${w.id}"><div class="rcp-hd"><h4>${esc(w.name)}</h4>` +
+        tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}${n} standing</span>` : '')) + '</div>' +
+        `<p class="ds">${chem(esc(w.desc))} Makes ${esc(makes)}.</p>` + (n ? `<p class="ds">A second one works a second job at the same time.</p>` : '') + `<div class="cost">${costChips(w.cost)}</div>` +
+        (buildKind === w.id ? placing : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>${n ? 'Build another' : 'Build'}</button>` +
+        `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc((n ? 'For another: ' : '') + missingText(w.cost)))}</span></div>`) + '</article>']);
     }
     // ... and the buildings: what he builds of what the works make
     const bcards = [];
@@ -335,7 +339,8 @@ export function renderColony() {
   //  which pushed them down a row whenever he walked out of range.)
   body.innerHTML = '<div class="colony">' +
     `<div class="tabs" role="tablist">${tab('inv', 'box', 'Inventory')}${tab('craft', 'colony', 'Fabricate', ready)}${tab('build', 'up', 'Upgrades', upReady)}${tab('home', 'hab', 'Home', homeReady)}${isBase() ? tab('base', 'brick', 'Base', baseReady) : ''}</div>` +
-    (atHome ? '' : `<div class="col-bar off">${icon('warning')}<b>Fabricator out of range</b><span>Return to the Hab to fabricate or install. You can still deploy kits you carry.</span></div>`) +
+    // (... and only on the pages it bears on: it stood in red over the inventory and the base's list, which he was only reading)
+    (atHome || colonyTab === 'inv' || colonyTab === 'base' ? '' : `<div class="col-bar off">${icon('warning')}<b>Fabricator out of range</b><span>Return to the Hab to fabricate or install. You can still deploy kits you carry.</span></div>`) +
     '<div class="cols">' +
     `<section class="pane mg-scroll${colonyTab === 'inv' ? ' on' : ''}" id="mg-inv" aria-label="Inventory">${inv}</section>` +
     `<section class="pane mg-scroll${colonyTab === 'craft' ? ' on' : ''}" id="mg-craft" aria-label="Fabrication">${craft}</section>` +
@@ -417,10 +422,13 @@ const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.
 function baseLine() {
   const all = WORKS.concat(BUILDINGS), has = (w) => World.builtMeshes.some((b) => b.kind === (w.builds || w.id));
   // (a greenhouse set down from a kit is a farm dome all the same)
-  const up = all.filter(has), next = all.find((w) => !has(w));
+  const up = all.filter(has);
+  // (what comes next is what the task card says comes next: the journal said "a farm dome" under a card that said "a comms tower")
+  const lead = missionList().find((e) => !e.done && /^b-/.test(e.o.id));
+  const next = lead ? lead.o.text().replace(/\s*\(.*\)$/, '') : '';
   if (!up.length) return 'No ship can reach Mars for four years. Make this somewhere a man can live, out of what the planet holds: basalt off any boulder, and the minerals the map marks. A kiln first: Colony, the Base tab.';
   const names = up.map((w) => w.name.toLowerCase());
-  return `Standing: ${names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]}.` + (next ? ` Next: a ${next.name.toLowerCase()}.` : ' Everything a base has is built. Now keep it running.');
+  return `Standing: ${names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]}.` + (next ? ` Next: ${next.charAt(0).toLowerCase() + next.slice(1)}.` : ' Everything a base has is built. Now keep it running.');
 }
 function wayHomeHtml() {
   const mav = fmtDist(groundDist(World.hab.position, World.mav.position));
@@ -552,7 +560,7 @@ function statsHtml() {
   const st = S.stats;
   const tile = (v, unit, label) => `<div class="stat"><b class="t-num">${v}${unit ? `<small>${unit}</small>` : ''}</b><span>${label}</span></div>`;
   return `<div class="pane-hd">This run <span>${esc(DIFFICULTIES[S.diff].name)} · ${isBase() ? 'no rescue' : `rescue on Sol ${S.rescueSol}`}</span></div><div class="stat-grid">` +
-    tile(S.sol, '', 'Sols survived') + (isBase() ? tile(World.builtMeshes.length, '', 'Things set down') : tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue')) +
+    tile(S.sol, '', 'Sols survived') + (isBase() ? tile(st.quarried || 0, '', 'Stone and minerals quarried') + tile(st.made || 0, '', 'Made in the works') : tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue')) +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes + (st.produce || 0), '', 'Meals grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
     tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +

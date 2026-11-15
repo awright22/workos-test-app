@@ -108,9 +108,21 @@ function ringWall(q, group, radius, wallR, wallHalf, doorAngle, passHalf, passOu
   _v1.set(0, 1, 0).applyQuaternion(q);
   return true;
 }
-export function collideUnit(q, radius) {
+/**
+ * What the last collideUnit ran into: `n`, the way it was pushed (a unit vector along the ground, from the thing
+ * toward the body), and `disc`, whether that was a round thing (a rock, a lander: `n` is set) and not only a wall.
+ * A body that slides keeps its pace along the thing and loses only what was carrying it in.
+ */
+export const contact = { n: new THREE.Vector3(), disc: false };
+/**
+ * Push a body (a circle of `radius` metres about the place `q` stands over) out of whatever it stands in.
+ * `rocks`: the lowest rock, in metres, that is in its way (a man's boots go over nothing a collider is made for; a
+ * rover's wheels go over a good deal: see game/rover.js). Returns whether it was moved.
+ */
+export function collideUnit(q, radius, rocks = 0) {
   _v1.set(0, 1, 0).applyQuaternion(q);              // current up
   let moved = false;
+  contact.disc = false;
   const test = (cv, cr) => {
     const sep = angDist(_v1.x, _v1.y, _v1.z, cv.x, cv.y, cv.z) * R;
     const min = cr + radius;
@@ -118,6 +130,7 @@ export function collideUnit(q, radius) {
       _v2.copy(_v1).sub(_v3.copy(cv).multiplyScalar(_v1.dot(cv)));   // tangent away-dir at collider
       if (_v2.lengthSq() < 1e-12) return;
       _v2.normalize();
+      contact.n.copy(_v2); contact.disc = true;
       _v3.copy(cv).multiplyScalar(R).addScaledVector(_v2, min);      // pushed-out point (chord space)
       _v3.normalize();
       _q1.setFromUnitVectors(_v1, _v3);
@@ -130,7 +143,7 @@ export function collideUnit(q, radius) {
     if (S.mode === 'rover' && c === World.roverCollider) continue;
     test(c.v, c.r);
   }
-  for (const c of rockColliders) test(c.v, c.r);
+  if (rocks !== Infinity) for (const c of rockColliders) if (c.h === undefined || c.h >= rocks) test(c.v, c.r);
   // round buildings: the Hab with its airlock, and any greenhouse dome the player has put up
   if (World.hab && ringWall(q, World.hab, radius, HAB_R, 0.5 + radius * 0.5, DOOR_HALF + 0.02, AIRLOCK_HALF, AIRLOCK_OUTER_HALF, AIRLOCK_END)) moved = true;
   for (const b of World.builtMeshes) {
@@ -424,7 +437,14 @@ export function updateWalk(dt) {
     }
   }
   const hit = collideUnit(player.q, player.radius);
-  if (hit) { player.vx *= 0.6; player.vz *= 0.6; }
+  if (hit && contact.disc) {
+    // Against a rock he loses what was carrying him into it and keeps the rest: he slides along it at the pace he
+    // came. (Every frame of touching one used to take four tenths of his speed: he crawled round a boulder, slower
+    // the faster the frames came.)
+    _fw.set(0, 0, -1).applyQuaternion(player.q); _rt.set(1, 0, 0).applyQuaternion(player.q);
+    const nx = contact.n.dot(_rt), nz = -contact.n.dot(_fw), into = player.vx * nx + player.vz * nz;
+    if (into < 0) { player.vx -= nx * into; player.vz -= nz * into; }
+  } else if (hit) { const k = Math.pow(0.6, dt * 60); player.vx *= k; player.vz *= k; }      // (a wall: by the clock, not by the frame)
   player.q.normalize();
 
   // --- gravity, jumping, landing (Mars: 3.72 m/s^2) -----------------------------------------

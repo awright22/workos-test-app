@@ -467,7 +467,7 @@ export function sleepToDawn(inRover) {
   // the first morning says once where all of this is going (the journal's task page has it from then on): after ten
   // minutes of play nothing had said that the rescue is a rocket a long drive away, or that Earth must be told first
   const later = rolled && S.sol === 2 && !S.pf.connected && isBase()
-    ? 'Find a radio and tell Earth you are alive. The next ship is four years out: make this somewhere a man can live.'
+    ? 'Find a radio and tell Earth you are alive. No ship can reach Mars for four years: make this somewhere a man can live.'
     : rolled && S.sol === 2 && !S.pf.connected
     ? `Find a radio and tell Earth you are alive. Then drive to the MAV, the only rocket on Mars: ${fmtDist(groundDist(World.hab.position, World.mav.position))} away in Schiaparelli. It can launch on Sol ${S.rescueSol}` : '';
   if (inRover) rows.push(['Night', 'Slept curled around the driver seat. The chiropractor is 225 million km away.']);

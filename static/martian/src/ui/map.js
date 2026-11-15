@@ -147,7 +147,7 @@ function buildMarkers() {
   }
   World.pods.forEach((p, i) => {
     if (p.taken) return;
-    add({ id: 'p:' + i, icon: 'cache', color: col.cold, pos: p.group.position, label: p.kind === 'pod' && !/debris/i.test(p.label) ? 'Cache' : '', pri: 7, small: /debris/i.test(p.label),
+    add({ id: 'p:' + i, icon: 'cache', color: col.cold, pos: p.group.position, label: p.kind === 'pod' && !/debris/i.test(p.label) ? (/supply drop/i.test(p.label) ? 'Drop' : 'Cache') : '', pri: 7, small: /debris/i.test(p.label),
       title: /debris/i.test(p.label) ? 'Debris' : 'Supply cache', type: 'Unopened', note: p.label + '.' });
   });
   if (S.flags.pfRevealed && !S.pf.loaded && !S.pf.connected) {
@@ -155,7 +155,8 @@ function buildMarkers() {
       title: 'Pathfinder', type: 'Objective · Ares Vallis', note: 'Dead since 1997. Bring the rover: it is too heavy to carry. With it, you can call Earth.' });
   }
   // (the rocket says what it is from the first sol: it stood on the map as "Ares 4 MAV" with nothing to say it was the way home)
-  add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed || isBase() ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : isBase() ? 3 : 2, main: !!S.flags.mavRevealed,
+  // (not in a base: there is no way home in that game, and a rocket standing on its map with no word said was taken for one)
+  if (!isBase()) add({ id: 'mav', icon: 'rocket', color: S.flags.mavRevealed ? col.accent : col.ink, pos: World.mav.position, label: S.flags.mavRevealed || isBase() ? 'MAV' : 'MAV: the way home', pri: S.flags.mavRevealed ? 1 : isBase() ? 3 : 2, main: !!S.flags.mavRevealed,
     title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : isBase() ? 'Ares 4 · Schiaparelli crater' : 'The way home · Schiaparelli crater',
     note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : isBase() ? 'The next mission’s ascent vehicle, standing ready in Schiaparelli. No ship is coming to meet it.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,

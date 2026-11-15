@@ -75,7 +75,7 @@
 .map-legend li i.sw { border-radius: .125rem; border-style: dashed; }
 .map-legend li i.night { border: 0; border-radius: .125rem; background: linear-gradient(90deg, rgba(4, 6, 12, .9), rgba(4, 6, 12, .25)); outline: 1px solid var(--line-2); }
 .map-legend li span { color: var(--ink-2); }
-.map-status { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 1.25rem; height: 2.5rem; padding: 0 1rem; background: rgba(10, 9, 8, .9);
+.map-status { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 1.25rem; height: 2.5rem; padding: 0 1rem; background: rgb(10, 9, 8);
   border-top: 1px solid var(--line-2); font: 500 .8125rem/1 var(--f-cond); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
 .map-status b { color: var(--ink); font-weight: 600; }
 .map-status .t-mono { font-size: .75rem; letter-spacing: 0; text-transform: none; }
