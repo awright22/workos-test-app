@@ -721,6 +721,10 @@ export function buildDeployable(kind, atVec, yaw = 0) {
       addLamp(m.part('fire') || g, { color: 0xff7a22, power: 4.5, range: 3.5, decay: 2, level: () => b.heat * (0.3 + 0.7 * (World.dark || 0)) });
     } else {
       b.glow = ownMaterials(m.root, /^light_(white|blue|red)/);       // a building's windows and lamps: they come up after dark
+      // (... and two of them light the ground they stand on: the lamp over the quarters' hatch, and the pad's rim
+      //  lamps. A base after dark was three fires and nothing else: nowhere in it looked lived in.)
+      if (kind === 'quarters') addLamp(g, { offset: new THREE.Vector3(0.3, 2.05, 3.1), color: 0xffd9a8, power: 7, range: 9, decay: 1.6, level: () => World.dark || 0 });
+      if (kind === 'pad') addLamp(g, { offset: new THREE.Vector3(0, 1.1, 0), color: 0x9fc8ff, power: 5, range: 10, decay: 1.5, level: () => World.dark || 0 });
     }
   }
   World.builtMeshes.push(b);

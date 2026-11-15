@@ -115,7 +115,7 @@ await shot('base-tab-kiln-ready', 'Colony, the Base tab: the kiln can be built.'
 await tap('#mg-base [data-build="kiln"]');
 await ev(async (G) => { G.paused = true; G.tpLocal(26, 22, 0); await G.settle(); G.tick(0.05, 8); });
 expect('the place for the kiln is offered', /build the kiln here/i.test(await prompt()), await prompt());
-await shot('kiln-where', 'He pressed Build and walked out: where he stands is where it will go.', 1800);
+await shot('kiln-where', 'He pressed Build and walked out: the ring on the ground ahead of him is where the kiln will stand (green: it can go there).', 1800);
 await hold(2.7);
 await ev((G) => { G.tick(0.05, 6); });
 await shot('kiln-built', 'The kiln, built.', 2500);
@@ -161,7 +161,7 @@ const dep = await ev(async (G) => {
   const site = G.World.deposits.filter((d) => d.dep.id === 'hematite').sort((a, b) => a.group.position.distanceTo(G.player.pos) - b.group.position.distanceTo(G.player.pos))[0];
   G.roverTo(site.group.position, 9);
   G.setLocalTime(11);
-  G.tpNear(site.group.position, 3.4); await G.settle(); G.tick(0.05, 12);
+  G.tpNear(site.group.position, 3.4); await G.settle(); G.tick(0.05, 40);       // (two seconds: the game looks for what he has reached every second and a half)
   return { found: !!G.S.base.found[site.key], away: Math.round(site.group.position.distanceTo(G.World.hab.position)) };
 });
 expect('standing at a deposit finds it', dep.found, dep);
@@ -207,7 +207,8 @@ await shot('journal-the-long-stay', 'The journal: where a base stands and what c
 await closeScreens();
 await ev(async (G) => { G.setLocalTime(15); G.tpAround(G.at(44, 30), 30, 215); await G.settle(); G.tick(0.05, 30); });
 await shot('base-by-day', 'The base as he sees it, afternoon, walking back toward it.', 3500);
-await ev(async (G) => { G.setLocalTime(20.8); G.tpAround(G.World.builtMeshes.find((b) => b.kind === 'smelter').group.position, 10, 130); await G.settle(); G.tick(0.05, 40); });
+// (from the side away from the kiln: from the other he stood against its flue)
+await ev(async (G) => { G.setLocalTime(20.8); G.tpAround(G.World.builtMeshes.find((b) => b.kind === 'smelter').group.position, 10, 310); await G.settle(); G.tick(0.05, 40); });
 await shot('works-at-night', 'After dark, at the works.', 3500);
 // (two pictures from a camera of the picture-taker's own, the interface hidden: the whole base at once)
 await ev(async (G) => {
@@ -233,7 +234,7 @@ const drop = await ev(async (G) => {
 });
 expect('a supply drop comes down on the pad', drop.pod, drop);
 await shot('supply-drop', 'Ten sols after the pad was laid: the first supply drop stands on it.', 3500);
-await ev((G) => { const p = G.World.pods.filter((x) => !x.taken).pop(); G.tpNear(p.group.position, 1.8); G.tick(0.05, 20); });
+await ev((G) => { const p = G.World.pods.filter((x) => !x.taken).pop(); G.tpNear(p.group.position, 2.7); G.tick(0.05, 20); });
 await shot('supply-drop-open', 'At the drop.', 2000);
 
 await writeFile(path.join(dir, 'steps.txt'), steps.join('\n') + '\n' + (notes.length ? '\nNOT AS EXPECTED:\n' + notes.join('\n') + '\n' : ''));
