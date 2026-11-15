@@ -27,7 +27,8 @@ const OUT_JSON = path.join(here, '..', 'static', 'martian', 'src', 'world', 'con
 /** What stands on the ground out of doors. (Not the Hab, which has its own skirt; not what is indoors or in orbit.) */
 const MODELS = ['rover', 'solar_panel', 'uplink_dish', 'uplink_pad', 'solar_kit', 'beacon', 'o2_cache', 'supply_pod', 'rtg', 'greenhouse', 'mav',
   'pathfinder', 'viking', 'mars3', 'beagle2', 'mer', 'phoenix', 'msl', 'm2020', 'insight', 'ingenuity', 'zhurong', 'schiaparelli_wreck',
-  'debris_a', 'debris_b', 'debris_c', 'regolith_pile',
+  // (not the soil heap: it shrinks as it is dug, and its patch would stay where the heap had been)
+  'debris_a', 'debris_b', 'debris_c',
   'bs_kiln', 'bs_smelter', 'bs_glassworks', 'bs_solar', 'bs_battery', 'bs_tank', 'bs_quarters', 'bs_tower', 'bs_pad',
   'dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfate', 'dep_salt'];
 const TILE = 64, DIRS = 128, COLS = 8, TOP = 3;
@@ -53,7 +54,10 @@ const res = await g.eval(async (G, o) => {
         w.y = 0.0;
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
-    fragmentShader: 'uniform float uTop; varying float vH; void main() { if (vH > uTop) discard; gl_FragColor = vec4(1.0); }',
+    // (and nothing that lies on the ground itself: an apron of spilt soil, a cable, a parachute's cloth. Such a thing does
+    //  not shade the ground that is seen there: it is what is seen there, and a patch laid over it painted it dark. The
+    //  soil heap's apron came out as a hard-edged dark slab beside the heap.)
+    fragmentShader: 'uniform float uTop; varying float vH; void main() { if (vH > uTop || vH < 0.07) discard; gl_FragColor = vec4(1.0); }',
     side: THREE.DoubleSide, depthTest: false, depthWrite: false,
   });
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -96,7 +100,9 @@ const res = await g.eval(async (G, o) => {
       const dx = (x + 0.5) / o.tile * 2 - 1, dy = (y + 0.5) / o.tile * 2 - 1, e = Math.max(Math.abs(dx), Math.abs(dy));
       // (nothing at the tile's own edge: a patch must not show its square)
       const edge = 1 - Math.min(1, Math.max(0, (e - 0.8) / 0.2)) ** 2;
-      const occ = acc[(o.tile - 1 - y) * o.tile + x] / o.dirs * edge;
+      // (lifted where it is slight: a slim thing hides little of the sky from the ground at its foot, and a tenth off
+      //  the ground's brightness could not be seen)
+      const occ = Math.pow(acc[(o.tile - 1 - y) * o.tile + x] / o.dirs, 0.7) * edge;
       tile[y * o.tile + x] = Math.round(occ * 255);
       most = Math.max(most, occ); sum += occ;
     }

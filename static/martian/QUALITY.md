@@ -158,8 +158,8 @@ run of the suite takes an hour and a half.
 | Picture: orbit | The title screen and the launch show a real globe with a thin atmosphere | Round 7: **MET**. The launch itself still lacks spectacle (Q1). Round 11: **MET**; the launch NEARLY (V2, V5, V6) |
 | Models | Every object is a purpose-built model; nothing reads as a primitive | Round 7: NEARLY. Everything built meets the bar (the rocket, the pods, the rover, the landers); rocks, the commonest object, do not (Q4). Round 11: **MET** |
 | Animation | The astronaut never slides, pops or T-poses; every action has a pose | Fourteen clips blended. Idle is a relaxed, asymmetric stand (8 s); he takes his helmet off where there is air; kneeling has clips of its own. The builder's checks find no sliding or sinking foot in any clip. Not yet reviewed in motion |
-| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fifth independent review: NEARLY. At every step there is one task with a distance, a compass tag, a world marker and a hold prompt, and most earlier hesitations are answered. Remaining: a pile-up at the moment the suit is sealed (J2), a bare "LOCKED" at the first empty bed (J3), a distance labelled AIRLOCK that looks wrong (J4), and no word on the long-term goal (J16). **Ninth review (held to the indie standard): NEARLY at both phone sizes, which by the owner's target of 14 November is reached.** What it still lists is under N9 |
-| Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fifth independent review (phone only, incomplete: see the review): 844 wide NEARLY (clean, unclipped, clear of the notch, one product; short on settings controls under 44 px, an 18 px help button, labels under 11 px and a few numbers that read as bugs); 667 wide NEARLY, provisionally (its three broken screens are fixed; its HUD and map were not seen). The suite's audit measures 128 phone states and finds nothing, which the review shows is not the same as nothing to find. **Ninth review (held to the indie standard): NEARLY at 844 x 390 (55 of 66 interface pictures seen) and NEARLY at 667 x 375 (all seen): reached, by the owner's target of 14 November.** Its four bugs and blockers (N1 to N4) are fixed; the rest of its list is polish |
+| First ten minutes | A new player always knows what to do next and why, without reading a wall of text | Fifth independent review: NEARLY. At every step there is one task with a distance, a compass tag, a world marker and a hold prompt, and most earlier hesitations are answered. Remaining: a pile-up at the moment the suit is sealed (J2), a bare "LOCKED" at the first empty bed (J3), a distance labelled AIRLOCK that looks wrong (J4), and no word on the long-term goal (J16). **Ninth review (held to the indie standard): NEARLY at both phone sizes, which by the owner's target of 14 November is reached.** What it still lists is under N9 Tenth review (15 November, with the quiet HUD): **NEARLY at both phone sizes**; what is not taught is the quiet HUD's own gestures (a card for the dial was added after it) |
+| Interface | Every screen is legible and unclipped at phone sizes under the notch and status bar (the iPhone in landscape is the target); desktop sizes are a bonus; touch has a pause button | Fifth independent review (phone only, incomplete: see the review): 844 wide NEARLY (clean, unclipped, clear of the notch, one product; short on settings controls under 44 px, an 18 px help button, labels under 11 px and a few numbers that read as bugs); 667 wide NEARLY, provisionally (its three broken screens are fixed; its HUD and map were not seen). The suite's audit measures 128 phone states and finds nothing, which the review shows is not the same as nothing to find. **Ninth review (held to the indie standard): NEARLY at 844 x 390 (55 of 66 interface pictures seen) and NEARLY at 667 x 375 (all seen): reached, by the owner's target of 14 November.** Its four bugs and blockers (N1 to N4) are fixed; the rest of its list is polish Tenth review (15 November, with the quiet HUD and one thing leading in an emergency): **NEARLY at both phone sizes**, not MET: the sheets "at indie-release level"; the small tap targets as drawn, lists cut at the fold and the direction arrow keep it from MET (P1 to P10) |
 | Sound | Wind, suit, footsteps, rover, Hab, actions, events, and an adaptive score; nothing clips | Synthesised in the browser, no audio files. Measured offline: peaks under -1.4 dBFS with everything at once, calm day about -34 LUFS, storm -18. **Nobody has listened to it**: timbre and musicality are judged only from spectrograms. Calm beds are mostly below 300 Hz and will be faint on a phone speaker |
 | Feel | Walking, jumping and driving have weight; the camera never clips through walls or ground | New controllers in. The camera treats the Hab, its airlock and greenhouse domes as rooms from inside and as obstacles from outside. Not yet reviewed in motion |
 | Depth | "On par with Stardew Valley or Animal Crossing": many systems that feed each other, and always something worth doing | Survival, five crops with a pantry and cooked dinners, morale, field science with 17 materials and NASA grants, equipment wear, crafting and ten upgrades, four deployables, seven survey tasks, fourteen landers to salvage, dust storms and dust devils, mail from Earth and the Hermes, nine comforts to make for the Hab, photo mode, nineteen achievements. Still thin: things to do with a second greenhouse, anything to do with other people's hardware beyond salvage |
@@ -861,6 +861,40 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
 | N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
+### Tenth review (phone only; two reviewers, one a size; the owner's item (c), with the quiet HUD)
+
+After the quiet HUD, one thing leading in an emergency, and the wording of N10 and N11, on commit `338a907`. Each
+reviewer was given 78 interface states, a new player's first 29 steps and 12 states of the HUD on its own at their
+size, the bar (with the emergency rule added to it) and the ninth review's list to re-check, and was not told what
+had been done. Every picture was opened. Verdicts: interface **NEARLY at 844 x 390 and at 667 x 375**; first ten
+minutes **NEARLY at both**. The owner's item (c) asked for MET: after one pass and its re-check it is not MET; under
+the owner's bounds what is left is recorded here and not gone round again. Both: "the sheets are at indie-release
+level"; "the player always has a task, a reason, a place and a distance". Of the quiet HUD, the small phone's
+reviewer: it works "at rest and in a single emergency. It fails in the stacked emergency, and it depends on small,
+untaught tap targets."
+
+Of the ninth review's thirteen: gone are the dawn sheet's scroll (N2), the false arrow on the Hab's air (N4), "HAB
+AIR" and "ROVER AIR", "HARDER", the count of sols on the pause card and the undirected "Survive to Sol 25" (N10 in
+part, N11), the pale toasts, the win sheet's scroll at 844; much reduced is the emergency (N6: about a fifth of the
+picture with one thing wrong, a quarter to 29% with everything; one banner and marks); partly the arrow (N1: its
+point reads; still no distance on the quiet HUD and never introduced), the gauge rows (N8), the status strip (N12);
+still there the lists cut at the fold (N5), "? GUIDE" as bare text (N7), the onboarding order (N9), four verbs for
+making and two names for a storm (N10), the map's small rings and the smaller things (N13). N3 could not be judged
+(no low bar in the colour-blind picture).
+
+| # | Finding (both reviewers unless a size is named) | State |
+| --- | --- | --- |
+| P1 | **With everything wrong at once the banner and the gauge led with the wrong emergency** (both: a bug, a blocker for the emergency bar): out of doors with 31 seconds of air and the Hab holed, the banner said HAB BREACH over "HAB O2 100%", beside a dial at 9% and a task that said "Run for air" | fixed after the review: the tank comes before the breach in the one order (it kills in seconds); `tests/hud-cover.mjs` holds it (`foot-breach-behind`). Not seen by a reviewer |
+| P2 | Tap targets the quiet HUD depends on, as drawn: the marks 23 to 25 px rings 5 px apart; the task line 186 to 200 by 30; "? GUIDE" 45 by 12; the chevron that says the panel opens 10 px (what is pressed is a thumb in each case; what is drawn is not) | part, after the review: the marks stand in one plate a thumb high. The task line, "? GUIDE" and the chevron: left |
+| P3 | The quiet HUD's own gestures are never taught: nothing says a tap on the dial shows every gauge ("the biggest onboarding gap") | done after the review: the first time a gauge arrives, a card says "Tap the dial to see them all" with the dial lit |
+| P4 | A storm's WARNING card comes up beside a red banner: a fourth voice | left: in the pictures it is the test's own card; in play only what bears on his life is said while a banner is red, and a storm's warning is counted as that |
+| P5 | The direction arrow: no distance on the quiet HUD, never introduced; it lands beside the task card, where RUN appears, above the stick, on the floor; once on the Hab itself while the Hab is on screen | left (the ninth review's N1, second review running): it is the marker over the place when the place is out of view. Open, the first thing for the next interface pass |
+| P6 | Lists sliced at the fold in fourteen pictures; the MORE BELOW bar cuts through a BUILD and a RUN button (844) and through the guide's "At zero" (667); 117 px of headers on a 375 px screen | left, open |
+| P7 | Things shown before they are explained: a trend arrow eleven game hours before its card; morale scored before its bar; five NEW cards in 40 game minutes; POWER with no "at zero" | part: the POWER and VITALS cards say what they are for and what zero means. The rest left |
+| P8 | The controls sheet names VIEW, MENU and CANDLE, which the quiet HUD does not show by those names | left, open (a wording bug) |
+| P9 | Three or four styles of refusal; four verbs for making; "DUST STORM" and "STORM CELL"; "11 SOLS SURVIVED" on Sol 12 against "SOLS SURVIVED 25" on Sol 25; "water again at 50%" of what | left, polish |
+| P10 | The plate changes size as gauges come and go, and the task line's left edge moves with the distance's digits; map rings 14 to 20 px; marks have no words and one was missing for power in a made-up state; smaller things | left, polish |
+
 ## The quiet HUD (a phone's)
 
 The owner's second finding of 15 November (item 7 under "Direction from the owner"): the HUD was too crowded on the
@@ -973,24 +1007,26 @@ litres the banner said WATER CRITICAL beside a card that said "Get to air").
 
 Now (`ui/hud.js`, "one thing leads"; `css/hud.css`): whatever is wrong is put in one order and the first leads.
 
-- **The order.** What kills in minutes comes first whatever its level (a breach, then an emptying tank); after
-  those, what is critical before what is low; within a level, air, health, water, food, power, the rover's battery,
-  a storm, cold, morale.
+- **The order.** What kills in minutes comes first whatever its level: an emptying tank, then a breach (the tank
+  first: it is seconds, and the tenth interface review found the breach leading over it, out of doors, with half a
+  minute of air); after those, what is critical before what is low; within a level, air, health, water, food, power,
+  the rover's battery, a storm, cold, morale.
 - **What leads shows three things**: its banner (what is wrong, and its stake), the gauge it bears on (the Hab's air
   for a breach, the dial for the tank, its own bar for a low reserve), and the task card, which gives the one task
   (what to do, where, how far) and no second line.
 - **The rest are marks**: a ring with the thing's own sign, red if critical and amber if low, with no words and no
   bar; two beside the banner, or three under it on the small phone (beside it there the second stood under the task
   card), and a count past that. A ring round a sign is drawn as a button (the audit's rule, from a reviewer), so the
-  marks are one: a press on them opens every gauge, as a press on the dial does.
+  marks are one: they stand in a plate a thumb high, and a press on it opens every gauge, as a press on the dial
+  does.
 - The leading banner is the colour of the task it stands beside: an amber "suit low" beside a red "Get to air" is
   red (not in the first minute, whose leak stays amber).
 - The full HUD (the setting) shows two banners and every gauge, as it did.
 
 Measured (`tests/hud-cover.mjs`, states `foot-low`, `foot-many-wrong`, `hab-breach`; no bar is held in an
 emergency): 19 to 25% of the screen at 844 x 390 and 21 to 27% at 667 x 375, against 35 to 38% for the full HUD
-standing at the rover with nothing wrong. Seen by me at 932, 844 and 667; to go to the interface reviewers with the
-rest of item (c).
+standing at the rover with nothing wrong. Reviewed in the tenth interface review (above): with one thing wrong the
+banner, the dial, the task and the marker "all agree"; with everything wrong the order was wrong (P1, fixed).
 
 ## Base mode
 
@@ -1471,15 +1507,15 @@ What it found (none a blocker), and what was done after it, seen by me in check 
 The owner: "baked lighting from the Blender build (AO so props sit in the ground; baked light for Hab and
 greenhouse interiors)", then "a pass on the built objects the reviewers flagged: the greenhouse (chunky struts,
 plain cap, the dark band at its door), glass on the rover's windows, the rescue ship close up (flat-shaded), and the
-faceted soil heap". One pass each; **their one re-check is the next picture review**, which has not been run: what
-follows was seen by me alone, in the pictures named.
+faceted soil heap". One pass each and one re-check (below), then a second and last attempt at what had not
+improved.
 
 **Props sit in the ground** (`tools/build_contact.mjs`, `world/build.js` `contactPatch`). The models already
 carried occlusion baked into their vertices by the Blender build, with the ground counted as a plane under them: their
-undersides were dark and the ground under them was not. The bake now also does the ground's side: for each of the 41
+undersides were dark and the ground under them was not. The bake now also does the ground's side: for each of the 40
 models that stand out of doors it adds up, from above, the model's shadow cast from 128 directions spread over the
 sky, into a 64 px tile of "how much of the sky does it hide here"; the game lays a model's tile on the ground under
-it as a soft dark patch. One picture of all the tiles, 115 kB. Not on the lightest preset for the eight solar
+it as a soft dark patch. One picture of all the tiles, 135 kB. Not on the lightest preset for the eight solar
 panels (eight more things to draw).
 
 **The Hab's own lamps, baked** (`tools/assets/lib.py` `bake_light`, called from `hab.py`). The game lights the room
@@ -1502,6 +1538,30 @@ panes, which casts real shadows of its frame, and its own lamps are a glimmer th
 | B5 | The rover: "no glass feel to its windows" | Its panes are tinted and mirror the sky: twice as solid squarely, nearly opaque looked along (`rover-park`) |
 | B6 | The rescue ship close up: "flat-shaded", "faceted" | The ring's section is a box with rounded shoulders turned in 72 steps (an octagon in 48), its hub in 40 sides and its spokes in 20 (were 24 and 12) |
 | B7 | "the faceted soil heap" | Twice the columns and nearly twice the rings (96 by 18; it was 48 by 10, and its lumps came out as two or three flat faces each): 5,100 triangles (`pile`) |
+
+The re-check (one independent reviewer; 15 pictures `earlier` and 15 `now`, every one opened, brightness measured,
+difference maps made):
+
+| Point | Verdict | Then and now | From the review |
+| --- | --- | --- | --- |
+| The greenhouse | **MET** | "better, clearly" | struts "about half their earlier thickness", "a made vent replaces the two stacked plain discs", "glass sheen where there was none", "the dark diagonal band at the door is gone"; weakest: the panes that face a camera above are still almost clear |
+| The rover's windows | NOT MET | the same | "the same dark brown pane with a blue sliver along the bottom", no reflection or glint (one window in view, 45 by 60 px) |
+| The soil heap | NOT MET | mixed | smooth in `pile`; from the Hab side "four or five long parallel flat sheets with hard creases" (its dug face); and a new dark patch beside it (a bug of mine, below) |
+| The rescue ship | **MET** | better | the ring "smoothly shaded", "no flat-shaded parts"; its last shot too dark to judge |
+| Props sit in the ground | NOT MET | better for most, worse at the heap | the pod "now clearly rests on the ground"; the generator's foot shade "too faint to see"; Hab, airlock and rover unchanged; "would be NEARLY with the heap patch removed" |
+| The Hab's interior | NEARLY | about the same | "pools of light under the lamps and floor about half as bright in the corners. It is not evenly lit"; shade under things inconsistent |
+
+What it found, and the second attempt (seen by me in new pictures and by no reviewer; under the owner's bounds
+these are not re-checked again, and what does not show is recorded as plateaued):
+
+| | Finding | State |
+| --- | --- | --- |
+| B8 | **A bug of this pass**: "a large dark grey-brown patch with a jagged, lobed edge" beside the soil heap, a flat dark bar from a distance. The contact bake counted the heap's apron of spilt soil, which lies on the ground, as shading the ground; the patch was laid over the apron and painted it dark | fixed at the bake: nothing lower than 7 cm counts as shading the ground (an apron, a cable, a parachute's cloth is what is seen there, not what shades it); and the heap has no patch at all (it shrinks as it is dug, and its patch would stay where the heap had been) |
+| B9 | The heap from the Hab side: flat sheets with hard creases | second attempt: the spade cuts are smoothed like the rest of the heap. Seen in `hab-noon`: the dark patch is gone; the dug face is still a few broad flat planes (each cut is one face a spade wide). **Plateaued** for this item: a dug face that reads as soil needs the cuts modelled as scoops, a rebuild of that part of the heap |
+| B10 | The rover's window unchanged | second and last attempt: a coated pane that gives back a quarter of the sky (a clear one gives back a twenty-fifth, which over a dark cab could not be told from none). Seen in `rover-park`: the one window in view, 45 px wide, has a pale sheen low on it and is otherwise as dark as before. **Plateaued** as judged from that view; no picture looks at the windscreen from the front, where it would show |
+| B11 | The generator's foot shade a tenth off the ground's brightness; the rover's and the Hab's not visible | second attempt: the patches are lifted where they are slight (the bake's values raised to the power 0.7). Seen in `rover-park` and `rtg`: the ground between the rover's wheels and round the generator's foot is darker than the open ground beside it; under a high sun the sun's own shadow is still most of what places a thing |
+| B12 | In the player's own view indoors the shade under the table is weaker than in the earlier picture, and the planters stand on bright floor | left: the bake can only darken, so the earlier picture's deeper shade was that build's lighting; shade under furniture needs the lamps' rays to be blocked by the furniture's own thin legs and tops, which they are, but a vertex under a table is rarely there to take it (the floor's tiles are a metre across) |
+| B13 | Smaller: he is pink under a grow light in one view; a rimmed disc under him indoors; the pendant lamp under the greenhouse's vent reads from above as a second lid; two large floor stains read as dirt; the parachute's cloth has no shade at its edge | left, polish |
 
 ## Sharpness and the frame rate (the owner's item g)
 
@@ -1573,7 +1633,7 @@ from the Hab (the map is the base's; elsewhere the last few hundred marks are al
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
 | 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed (every model NEARLY or better; the mode as a whole NEARLY on all five points) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G11, G14; and an hour of it has not yet been played through by hand |
 | 37 | **The quiet HUD on the phone** (the owner's second finding of 15 November) | built, measured in the suite (`tests/hud-cover.mjs`), reviewed and re-checked: calm MET at all three sizes by every review, the other five points MET or NEARLY, nothing NOT MET (see "The quiet HUD"). Closed under the owner's bounds. Open for the owner: the sol and the clock stand beside the dial, not on the buttons' row (one menu button in place of four would make room there); and whether the quiet HUD suits him on his phone |
-| 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | (a) and (b), the game in motion and how it drives and walks: done, re-checked, and the re-check's bugs fixed (see "In motion", K1 to K26); two things are second attempts not yet seen by anyone but me (getting into the rover, the rover's weight), and K11 and K13 are plateaued for code. (g) sharpness: one pass done (see "Sharpness and the frame rate"); its re-check is the phone's own report. (f) wear: one pass done (see "Wear"); to be looked at in the next picture review. All of that is on the preview. **The four additions of the same day**: the storm and the idle stance in motion: done and re-checked (storm moves MET, the rest NEARLY; see "The storm and standing still"). Night light and the horizon: done and re-checked (walking light MET, the rest NEARLY; the horizon's ruled line plateaued; see "Light to get about by at night"). The emergency HUD: built and measured, to go to the interface reviewers (see "An emergency: one thing leads"). **Next, in the owner's order: (c)** the one review of the interface at both phone sizes after this pass (the emergency HUD, the wording of N10 and N11; N5, N7, N9, N12, N13 are polish and are left), **(d)** the launch and the rescue as cutscenes (V5, V6), **(e)** baked lighting (a contact-shadow bake for every prop is written and not yet run: `tools/build_contact.mjs`; then light baked into the Hab's and the greenhouse's interiors), then the built objects (the greenhouse, the rover's glass, the rescue ship close up, the soil heap) |
+| 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | (a) and (b), the game in motion and how it drives and walks: done, re-checked, and the re-check's bugs fixed (see "In motion", K1 to K26); two things are second attempts not yet seen by anyone but me (getting into the rover, the rover's weight), and K11 and K13 are plateaued for code. (g) sharpness: one pass done (see "Sharpness and the frame rate"); its re-check is the phone's own report. (f) wear: one pass done (see "Wear"); to be looked at in the next picture review. All of that is on the preview. **The four additions of the same day**: the storm and the idle stance in motion: done and re-checked (storm moves MET, the rest NEARLY; see "The storm and standing still"). Night light and the horizon: done and re-checked (walking light MET, the rest NEARLY; the horizon's ruled line plateaued; see "Light to get about by at night"). The emergency HUD: built and measured, to go to the interface reviewers (see "An emergency: one thing leads"). **(c)** the interface: the emergency HUD and the wording done, and reviewed at both phone sizes: NEARLY at both, not the MET the owner asked for (see the tenth interface review, P1 to P10: its one bug fixed, the rest recorded). **(d)** the launch and the rescue: done and re-checked (all four points NEARLY, no blockers; see "The launch and the rescue"). **(e)** baked lighting and **the built objects**: one pass done (contact shadows for 40 props, the Hab's lamps baked into its interior, the greenhouse, the rover's glass, the ship's ring, the heap) and re-checked: the greenhouse and the ship MET, the interior NEARLY, the rover's windows, the heap and the props' contact NOT MET, with one bug of the pass found and fixed; a second and last attempt made at those three and not reviewed (see "Baked lighting and the built objects", B8 to B13). **Nothing on the owner's list is unstarted, and every item has had its pass and its re-check.** Open for the owner: whether the quiet HUD and the 30 fps setting suit him on his phone (the phone's own diagnostics), and the go to replace the first game at the root |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. On 15 November: the rover fix, the update repair and Base mode from `4e281c1` (cache `stranded2-e0658cf9b76a`); the quiet HUD from `3b08503` (cache `stranded2-96466c63e911`); then the cameras, getting in, the frame-rate setting and worn ground from `1105da6` (`gh-pages` `58f3c02`, cache `stranded2-4636a574a41c`; the suite's first thirteen parts ran on `f130007`, which differs only in one test). Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | measured on the owner's iPhone on an older build (60 fps average at a dynamic scale of 0.64; see the bar); to be measured again on the current build. Laptop: not measured |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |

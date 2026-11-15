@@ -484,10 +484,12 @@ function mergeSkinned(scene, dust) {
  * How much of a pane can be seen, by model. `a`: how solid it is looked through squarely; `film`: how much of its
  * film of dust shows then (all of it shows looked along); `top`: how solid it is looked along; `env`: how strongly
  * it mirrors the sky. A vehicle's windows are tinted and coated, and are seen from outside: the rover's read as
- * holes in its cab ("no glass feel to its windows", two picture reviews). The greenhouse is seen from above as much
+ * holes in its cab ("no glass feel to its windows", two picture reviews). (A first attempt, a little more solid and
+ * a little more mirror, could not be told from before: a clear pane gives back a twenty-fifth of the sky, and the
+ * cab behind it is dark. A coated one gives back a quarter.) The greenhouse is seen from above as much
  * as from beside: looked down on, its panes were not there ("no glass seen from above").
  */
-const PANES = { rover: { a: 0.42, film: 0.5, top: 0.93, env: 2.6 }, greenhouse: { a: 0.27, film: 0.48, top: 0.84, env: 1.6 }, default: { a: 0.2, film: 0.35, top: 0.82, env: 1.6 } };
+const PANES = { rover: { a: 0.5, film: 0.5, top: 0.93, env: 6.5 }, greenhouse: { a: 0.27, film: 0.48, top: 0.84, env: 1.6 }, default: { a: 0.2, film: 0.35, top: 0.82, env: 1.6 } };
 
 function prepare(gltf, name) {
   const dust = DUST[name] === undefined ? DUST.default : DUST[name], twoSided = TWO_SIDED.test(name), pane = PANES[name] || PANES.default;

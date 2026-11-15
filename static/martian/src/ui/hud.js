@@ -441,9 +441,9 @@ export const BAR_UNLOCKS = [
     card: () => (isBase() ? ['Food', 'Meals left: breakfast takes one each dawn, two with a side. The bar is full at twenty sols of meals.', 'Meals left. Full means twenty sols of them.']
       : ['Food', 'Meals left: breakfast takes one each dawn, two with a side. The bar is full when there is enough to reach the rescue.', 'Meals left. Full means enough to reach the rescue.']) },
   { id: 'power', flag: 'barPower', when: () => plantedPlots() > 0 || S.stats.panels > 0 || S.power < 55,
-    card: () => ['Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night drain it.', 'The Hab’s battery. Clean panels fill it by day.'] },
+    card: () => ['Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night drain it. Empty, the machines stop.', 'Runs the machines. Clean panels fill it by day.'] },
   { id: 'health', flag: 'barHealth', when: () => S.health < 96 || bedtime(),
-    card: () => ['Vitals', 'Your body. Air, water, food and sleep keep it up. At zero the run is over.', 'Your body. Air, water, food and sleep keep it up.'] },
+    card: () => ['Vitals', 'Your body. Air, water, food and sleep keep it up. At zero the run is over.', 'Your body. At zero the run is over.'] },
   { id: 'morale', flag: 'barMorale', when: () => S.sol > 1 || S.morale < 40,
     card: () => ['Morale', 'Your spirits, out of 100. Variety on the plate, music and comforts lift them. High, work goes faster.', 'Your spirits, out of 100. Low, work goes slower.'] },
 ];
@@ -480,6 +480,12 @@ function updateUnlocks() {
         S.flags[b.flag] = true;
         // (what a loaded game already had is not news)
         if (unlocksSeeded && b.card && met && !legacy) { const c = b.card(); toast('NEW', c[0], layout.compact ? c[2] : c[1], { lit: UI.bars[b.id].wrap, life: 7000 }); Snd.jingle(); }
+        // (the quiet HUD puts a gauge away again once it has been read: the first time one arrives, say how to bring
+        //  them all back. Nothing did, and a new player never saw the rest: "the biggest onboarding gap", two reviewers.)
+        if (unlocksSeeded && met && !legacy && layout.calm && !S.flags.dialTaught) {
+          S.flags.dialTaught = true;
+          toast('TIP', 'Every gauge', 'Tap the dial to see them all.', { lit: UI.suit, life: 6000 });
+        }
       }
     }
     const on = !!S.flags[b.flag];
@@ -1133,10 +1139,12 @@ export function updateHud() {
   // (the alarm and its stake. What to do about it, where and how far, is the first line of the mission list beside
   //  it: the two used to say the same thing in the same words, "Hab breach / seal it" beside "Hab breach: seal it")
   // (each also names the gauge it bears on, if it has one, and its place in the queue when several are up at once)
-  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out', 'o2', 0]);
+  // (the tank before the breach: out of doors with half a minute of air and the Hab holed behind him, the banner said
+  //  HAB BREACH over a full Hab, beside a dial at 9% and a card that said "Run for air". Two reviewers, one bug.)
+  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out', 'o2', 1]);
   if (!filling && !safeAir && S.mode !== 'rover') {
-    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty', null, 1]);
-    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left', null, 1]);
+    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty', null, 0]);
+    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left', null, 0]);
   }
   if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge', 'park it in the sun', null, 7]);
   if (S.storm.i > 0.15) {

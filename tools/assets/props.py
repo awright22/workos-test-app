@@ -2352,7 +2352,9 @@ def build_regolith_pile():
     # (loose soil has no facets: smooth over all but its sharpest breaks. And a spade's cut is a curved scoop with an
     #  edge to it, not a flat card: at 8 degrees the dug side was a heap of triangles.)
     bm = H.bm('ground_dust', smooth=62.0)
-    cut = H.bm('ground_dust', smooth=34.0)                   # the spade cuts: scoops with hard edges between them
+    # (the spade cuts: smoothed like the rest. With hard edges between them, from the side they are dug from the heap was
+    #  "four or five long parallel flat sheets with hard creases": cut card, not soil that has been dug and has slumped.)
+    cut = H.bm('ground_dust', smooth=62.0)
     # (twice the columns and nearly twice the rings it had: at 48 by 10 its lumps were sampled a hand apart, and each
     #  came out as two or three flat faces. The spade's scallops keep their width: they are counted in pairs of old columns.)
     NA, NR = 96, 18

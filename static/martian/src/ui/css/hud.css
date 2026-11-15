@@ -897,9 +897,10 @@
    sign in its own colour, with no words and no bar. */
 #mg-root.mg-calm #mg-alerts { flex-direction: row; align-items: center; justify-content: center; gap: .375rem; }
 /* (a ring round a sign is drawn as a button, so it is one: a press on the marks opens every gauge, as a press on the
-   dial does. What is pressed is a thumb high and wide; what is drawn is the marks.) */
-#mg-alerts .marks { display: flex; align-items: center; gap: .25rem; box-sizing: border-box; min-width: max(2.75rem, 44px); min-height: max(2.75rem, 44px); margin: calc((1.625rem - max(2.75rem, 44px)) / 2) 0; padding: 0;
-  border: 0; background: none; color: inherit; font: inherit; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+   dial does. They stand in one plate a thumb high, which is what is pressed: as bare 25 px rings they were "the only
+   route to the hidden gauges during an emergency" and looked a quarter of the size a thumb needs.) */
+#mg-alerts .marks { display: flex; align-items: center; justify-content: center; gap: .3125rem; box-sizing: border-box; min-width: max(2.75rem, 44px); height: max(2.75rem, 44px); margin: 0; padding: 0 .5rem;
+  border: 1px solid var(--line-2); border-radius: max(1.375rem, 22px); background: var(--plate); color: inherit; font: inherit; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 #mg-alerts .mark { display: grid; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; box-sizing: border-box;
   background: var(--plate-strong); border: 1.5px solid var(--accent); color: var(--accent); font: 600 var(--t12)/1 var(--f-cond); font-style: normal; }
 #mg-alerts .mark .ic { width: .9375rem; height: .9375rem; }

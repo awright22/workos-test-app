@@ -28,8 +28,8 @@ export const PHONES = [
 //  corner of the middle by one 2 px cell.)
 export const BAR = { all: 0.15, middle: 0.001, top: 0.35 };
 const pct = (v) => (v * 100).toFixed(1) + '%';
-/** What must lead in each emergency: the tank before the water, the breach before either. */
-const LEADS = { 'foot-low': /suit/i, 'foot-many-wrong': /suit/i, 'hab-breach': /breach/i };
+/** What must lead in each emergency: the tank before everything (it kills in seconds), the breach before the rest. */
+const LEADS = { 'foot-low': /suit/i, 'foot-many-wrong': /suit/i, 'foot-breach-behind': /suit/i, 'hab-breach': /breach/i };
 
 /**
  * Take one phone through the states and measure each.
@@ -137,6 +137,14 @@ export async function measure(size, o = {}) {
   await sleep(400);
   await ev((G) => { G.tick(0.05, 12); });
   await take('foot-many-wrong', false);
+  // ... and the Hab holed behind him while he is out here with half a minute of air: the tank still leads (it kills
+  // in seconds; the breach is a mark)
+  await ev((G) => { G.S.breach.active = true; G.S.breach.done = false; G.S.suit = 9; G.tick(0.05, 12); });
+  await quiet();
+  await sleep(1200);
+  await ev((G) => { G.tick(0.05, 12); });
+  await take('foot-breach-behind', false);
+  await ev((G) => { G.S.breach.active = false; G.S.breach.done = true; G.tick(0.05, 4); });
   // ... and a breach indoors, with the water and the power still short
   await ev((G) => { G.setStorm(0); G.S.storm.i = 0; G.S.suit = 100; G.tpLocal(-5.0, -6.2); G.S.breach.active = true; G.S.breach.done = false; G.S.o2 = 61; G.tick(0.05, 12); });
   await quiet();
