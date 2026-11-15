@@ -263,6 +263,7 @@ export function objectiveThen(o, where) {
   return w && w.via === 'out' ? [placeOf(o) || 'Outside', fmtDist(w.on)] : null;
 }
 export const objDone = new Set();
+let objUrgent = false;
 let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null, objWatch = null;
 /** How long the reason under the first line stays open on a phone, in seconds of play, after it changes or is asked for. */
 const WHY_OPEN = 9;
@@ -405,7 +406,8 @@ export function updateWaypoint(camera) {
   wayEl.classList.toggle('off', off);
   wayEl.classList.toggle('urgent', urgent);
   wayEl.firstChild.style.transform = off ? `rotate(${(ang * 180 / Math.PI + 90).toFixed(0)}deg)` : '';
-  wayEl.lastChild.textContent = tag;
+  // (on the quiet HUD how far it is has one home, the task's line: the marker is where, and the compass which way)
+  wayEl.lastChild.textContent = layout.calm ? '' : tag;
 }
 
 // ============================================================
@@ -512,6 +514,8 @@ export function updateObjectivesHud() {
   //  under a card that still said HEAP)
   // (and its own words are part of what leads: "0 of 2" stood under a place that had already moved on to the second machine)
   const lead = leadTask(), lk = lead ? `${lead.o.id}|${lead.o.text()}` : '';
+  // (a red task leads: the root says so, and the quiet HUD's log keeps quiet while it does)
+  { const urg = !!(lead && lead.o.urgent); if (urg !== objUrgent) { objUrgent = urg; root.classList.toggle('is-urgent', urg); } }
   if (lk !== objLead || now - objThrottle >= 0.3 || ++objCalls >= 18 || objFrom.distanceToSquared(from) > 9) { objLead = lk; objThrottle = now; objCalls = 0; objFrom.copy(from); rebuildObjectives(now); }
   let refit = false;
   for (const n of objNodes.values()) {
@@ -524,8 +528,10 @@ export function updateObjectivesHud() {
         const w = objectiveWhere(n.o);
         // (on the place itself the first line says so: "RIG · 0 m" read as a reading gone wrong)
         dist = !w ? '' : (n.lead || n.o.id === inHand) && !w.via && w.near < 2.4 ? 'here' : fmtDist(n.lead ? w.show : w.d);
+        // (the quiet HUD gives one distance, the first line's: the compass has the rest, for the turning)
+        if (layout.calm && !n.lead) dist = '';
         if (n.lead) { place = objectivePlace(n.o, w); const t = objectiveThen(n.o, w); if (t) then = `then <b>${esc(t[0])}</b> ${t[1]}`; }
-      } else if (n.q) { const p = questTargetPos(n.q); dist = p ? fmtDist(distTo(p)) : ''; }
+      } else if (n.q) { const p = questTargetPos(n.q); dist = p && !layout.calm ? fmtDist(distTo(p)) : ''; }
     }
     if (n.place !== place) { n.place = place; n.pl.textContent = place; }
     if (n.dist !== dist) { n.dist = dist; n.ds.textContent = dist; }
@@ -557,7 +563,8 @@ function rebuildObjectives(now) {
   // (on a touch screen the block is pressed to bring the reason under its first line back)
   if (!objTap && layout.touch) {
     objTap = true;
-    UI.objectives.addEventListener('click', () => { whyAt = playTime(); fitKey = ''; rebuildObjectives(perf()); });
+    // (on the quiet HUD a press on the open card shuts it again: he has read it)
+    UI.objectives.addEventListener('click', () => { whyAt = layout.calm && playTime() - whyAt < WHY_OPEN ? -1e9 : playTime(); fitKey = ''; rebuildObjectives(perf()); });
   }
   const list = hudList();
   for (const e of list) {
@@ -612,17 +619,20 @@ function rebuildObjectives(now) {
   // On a phone the reason under the first line is news, not furniture: it stays while it is new (a new task, or a
   // new step of the same one) and then the card closes to its title and its place; a press on the card opens it
   // again. (Open always, the card was a hundred pixels of a small screen, and its grey detail was read once.)
-  const head = rows.find((r) => r.lead), hk = head ? `${head.key}|${head.why}` : '';
+  const head = rows.find((r) => r.lead), hk = head ? `${head.key}|${head.why}${layout.calm ? '|' + head.text : ''}` : '';
   if (hk !== whyKey) { whyKey = hk; whyAt = playTime(); }
   const whyOpen = !layout.compact || playTime() - whyAt < WHY_OPEN;
-  UI.objectives.classList.toggle('shut', !!(head && head.why) && !whyOpen);
+  // (the quiet HUD's card is shut whenever it is not open, reason or none: one line, the title and how far)
+  UI.objectives.classList.toggle('shut', !!head && (layout.calm || !!head.why) && !whyOpen);
   const live = new Set();
   let prev = objHead, key = '';
   for (const r of rows) {
     live.add(r.key);
     const n = objRow(r.key);
     n.o = r.o || null; n.q = r.q || null;
-    if (n.text !== r.text) { n.text = r.text; n.tx.innerHTML = chem(esc(r.text)); }
+    // (a count at the end of a title, "(1 of 3)", is a piece of its own: the quiet HUD's one line leaves it out, and
+    //  opens the card when it changes)
+    if (n.text !== r.text) { n.text = r.text; n.tx.innerHTML = chem(esc(r.text)).replace(/ (\(\d+ of \d+\))$/, ' <span class="ct">$1</span>'); }
     // (the line that leads carries the name of its place: set here, so the block is fitted at its real height, and
     //  kept in step with the distance by the frame's own pass, above)
     n.lead = !!r.lead;
@@ -638,7 +648,7 @@ function rebuildObjectives(now) {
   for (const [k, n] of objNodes) if (!live.has(k)) { n.el.remove(); objNodes.delete(k); }
   objHead.style.display = rows.length ? '' : 'none';
   UI.objectives.style.display = rows.length ? '' : 'none';
-  key += `${layout.rem}|${window.innerWidth}|${UI.tCandle.style.display}|${S.mode}`;
+  key += `${layout.rem}|${window.innerWidth}|${UI.tCandle.style.display}|${S.mode}|${layout.calm}`;
   if (key !== fitKey) { fitKey = key; fitObjectives(now); }
 }
 /**
@@ -778,7 +788,7 @@ export function updateCompass() {
       if (!n) n = cp.nodes[m.id] = { el: el('div', null, 'mk', UI.compassMarks, icon(m.icon)), cls: null, lab: el('span', null, null, UI.compassDists, '<i></i> <b class="t-num"></b>'), text: null, shown: null, w: 0 };
       m.node = n;
       const cls = m.cls;
-      if (n.cls !== cls) { n.el.className = 'mk' + (cls ? ' ' + cls : ''); n.cls = cls; n.state = null; }
+      if (n.cls !== cls) { n.el.className = 'mk' + (cls ? ' ' + cls : '') + (m.lead ? ' lead' : ''); n.cls = cls; n.state = null; }
     }
     for (const id in cp.nodes) if (!seen.has(id)) { cp.nodes[id].el.remove(); cp.nodes[id].lab.remove(); delete cp.nodes[id]; }
     // indoors, say where you are standing rather than what the Hab is standing on
@@ -809,7 +819,8 @@ export function updateCompass() {
   }
   // where each mark stands on the strip, how far it is, and which one he is facing
   const iconW = layout.rem * (layout.compact ? 1.1 : 1.35);
-  let focus = null, focusRel = 7, urgent = false;
+  // (on the quiet HUD only the task's mark and the one he faces are named, so he is "facing" a thing a little sooner)
+  let focus = null, focusRel = layout.calm ? 12 : 7, urgent = false;
   for (const m of cp.marks) {
     // (every frame, with the marker's and the mission line's: the lead's is the mission line's own number)
     const at = m.lead ? objectiveWhere(m.lead) : null;
@@ -837,7 +848,8 @@ export function updateCompass() {
   // read "HAB 29 m" while the task was the heap at his feet.
   const labels = [];
   const tryLabel = (m, cls) => {
-    const n = m.node, dist = m.lead ? '' : fmtDist(m.d), text = m.name + '|' + dist;
+    // (on the quiet HUD a mark is its name, and how far it is only for the one he is facing: turn to a thing to ask)
+    const n = m.node, dist = m.lead || (layout.calm && cls !== 'focus') ? '' : fmtDist(m.d), text = m.name + '|' + dist;
     if (n.text !== text) { n.text = text; n.lab.firstChild.textContent = m.name; n.lab.lastChild.textContent = dist; n.w = n.lab.offsetWidth; }
     const w = n.w + 6;
     const a = w >= cp.w || m.here ? mid : clamp(m.x, w / 2, cp.w - w / 2);
@@ -852,18 +864,21 @@ export function updateCompass() {
   if (leadMark) leadMark.labelled = tryLabel(leadMark, 'focus');
   if (!urgent) {
     if (focus && !focus.labelled) focus.labelled = tryLabel(focus, 'focus');
-    for (const m of cp.marks) if (!m.labelled && !m.gone) m.labelled = tryLabel(m, '');
+    // (The quiet HUD names the task's mark and the mark he faces, and draws the rest as their pictures, the same at
+    //  every size: a dome, a rover, a crate. Named all the time they were three plates under the strip on a wide
+    //  phone and none on a narrow one, which had no room for them.)
+    if (!layout.calm) for (const m of cp.marks) if (!m.labelled && !m.gone) m.labelled = tryLabel(m, '');
   }
   // the marks themselves: labelled ones as their pictures (earlier ones win where two would touch), the others as dots
   const placed = [];
   for (const pass of [true, false]) {
     for (const m of cp.marks) {
       if (m.labelled !== pass) continue;
-      let state = m.gone || !pass ? 'hide' : m.off ? (m.rel < 0 ? 'off left' : 'off right') : 'on';
+      let state = m.gone || !(pass || layout.calm) ? 'hide' : m.off ? (m.rel < 0 ? 'off left' : 'off right') : 'on';
       if (state !== 'hide') {
         let near = 1e9;
         for (const px of placed) near = Math.min(near, Math.abs(px - m.x));
-        if (near < iconW * (pass ? 0.6 : 0.75)) state = 'hide'; else if (pass) placed.push(m.x);
+        if (near < iconW * (pass ? 0.6 : 0.75)) state = 'hide'; else placed.push(m.x);
       }
       const n = m.node;
       if (state !== n.state) {
@@ -890,6 +905,19 @@ export function updateCompass() {
 // ============================================================
 // GAUGES, CLOCK, ROVER, ALERTS
 // ============================================================
+/*
+ * The quiet HUD (a phone's, unless the full one is asked for in the settings). When nothing is wrong it is the suit's
+ * dial with the day and the hour, the compass, four buttons and one line of task. A bar shows itself when it is low,
+ * falling fast, or has just changed; a tap on the dial shows them all, with the weather and the rescue, for a few
+ * seconds, and a second tap opens the guide. Buttons are there while they apply. An alarm is as loud as it ever was.
+ */
+/** How long the gauges stay open after a tap, in seconds of play. */
+const OPEN_FOR = 7;
+let openUntil = -1e9;
+/** True while every gauge is showing because he asked. */
+export function gaugesOpen() { return layout.calm && playTime() < openUntil; }
+/** Show every gauge for a while (the dial was tapped); `sec` = 0 puts them away. */
+export function openGauges(sec = OPEN_FOR) { openUntil = sec > 0 ? playTime() + sec : -1e9; }
 /** Local solar time where the astronaut stands, as hh:mm (a sol has 24 h 40 m). */
 export function fmtClock() {
   const ll = vecToLl(_v1.copy(player.pos).normalize());
@@ -900,7 +928,7 @@ export function fmtClock() {
 }
 const minus = (n) => (n < 0 ? '−' + Math.abs(n) : String(n));
 
-const hud = { tod: null, prev: {}, rate: {}, jump: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null };
+const hud = { tod: null, prev: {}, rate: {}, jump: {}, last: {}, keep: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null, moveAt: -1e9, mode: '', roverAt: -1e9 };
 function setText(key, node, html) { if (hud.text[key] !== html) { hud.text[key] = html; node.innerHTML = html; } }
 function setLevel(key, node, frac, warnAt, critAt) {
   const c = frac < critAt ? 'crit' : frac < warnAt ? 'warn' : '';
@@ -959,7 +987,6 @@ export function updateHud() {
   if (hud.text.suitArc !== off) { hud.text.suitArc = off; UI.suitArc.style.strokeDashoffset = off; }
   const filling = suitRate > 0.5;
   const suitCls = filling ? 'fill' : sf < 0.12 ? 'crit' : (sf < 0.25 || S.flags.coldOpen) ? 'warn' : '';
-  if (hud.cls.suit !== suitCls) { hud.cls.suit = suitCls; UI.suit.className = 'suit' + (suitCls ? ' ' + suitCls : ''); }
   // under the dial: where the air is coming from, or, while the tank is all there is, how long it lasts
   let st;
   if (filling) st = 'Refilling';
@@ -968,6 +995,12 @@ export function updateHud() {
   // ("of air", not "left": beside a tank just filled at the airlock door, "5:56 left" read as a countdown to something)
   else st = S.suit > 0 ? `${fmtLeft(suitTimeLeft())} of air` : 'Empty';
   setText('suitSt', UI.suitState, st);
+  // (On the quiet HUD the dial is the tank and says it once. The line under it is there when it adds something: the
+  //  time left once the tank is under half, the leak of the first minute, a refill, or when he asks.)
+  const calm = layout.calm, open = gaugesOpen();
+  const say = !calm || open || filling || suitCls !== '' || (!safeAir && S.mode !== 'rover' && sf < 0.5);
+  const suitKey = suitCls + (say ? ' say' : '');
+  if (hud.cls.suit !== suitKey) { hud.cls.suit = suitKey; UI.suit.className = 'suit' + (suitKey ? ' ' + suitKey.trim() : ''); }
 
   // --- the colony's reserves ---
   // (The FOOD bar is measured against the wait: it is full when there are meals enough, at one a sol, to reach the
@@ -985,13 +1018,29 @@ export function updateHud() {
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small class="pc">%</small>`, S.health],
     ['morale', S.morale / 100, `${Math.round(S.morale)}`, null],
   ];
-  let arrow = null;
+  let arrow = null, barsIn = 0;
+  const pt = playTime();
   for (const [k, frac, txt, raw, level] of rows) {
     const b = UI.bars[k];
     const f = clamp(frac, 0, 1).toFixed(3);
     if (hud.text[k + 'f'] !== f) { hud.text[k + 'f'] = f; b.fill.style.transform = `scaleX(${f})`; b.wrap.style.setProperty('--f', f); }
     setText(k, b.val, txt);
-    setLevel(k, b.wrap, level === undefined ? frac : level, k === 'morale' ? 0.3 : 0.22, k === 'morale' ? 0.12 : 0.1);
+    const warnAt = k === 'morale' ? 0.3 : 0.22;
+    const lvl = setLevel(k, b.wrap, level === undefined ? frac : level, warnAt, k === 'morale' ? 0.12 : 0.1);
+    // what a bar read a frame ago: a step in it (a bed watered, a meal eaten, a night slept through) is news
+    const was = hud.last[k], is = raw !== null ? raw : k === 'food' ? food : S.morale;
+    hud.last[k] = is;
+    if (calm) {
+      // Low, it shows. Falling fast, it shows: at this rate it is at its warning mark within two and a half minutes.
+      // Just changed, it shows for a few seconds. Asked for, they all do. Otherwise it is put away.
+      const r = raw !== null ? hud.rate[k] || 0 : 0;
+      const fast = r < -0.0015 && frac > warnAt && (frac - warnAt) * (raw / frac) / -r < 150;
+      const step = was !== undefined && Math.abs(is - was) > 0.9;
+      if (lvl || fast || step || hud.jump[k] || b.wrap.classList.contains('fresh')) hud.keep[k] = pt + (lvl || fast ? 2 : 5);
+      const on = open || pt < (hud.keep[k] || 0);
+      if (hud.cls[k + 's'] !== on) { hud.cls[k + 's'] = on; b.wrap.classList.toggle('show', on); }
+      if (on && !b.wrap.hidden) barsIn++;
+    }
     if (raw !== null) {
       const r = track(k, raw, dt), j = hud.jump[k];
       if (j && (j.t -= dt) <= 0) hud.jump[k] = null;
@@ -1002,9 +1051,13 @@ export function updateHud() {
       let tr = hud.jump[k] ? '' : r > 0.0015 ? 'up' : r < -0.0015 ? 'dn' : '';
       if ((tr === 'up' && frac >= 0.995) || (tr === 'dn' && frac <= 0.001)) tr = '';
       if (hud.cls[k + 't'] !== tr) { hud.cls[k + 't'] = tr; b.trend.className = 'tr' + (tr ? ' ' + tr : ''); }
-      if (tr && !arrow && !b.wrap.hidden) arrow = b.wrap;
+      if (tr && !arrow && !b.wrap.hidden && (!calm || hud.cls[k + 's'])) arrow = b.wrap;
     }
   }
+  if (calm) {
+    const key = barsIn + (open ? 'o' : '');
+    if (hud.cls.barsIn !== key) { hud.cls.barsIn = key; root.classList.toggle('bars-in', barsIn > 0); root.classList.toggle('bars-open', open); measureVitals(); }
+  } else if (hud.cls.barsIn !== '') { hud.cls.barsIn = ''; root.classList.remove('bars-in', 'bars-open'); measureVitals(); }      // (the full HUD's panel is taller: the log and the cards stand under it from this frame)
   // the arrows are said once, the first time one is on a bar he can see and nothing else is being said
   // (they were explained only in the guide: "what do the arrows mean" was a new player's question at the first bars)
   if (arrow && !S.flags.arrowTold && S.started && !S.flags.coldOpen) {
@@ -1044,7 +1097,16 @@ export function updateHud() {
     setText('ro2', b.val, `${Math.round(of * 100)}<small class="pc">%</small>`);
     setLevel('rpwr', a.wrap, pf, 0.2, 0.08);
     setLevel('ro2', b.wrap, of, 0.2, 0.08);
+    // (the quiet HUD's rover panel is the speed; a reserve shows when it is under a third, or when he asks)
+    // (and for a few seconds on getting in: what it has in it is the first thing a driver wants, and it is how he
+    //  learns the panel has them)
+    if (hud.mode !== 'rover') hud.roverAt = pt;
+    const fresh = pt - hud.roverAt < 6;
+    const showP = !calm || open || fresh || pf < 0.34, showO = !calm || open || fresh || of < 0.34, rk = (showP ? 'p' : '') + (showO ? 'o' : '');
+    if (hud.cls.rv !== rk) { hud.cls.rv = rk; a.wrap.classList.toggle('show', showP); b.wrap.classList.toggle('show', showO); UI.rover.classList.toggle('bars', showP || showO); }
   }
+
+  hud.mode = S.mode;
 
   // --- alerts: at most two, worst first. Each says what is wrong and what to do (in fewer words where the screen is narrow) ---
   const al = [];
@@ -1094,14 +1156,25 @@ export function updateHud() {
     : (S.mode === 'rover' ? 'F:Exit rover|' : '') + (candles > 0 ? `X:Candle × ${candles}|` : '') + (S.sol <= 2 ? SCREEN_UNLOCKS.filter((s) => s.key && S.flags[s.flag]).sort((a, b) => 'JMC'.indexOf(a.key) - 'JMC'.indexOf(b.key)).map((s) => `${s.key}:${s.name}|`).join('') : '') + 'Esc:Menu';
   const nudgeRun = !!S.flags.coldOpen && layout.touch && !hud.ran;
   if (nudgeRun !== hud.nudgeRun) { hud.nudgeRun = nudgeRun; UI.tSprint.classList.toggle('nudge', nudgeRun); }
-  const keyState = keys + '#' + candles;
+  // The quiet HUD shows the buttons that apply now. RUN and JUMP are for a man on the move: they are there while the
+  // stick is held and for a moment after (and through the first minute, when RUN is what saves him). The candle is
+  // there when the tank is under half and there is no other air. (JUMP, RUN and a candle stood beside a parked rover
+  // at 99% of a tank.)
+  if (calm) {
+    const now = perf();
+    if (UI.joy.classList.contains('live') || S.flags.coldOpen) hud.moveAt = now;
+    const feet = now - hud.moveAt < 2.5;
+    if (hud.cls.feet !== feet) { hud.cls.feet = feet; UI.tSprint.classList.toggle('show', feet); UI.tJump.classList.toggle('show', feet); }
+  }
+  const candleOn = candles > 0 && (!calm || (!safeAir && !filling && S.mode !== 'rover' && sf < 0.5));
+  const keyState = keys + '#' + candles + (candleOn ? 'c' : '');
   if (keyState !== hud.keys) {
     hud.keys = keyState;
     UI.keys.innerHTML = keys ? keys.split('|').map((k) => {
       const [a, b] = k.split(':');
       return `<span>${b}${a.split(' ').filter(Boolean).map((x) => `<kbd class="mg-kbd">${x}</kbd>`).join('')}</span>`;
     }).join('') : '';
-    UI.tCandle.style.display = candles > 0 ? '' : 'none';
+    UI.tCandle.style.display = candleOn ? '' : 'none';
     UI.tCandle.querySelector('b').textContent = candles;
   }
 }

@@ -166,6 +166,22 @@ export async function walk(size, o = {}) {
   await sleep(9500);
   await ev((G) => { G.tick(0.05, 300); });
   await shot('hud-day-settled', 1500, 'b');
+  if (size.touch && !size.portrait) {
+    // (a phone's HUD is the quiet one: here it is asked for its detail, by the dial and by the task line; and then
+    //  the full HUD, which is still there as a setting, in the same place)
+    await ui((U) => U.openGauges(1e6));
+    await ev((G) => { G.tick(0.05, 4); });
+    await shot('hud-gauges-open', 300, 'c');
+    await ui((U) => U.openGauges(0));
+    await page.locator('#mg-objectives').tap({ timeout: 20000 }).catch(() => {});
+    await ev((G) => { G.tick(0.05, 4); });
+    await shot('hud-task-open', 300, 'd');
+    await ui((U) => U.setSetting('fullHud', true));
+    await ev((G) => { G.tick(0.05, 6); });
+    await shot('hud-full', 300, 'e');
+    await ui((U) => U.setSetting('fullHud', false));
+    await ev((G) => { G.tick(0.05, 6); });
+  }
   await ev((G) => { G.tpLocal(0, 30, 0); G.tick(0.05, 4); });
 
   // the interaction prompt: ready, being held, and refused
@@ -363,6 +379,12 @@ export async function walk(size, o = {}) {
   await key('Escape');
   await click('[data-act="settings"]');
   await shot('pause-settings');
+  if (size.touch && !size.portrait) {
+    // (in a game, on a phone, Controls has the view's switch: the quiet HUD has no VIEW button)
+    await click('[data-seg="settab"] [data-v="controls"]');
+    await shot('pause-settings-controls', 250, 'b');
+    await click('[data-seg="settab"] [data-v="graphics"]');
+  }
   await key('Escape');
   await click('[data-act="restart"]');
   await shot('pause-restart-confirm');

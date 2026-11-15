@@ -11,6 +11,7 @@ export const DEFAULTS = {
   hudScale: 1,           // multiplier on the interface size, 0.8 .. 1.4
   reducedMotion: null,   // null = follow the system setting
   colorBlind: false,
+  fullHud: false,        // a phone's HUD: false = the quiet one (what is not needed just now is put away), true = everything, always
 };
 
 function read() {

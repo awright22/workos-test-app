@@ -62,6 +62,7 @@ export function showPause() {
 // the interface pauses the game itself in two cases: a phone turned upright, and before a reload
 uiHooks.pause = showPause;
 menuHooks.save = saveGame;
+menuHooks.view = { can: () => S.started && !S.over && S.mode === 'walk', get: () => !!S.firstPerson, set: (on) => { S.firstPerson = !!on; } };
 
 // ============================================================
 // 33. BOOT & START

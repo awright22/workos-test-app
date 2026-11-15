@@ -20,7 +20,8 @@ export const ICONS = {
   battery: ['M3 8h15v8H3z', 'M18 10.5h2.5v3H18', 'M6.5 11v2', 'M9.5 11v2'],
   // navigation and screens
   map: ['M9 4.5L3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z', 'M9 4.5v13', 'M15 6.5v13'],
-  colony: ['M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
+  // (a crate, for the stores and what is made of them: it was a hexagon with a ring in it, which is a nut, and a nut is "settings")
+  colony: ['M4.5 9.5v10h15v-10', 'M3 5h18v4.5H3z', 'M9.75 13.25h4.5'],
   journal: ['M5 4.5h11a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z', 'M5 17a3 3 0 0 1 3-3h11', 'M9 8.5h6'],
   camera: ['M4 8h3l1.5-2.5h7L17 8h3v11H4z', 'M12 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
   pause: ['M9 5.5v13', 'M15 5.5v13'],

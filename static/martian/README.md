@@ -120,9 +120,17 @@ title offers "Continue the base". `QUALITY.md` ("Base mode") has its plan, its r
 | `F3` | Diagnostics (frame rate, GPU, errors) |
 
 On a phone (landscape): the left thumb moves, dragging anywhere else looks, and the big button
-on the right is the one verb: it shows what it will do and fills as you hold it. Run, jump,
-camera and the oxygen candle sit around it; pause, map, colony and journal are top right.
-Photo mode is in the pause menu.
+on the right is the one verb: it shows what it will do and fills as you hold it. Colony, map,
+journal and pause are four buttons top right. Photo mode is in the pause menu.
+
+A phone's HUD is the quiet one. When nothing is wrong it shows the suit's dial with the sol and
+the hour, the compass, the four buttons, one line of task (what to do next and how far), and the
+stick. A gauge shows itself when it is low, falling fast or has just changed; a tap on the dial
+shows them all, with the rescue sol and the temperature, for a few seconds, and a second tap
+opens the guide to them. A tap on the task line opens the task (where, why, what comes after)
+and it closes itself. Run and jump are there while the stick is held, the oxygen candle when the
+tank is under half, and the view (helmet or behind) is a switch in Settings, Controls. Getting
+into the rover shows its battery and tank for a few seconds. Alarms take the room they always did. **Settings, Interface, Full HUD** brings back everything, always on.
 Four quick taps in the top-left corner open the diagnostics.
 
 ## Interface
@@ -140,6 +148,10 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
 - `node tools/tests/ui.mjs` checks the interface (keyboard, settings, touch, and that nothing
   overlaps or leaves the safe area at seven window sizes). `node tools/tests/ui-shots.mjs`
   saves a screenshot of every state at every size to `tools/tests/.cache/ui/`.
+- `node tools/tests/hud-cover.mjs` measures how much of a phone's screen the quiet HUD covers
+  (standing, walking, at the rover, driving) at three phone sizes and holds it to its bar: 15% of
+  the screen, the middle clear, 35% of the top third. `--shoot` photographs each state.
+  `tools/tests/ui-audit.mjs` runs it as its last part.
 - Third-party fonts and data are credited in `CREDITS.md`. App icons: `tools/build_icons.py`.
 
 ## How it is built

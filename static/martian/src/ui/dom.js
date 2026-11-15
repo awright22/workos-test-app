@@ -6,7 +6,7 @@
 import { S } from '../game/state.js';
 import { icon } from './icons.js';
 import { reducedMotion } from './settings.js';
-import { layout, applyLayout } from './layout.js';
+import { layout, applyLayout, onLayout } from './layout.js';
 
 export const root = document.createElement('div');
 root.id = 'mg-root';
@@ -50,7 +50,7 @@ UI.vitals = el('div', 'mg-vitals', null, UI.hud);
 // (on a touch screen the panel is a control: pressed, it opens the guide to what it shows)
 if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'Guide: what the bars mean'); }
 UI.suit = el('div', null, 'suit', UI.vitals,
-  `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
+  `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><i class="si">${icon('suit')}</i><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
   // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
   //  inside a 54 px ring the name was 9 px capitals)
   '<div class="cap">SUIT <span class="chem">O<sub>2</sub></span></div><div class="st t-num"></div>');
@@ -111,6 +111,14 @@ UI.clockTime = UI.clock.querySelector('.time');
 UI.clockTemp = UI.clock.querySelector('.temp');
 UI.clockSep = UI.clock.querySelector('.sep');
 UI.objectives = el('div', 'mg-objectives', null, UI.tr);
+// The quiet HUD keeps the day and the hour with the suit's dial, top left, at the head of whatever bars are showing;
+// the full one keeps them over the task card. (One node, moved: everything that writes the clock writes it once.)
+onLayout(() => {
+  const home = layout.calm ? UI.res : UI.tr;
+  if (UI.clock.parentNode !== home) home.insertBefore(UI.clock, layout.calm ? UI.res.firstChild : UI.objectives);
+  // (a tap on the quiet panel shows every gauge for a few seconds; a second tap, or a tap on the full one, opens the guide)
+  if (layout.touch) UI.vitals.setAttribute('aria-label', layout.calm ? 'Show every gauge' : 'Guide: what the bars mean');
+});
 
 UI.log = el('div', 'mg-log', null, UI.hud);
 UI.log.setAttribute('role', 'log');
@@ -503,7 +511,8 @@ export function log(full, cls, o) {
   const text = layout.compact ? fitSentences(tx, shownText) : shownText;
   tx.textContent = '';
   const done = () => {
-    setTimeout(() => { line.classList.add('fade'); setTimeout(() => line.remove(), 1300); }, 9500);
+    // (on the quiet HUD a line is up for as long as it takes to read and no longer: three seconds and a little for each word)
+    setTimeout(() => { line.classList.add('fade'); setTimeout(() => line.remove(), 1300); }, layout.calm ? Math.min(9000, 3200 + text.length * 45) : 9500);
   };
   // (once it is all there, O2 gets its subscript, as it has everywhere else)
   if (reducedMotion()) { tx.innerHTML = chem(esc(text)); done(); }
@@ -662,7 +671,12 @@ export function setPrompt(p) {
   // how long it has been saying this (a figure that ticks over in it, "41% grown", is the same thing said)
   const key = state + '|' + label.replace(/\d+/g, '#');
   if (key !== pr.key) { pr.key = key; pr.since = playT; }
-  const rest = (state === 'info' || (pr.minor && layout.touch && state === 'hold')) && pct === 0 && playT - pr.since > PROMPT_REST;
+  // On the quiet HUD the action button is where an offer is made: it carries the verb, HOLD and the ring. The pill
+  // beside it is for what the button cannot say: a line of detail under the offer (for a few seconds), a refusal's
+  // reason, a reading. ("HOLD Drive the rover" stood beside a button marked DRIVE / HOLD: one thing said twice.)
+  const bare = layout.calm && state === 'hold' && !sub;
+  const restAfter = layout.calm ? (state === 'hold' ? 5 : PROMPT_REST) : (state === 'info' || (pr.minor && layout.touch && state === 'hold')) ? PROMPT_REST : Infinity;
+  const rest = bare || (pct === 0 && playT - pr.since > restAfter);
   if (rest !== pr.rest) { pr.rest = rest; UI.prompt.classList.toggle('rest', rest); }
 }
 

@@ -41,7 +41,8 @@ const hold = (sec) => ev((G, s) => G.hold(s), sec);
 const prompt = () => ev((G) => (G.interaction.active ? G.interaction.active.label() : ''));
 const closeScreens = async () => { await page.keyboard.press('Escape'); await sleep(300); await ev((G) => { if (G.S.uiOpen) { const b = document.querySelector('#mg-panel [data-act="resume"]'); if (b) b.click(); } }); };
 // (a tap on the task card opens its reason for a few seconds, as a player's thumb would)
-const why = async () => { await page.locator('#mg-objectives').tap({ timeout: 60000 }).catch(() => {}); await ev((G) => { G.tick(0.05, 6); }); };
+// (a press opens the card, and on the quiet HUD a press on an open card shuts it: only a shut one is pressed)
+const why = async () => { if (await page.evaluate(() => document.getElementById('mg-objectives').classList.contains('shut'))) await page.locator('#mg-objectives').tap({ timeout: 60000 }).catch(() => {}); await ev((G) => { G.tick(0.05, 6); }); };
 const notes = [];
 const expect = (what, ok, got) => { if (!ok) { notes.push(`${what}: ${JSON.stringify(got)}`); console.log('  NOTE', what, JSON.stringify(got)); } };
 

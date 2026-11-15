@@ -355,6 +355,96 @@ export function auditInPage(safe) {
 }
 
 /**
+ * How much of the screen the HUD stands on. Everything in the play layers (the HUD, the touch controls, the cards)
+ * that is showing and paints something (a plate, a frame, a picture, a line of text) is laid on a grid of 2 px
+ * cells as the box it is drawn in, with its corners rounded as they are drawn (a round button is its disc), and
+ * cut by whatever clips it. Two things are left out: the marker over a place in the world, which is a mark on the
+ * world and not furniture; and the soft shades behind the full HUD's top and bottom rows, which darken the picture
+ * and hide nothing.
+ *
+ * Runs in the browser. Returns shares between 0 and 1: `all` of the whole screen, `middle` of the middle of it (the
+ * middle two fifths of its width by the middle half of its height: where the astronaut and the way ahead are), `top`
+ * of its top third; and `parts`, each block's own share of the screen, largest first (a block is a
+ * child of a layer: the gauges, the compass, a button), which says what is taking the room.
+ */
+export function coverInPage() {
+  const W = window.innerWidth, H = window.innerHeight, C = 2;
+  const gw = Math.ceil(W / C), gh = Math.ceil(H / C);
+  const grid = new Uint8Array(gw * gh);
+  const styleOf = (n) => getComputedStyle(n);
+  const layers = ['mg-hud', 'mg-touch', 'mg-toast'].map((id) => document.getElementById(id)).filter(Boolean);
+  const shown = (n) => {
+    if (styleOf(n).visibility === 'hidden') return false;
+    for (let a = n; a && a !== document.body; a = a.parentElement) {
+      const cs = styleOf(a);
+      if (cs.display === 'none' || +cs.opacity < 0.05) return false;
+    }
+    const r = n.getBoundingClientRect();
+    return r.width > 1 && r.height > 1;
+  };
+  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const p = m[1].split(/[,/]/).map(parseFloat); return p.length > 3 ? p[3] : 1; };
+  const clipOf = (n) => {
+    let box = { left: 0, top: 0, right: W, bottom: H };
+    for (let a = n.parentElement; a && !layers.includes(a) && a !== document.body; a = a.parentElement) {
+      const cs = styleOf(a);
+      if (/(hidden|clip|auto|scroll)/.test(cs.overflowY + cs.overflowX)) {
+        const c = a.getBoundingClientRect();
+        box = { left: Math.max(box.left, c.left), top: Math.max(box.top, c.top), right: Math.min(box.right, c.right), bottom: Math.min(box.bottom, c.bottom) };
+      }
+    }
+    return box;
+  };
+  const blockOf = (n) => { let a = n; while (a.parentElement && !layers.includes(a.parentElement)) a = a.parentElement; return a.id ? '#' + a.id : '.' + [...a.classList].slice(0, 2).join('.'); };
+  const parts = new Map();
+  const paint = (r, rad, clip, owner) => {
+    const l = Math.max(r.left, clip.left), t = Math.max(r.top, clip.top), rt = Math.min(r.right, clip.right), b = Math.min(r.bottom, clip.bottom);
+    if (rt - l < 1 || b - t < 1) return;
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, hw = r.width / 2, hh = r.height / 2;
+    rad = Math.min(rad, hw, hh);
+    let n = 0;
+    for (let y = Math.max(0, Math.floor(t / C)); y < Math.min(gh, Math.ceil(b / C)); y++) {
+      for (let x = Math.max(0, Math.floor(l / C)); x < Math.min(gw, Math.ceil(rt / C)); x++) {
+        if (rad > 0.5) {
+          const dx = Math.max(Math.abs((x + 0.5) * C - cx) - (hw - rad), 0), dy = Math.max(Math.abs((y + 0.5) * C - cy) - (hh - rad), 0);
+          if (dx * dx + dy * dy > rad * rad) continue;
+        }
+        const i = y * gw + x;
+        if (!grid[i]) { grid[i] = 1; n++; }
+      }
+    }
+    if (n) parts.set(owner, (parts.get(owner) || 0) + n);
+  };
+  const range = document.createRange();
+  for (const layer of layers) {
+    for (const n of layer.querySelectorAll('*')) {
+      if (n.closest('#mg-way, .hud-scrim, .sr') || (n.parentElement && n.parentElement.closest('svg')) || !shown(n)) continue;
+      const cs = styleOf(n), r = n.getBoundingClientRect();
+      const plate = alpha(cs.backgroundColor) > 0.04 || cs.backgroundImage !== 'none';
+      const frame = ['Top', 'Right', 'Bottom', 'Left'].some((e) => parseFloat(cs['border' + e + 'Width']) >= 1 && cs['border' + e + 'Style'] !== 'none' && alpha(cs['border' + e + 'Color']) > 0.04);
+      const clip = clipOf(n), owner = blockOf(n);
+      if (plate || frame || n.tagName.toLowerCase() === 'svg') {
+        const br = cs.borderTopLeftRadius || '0';
+        paint(r, /%/.test(br) ? parseFloat(br) / 100 * Math.min(r.width, r.height) : parseFloat(br) || 0, clip, owner);
+      }
+      for (const t of n.childNodes) {
+        if (t.nodeType !== 3 || !t.nodeValue.trim()) continue;
+        range.selectNodeContents(t);
+        for (const q of range.getClientRects()) if (q.width > 1 && q.height > 1) paint(q, 0, clip, owner);
+      }
+    }
+  }
+  const share = (x0, y0, x1, y1) => {
+    let on = 0, of = 0;
+    for (let y = Math.floor(y0 / C); y < Math.ceil(y1 / C); y++) for (let x = Math.floor(x0 / C); x < Math.ceil(x1 / C); x++) { of++; if (grid[y * gw + x]) on++; }
+    return of ? on / of : 0;
+  };
+  return {
+    all: share(0, 0, W, H), middle: share(W * 0.3, H / 4, W * 0.7, H * 3 / 4), top: share(0, 0, W, H / 3),
+    parts: [...parts.entries()].map(([k, v]) => [k, +(v / (gw * gh)).toFixed(4)]).sort((a, b) => b[1] - a[1]),
+  };
+}
+
+/**
  * True once nothing on the page is part-way through a finite animation or transition. Runs in the browser: wait
  * for it before measuring, or a dialog still fading in is measured as not there at all. (An animation's clock only
  * moves when a frame is drawn, and software rendering under load draws one a second.)

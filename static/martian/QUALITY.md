@@ -845,6 +845,62 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
 | N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
+## The quiet HUD (a phone's)
+
+The owner's second finding of 15 November (item 7 under "Direction from the owner"): the HUD was too crowded on the
+iPhone. This is what was built, how it is measured, and what reviewers made of it.
+
+**What it is.** On a touch screen in the phone arrangement the HUD is the quiet one unless "Full HUD" is switched on
+(Settings, Interface). `ui/hud.js` decides what shows; the styles are the last section of `css/hud.css` and of
+`css/touch.css`.
+
+| Part | When nothing is wrong | What brings the rest |
+| --- | --- | --- |
+| Suit | the dial, a share of the tank, with the suit's mark in it and a mark that it opens | under half a tank on the tank's own air, a refill, the first minute's leak, or a tap: its name and the minutes of air |
+| Sol and hour | beside the dial | a tap on the dial: the rescue sol and the temperature |
+| Six gauges | none | one that is low, falling fast (at its warning mark within 150 s at the present rate) or has just changed by a step shows itself, alone; a tap on the dial shows all six for 7 s; a second tap opens the guide |
+| Task | one line: its title and how far | a tap, a new task, or a count that has moved opens it for 9 s (the place, the reason, what comes after, the next task); a tap shuts it |
+| Compass | the tape; the task's mark, a diamond like its line's and the marker's, with its place's name; the other marks as their pictures | the name and the distance of the mark he is facing (within 12 degrees) |
+| Marker in the world | the diamond or the dart at the edge, no figure | |
+| Top right | four pictures a thumb wide: colony, map, journal, pause | each was named on a card when it arrived |
+| Action button | the verb and HOLD, when something is in reach | a pill beside it only for what the button cannot say: a line of detail (5 s), a refusal's reason, a reading (6 s) |
+| RUN, JUMP | not there standing still | while the stick is held and 2.5 s after; all through the first minute |
+| Candle | not there | the tank under half, on the tank's own air |
+| VIEW | a switch in Settings, Controls ("Helmet view"), in a game on foot | |
+| Rover | the speed | its battery and tank for 6 s on getting in, when either is under a third, and on a tap on the dial |
+| Log line | 3.2 s and 45 ms a letter, 9 s at most; none while a red task leads | |
+| Alarms | none | as before: the banner, the red task, the ringed gauge, the screen's edge |
+
+**Each fact once.** How far the task is: the task line (not the compass's chip for it, not the marker). The suit's
+tank: the dial (the minutes only when they matter). HOLD: the button. The rescue sol: the opened dial, the journal
+and the pause screen.
+
+**How it is measured.** `tests/hud-cover.mjs` (run by `tests/ui-audit.mjs` as its last part, and alone with
+`--shoot` for pictures) lays the box of everything on the HUD that is showing and paints something (a plate, a
+frame, a picture, a line of text) on a grid of 2 px cells, round things as their discs, and gives the share of the
+screen covered, of its middle (the middle two fifths across by the middle half down) and of its top third. The
+marker over the place in the world is left out, and so are the full HUD's two soft shades. The bar, held in the
+suite: standing, walking, at the rover and driving, no more than 15% of the screen (16% on the smallest phone, which
+has a third less screen than the owner's for the same thumb-sized controls), the middle clear, and no more than 35%
+of the top third. Software rendering does not enter into it: these are measurements of the page's layout.
+
+Measured on 15 November, after the review's pass below (share of the screen; of the middle; of the top third):
+
+| State | 932 x 430 (the owner's) | 844 x 390 | 667 x 375 |
+| --- | --- | --- | --- |
+| Standing in the open | 9.2%; 0; 23% | 11.2%; 0; 28% | 12.6%; 0; 31% |
+| Walking | 11.2%; 0; 23% | 13.6%; 0; 28% | 15.5%; 0; 31% |
+| At the rover, DRIVE up | 11.2%; 0; 23% | 13.6%; 0; 28% | 15.4%; 0; 31% |
+| Driving | 11.3%; 0; 23% | 13.7%; 0; 29% | 15.5%; 0; 31% |
+| Getting into the rover: its two reserves, for 6 s (no bar) | 12.7% | 15.4% | 17.6% |
+| Gauges opened by a tap, on foot (no bar) | 18.2% | 22.1% | 24.0% |
+| Gauges opened by a tap, in the rover (no bar) | 21.5% | 26.1% | 28.6% |
+| Task opened by a tap (no bar) | 13.8% | 16.8% | 18.5% |
+| Water and power low, tank at 20% (no bar) | 19.7% | 24.0% | 25.3% |
+| The full HUD at the rover (the setting; what it replaced) | 28.5%; 4%; 52% | 34.6%; 9%; 59% | 37.7%; 15%; 62% |
+
+REVIEW_PLACEHOLDER
+
 ## Base mode
 
 The owner's second mode: "a build-a-base mode where you never get rescued", "sorta like

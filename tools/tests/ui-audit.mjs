@@ -18,10 +18,14 @@
 //   node tools/tests/ui-audit.mjs --verbose           name every state as it is measured
 //   node tools/tests/ui-audit.mjs --shoot             photograph each state as well (into .cache/ui/<size>/, as ui-shots does)
 //
+// It ends by measuring how much of the screen the quiet HUD covers when nothing is wrong, on foot and in the rover,
+// at three phone sizes (tests/hud-cover.mjs, which holds it to its bar; --only=cover runs that part alone).
+//
 // Exits non-zero if anything is found. (The map's own labels are drawn on a canvas: the map reports what it lettered,
 // and the audit holds that to the page's sizes; see ui/map.js and audit-lib.mjs.)
 import { SIZES, walk } from './ui-shots.mjs';
 import { auditInPage, auditLines, settledInPage } from './audit-lib.mjs';
+import { run as coverRun } from './hud-cover.mjs';
 
 const arg = (k) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').slice(k.length + 3);
 const want = arg('size'), only = arg('only') ? arg('only').split(',') : null;
@@ -49,6 +53,11 @@ for (const size of SIZES) {
     });
   } catch (e) { bad++; console.log(`  ${size.name} FAILED: ${e.message}`); continue; }
   if (res.errors.length) { bad += res.errors.length; console.log('  console errors: ' + JSON.stringify(res.errors.slice(0, 4))); }
+}
+// ---- and how much of the screen the quiet HUD stands on, standing, walking and driving (tests/hud-cover.mjs has the bar)
+if (!only || only.some((x) => 'cover'.includes(x))) {
+  console.log('\nthe quiet HUD: how much of the screen it covers');
+  bad += await coverRun({ want });
 }
 console.log(`\n${states} states audited; ${bad} thing${bad === 1 ? '' : 's'} found`);
 process.exit(bad ? 1 : 0);

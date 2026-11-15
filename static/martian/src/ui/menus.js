@@ -5,7 +5,7 @@
 import { UI, openOverlay, hideOverlay, showOverlay, esc, chem, holdCards, log, logHistory, toast, dropPointer, setPrompt } from './dom.js';
 import { icon } from './icons.js';
 import { settings, setSetting, resetSettings, savedQuality, saveQuality, reducedMotion, onSettingsChange } from './settings.js';
-import { OBJECTIVES, missionList, suitTimeLeft } from './hud.js';
+import { OBJECTIVES, missionList, suitTimeLeft, openGauges, gaugesOpen } from './hud.js';
 import { layout } from './layout.js';
 import { DIFFICULTIES, isBase } from '../game/state.js';
 import { regionName } from '../planet/features.js';
@@ -16,7 +16,8 @@ import { setAudioVolume, getAudioVolumes } from '../audio/settings.js';
 const busVolume = (bus) => { try { const v = getAudioVolumes()[bus]; return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 1; } catch (e) { return 1; } };
 
 /** Hooks the game fills in: save() writes the saved game before a reload. */
-export const menuHooks = { save: null };
+/** `view`: { can(): the view can be changed now, get(): true in the helmet view, set(on) } (the quiet HUD has no VIEW button: Settings has the switch). */
+export const menuHooks = { save: null, view: null };
 
 const WORDMARK = '<h1 class="mg-wordmark" aria-label="Stranded 2">STRANDED<em>II</em></h1>';
 const on = (scope, sel, fn) => scope.querySelectorAll(sel).forEach((n) => n.addEventListener('click', (ev) => { ev.stopPropagation(); fn(n, ev); Snd.click(); }));
@@ -291,6 +292,7 @@ export function showSettings(back, overTitle) {
   // On a phone the four groups are four tabs, each of which fits the screen. (As one scrolling sheet, Sound
   // and the colour-blind switch were below the fold with nothing to say they were there.)
   const tabbed = layout.compact;
+  const view = !overTitle && layout.calm && menuHooks.view && menuHooks.view.can() ? menuHooks.view : null;
   const p = openOverlay('sheet',
     `<div class="sheet settings${tabbed ? ' tabbed' : ''}"><header class="sheet-hd"><h1>Settings</h1>${tabbed ? seg('settab', 'Settings group', SET_TABS, setTab) : ''}</header>` +
     '<div class="sheet-bd mg-scroll"><div class="set-grid">' +
@@ -305,7 +307,10 @@ export function showSettings(back, overTitle) {
     // controls
     `<section class="set-sec" data-sec="controls"><h3>${icon(layout.touch ? 'hand' : 'mouse')}Controls</h3>` +
     `<div class="set-row"><label for="set-sensitivity">Look sensitivity</label><div class="ctl">${range('sensitivity', 'Look sensitivity', 0.3, 2.5, 0.05, settings.sensitivity, pct, 1)}</div></div>` +
-    `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div></section>` +
+    `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div>` +
+    // (the quiet HUD has no VIEW button: in a game, on foot, the view is changed here)
+    (view ? `<div class="set-row"><span class="lbl">Helmet view</span><div class="ctl">${sw('helmetView', 'Helmet view', view.get())}</div>` +
+      '<p class="hint">Look out through the visor. Off, the camera stands behind you.</p></div>' : '') + '</section>' +
     // audio
     `<section class="set-sec" data-sec="sound"><h3>${icon('volume')}Sound</h3>` +
     `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div>` +
@@ -317,7 +322,10 @@ export function showSettings(back, overTitle) {
     `<div class="set-row"><span class="lbl">Reduce motion</span><div class="ctl">${sw('reducedMotion', 'Reduce motion', reducedMotion())}</div>` +
     '<p class="hint">Stills the interface\'s animations and softens screen flashes.</p></div>' +
     `<div class="set-row"><span class="lbl">Colour-blind-safe colours</span><div class="ctl">${sw('colorBlind', 'Colour-blind-safe colours', settings.colorBlind)}</div>` +
-    '<p class="hint">Blue, yellow and vermilion in place of green, amber and red; low gauges are hatched.</p></div></section>' +
+    '<p class="hint">Blue, yellow and vermilion in place of green, amber and red; low gauges are hatched.</p></div>' +
+    // (a phone's HUD is the quiet one unless this is on; on a desktop there is room for all of it, and it is all there)
+    (layout.touch && layout.compact ? `<div class="set-row"><span class="lbl">Full HUD</span><div class="ctl">${sw('fullHud', 'Full HUD', settings.fullHud)}</div>` +
+      '<p class="hint">Every gauge, the clock and the task card, all the time.</p></div>' : '') + '</section>' +
     '</div></div>' +
     `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Done</button>` +
     '<button type="button" class="mg-btn" data-act="reload" hidden>Reload to apply</button>' +
@@ -390,7 +398,7 @@ export function showSettings(back, overTitle) {
     const flip = () => {
       const v = b.getAttribute('aria-checked') !== 'true';
       b.setAttribute('aria-checked', v);
-      setSetting(b.dataset.switch, v);
+      if (b.dataset.switch === 'helmetView') menuHooks.view.set(v); else setSetting(b.dataset.switch, v);
       Snd.click();
     };
     b.addEventListener('click', (ev) => { ev.stopPropagation(); flip(); });
@@ -593,4 +601,6 @@ window.__UI = { showLoading, showTitle, showNewGame, showPauseMenu, showSettings
   get mapLettering() { return UI.mapLettering || []; },
   /** the name of the region at a latitude and longitude (so a test's made-up title screen can name the real place) */
   regionAt: (lat, lon) => regionName(llToVec(lat, lon)),
+  /** the quiet HUD: show every gauge for `sec` seconds of play (0 puts them away), and whether they are showing */
+  openGauges, gaugesOpen,
   suitTimeLeft, missionList, objectives: OBJECTIVES };

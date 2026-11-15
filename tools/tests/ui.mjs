@@ -758,11 +758,16 @@ for (const size of SIZES) {
     await page.locator('#mg-map .close').tap();
     // a phone's gauges: a band that can be read at arm's length (they were lines 34 px long and 3 px tall)
     if (size.w < 900) {
+      // (the quiet HUD puts a gauge away while it has nothing to say: they are measured as they stand when asked for)
+      await page.evaluate(() => window.__UI.openGauges(1e6));
+      await g.eval((G) => { G.tick(0.05, 3); });
       const gz = await page.evaluate(() => [...document.querySelectorAll('#mg-vitals .res .row')].map((r) => {
         const t = r.querySelector('.tk').getBoundingClientRect(), v = r.querySelector('.val'), l = r.querySelector('.lb');
         return { w: Math.round(t.width), h: Math.round(t.height), num: parseFloat(getComputedStyle(v).fontSize), name: parseFloat(getComputedStyle(l).fontSize), f: getComputedStyle(r).getPropertyValue('--f') };
       }));
       check(`${size.name}: each gauge is a band at least 60 px long and 6 px tall, its number at 13 px or more`, gz.length === 6 && gz.every((z) => z.w >= 60 && z.h >= 6 && z.num >= 12.95 && z.name >= 12.95 && z.f !== ''), gz);
+      await page.evaluate(() => window.__UI.openGauges(0));
+      await g.eval((G) => { G.tick(0.05, 3); });
       // the task card: its reason is news, and is put away once read; a press on the card brings it back
       const card = await g.eval((G) => {
         const o = document.getElementById('mg-objectives'), why = () => [...o.querySelectorAll('.obj .why')].some((n) => getComputedStyle(n).display !== 'none' && n.getBoundingClientRect().height > 3);
@@ -770,6 +775,9 @@ for (const size of SIZES) {
         const out = { open: why(), h0: Math.round(o.getBoundingClientRect().height) };
         G.tick(0.05, 220);
         out.shut = !why(); out.mark = o.classList.contains('shut'); out.h1 = Math.round(o.getBoundingClientRect().height);
+        // (the quiet HUD's shut card is one line to look at, and a thumb high to press: its hit area is drawn past it)
+        out.press = Math.max(out.h1, Math.round(parseFloat(getComputedStyle(o, '::before').height) || 0));
+        out.dist = !!o.querySelector('.obj .ds').textContent;
         // (closed, its title is still one line: the mark that it opens once took a rem of the title's own line)
         { const r = document.createRange(); r.selectNodeContents(o.querySelector('.obj.primary .tx, .obj.first .tx')); out.titleLines = new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size; }
         out.lead = !!o.querySelector('.obj.primary .tx, .obj.first .tx') && !!o.querySelector('.obj .pl').textContent;
@@ -777,7 +785,74 @@ for (const size of SIZES) {
         out.again = why();
         return out;
       });
-      check(`${size.name}: the task card closes to its title and its place once its reason has been read, and a press opens it again`, card.shut && card.mark && card.lead && card.titleLines === 1 && card.h1 < card.h0 && card.h1 >= 44 && card.again, card);
+      check(`${size.name}: the task card closes to one line, its title and how far, once its reason has been read; it is a thumb high to press, and a press opens it again`,
+        card.shut && card.mark && card.lead && card.dist && card.titleLines === 1 && card.h1 < card.h0 && card.h1 <= 36 && card.press >= 44 && card.again, card);
+      // ---- the quiet HUD: what is not needed is put away, and comes when asked for or when it matters
+      const calm = await g.eval((G) => {
+        const U = window.__UI, S = G.S, root = document.getElementById('mg-root');
+        const seen = (n) => !!n && getComputedStyle(n).display !== 'none' && getComputedStyle(n).visibility !== 'hidden' && n.getBoundingClientRect().height > 2;
+        const bars = () => [...document.querySelectorAll('#mg-vitals .res .row')].filter(seen).map((r) => r.dataset.k);
+        const q = (sel) => document.querySelector(sel);
+        const out = { calm: root.classList.contains('mg-calm') };
+        S.suit = 100; S.o2 = 96; S.water = 90; S.power = 88; S.health = 100; S.morale = 72; G.setStorm(0); S.storm.i = 0;
+        G.setLocalTime(13); G.tpLocal(10, 60, 3.4); U.openGauges(0); G.tick(0.05, 200);
+        out.rest = { bars: bars(), st: seen(q('#mg-vitals .suit .st')), run: seen(q('#mg-tSprint')), jump: seen(q('#mg-tJump')), view: seen(q('#mg-tCam')), captions: [...document.querySelectorAll('#mg-trow .mg-tbtn span')].filter(seen).length,
+          clock: q('#mg-clock').closest('#mg-vitals') ? 'dial' : 'card', temp: seen(q('#mg-clock .temp')), rescue: seen(q('#mg-clock .of')), tag: (q('#mg-way b') || {}).textContent || '' };
+        // a bar that is low shows itself, and no other
+        S.water = 9; G.tick(0.05, 8);
+        out.low = bars();
+        S.water = 90; G.tick(0.05, 200);
+        out.after = bars();
+        return out;
+      });
+      check(`${size.name}: the quiet HUD at rest is the dial with the day and the hour: no bars, no line under the dial, no RUN, JUMP or VIEW, no captions, no rescue or weather, no figure on the marker`,
+        calm.calm && calm.rest.bars.length === 0 && !calm.rest.st && !calm.rest.run && !calm.rest.jump && !calm.rest.view && calm.rest.captions === 0 && calm.rest.clock === 'dial' && !calm.rest.temp && !calm.rest.rescue && calm.rest.tag === '', calm);
+      check(`${size.name}: a bar that is low shows itself, alone, and goes when it is well again`, calm.low.join() === 'water' && calm.after.length === 0, calm);
+      // a tap on the dial shows every gauge, with the rescue and the weather; a second tap opens the guide
+      await page.locator('#mg-vitals').tap();
+      await g.eval((G) => { G.tick(0.05, 3); });
+      const asked = await page.evaluate(() => {
+        const seen = (n) => !!n && getComputedStyle(n).display !== 'none' && getComputedStyle(n).visibility !== 'hidden' && n.getBoundingClientRect().height > 2;
+        const v = document.getElementById('mg-vitals').getBoundingClientRect(), c = document.querySelector('#mg-compass .strip').getBoundingClientRect();
+        return { bars: [...document.querySelectorAll('#mg-vitals .res .row')].filter(seen).length, st: seen(document.querySelector('#mg-vitals .suit .st')), temp: seen(document.querySelector('#mg-clock .temp')),
+          rescue: seen(document.querySelector('#mg-clock .of')), clear: Math.round(c.left - v.right) };
+      });
+      await page.locator('#mg-vitals').tap();
+      await sleep(250);
+      const guide = await page.evaluate(() => !!document.querySelector('#mg-panel .guide, #mg-panel .bars-guide, #mg-panel [data-guide]') || /what the bars mean|suit o|hab o/i.test((document.querySelector('#mg-panel') || { textContent: '' }).textContent));
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      await page.evaluate(() => window.__UI.openGauges(0));
+      await g.eval((G) => { G.tick(0.05, 3); });
+      check(`${size.name}: a tap on the dial shows all six gauges, the time of air, the rescue and the weather, clear of the compass; a second tap opens the guide`,
+        asked.bars === 6 && asked.st && asked.temp && asked.rescue && asked.clear >= 2 && guide, { asked, guide });
+      // RUN and JUMP are there while a thumb is on the stick
+      {
+        const cdp0 = await page.context().newCDPSession(page);
+        const jx = size.safe[3] + 70, jy = size.h - 80;
+        await cdp0.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: jx, y: jy, id: 7 }] });
+        await cdp0.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: jx, y: jy - 36, id: 7 }] });
+        await g.eval((G) => { G.tick(0.05, 6); });
+        const moving = await page.evaluate(() => ['#mg-tSprint', '#mg-tJump'].map((s) => getComputedStyle(document.querySelector(s)).visibility !== 'hidden'));
+        await cdp0.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await g.eval((G) => { G.tick(0.05, 6); });
+        check(`${size.name}: RUN and JUMP are there while the stick is held`, moving.every(Boolean), moving);
+        await cdp0.detach();
+      }
+      // the full HUD is still there, as a setting: every bar, the line under the dial, the captions and VIEW
+      await page.evaluate(() => window.__UI.setSetting('fullHud', true));
+      await g.eval((G) => { G.tick(0.05, 6); });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const full = await page.evaluate(() => {
+        const seen = (n) => !!n && getComputedStyle(n).display !== 'none' && getComputedStyle(n).visibility !== 'hidden' && n.getBoundingClientRect().height > 2;
+        return { calm: document.getElementById('mg-root').classList.contains('mg-calm'), bars: [...document.querySelectorAll('#mg-vitals .res .row')].filter(seen).length, st: seen(document.querySelector('#mg-vitals .suit .st')),
+          view: seen(document.querySelector('#mg-tCam')), run: seen(document.querySelector('#mg-tSprint')), captions: [...document.querySelectorAll('#mg-trow .mg-tbtn span')].filter(seen).length, clock: document.querySelector('#mg-clock').closest('#mg-tr') ? 'card' : 'dial' };
+      });
+      const fullBad = layoutProblems(await rects(page), size).concat(await audit());
+      await page.evaluate(() => window.__UI.setSetting('fullHud', false));
+      await g.eval((G) => { G.tick(0.05, 6); });
+      check(`${size.name}: the full HUD (the setting) has every bar, the line under the dial, VIEW, RUN and the captions, the clock over the card, and nothing overlapping or cut`,
+        !full.calm && full.bars === 6 && full.st && full.view && full.run && full.captions === 4 && full.clock === 'card' && fullBad.length === 0, { full, fullBad });
     }
     // the action button carries the verb for what is in reach, and holding it works the interaction
     await g.eval((G) => { G.tpNear(G.World.rover.group.position, 3.2); G.tick(0.05, 3); });

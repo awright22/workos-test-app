@@ -11,7 +11,9 @@ import { auditInPage, auditLines, settledInPage } from './audit-lib.mjs';
 const safe = [0, 47, 21, 47];
 const g = await openGame({ width: 667, height: 375, touch: true, quality: 'low', query: 'safe=' + safe.join(',') });
 const page = g.page, ev = g.eval;
-await page.evaluate(() => window.__UI.setSetting('reducedMotion', true));
+// (with the full HUD: the faults put back below are in parts of it that the quiet HUD puts away, a gauge's unit, a
+//  button's caption, the candle; this test is of the audit, and wants them on the screen)
+await page.evaluate(() => { window.__UI.setSetting('reducedMotion', true); window.__UI.setSetting('fullHud', true); });
 let failed = 0;
 let kinds = /^(over|clipped|outside)/;
 const audit = async () => {

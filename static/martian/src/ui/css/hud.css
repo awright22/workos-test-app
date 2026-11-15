@@ -779,3 +779,100 @@
 .mg-touch.mg-compact.few-bars .res .help { display: inline-flex; align-items: center; gap: .25rem; margin-top: .3125rem; }
 .mg-touch.mg-compact .res .help i { font-style: normal; color: var(--accent); font-size: var(--t14); }
 .mg-touch.is-cold .res .help, .mg-touch.no-bars .res .help { display: none; }
+
+/* ================================================================ the quiet HUD (a phone's; ui/hud.js decides what shows)
+   A phone held sideways shows the world through what the HUD leaves of the screen. When nothing is wrong the HUD is
+   the suit's dial with the day and the hour beside it, the compass, four buttons, and one line that says what to do
+   next and how far it is. What is low, falling fast or has just changed shows itself; the rest comes on a tap of the
+   dial or of the task, and goes again. (The full HUD stood over a third of the screen and across the top 45% of it
+   edge to edge: six bars, mostly full; a clock strip; a card with its reason and a second task; four lettered
+   buttons; and the same distance on the compass, in the card and on the marker.) The full HUD is still there, as a
+   setting. tests/hud-cover.mjs measures how much of the screen this one takes. */
+#mg-root.mg-calm .hud-scrim { display: none; }
+
+/* --- top left: the dial, the day and the hour; a bar when it has something to say */
+#mg-root.mg-calm #mg-vitals { gap: .4375rem; padding: .25rem .5rem .25rem .3125rem; align-items: center; background: rgba(14, 12, 11, .6); border-color: transparent; }
+#mg-root.mg-calm.bars-in #mg-vitals { align-items: flex-start; background: rgba(14, 12, 11, .8); }
+#mg-root.mg-calm #mg-vitals:active { background: rgba(60, 54, 48, .9); }
+/* (the dial is the suit's tank, and was named when it leaked in the first minute: its name and the line under it are
+   there when the line has something to say, and when he asks) */
+#mg-root.mg-calm .suit .st, #mg-root.mg-calm .suit .cap { display: none; }
+#mg-root.mg-calm .suit.say .st, #mg-root.mg-calm .suit.say .cap { display: block; }
+#mg-root.mg-calm .suit .help, #mg-root.mg-calm .res .help { display: none; }
+#mg-root.mg-calm.bars-open .suit .help { display: inline-flex; }
+#mg-root.mg-calm .res { display: grid; align-content: center; gap: var(--rg); padding-left: .4375rem; border-left: 1px solid var(--line-2); }
+#mg-root.mg-calm.is-cold .res { display: none; }
+#mg-root.mg-calm .res .row:not(.show):not(.fresh) { display: none; }
+#mg-root.mg-calm #mg-clock { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: .25rem; padding: 0; background: none; border-radius: 0; }
+#mg-root.mg-calm #mg-clock .sol { font-size: 1.125rem; line-height: 1; }
+#mg-root.mg-calm #mg-clock .sol .k { margin-right: .25rem; }
+#mg-root.mg-calm #mg-clock .sol .of { display: none; }
+#mg-root.mg-calm #mg-clock .meta { margin: 0; gap: .3125rem; line-height: 1; }
+#mg-root.mg-calm #mg-clock .meta .dn, #mg-root.mg-calm #mg-clock .meta .sep, #mg-root.mg-calm #mg-clock .meta .temp { display: none; }
+/* (asked for: the rescue and the weather stand with them) */
+#mg-root.mg-calm.bars-open #mg-clock .sol .of:not(:empty) { display: inline; }
+#mg-root.mg-calm.bars-open #mg-clock .meta .temp { display: inline; }
+#mg-root.mg-calm.bars-open #mg-clock .meta .sep { display: inline-block; }
+/* (with bars under them they are one line at the head of the bars) */
+#mg-root.mg-calm.bars-in #mg-clock { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: .5rem; row-gap: .1875rem; margin-bottom: .1875rem; max-width: 9.5rem; }
+@media (max-width: 760px) { #mg-root.mg-calm.bars-in #mg-clock { max-width: 7.375rem; } }
+
+/* --- top right, under the four buttons: one line, what to do next and how far. A press opens it (ui/hud.js), and
+   what is pressed is a thumb high whatever the line is. */
+#mg-root.mg-calm #mg-tr { top: calc(var(--m) + var(--sat) + max(2.75rem, 44px) + .25rem); gap: 0; padding-bottom: 14px;
+  max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - max(2.75rem, 44px) - .25rem - 9.75rem); }
+#mg-root.mg-calm #mg-objectives { position: relative; width: auto; max-width: 100%; min-height: 0; padding: .25rem .5rem .3125rem; background: rgba(14, 12, 11, .72); border-color: transparent; }
+#mg-root.mg-calm #mg-objectives:not(.shut) { width: 100%; background: rgba(14, 12, 11, .9); border-color: var(--line-2); }
+#mg-root.mg-calm #mg-objectives::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 100%; min-height: 44px; }
+#mg-root.mg-calm #mg-objectives.shut .obj.primary, #mg-root.mg-calm #mg-objectives.shut .obj.urgent.first { grid-template-columns: .75rem minmax(0, 1fr) auto; }
+#mg-root.mg-calm #mg-objectives.shut .obj.primary .at, #mg-root.mg-calm #mg-objectives.shut .obj.urgent.first .at { grid-column: 3; display: inline-flex; flex-wrap: nowrap; align-items: baseline; }
+#mg-root.mg-calm #mg-objectives.shut .obj .pl, #mg-root.mg-calm #mg-objectives.shut .obj .nx { display: none; }
+#mg-root.mg-calm #mg-objectives.shut .obj .at::after { margin: 0 .0625rem .1875rem .4375rem; }
+#mg-root.mg-calm #mg-objectives.shut .obj .at { margin-left: .375rem; }
+/* (shut, the line is a label like the compass's: the condensed face, the title without its count, on one line where
+   it can be. A title too long for that runs to a second line; none is cut.) */
+#mg-root.mg-calm #mg-objectives.shut .obj .tx { font: 600 var(--t14)/1.25 var(--f-cond); letter-spacing: .02em; }
+#mg-root.mg-calm #mg-objectives.shut .obj .ct { display: none; }
+@media (min-width: 761px) { #mg-root.mg-calm #mg-tr { width: 15.375rem; } }
+/* (the small phone's line has 208 px: it is set a little closer, so that a title and three figures of distance stand on one line) */
+@media (max-width: 760px) {
+  #mg-root.mg-calm #mg-objectives { padding-left: .375rem; padding-right: .375rem; }
+  #mg-root.mg-calm #mg-objectives.shut .obj { column-gap: .25rem; }
+  #mg-root.mg-calm #mg-objectives.shut .obj .at { margin-left: .25rem; }
+  #mg-root.mg-calm #mg-objectives.shut .obj .at::after { margin-left: .3125rem; }
+}
+
+/* --- driving: the speed; a reserve when it is low or asked for */
+#mg-root.mg-calm #mg-rover { gap: .5rem; padding: .1875rem .625rem; background: rgba(14, 12, 11, .5); border-color: transparent; }
+#mg-root.mg-calm #mg-rover.bars { background: rgba(14, 12, 11, .8); }
+#mg-root.mg-calm #mg-rover .spd { min-width: 0; }
+#mg-root.mg-calm #mg-rover:not(.bars) .rv { display: none; }
+#mg-root.mg-calm #mg-rover .row:not(.show) { display: none; }
+
+/* --- the pill beside the action button says what the button cannot: HOLD is the button's */
+#mg-root.mg-calm #mg-prompt .ph { display: none; }
+
+/* --- the dial says whose it is and that it opens: the suit's mark over the figure, and at the panel's end the same
+   mark the task line has. (Bare, it was "a percentage in a circle": two reviewers could not say it was the suit's
+   air, took it for the rover's charge beside the speed, and found nothing to show it could be pressed.) Opened, the
+   dial keeps its place under the thumb that pressed it. */
+.suit .si { display: none; }
+#mg-root.mg-calm .suit .si { display: block; line-height: 0; margin: -.0625rem 0 .0625rem; }
+#mg-root.mg-calm .suit .si .ic { width: .75rem; height: .75rem; color: var(--ink-2); stroke-width: 2; }
+#mg-root.mg-calm .suit .num { font-size: 1.1875rem; }
+#mg-root.mg-calm .suit.warn .si .ic { color: var(--accent); }
+#mg-root.mg-calm .suit.crit .si .ic { color: #ff8f84; }
+#mg-root.mg-calm:not(.bars-in) #mg-clock::after { content: ""; align-self: center; flex: none; width: .375rem; height: .375rem; margin: -.125rem 0 .0625rem;
+  border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(45deg); }
+/* --- with his life in the balance (the task that leads is a red one) the log keeps quiet: its line stood over the
+   airlock he was being sent to, and said "wipe the panels" beside "get to air" */
+#mg-root.mg-calm.is-urgent #mg-log { display: none; }
+#mg-root.mg-calm.bars-in .suit { align-self: flex-start; }
+/* (a gauge's name stands clear of its bar: the 2 of "HAB O2" ran into it) */
+#mg-root.mg-calm .res .row { row-gap: 3px; }
+
+/* --- the task is one mark everywhere: the diamond of its line and of the marker over its place is its mark on the
+   compass too (it was a bullseye there, or a dome, or a door: three signs for one place) */
+#mg-root.mg-calm #mg-compass .mk.lead .ic { display: none; }
+#mg-root.mg-calm #mg-compass .mk.lead::before { content: ""; width: .5625rem; height: .5625rem; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 0 1.5px rgba(19, 17, 15, .7); }
+#mg-root.mg-calm #mg-compass .mk.lead.danger::before { background: var(--danger); }

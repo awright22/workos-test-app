@@ -6,7 +6,7 @@ import { log } from '../ui/dom.js';
 import { perf } from '../core/math.js';
 import { screenOpen, closeScreens, toggleScreen } from '../ui/screens.js';
 import { showBarsGuide } from '../ui/menus.js';
-import { screenUnlocked } from '../ui/hud.js';
+import { screenUnlocked, gaugesOpen, openGauges } from '../ui/hud.js';
 import { showPause } from './flow.js';
 import { exitRover } from './rover.js';
 import { useCandle } from './inventory.js';
@@ -146,12 +146,13 @@ function initTouch(canvas) {
     if (touchIn.joyId !== null) return;
     const t = ev.changedTouches[0];
     touchIn.joyId = t.identifier;
+    // (measured as it is under a thumb: at rest, on the quiet HUD, it is drawn smaller)
+    base.classList.add('live');
     const half = base.offsetWidth / 2;
     travel = half * 0.62;
     ox = Math.max(layout.safe[3] + half + 4, t.clientX);
     oy = Math.min(window.innerHeight - layout.safe[2] - half - 4, t.clientY);
     base.style.left = (ox - half) + 'px'; base.style.top = (oy - half) + 'px'; base.style.bottom = 'auto';
-    base.classList.add('live');
   }, { passive: false });
   window.addEventListener('touchmove', (ev) => {
     for (const t of ev.changedTouches) {
@@ -214,8 +215,11 @@ function initTouch(canvas) {
   press(UI.tCam, () => { if (playing()) S.firstPerson = !S.firstPerson; });
   press(UI.tCandle, () => { if (playing()) useCandle(); });
   press(UI.tPause, () => { if (screenOpen()) closeScreens(); showPause(); });
-  // the bars, tapped, say what they are
-  UI.vitals.addEventListener('click', () => { if (playing() && !S.uiOpen && !screenOpen() && !S.flags.coldOpen) showBarsGuide(); });
+  // the bars, tapped, say what they are (on the quiet HUD the first tap shows them all, and a tap while they show is this one)
+  UI.vitals.addEventListener('click', () => {
+    if (!playing() || S.uiOpen || screenOpen() || S.flags.coldOpen) return;
+    if (layout.calm && !gaugesOpen()) openGauges(); else showBarsGuide();
+  });
   UI.tRow.querySelectorAll('[data-t]').forEach((btn) => {
     press(btn, () => { if (playing() && !S.flags.coldOpen && screenUnlocked(btn.dataset.t)) toggleScreen(btn.dataset.t); });
   });

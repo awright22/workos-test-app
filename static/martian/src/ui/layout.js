@@ -9,6 +9,7 @@ const params = new URLSearchParams(location.search);
 export const layout = {
   /** root font size in px */ rem: 16,
   /** phone-sized landscape window: the HUD uses its compact arrangement */ compact: false,
+  /** a phone's quiet HUD is in use (a touch screen in the compact arrangement, unless the full HUD is asked for) */ calm: false,
   /** portrait phone: the game asks the player to rotate */ portrait: false,
   touch: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
   /** the interface-size setting in effect, and the most this window has room for */ scale: 1, maxScale: 1.4,
@@ -47,6 +48,7 @@ export function applyLayout(root) {
   const w = window.innerWidth, h = window.innerHeight;
   layout.portrait = h > w * 1.15 && w < 620;
   layout.compact = !layout.portrait && (h < 540 || w < 760);
+  layout.calm = layout.compact && layout.touch && !settings.fullHud;
   let s;
   if (layout.portrait) s = 1;
   else if (layout.compact) s = Math.min(1, Math.max(0.92, h / 390));
@@ -64,6 +66,7 @@ export function applyLayout(root) {
     c.toggle('mg-compact', layout.compact);
     c.toggle('mg-portrait', layout.portrait);
     c.toggle('mg-touch', layout.touch);
+    c.toggle('mg-calm', layout.calm);
     c.toggle('mg-reduced', reducedMotion());
     c.toggle('mg-cb', !!settings.colorBlind);
   }
