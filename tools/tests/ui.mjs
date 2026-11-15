@@ -890,7 +890,8 @@ for (const size of SIZES) {
     const eb = await page.locator('#mg-tE').boundingBox();
     await touch('touchStart', [[eb.x + eb.width / 2, eb.y + eb.height / 2]]);
     const held = await g.eval((G) => { const h = G.input.eHeld; G.tick(0.05, 6); return { h, pct: document.querySelector('#mg-tE').classList.contains('holding') }; });
-    await g.eval((G) => { G.tick(0.05, 10); });
+    // (the hold is 0.6 s; getting in is three quarters of a second more: game/rover.js, boardRover)
+    await g.eval((G) => { G.tick(0.05, 26); });
     await touch('touchEnd', []);
     const drove = await g.eval((G) => ({ mode: G.S.mode, held: G.input.eHeld }));
     check(`${size.name}: holding the action button fills it and does the thing`, held.h && held.pct && drove.mode === 'rover' && !drove.held, { held, drove });
