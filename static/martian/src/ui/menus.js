@@ -436,16 +436,19 @@ const KEYBOARD = [
   ['Interact (hold)', kbd('E')], ['Crack an <span class="chem">O<sub>2</sub></span> candle', kbd('X')], ['Exit the rover', kbd('F')], ['Switch view', kbd('V')],
   ['Map', kbd('M')], ['Colony and fabrication', kbd('C')], ['Journal', kbd('J')], ['Photo mode', kbd('P')], ['Pause, back', kbd('Esc')],
 ];
-const TOUCH = [
+// (By the names and signs the HUD in use shows. The quiet HUD has no VIEW button and its menu button is the pause sign
+//  alone: the sheet sent a player looking for "VIEW" and "MENU", which only the full HUD has. Two reviewers.)
+const touchRows = () => [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
-  ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle'], ['Switch view', `${icon('eye')}View`],
-  // (the four buttons at the top right carry their own names: one line for the three screens and one for the menu,
+  ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle (when you carry one)'],
+  ['Switch view', layout.calm ? 'Settings, Controls' : `${icon('eye')}View`],
+  // (the four buttons at the top right carry their own signs: one line for the three screens and one for the menu,
   //  and the whole list fits a phone held sideways without scrolling. A line apiece ran to seven rows.)
-  ['The three screens', 'Top right'], ['Pause, settings, photo mode', `${icon('pause')}Menu`],
+  ['The three screens', 'Top right'], ['Pause, settings, photo mode', layout.calm ? `${icon('pause')}Top right` : `${icon('pause')}Menu`],
 ];
 export function showControls(back, which) {
   const mode = which || (layout.touch ? 'touch' : 'keys');
-  const rows = (mode === 'touch' ? TOUCH : KEYBOARD).map(([a, k]) => `<div class="ctl-row"><span>${a}</span><span class="keys">${k}</span></div>`).join('');
+  const rows = (mode === 'touch' ? touchRows() : KEYBOARD).map(([a, k]) => `<div class="ctl-row"><span>${a}</span><span class="keys">${k}</span></div>`).join('');
   const p = openOverlay('sheet',
     '<div class="sheet"><header class="sheet-hd"><h1>Controls</h1>' +
     // (a tablet may have a keyboard on it; a phone held sideways does not, and was offered the keyboard's page)

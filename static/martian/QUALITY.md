@@ -889,10 +889,10 @@ making and two names for a storm (N10), the map's small rings and the smaller th
 | P3 | The quiet HUD's own gestures are never taught: nothing says a tap on the dial shows every gauge ("the biggest onboarding gap") | done after the review: the first time a gauge arrives, a card says "Tap the dial to see them all" with the dial lit |
 | P4 | A storm's WARNING card comes up beside a red banner: a fourth voice | left: in the pictures it is the test's own card; in play only what bears on his life is said while a banner is red, and a storm's warning is counted as that |
 | P5 | The direction arrow: no distance on the quiet HUD, never introduced; it lands beside the task card, where RUN appears, above the stick, on the floor; once on the Hab itself while the Hab is on screen | left (the ninth review's N1, second review running): it is the marker over the place when the place is out of view. Open, the first thing for the next interface pass |
-| P6 | Lists sliced at the fold in fourteen pictures; the MORE BELOW bar cuts through a BUILD and a RUN button (844) and through the guide's "At zero" (667); 117 px of headers on a 375 px screen | left, open |
+| P6 | Lists sliced at the fold in fourteen pictures; the MORE BELOW bar cuts through a BUILD and a RUN button (844) and through the guide's "At zero" (667); 117 px of headers on a 375 px screen | left, **plateaued as a cue**: the foot has been a fade (an earlier review: its last rows "read as rows that were switched off") and is a shelf (this review: it slices). What is left is to make rows fit the fold: one row of headers in place of two, and cards sized so that two rows show. Open, for the next interface pass |
 | P7 | Things shown before they are explained: a trend arrow eleven game hours before its card; morale scored before its bar; five NEW cards in 40 game minutes; POWER with no "at zero" | part: the POWER and VITALS cards say what they are for and what zero means. The rest left |
-| P8 | The controls sheet names VIEW, MENU and CANDLE, which the quiet HUD does not show by those names | left, open (a wording bug) |
-| P9 | Three or four styles of refusal; four verbs for making; "DUST STORM" and "STORM CELL"; "11 SOLS SURVIVED" on Sol 12 against "SOLS SURVIVED 25" on Sol 25; "water again at 50%" of what | left, polish |
+| P8 | The controls sheet names VIEW, MENU and CANDLE, which the quiet HUD does not show by those names | fixed after the review: the sheet is written for the HUD in use (the view is "Settings, Controls", the menu is the pause sign at the top right, the candle's button "when you carry one"); the journal says "Photo mode from the pause menu"; the candle's own card says "tap CANDLE" |
+| P9 | Three or four styles of refusal; four verbs for making; "DUST STORM" and "STORM CELL"; "11 SOLS SURVIVED" on Sol 12 against "SOLS SURVIVED 25" on Sol 25; "water again at 50%" of what | part: the two counts are two things and have two names ("Sols seen out" on the pause card, "Sols on Mars" on the win sheet). The rest left, polish |
 | P10 | The plate changes size as gauges come and go, and the task line's left edge moves with the distance's digits; map rings 14 to 20 px; marks have no words and one was missing for power in a made-up state; smaller things | left, polish |
 
 ## The quiet HUD (a phone's)
@@ -1196,6 +1196,41 @@ Not acted on, and why: "one verb" (every gathering act is a hold, every job a ti
 design on a phone, and the story's); "ten buildables in a fixed order" (the order is the task card's suggestion:
 the Base tab offers every one from the start).
 
+**The walk's re-check** (15 November, evening; one independent reviewer, 37 pictures of the mode played from its
+start at 844 x 390 with the quiet HUD, every one opened; given the bar, the first walk's nineteen findings to
+re-check, and not told what had been done). Verdicts: guidance **NEARLY**, the loop **MET** (was NEARLY: "it reads as
+a real chain, not a layer on the story"), the screens NEARLY, the picture NEARLY, finish NEARLY. "The first eighteen
+pictures are release standard; guidance thins once he leaves the Hab and at the reward." Of the quiet HUD in this
+mode: it "serves this mode in the early game ... the right gauge appears when it matters"; its cost is that "a mode
+about stores and running jobs shows neither".
+
+Of the nineteen: fixed are the boards' sources (G1), the MAV marker (G2), the kiln's sheet (G3), ten against twelve
+(G5), the sample-first wording (G6), standing in the drop (G8), "Built" and "standing" and hematite and ore (G13),
+scrap's source and the soil (G15), the dead button's height (G16), the idle kiln's mouth and the tank close up
+(G17); half fixed the night (G7: nothing stands between the camera and him; the whole base from above is still a few
+glows), the airlock at nightfall (G10), the map (G11: the storm no longer shows through the bar; labels still
+crowded), what was played and not set down (G19); still there "no ship for four years" (G9, weaker), no mark from
+gathering (G14), two voices (G18); not seen in these pictures G4, G12, part of G13 and G17.
+
+**The pictures from the tank on were not what play shows**, and the reviewer said so ("possibly the capture"). The
+walk moves the sol on by hand, so a breach that came on Sol 9 was never sealed and hardly leaked: it led the HUD in
+every outdoor picture to Sol 24, and while a red task leads the quiet HUD says nothing else. That is why the opened
+drop "shows nothing of its contents" (its line is a log line), why no note says a batch is done or a drop has
+landed, and why three captions did not match their pictures. The walk now seals a breach after the picture it
+comes in (`tests/base-walk.mjs`). Not re-reviewed.
+
+| | Finding | State |
+| --- | --- | --- |
+| BM1 | Opening the supply drop shows nothing of what was in it (it called this a blocker) | the capture, above: the line is "Recovered: ..." in the log, silent while a breach leads. To be seen in the next walk |
+| BM2 | The first BUILD of the mode is cut in half by the fold under an empty space (the Base tab's kiln card, ready, beside a smelter card made tall by what it lacks) | fixed after the review: a card that is ready has its button directly under what it takes |
+| BM3 | RAKE and OPEN have no line of detail: after six rakes nothing on the screen says what he has or what is left | done after the review: on the quiet HUD the detail line shows again for its few seconds after each hold, with its new count (it showed once, when he arrived) |
+| BM4 | No note that batches are done or that a drop has landed; no prompt at the airlock at night | the first two are the capture; the airlock at night: left (G10, half fixed) |
+| BM5 | "No ship for 4 years" still reads as a ship that comes | left: it is the reason there is no rescue; open (wording) |
+| BM6 | The smelter's task names fourteen bricks and not its circuit board; "Find a mineral deposit" does not point at the map or say a rover is needed; a standing building's card shows a dead BUILD and "Missing" without the word "another" | left, open (wording) |
+| BM7 | Map labels crowded, detached, over storm circles; unlabelled dots; storms unlabelled | left (G11, the third review to say it): open |
+| BM8 | The whole base at night from above is a few glows; a black half-disc at the edge of one night picture; the tank a dark drum from afar; the base strewn wide, not a compound | left, polish |
+| BM9 | "soil" and "Regolith", "scrap" and "Scrap Metal"; cards cut by the fold; two button heights on one sheet; no way shown to cancel a placement; the dial has no label | left, polish |
+
 **It is on the title.** New Game asks which game: "Get home" (the story) or "Stay" (the base). While it
 was being built it was offered only when the address ended in `?base`; that gate came off on 15 November,
 when its four parts had been built and its models reviewed (`?base` still works, and does nothing now).
@@ -1211,7 +1246,7 @@ passes with the base's code in it).
 | Bar | State |
 | --- | --- |
 | The picture: every deposit, works and building | reached: every one NEARLY or MET (third review and the second look, above) |
-| The mode played from its start: guidance, loop, screens, picture, finish | reached: NEARLY on all five (above); its findings acted on, not yet reviewed again |
+| The mode played from its start: guidance, loop, screens, picture, finish | reached, and re-checked: the loop MET, the other four NEARLY (the walk's re-check, above) |
 | An hour of things to do | reached by the recipes, **not yet by a played hour**: one of everything takes 62 brick, 54 iron, 22 glass and 30 cement. From soil alone that is 310 hours of the works' time (31 + 54 + 22 + 10 batches), of which the smelter's line is 162 hours: six and a half sols, 52 minutes of play, if it never stands idle, and it does, because those batches draw five and a half times the Hab's battery. From ore, silica and clay it is about 90 hours. Salt and gypsum are a journey each, and eight circuit boards have to be earned or fetched |
 | Every sheet inside the safe area at both phone sizes | `ui-audit.mjs --only=base`: eight states at each size (the choice of game, the difficulties, the inventory, the Base tab, the map, a works' sheet idle and running, the HUD at a works) |
 | A base saved in one build loads in the next | `base.mjs` saves and loads within a build (deposits, what is left, what stands, jobs, the reserve); across builds it rests on the story's save migration, which the base's save goes through; a save from the first preview of Base mode has not been loaded here |
@@ -1631,7 +1666,7 @@ from the Hab (the map is the base's; elsewhere the last few hundred marks are al
 | 33 | Act on the sixth interface review (K1–K20 above) | open: a helper next |
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
-| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed (every model NEARLY or better; the mode as a whole NEARLY on all five points) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G11, G14; and an hour of it has not yet been played through by hand |
+| 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed and re-checked (every model NEARLY or better; the mode as a whole: the loop MET, guidance, screens, picture and finish NEARLY) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G9, G11, G14, G18, BM4 to BM9; the walk's last twelve pictures are to be taken again with the breach sealed (BM1); and an hour of it has not yet been played through by hand |
 | 37 | **The quiet HUD on the phone** (the owner's second finding of 15 November) | built, measured in the suite (`tests/hud-cover.mjs`), reviewed and re-checked: calm MET at all three sizes by every review, the other five points MET or NEARLY, nothing NOT MET (see "The quiet HUD"). Closed under the owner's bounds. Open for the owner: the sol and the clock stand beside the dial, not on the buttons' row (one menu button in place of four would make room there); and whether the quiet HUD suits him on his phone |
 | 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | (a) and (b), the game in motion and how it drives and walks: done, re-checked, and the re-check's bugs fixed (see "In motion", K1 to K26); two things are second attempts not yet seen by anyone but me (getting into the rover, the rover's weight), and K11 and K13 are plateaued for code. (g) sharpness: one pass done (see "Sharpness and the frame rate"); its re-check is the phone's own report. (f) wear: one pass done (see "Wear"); to be looked at in the next picture review. All of that is on the preview. **The four additions of the same day**: the storm and the idle stance in motion: done and re-checked (storm moves MET, the rest NEARLY; see "The storm and standing still"). Night light and the horizon: done and re-checked (walking light MET, the rest NEARLY; the horizon's ruled line plateaued; see "Light to get about by at night"). The emergency HUD: built and measured, to go to the interface reviewers (see "An emergency: one thing leads"). **(c)** the interface: the emergency HUD and the wording done, and reviewed at both phone sizes: NEARLY at both, not the MET the owner asked for (see the tenth interface review, P1 to P10: its one bug fixed, the rest recorded). **(d)** the launch and the rescue: done and re-checked (all four points NEARLY, no blockers; see "The launch and the rescue"). **(e)** baked lighting and **the built objects**: one pass done (contact shadows for 40 props, the Hab's lamps baked into its interior, the greenhouse, the rover's glass, the ship's ring, the heap) and re-checked: the greenhouse and the ship MET, the interior NEARLY, the rover's windows, the heap and the props' contact NOT MET, with one bug of the pass found and fixed; a second and last attempt made at those three and not reviewed (see "Baked lighting and the built objects", B8 to B13). **Nothing on the owner's list is unstarted, and every item has had its pass and its re-check.** Open for the owner: whether the quiet HUD and the 30 fps setting suit him on his phone (the phone's own diagnostics), and the go to replace the first game at the root |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. On 15 November: the rover fix, the update repair and Base mode from `4e281c1` (cache `stranded2-e0658cf9b76a`); the quiet HUD from `3b08503` (cache `stranded2-96466c63e911`); then the cameras, getting in, the frame-rate setting and worn ground from `1105da6` (`gh-pages` `58f3c02`, cache `stranded2-4636a574a41c`; the suite's first thirteen parts ran on `f130007`, which differs only in one test). Later on 15 November: the four additions and items (c), (d), (e) from `6af55b7`, whose whole suite passed (`gh-pages` `8de1f47`, cache `stranded2-80b1ac4c4baa`). Replace the root once the preview has been seen running on the owner's phone |

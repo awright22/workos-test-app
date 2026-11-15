@@ -460,6 +460,10 @@
 .rcp { display: flex; flex-direction: column; }
 .rcp-ft { margin-top: auto; padding-top: .6875rem; }
 .mg-compact .rcp-ft { margin-top: auto; padding-top: .4375rem; }
+/* (but a card that is READY has its button directly under what it takes: beside a neighbour made tall by a long
+   list of what it lacks, the foot of the row is under the fold, and the first BUILD of the base mode was half a
+   button under an empty space) */
+.rcp.ready .rcp-ft, .mg-compact .rcp.ready .rcp-ft { margin-top: 0; }
 .rcp-ft .why.bad { color: var(--ink-2); }
 .chip.miss { border-color: rgba(255, 106, 92, .5); background: transparent; }
 /* (a page's first line of explanation is for the first visit: on a phone, once there is something on the page to see,

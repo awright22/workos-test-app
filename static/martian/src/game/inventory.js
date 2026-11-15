@@ -19,7 +19,7 @@ export const ITEM_NAMES = {
 // (One name and one unit for each thing, here as on the HUD. Suit oxygen is time, "of air", as under the dial; the
 // rover's reserve is its battery, in per cent, and "power" is the Hab's; the suit is the suit, not "EVA".)
 export const RECIPES = [
-  { id: 'candle', name: 'O2 Candle', desc: `+${airTime(40)} of suit air in the field`, how: ['press X to crack one', 'tap the O2 button to crack one'], cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
+  { id: 'candle', name: 'O2 Candle', desc: `+${airTime(40)} of suit air in the field`, how: ['press X to crack one', 'tap CANDLE to crack one'], cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
   { id: 'meltIce', name: 'Melt Ice', desc: '+10 L of water (uses 2% of Hab power)', cost: { ice: 1 }, run: () => {
       if (S.power < 2) return 'Not enough Hab power';
       S.power -= 2; S.water = clamp(S.water + BAL.iceWater, 0, waterCap());

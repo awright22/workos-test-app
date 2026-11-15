@@ -32,7 +32,10 @@ const shot = async (name, what, wait = 900) => {
   n++;
   const file = `${String(n).padStart(2, '0')}-${name}.png`;
   await page.screenshot({ path: path.join(dir, file), timeout: 420000 });
-  await ev((G) => { G.paused = true; });
+  // (A breach is in the picture it comes in, and sealed after it, as a player seals it. This walk moves the sol on by
+  //  hand, so the Hab's air hardly fell, and left open the breach led the HUD for fifteen sols of pictures and kept
+  //  the notes the captions speak of off the screen: a reviewer took the silence for the game's.)
+  await ev((G) => { G.paused = true; if (G.S.breach.active) { G.S.breach.active = false; G.S.breach.done = true; G.tick(0.05, 6); } });
   steps.push(`${file}  ${what}`);
   console.log('  shot', file);
 };

@@ -662,6 +662,9 @@ export function setPrompt(p) {
   if (changed) fitPrompt();
   const pct = p.disabled ? 0 : Math.round(Math.min(1, Math.max(0, p.progress || 0)) * 100);
   if (pct !== pr.pct) {
+    // (a hold just done: on the quiet HUD the line of detail is shown again for its few seconds, with its new count.
+    //  After six rakes at a deposit nothing on the screen said what he had, or what was left there.)
+    if (layout.calm && pr.pct > 60 && pct === 0) pr.since = playT;
     pr.pct = pct;
     UI.promptArc.style.strokeDashoffset = 100 - pct;
     UI.tEArc.style.strokeDashoffset = 100 - pct;
