@@ -719,7 +719,7 @@ function compassGeometry() {
     cp.cards = CARDS.map(([name, deg]) => {
       const s = el('span', null, name.length > 1 ? 'minor' : name === 'N' ? 'north' : '', UI.compassCards);
       s.textContent = name;
-      return { el: s, deg, on: true, x: 0, under: false };
+      return { el: s, deg, on: true, x: 0, under: false, minor: name.length > 1 };
     });
   }
 }
@@ -878,7 +878,10 @@ export function updateCompass() {
       if (state !== 'hide') {
         let near = 1e9;
         for (const px of placed) near = Math.min(near, Math.abs(px - m.x));
-        if (near < iconW * (pass ? 0.6 : 0.75)) state = 'hide'; else placed.push(m.x);
+        if (near < iconW * (pass ? 0.6 : 0.75)) state = 'hide';
+        // (a mark with no name gives way to a letter of the compass: on a narrow strip N and E were lost under a dome and a crate)
+        else if (!pass && cp.cards.some((c) => c.on && !(c.minor && layout.compact) && Math.abs(c.x - m.x) < iconW * 0.8)) state = 'hide';
+        else placed.push(m.x);
       }
       const n = m.node;
       if (state !== n.state) {
@@ -992,8 +995,10 @@ export function updateHud() {
   if (filling) st = 'Refilling';
   else if (S.mode === 'rover') st = S.roverO2 > 0 ? 'Rover air' : 'Tank empty';
   else if (safeAir) st = 'Hab air';
-  // ("of air", not "left": beside a tank just filled at the airlock door, "5:56 left" read as a countdown to something)
-  else st = S.suit > 0 ? `${fmtLeft(suitTimeLeft())} of air` : 'Empty';
+  // (Minutes and seconds, and it says so: "5:46 of air" was read by three reviewers running as five hours or five
+  //  minutes, which is the difference that matters at "1:10". It stands under the dial's own name, so "of air" is said.
+  //  Not "left": beside a tank just filled at the airlock door, "5:56 left" read as a countdown to something.)
+  else st = S.suit > 0 ? `${fmtLeft(suitTimeLeft())} min` : 'Empty';
   setText('suitSt', UI.suitState, st);
   // (On the quiet HUD the dial is the tank and says it once. The line under it is there when it adds something: the
   //  time left once the tank is under half, the leak of the first minute, a refill, or when he asks.)
@@ -1073,7 +1078,8 @@ export function updateHud() {
   // (The second figure says what it is, and is not there before he knows of it: "SOL 1 / 25" stood on the screen from
   //  the first second, and nothing ever said that 25 was the rescue.)
   const knows = (!!S.flags.didMath || S.sol > 1) && !isBase();
-  setText('of', UI.clockOf, knows ? `<i>Rescue</i> ${S.rescueSol}` : '');
+  // (on the quiet HUD it is shown when asked for, on a line of its own: "RESCUE SOL 25", not a bare "RESCUE 25")
+  setText('of', UI.clockOf, knows ? `<i>Rescue${calm ? ' sol' : ''}</i> ${S.rescueSol}` : '');
   // (on a wide screen the clock's line has no room for it beside the time and the temperature: it heads the mission list)
   if (objHead) setText('ofHd', objHead.lastChild, knows ? `Rescue Sol ${S.rescueSol}` : '');
   setText('time', UI.clockTime, fmtClock());

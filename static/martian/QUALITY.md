@@ -899,7 +899,54 @@ Measured on 15 November, after the review's pass below (share of the screen; of 
 | Water and power low, tank at 20% (no bar) | 19.7% | 24.0% | 25.3% |
 | The full HUD at the rover (the setting; what it replaced) | 28.5%; 4%; 52% | 34.6%; 9%; 59% | 37.7%; 15%; 62% |
 
-REVIEW_PLACEHOLDER
+**Reviewed twice on 15 November, as the owner's bounds allow: one review, one pass, one re-check.** The reviewers
+were given the pictures (`hud-cover.mjs --shoot`: eight states, then ten, at each of the three sizes) and the bar,
+not the measurements. Every picture was opened. Their own estimates of the calm states by eye, by three different
+hands: 9 to 11% at 932 x 430, 11 to 14% at 844 x 390, 12.5 to 16% at 667 x 375: the table above, to within their
+point and a half.
+
+| Point of the bar | First review (A, B) | Re-check (A again; C, new) |
+| --- | --- | --- |
+| Calm: quiet, the middle and most of the top third clear | MET, MET | MET, MET |
+| Each fact once | NEARLY, NEARLY | NEARLY, NEARLY |
+| Enough: nothing needed is more than a tap away; each thing can be told | NEARLY, NEARLY | MET (narrowly), NEARLY |
+| Detail on asking | NEARLY (close to MET), MET | NEARLY (close to MET), MET |
+| An emergency cannot be missed | NEARLY, NEARLY | NEARLY, NEARLY |
+| Finish at each size | NEARLY (NOT MET at 667 on one picture), NEARLY | NEARLY, NEARLY |
+
+What the first review found and what was done (H for HUD):
+
+| | Finding | State |
+| --- | --- | --- |
+| H1 | The dial was "a percentage in a circle": nothing said it was the suit's, it was taken for the rover's charge beside the speed, and nothing showed it could be pressed (both) | The suit's mark in the dial, a mark under the clock that the panel opens, its name whenever its line shows. Re-check: gone as a blocker; the mark in the dial is small (polish) |
+| H2 | The rover's charge was nowhere on the calm HUD, and no picture showed a tap bringing it (both) | Shown for 6 s on getting in, when under a third, and on a tap of the dial (pictured). Re-check: gone |
+| H3 | The Colony button's hexagon read as "settings" (both) | A crate. Re-check: reads as stores |
+| H4 | One destination, three signs: a bullseye on the compass, a diamond in the line and in the world (both) | The task's mark is the diamond on the compass too. Re-check: gone |
+| H5 | Name tags under the compass at two sizes and none at the third (both) | The task's mark and the mark he faces are named; the rest are their pictures, at every size. Re-check: gone; then N and E were lost under them at 667 (C): a mark with no name now gives way to a letter |
+| H6 | The emergency picture: the marker on the airlock behind the log's line (both) | Partly the picture (taken before the game's next frames: the marker gives way to a panel within a fifth of a second), partly real (the line stood on the door, and said "wipe the panels" beside "get to air"): the log keeps quiet while a red task leads. Re-check: the marker is clear at all three sizes |
+| H7 | The 2 of "HAB O2" cut by its bar (A) | 3 px between a gauge's name and its bar. Re-check: gone there, found in the rover's panel, fixed there too |
+| H8 | The dial moved under the thumb when the panel opened (A) | It keeps its place |
+| H9 | The pause menu ran off the small phone with a seventh line, the view (the audit) | The view is a switch in Settings, Controls |
+| H10 | "5:46 of air" has no unit (A, B, then C as a blocker) | "5:46 min" under the dial's name, and "+2:40 min of air" wherever a candle or a cache says what it gives |
+| H11 | In the made-up emergency the one red box is on WATER and the suit, which is the end, is amber (all three) | While a red task leads and the tank is low the dial is the task's red (not in the first minute). Each gauge's own thresholds are unchanged: the suit's amber is under a quarter and its red under an eighth, and the game's alarms key on them |
+| H12 | "RESCUE 25" unexplained (A, B, C) | "RESCUE SOL 25" |
+| H13 | The task line, 31 px, 5 px under the buttons (A, C) | 8 px under them; what is pressed is 44 px, drawn past the line downward |
+
+Left as they are, with the reason:
+
+- **The sol and the clock stand beside the dial, not on the buttons' row** (A: "the owner asked for them on the buttons'
+  row"). Four buttons a thumb wide fill the room between the compass and the notch's margin at 844 and overflow it at
+  667. Beside the dial they make one cluster of what the suit and the day are doing. One menu button in place of the
+  four would free the row: that is the owner's to choose.
+- **The direction is given by the compass's mark and by the dart at the screen's edge** (B, C). The dart is the
+  marker over the place when the place is out of view; without it the place has no mark in the picture at all.
+- **The suit is said four ways in an emergency** (ring, minutes, banner, task): that is the emergency taking room.
+- **EXIT stands where JUMP does and takes one tap at any speed** (B, C). It always has; it belongs to the driving
+  pass (item b of the owner's direction).
+- Polish, not done: "? GUIDE" is bare text; the compass's E fades at the strip's end; the dart is orange over the
+  landing pad's orange marks; the banner's wording is shorter at 667; the opened panel is a few pixels wider with
+  the rover's rows; the cube on the compass is not named until he faces it.
+
 
 ## Base mode
 
@@ -1140,6 +1187,8 @@ not how it feels in the hand. That is for the phone.
 | 23 | A desktop-only interface review (the third review could read only four desktop pictures) | low priority: the desktop is a bonus (see the owner's direction) |
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
 | 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed (every model NEARLY or better; the mode as a whole NEARLY on all five points) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G11, G14; and an hour of it has not yet been played through by hand |
+| 37 | **The quiet HUD on the phone** (the owner's second finding of 15 November) | built, measured in the suite (`tests/hud-cover.mjs`), reviewed and re-checked: calm MET at all three sizes by every review, the other five points MET or NEARLY, nothing NOT MET (see "The quiet HUD"). Closed under the owner's bounds. Open for the owner: the sol and the clock stand beside the dial, not on the buttons' row (one menu button in place of four would make room there); and whether the quiet HUD suits him on his phone |
+| 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | next, in order: (a) the game checked in motion by a scripted player with frame strips for reviewers; (b) driving and walking feel (and EXIT at speed, from the HUD reviews); (c) the rest of the interface to MET; (d) the launch and the rescue as cutscenes; (e) baked lighting; (f) wear by code; (g) a sharper picture at 30 or 40 fps as a setting |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | measured on the owner's iPhone on an older build (60 fps average at a dynamic scale of 0.64; see the bar); to be measured again on the current build. Laptop: not measured |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |

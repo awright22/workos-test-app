@@ -819,8 +819,9 @@
 
 /* --- top right, under the four buttons: one line, what to do next and how far. A press opens it (ui/hud.js), and
    what is pressed is a thumb high whatever the line is. */
-#mg-root.mg-calm #mg-tr { top: calc(var(--m) + var(--sat) + max(2.75rem, 44px) + .25rem); gap: 0; padding-bottom: 14px;
-  max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - max(2.75rem, 44px) - .25rem - 9.75rem); }
+/* (8 px under the buttons: at 4 a thumb for the line was a thumb on Map) */
+#mg-root.mg-calm #mg-tr { top: calc(var(--m) + var(--sat) + max(2.75rem, 44px) + .5rem); gap: 0; padding-bottom: 14px;
+  max-height: calc(100vh - var(--sat) - var(--sab) - var(--m) - max(2.75rem, 44px) - .5rem - 9.75rem); }
 #mg-root.mg-calm #mg-objectives { position: relative; width: auto; max-width: 100%; min-height: 0; padding: .25rem .5rem .3125rem; background: rgba(14, 12, 11, .72); border-color: transparent; }
 #mg-root.mg-calm #mg-objectives:not(.shut) { width: 100%; background: rgba(14, 12, 11, .9); border-color: var(--line-2); }
 #mg-root.mg-calm #mg-objectives::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 100%; min-height: 44px; }
@@ -869,10 +870,23 @@
 #mg-root.mg-calm.is-urgent #mg-log { display: none; }
 #mg-root.mg-calm.bars-in .suit { align-self: flex-start; }
 /* (a gauge's name stands clear of its bar: the 2 of "HAB O2" ran into it) */
-#mg-root.mg-calm .res .row { row-gap: 3px; }
+#mg-root.mg-calm .res .row, #mg-root.mg-calm #mg-rover .row { row-gap: 3px; }
 
 /* --- the task is one mark everywhere: the diamond of its line and of the marker over its place is its mark on the
    compass too (it was a bullseye there, or a dome, or a door: three signs for one place) */
 #mg-root.mg-calm #mg-compass .mk.lead .ic { display: none; }
 #mg-root.mg-calm #mg-compass .mk.lead::before { content: ""; width: .5625rem; height: .5625rem; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 0 1.5px rgba(19, 17, 15, .7); }
 #mg-root.mg-calm #mg-compass .mk.lead.danger::before { background: var(--danger); }
+
+/* --- while a red task leads and the tank is low, the dial is the task's colour: "Get to air" stood in red beside
+   an amber dial and a red-ringed WATER, and the eye went to the water. (Not in the first minute, whose leak is the
+   amber it has always been.) */
+#mg-root.mg-calm.is-urgent:not(.is-cold) .suit.warn .arc { stroke: var(--danger); }
+#mg-root.mg-calm.is-urgent:not(.is-cold) .suit.warn .num, #mg-root.mg-calm.is-urgent:not(.is-cold) .suit.warn .cap, #mg-root.mg-calm.is-urgent:not(.is-cold) .suit.warn .st { color: #ff8f84; }
+#mg-root.mg-calm.is-urgent:not(.is-cold) .suit.warn .si .ic { color: #ff8f84; }
+
+/* (on the small phone the rescue has a line of its own in the opened panel: beside the sol it ran out to the panel's edge) */
+@media (max-width: 760px) {
+  #mg-root.mg-calm.bars-open #mg-clock .sol { flex-wrap: wrap; row-gap: .1875rem; }
+  #mg-root.mg-calm.bars-open #mg-clock .sol .of:not(:empty) { flex-basis: 100%; margin-left: 0; }
+}

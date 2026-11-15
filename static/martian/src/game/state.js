@@ -79,7 +79,7 @@ export function suitCap() { return S.upgrades.tank2 ? 200 : S.upgrades.tank1 ? 1
  * not a share of the tank: time, as under the dial ("5:56 of air"). (A candle gave "+40 suit O2" and a tank went
  * "150 → 200", beside a dial that read 100%.)
  */
-export function airTime(units) { const s = Math.floor(units / BAL.suitWalk); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+export function airTime(units) { const s = Math.floor(units / BAL.suitWalk); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min`; }
 /** The same in whole minutes, for a tank's size. */
 export function airMinutes(units) { return Math.round(units / BAL.suitWalk / 60); }
 export function roverTopSpeed() { return (S.upgrades.drive2 ? 55 : S.upgrades.drive1 ? 45 : 35) * (0.62 + 0.38 * machineEff('rover')); }

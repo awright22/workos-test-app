@@ -145,7 +145,7 @@ if (!onlySize || onlySize === 'keys') {
 if (!onlySize || onlySize === 'play') {
   const g = await openGame({ quality: 'low' });
   const page = g.page;
-  const secs = (s) => { const m = /^(\d+):(\d\d) of air$/i.exec(String(s).trim()); return m ? +m[1] * 60 + +m[2] : null; };
+  const secs = (s) => { const m = /^(\d+):(\d\d) min$/i.exec(String(s).trim()); return m ? +m[1] * 60 + +m[2] : null; };
   await page.evaluate(() => { window.__st = () => document.querySelector('#mg-vitals .suit .st').textContent.trim(); window.__UI.setSetting('reducedMotion', true); });
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.paused = true; G.tick(0.05, 10); });
   // the cold open: a holed suit, counting down from the first second
