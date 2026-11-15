@@ -156,7 +156,7 @@ if (!onlySize || onlySize === 'keys') {
   const asks = await page.locator('#mg-panel').innerText();
   await page.locator('#mg-panel button', { hasText: 'Keep playing' }).click();
   const kept = await page.evaluate(() => ({ kind: document.getElementById('mg-overlay').className, save: !!localStorage.getItem('stranded2-save') }));
-  check('restart: asks first, and Keep playing goes back with the save intact', /start over/i.test(asks) && /k-pause/.test(kept.kind) && kept.save, { asks: asks.slice(0, 60), kept });
+  check('restart: asks first, and Keep playing goes back with the save intact', /restart from sol 1\?/i.test(asks) && /k-pause/.test(kept.kind) && kept.save, { asks: asks.slice(0, 60), kept });
   await page.locator('[data-act="restart"]').click();
   await page.locator('#mg-panel button', { hasText: 'Delete and restart' }).click({ noWaitAfter: true });
   await titleReady();
@@ -253,7 +253,7 @@ if (!onlySize || onlySize === 'play') {
     return out;
   });
   check('suit timer: a refill shows at once, and a 150 tank reads longer than a 100', Math.abs(secs(refill.b) - 2 * secs(refill.a)) <= 2 && secs(refill.big) > secs(refill.full) * 1.4, refill);
-  check('suit timer: in the Hab it says where the air comes from, not a time', /^(hab air|refilling)$/i.test(refill.inside), refill.inside);
+  check('suit timer: in the Hab it says where the air comes from, not a time', /^(hab o2|refilling)$/i.test(refill.inside), refill.inside);
 
   // one distance per place: the marker's tag, the mission line and the compass's Hab mark are the same number, and move together
   const where = () => g.eval(() => ({
@@ -681,13 +681,14 @@ for (const size of SIZES) {
   };
   bad = await busy();
   check(`${size.name}: on foot with alerts, log, toast and prompt, nothing overlaps or leaves the safe area`, bad.length === 0, bad);
-  // what the marker says is what the mission line says; on a phone both banners keep their instruction and the line its reason
+  // what the marker says is what the mission line says; on a phone the banner that leads keeps its instruction and the line its reason
   const hudNow = () => page.evaluate(() => {
     const on = (n) => !!n && getComputedStyle(n).display !== 'none' && n.getBoundingClientRect().height > 3;
     const way = document.getElementById('mg-way'), why = [...document.querySelectorAll('#mg-objectives .obj .why')].find(on);
     return {
       way: on(way), tag: way ? way.querySelector('b').textContent : '', line: (document.querySelector('#mg-objectives .obj:not(.done) .ds') || {}).textContent || '',
       notes: [...document.querySelectorAll('#mg-alerts .alert small')].map((n) => ({ t: n.textContent, on: on(n) })), why: why ? why.textContent : '',
+      marks: document.querySelectorAll('#mg-alerts .mark').length, calm: document.getElementById('mg-root').classList.contains('mg-calm'),
     };
   });
   let hn = await hudNow();
@@ -709,7 +710,9 @@ for (const size of SIZES) {
       return t ? { under: Math.round((t.top - v.bottom) * 10) / 10, over: Math.round((j.top - t.bottom) * 10) / 10, note: (document.querySelector('#mg-toast .t3') || { textContent: '' }).textContent } : null;
     });
     check(`${size.name}: a card stands 8 px under the bars and at least 8 px over the stick, and its note ends with a sentence`, !!gaps && gaps.under >= 7.5 && gaps.under <= 9 && gaps.over >= 7.5 && (!gaps.note || /[.!?]$/.test(gaps.note)), gaps);
-    check(`${size.name}: both banners keep their instruction, and the first mission line its reason`, hn.notes.length === 2 && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
+    // (the quiet HUD: one thing leads, with its instruction, and the other waits beside it as a mark; the full HUD: two banners)
+    check(`${size.name}: the banner that leads keeps its instruction, the other waits as a mark, and the first mission line keeps its reason`,
+      (hn.calm ? hn.notes.length === 1 && hn.marks >= 1 : hn.notes.length === 2) && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
     const a = await audit();
     check(`${size.name}: the busy HUD has nothing under 11 px or 44 px, and nothing cut`, a.length === 0, a);
     // every prompt is a line, and at most one line under it (three-line prompts stood over the stick at 667 wide)

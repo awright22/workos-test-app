@@ -220,6 +220,11 @@ function initTouch(canvas) {
     if (!playing() || S.uiOpen || screenOpen() || S.flags.coldOpen) return;
     if (layout.calm && !gaugesOpen()) openGauges(); else showBarsGuide();
   });
+  // (and so do the marks that wait beside a warning: each is a gauge, or an alarm, that is not being shown)
+  UI.alerts.addEventListener('click', (e) => {
+    if (!e.target.closest('.marks') || !playing() || S.uiOpen || screenOpen() || S.flags.coldOpen) return;
+    openGauges();
+  });
   UI.tRow.querySelectorAll('[data-t]').forEach((btn) => {
     press(btn, () => { if (playing() && !S.flags.coldOpen && screenUnlocked(btn.dataset.t)) toggleScreen(btn.dataset.t); });
   });

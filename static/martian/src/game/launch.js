@@ -2,7 +2,7 @@
 // a black sky, and the rescue as the book has it: the ascent vehicle falls short, the Hermes blows her forward
 // airlock to brake, and Beck crosses on a tether to fetch him. Nobody flies anything: he is cargo.
 //
-// It is eight shots, cut like film, and three effects that exist only here:
+// It is nine shots, cut like film, and three effects that exist only here:
 //   the flame   three nested cones of light (a white core, the flame, a wide faint plume that spreads as the air thins)
 //   the smoke   lit puffs: a skirt of dust rolling out along the ground, and the column the engine leaves up the sky
 //   the glow    the engine's light on the pad and on the smoke round it
@@ -26,11 +26,12 @@ const LIFT = 5.2;            // seconds from "punch it" to lift-off
 const IGNITE = 4.3;          // the engine lights just before
 const CUT_WIDE = 1.7;        // seconds after lift-off: cut from the pad to the far camera
 const CUT_CHASE = 4.0;       // ... to the camera that climbs beside the rocket
-const CUT_LEAVE = 12.6;      // ... to the one ahead of it, looking back down at it over the curve of the planet
+const CUT_PASS = 7.2;        // ... to a long lens far off to one side, level with it: the sky going black behind it
+const CUT_LEAVE = 10.4;      // ... to the one ahead of it, looking back down at it over the curve of the planet
 const MECO = 15.2;           // the engine burns out
 const CUT_ORBIT = 16.4;      // ... the Hermes
 const WIN = 26.0;            // the rescue is called
-const CROSS_AT = 2.6;        // seconds into the last scene: cut from the whole ship to the man on the tether
+const CROSS_AT = 3.9;        // seconds into the last scene: cut from the whole ship to the man on the tether
 const CLOSE_AT = 6.7;        // ... to the vehicle's open nose as he reaches it
 const HOME_AT = 10.6;        // ... and to the two of them going home, the ship ahead of them
 const ORBIT_R = R * 1.45;    // where the Hermes waits, from the planet's centre
@@ -436,6 +437,8 @@ export function startLaunch() {
   // at a hundred and fifty metres it had tilted up into bare sky within a second)
   const FAR = 250;
   const nearDir = around(38), farDir = around(-52);
+  // (at eye height. Tried from eight metres up, to put the stones at the foot of its picture further off: the horizon
+  // left the frame with them, and the shot was a rocket in a blank sky. The land under the column is what gives it its size.)
   const camNear = clear(onGround(nearDir, 46, 2.0)), camFar = clear(onGround(farDir, FAR, 3.2));
 
   log('Strapped into a rocket with no nose cone under a tarp. Countdown started. If this works, drinks are on NASA forever.');
@@ -520,7 +523,8 @@ export function startLaunch() {
       parts.flame.scale.set(1 + thin * 0.5, flick * (1 + thin * 0.6), 1 + thin * 0.5);
       parts.core.scale.set(1, 0.9 + Math.random() * 0.25, 1);
       parts.wide.scale.set(1 + thin * 3.2, (0.95 + Math.random() * 0.1) * (1 + thin * 1.4), 1 + thin * 3.2);
-      parts.wide.material.uniforms.uGain.value = 1.5 * (1 - 0.55 * thin);
+      // (in a vacuum there is nothing for it to light: over lit ground it was a tan puff that sat on the surface under the flame)
+      parts.wide.material.uniforms.uGain.value = 1.5 * (1 - 0.93 * thin);
       parts.glow.scale.setScalar((3.6 + thin * 2.4) * (0.92 + Math.random() * 0.16));
       F.flame.getWorldPosition(nozzle);
       F.glow = burn * (1 - smoothstep(6, 90, alt)) * (0.85 + Math.random() * 0.15);
@@ -563,33 +567,44 @@ export function startLaunch() {
       S.shake = 0.05;
       cam.position.copy(camFar);
       camLookAt(_a.copy(pad).addScaledVector(up, Math.max(40, alt + 9 - 12 - alt * 0.05)), up);
-    } else if (lt < CUT_LEAVE) {
+    } else if (lt < CUT_PASS) {
       // 3. Beside it and above, climbing with it: its trail running down to the pad, the ground dropping away, the
-      //    horizon bending and the sky going black.
+      //    horizon bending.
       setShot('chase', 50);
       // (above it from the first frame, looking down its trail to the pad and the dust still spreading there: level
       // with it, the shot began as a rocket in a beige void over a blank horizon)
-      const rel = (lt - CUT_CHASE) / (CUT_LEAVE - CUT_CHASE), over = 1;
+      const rel = (lt - CUT_CHASE) / (CUT_PASS - CUT_CHASE), over = 1;
       const dist = 38 + Math.min(alt, 2400) * 0.014;
       S.shake = clamp(0.5 - (lt - CUT_CHASE) * 0.07, 0, 0.5);
       cam.position.copy(pad).addScaledVector(nearDir, dist).addScaledVector(side, -dist * (0.35 + 0.25 * rel))
         .addScaledVector(up, alt + lerp(5, 31 + Math.min(alt, 2400) * 0.008, over));
       camLookAt(rocketAt.addScaledVector(up, -6 * over), up);
+    } else if (lt < CUT_LEAVE) {
+      // 4. From far off to one side, a long lens level with it: the rocket and its flame against the sky as the sky
+      //    goes from dust to black, the planet's edge sinking under it. (The climb was one angle for eight and a half
+      //    seconds, looking down the whole time at ground that is neither near enough nor far enough to be anything.)
+      setShot('pass', 30);
+      const k = (lt - CUT_PASS) / (CUT_LEAVE - CUT_PASS), dist = 112 - 22 * k;
+      cam.position.copy(pad).addScaledVector(farDir, dist).addScaledVector(side, -dist * 0.2).addScaledVector(up, alt + 9 + 12);
+      _b.copy(up).applyAxisAngle(farDir, -0.1);
+      camLookAt(rocketAt.addScaledVector(up, -8 - 14 * k), _b);
     } else if (lt < CUT_ORBIT) {
-      // 4. From ahead of it and above, looking back down: the rocket climbing toward the lens out of the curve of
+      // 5. From ahead of it and above, looking back down: the rocket climbing toward the lens out of the curve of
       //    the planet, the plume spread wide in the vacuum behind it; the engine burns out, and it coasts.
+      //    (Nothing of the pad is in it: from here the column it left was a thread ending in a puff on the ground.)
       setShot('above', 46);
+      F.column.visible = false; smoke.points.visible = false;
       const k = (lt - CUT_LEAVE) / (CUT_ORBIT - CUT_LEAVE);
       const lead = 42 - 24 * k, off = 40 - 20 * k;
       cam.position.copy(pad).addScaledVector(up, alt + 9 + lead).addScaledVector(nearDir, off * 0.94).addScaledVector(side, off * 0.34);
       _b.copy(up).applyAxisAngle(nearDir, 0.16);
       camLookAt(rocketAt.addScaledVector(up, -3), _b);
     } else {
-      // 5. The Hermes, over the line between day and night. The ascent vehicle has fallen short of her and hangs
+      // 6. The Hermes, over the line between day and night. The ascent vehicle has fallen short of her and hangs
       //    off her bow. Her forward airlock blows, to brake her; a man comes out of it on a tether.
-      // 6. The man on the tether, crossing: the ship behind him, the planet under him.
-      // 7. Close on the vehicle's open nose as he reaches it and takes hold; and back, the two of them together.
-      if (!orbit) orbit = enterOrbit(up, F);
+      // 7. The man on the tether, crossing: the ship behind him, the planet under him.
+      // 8. Close on the vehicle's open nose as he reaches it and takes hold; and back, the two of them together.
+      if (!orbit) { orbit = enterOrbit(up, F); smoke.points.visible = true; }
       const ot = lt - CUT_ORBIT, O = orbit;
       hermes.visible = true;
       if (World.hermesRing) World.hermesRing.rotation.z = ot * 0.22;
@@ -661,11 +676,18 @@ export function startLaunch() {
         _a.crossVectors(head, front).normalize();                         // his right... (x = y cross z)
         fig.root.quaternion.setFromRotationMatrix(_m.makeBasis(_a, head, _c.crossVectors(_a, head)));
       };
-      // Beck turns his front from the planet to the man he holds; Watney his, from the planet to Beck
-      face(crew.beck, ahead, _b.copy(up).negate().lerp(side2, carried).normalize());
+      // Their fronts are to where the cameras of the crossing and of the catch stand, off the bow on the sunlit side
+      // and above. (Belly to the planet, as a man falls, under cameras that look down on them: the crossing was a
+      // backpack on a string and the catch two backpacks, and no visor was turned to the lens in either.) Holding
+      // him, Beck turns his part of the way to the man he holds, and Watney his to Beck.
+      // (to whichever of the two is looking: the turn from one to the other is under the cut between them)
+      const lookAz = ot < CLOSE_AT ? O.crossAz : O.reachAz, lookPitch = ot < CLOSE_AT ? O.crossPitch : O.reachPitch;
+      const camDir = O.camDir.copy(O.f).multiplyScalar(Math.cos(lookAz)).addScaledVector(O.x, -Math.sin(lookAz)).multiplyScalar(Math.cos(lookPitch)).addScaledVector(up, Math.sin(lookPitch));
+      const frontOf = (v, head) => v.copy(camDir).addScaledVector(head, -camDir.dot(head)).normalize();
+      face(crew.beck, ahead, frontOf(O.frontB, ahead).lerp(side2, carried * 0.55).normalize());
       crew.mark.root.visible = true;
       crew.mark.root.position.copy(markAt);
-      face(crew.mark, markUp, _b.copy(up).negate().lerp(_d.copy(side2).negate(), carried).normalize());
+      face(crew.mark, markUp, frontOf(O.frontM, markUp).lerp(_d.copy(side2).negate(), carried * 0.55).normalize());
       crew.mark.mixer.setTime(0.2 + 0.2 * Math.sin(ot * 0.7 + 1));
       // Their arms: Beck reaches for him over the last of the crossing, and Watney for Beck; then Beck holds him
       // with one arm and the tether with the other.
@@ -681,7 +703,7 @@ export function startLaunch() {
       // the tether, slack as it pays out and drawn straight as he nears the end of it
       {
         const line = O.tether.userData.line, n = line.length / 3, slack = 2.6 * (1 - 0.85 * Math.max(out - back, 0));
-        O.clip.copy(beckAt).addScaledVector(up, 0.26 * (1 - carried)).addScaledVector(side2, -0.26 * carried).addScaledVector(ahead, 0.18);
+        O.clip.copy(beckAt).addScaledVector(O.frontB, -0.26).addScaledVector(ahead, 0.18);
         for (let i = 0; i < n; i++) {
           const k = i / (n - 1), sag = Math.sin(k * Math.PI) * slack;
           // (made fast at his pack, not his middle: from the ship's side it ran to his ankles)
@@ -699,23 +721,33 @@ export function startLaunch() {
         _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(O.centre).normalize(), O.roll);
         camLookAt(_c.copy(O.centre).addScaledVector(O.f, 27), _b);
       } else if (ot < CLOSE_AT) {
-        // ahead of him on the sunlit side, and above: he comes on toward the lens, the tether running back to the
-        // open lock behind him
+        // Off to the sunlit side of his line and above, square on to it: he crosses the picture head first with his
+        // front to the lens, the planet under him and the tether running back out of the frame. The shot begins with
+        // the open lock at its edge and he leaves it behind. (From ahead of him, looking back, an arc of the ship's
+        // ring hung in a corner for as long as the shot ran; from dead ahead with a wide lens the ship was whole,
+        // and it was her shaded bow, with no planet in the picture.)
         setShot('cross', 36);
         const ct = ot - CROSS_AT;
         _a.copy(O.f).multiplyScalar(Math.cos(O.crossAz)).addScaledVector(O.x, -Math.sin(O.crossAz));
-        // (it looks back toward the ship at first, the lock and the man both in the frame; as the tether pays out it
-        // comes round to him alone, so the ship leaves the frame whole: held on the first aim, a sliver of her ring
-        // hung in the corner for the last second of the shot)
-        stand(_d.copy(beckAt).addScaledVector(O.f, -3.5 + 6.0 * smoothstep(1.0, 3.4, ct)), _a, O.crossPitch, 10.5 - ct * 0.5, O.crossRoll);
+        // (aimed at him until the open nose of the ascent vehicle is near enough to share the picture, then half-way
+        //  between the two: the man in the nose reaching out from one side and Beck in from the other. Aimed at him
+        //  to the end, it was a man reaching into empty space.)
+        const gap = _c.copy(to).sub(beckAt).length(), lead = lerp(1.0, gap * 0.5, 1 - smoothstep(8, 11, gap));
+        stand(_d.copy(beckAt).addScaledVector(O.f, lead), _a, O.crossPitch, 7.6 - ct * 0.4, O.crossRoll);
       } else if (ot >= HOME_AT) {
         // behind the two of them and above, on the way home: the tether drawing them in, the ship and her open lock ahead
-        setShot('home', 50);
+        // (a wide lens aimed between them and the ship, so that she is whole in the picture and they are near the lens:
+        //  aimed at the pair, a piece of her ring hung in the corner of the last picture of the game)
+        setShot('home', 62);
         const ct = ot - HOME_AT;
         _a.copy(O.f).multiplyScalar(Math.cos(O.homeAz)).addScaledVector(O.x, -Math.sin(O.homeAz));
+        // (the camera stands off the pair, beyond them from the ship, and looks a fifth of the way from them to her)
         _d.copy(beckAt).lerp(markAt, 0.5);
-        _d.addScaledVector(_c.copy(from).sub(_d).normalize(), 3.2);
-        stand(_d, _a, O.homePitch, 8.2 + Math.min(ct, 8) * 0.15, O.homeRoll);
+        const off = 6.6 + Math.min(ct, 8) * 0.12;
+        cam.position.copy(_d).addScaledVector(_a, Math.cos(O.homePitch) * off).addScaledVector(up, Math.sin(O.homePitch) * off);
+        _d.lerp(_c.copy(O.centre).addScaledVector(O.f, 4), 0.2);
+        _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(_d).normalize(), O.homeRoll);
+        camLookAt(_d, _b);
       } else {
         // above the vehicle's nose on the same side: the two of them, the dark line of the night behind them
         setShot('reach', 36);
@@ -831,9 +863,9 @@ function enterOrbit(up, F) {
   F.glow = 0; F.smoke.u.uGlow.value = 0; F.smoke.u.uColumn.value = 0; F.smoke.u.uWind.value.set(0, 0, 0);
   const V = () => new THREE.Vector3();
   return { centre, dock, f, x, s, h, rocketWorldQ, parentInvQ, stageLength, tether, debris, debrisVel, ventQ, said: 0,
-    mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), markAt: V(), markUp: V(), from: V(), to: V(), ahead: V(), way: V(), lat: V(), side2: V(), clip: V(),
+    mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), markAt: V(), markUp: V(), from: V(), to: V(), ahead: V(), way: V(), lat: V(), side2: V(), clip: V(), camDir: V(), frontB: V(), frontM: V(),
     dist: 106, pitch: 50 * DEG, swing: 25 * DEG, roll: -0.14,
-    crossAz: 35 * DEG, crossPitch: 40 * DEG, crossRoll: -0.3,
+    crossAz: 112 * DEG, crossPitch: 34 * DEG, crossRoll: -0.2,
     reachAz: 60 * DEG, reachPitch: 50 * DEG, reachRoll: -0.2,
     homeAz: 52 * DEG, homePitch: 23 * DEG, homeRoll: 0.08 };
 }

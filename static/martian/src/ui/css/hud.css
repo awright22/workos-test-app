@@ -869,7 +869,7 @@
    airlock he was being sent to, and said "wipe the panels" beside "get to air" */
 #mg-root.mg-calm.is-urgent #mg-log { display: none; }
 /* (and the card gives that one task: "Make water" stood under "Get to air" while his tank ran out) */
-#mg-root.mg-calm.is-urgent #mg-objectives .obj:not(.first) { display: none; }
+#mg-root.mg-calm.is-urgent #mg-objectives .obj:not(.first):not(.primary) { display: none; }
 #mg-root.mg-calm.bars-in .suit { align-self: flex-start; }
 /* (a gauge's name stands clear of its bar: the 2 of "HAB O2" ran into it) */
 #mg-root.mg-calm .res .row, #mg-root.mg-calm #mg-rover .row { row-gap: 3px; }
@@ -896,7 +896,10 @@
 /* One thing leads (ui/hud.js): beside the leading banner, or alone, the other warnings wait as marks: each its own
    sign in its own colour, with no words and no bar. */
 #mg-root.mg-calm #mg-alerts { flex-direction: row; align-items: center; justify-content: center; gap: .375rem; }
-#mg-alerts .marks { display: flex; align-items: center; gap: .25rem; }
+/* (a ring round a sign is drawn as a button, so it is one: a press on the marks opens every gauge, as a press on the
+   dial does. What is pressed is a thumb high and wide; what is drawn is the marks.) */
+#mg-alerts .marks { display: flex; align-items: center; gap: .25rem; box-sizing: border-box; min-width: max(2.75rem, 44px); min-height: max(2.75rem, 44px); margin: calc((1.625rem - max(2.75rem, 44px)) / 2) 0; padding: 0;
+  border: 0; background: none; color: inherit; font: inherit; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 #mg-alerts .mark { display: grid; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; box-sizing: border-box;
   background: var(--plate-strong); border: 1.5px solid var(--accent); color: var(--accent); font: 600 var(--t12)/1 var(--f-cond); font-style: normal; }
 #mg-alerts .mark .ic { width: .9375rem; height: .9375rem; }
@@ -905,4 +908,5 @@
 /* (on the small phone there is no room beside the banner: the second mark stood under the task's card. They wait under it.) */
 @media (max-width: 760px) {
   #mg-root.mg-calm #mg-alerts { flex-direction: column; gap: .25rem; }
+  #mg-alerts .marks { justify-content: center; }
 }

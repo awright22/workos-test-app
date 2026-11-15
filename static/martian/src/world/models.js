@@ -480,8 +480,17 @@ function mergeSkinned(scene, dust) {
   }
 }
 
+/*
+ * How much of a pane can be seen, by model. `a`: how solid it is looked through squarely; `film`: how much of its
+ * film of dust shows then (all of it shows looked along); `top`: how solid it is looked along; `env`: how strongly
+ * it mirrors the sky. A vehicle's windows are tinted and coated, and are seen from outside: the rover's read as
+ * holes in its cab ("no glass feel to its windows", two picture reviews). The greenhouse is seen from above as much
+ * as from beside: looked down on, its panes were not there ("no glass seen from above").
+ */
+const PANES = { rover: { a: 0.42, film: 0.5, top: 0.93, env: 2.6 }, greenhouse: { a: 0.27, film: 0.48, top: 0.84, env: 1.6 }, default: { a: 0.2, film: 0.35, top: 0.82, env: 1.6 } };
+
 function prepare(gltf, name) {
-  const dust = DUST[name] === undefined ? DUST.default : DUST[name], twoSided = TWO_SIDED.test(name);
+  const dust = DUST[name] === undefined ? DUST.default : DUST[name], twoSided = TWO_SIDED.test(name), pane = PANES[name] || PANES.default;
   let skinned = false;
   gltf.scene.traverse((o) => { if (o.isSkinnedMesh) skinned = true; });
   if (skinned) mergeSkinned(gltf.scene, dust); else mergeStatic(gltf.scene, dust);
@@ -504,9 +513,9 @@ function prepare(gltf, name) {
       if (name.startsWith('glass_clear')) {
         // (not mirror-smooth: a lamp a metre away would otherwise reflect as a white-out)
         // (and dark in itself: a pane takes a glint from a lamp, it does not light up like a sheet of paper held to it)
-        m.transparent = true; m.depthWrite = false; m.opacity = 0.2; m.roughness = 0.12; m.metalness = 0.0;
+        m.transparent = true; m.depthWrite = false; m.opacity = pane.a; m.roughness = 0.12; m.metalness = 0.0;
         m.color.setRGB(0.035, 0.045, 0.055);
-        m.envMapIntensity = 1.6; m.side = THREE.DoubleSide;
+        m.envMapIntensity = pane.env; m.side = THREE.DoubleSide;
         // (and its glint from a lamp is a glint: the helmet lamp three metres off still burnt a white star into a pane)
         // A pane is seen by what it does to the light: looked through squarely it is almost not there, and looked along
         // it mirrors the sky. And glass on Mars carries a film of dust. (At one faint tint from every angle a dome of
@@ -521,11 +530,11 @@ function prepare(gltf, name) {
                 #if NUM_DIR_LIGHTS > 0
                   filmLit += directionalLights[0].color * (abs(dot(paneN, directionalLights[0].direction)) * 0.32);
                 #endif
-                outgoingLight += vec3(0.34, 0.24, 0.16) * filmLit * (0.35 + 0.65 * glance);
-                diffuseColor.a = mix(diffuseColor.a + 0.10, 0.82, glance * 0.85); }
+                outgoingLight += vec3(0.34, 0.24, 0.16) * filmLit * (${pane.film.toFixed(2)} + ${(1 - pane.film).toFixed(2)} * glance);
+                diffuseColor.a = mix(diffuseColor.a + 0.10, ${pane.top.toFixed(2)}, glance * 0.85); }
               #include <opaque_fragment>`);
         };
-        m.customProgramCacheKey = () => 'glass4';
+        m.customProgramCacheKey = () => `glass5:${pane.film}:${pane.top}`;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;

@@ -3592,6 +3592,12 @@ def finish(root, name, soften=None, paint=None, wear=None, prepare=None, samples
             soften_ao(root, soften)
         if paint:
             paint_ao(root, paint)
+        # the room's own lamps, baked into what is seen only from inside (lib.bake_light): pools under the truss
+        # lights and the grow lights, shade under the bunk and behind the racks
+        room = next((o for o in lib_descendants(root) if o.name == 'interior'), None)
+        if room is not None:
+            n = bake_light(root, within=room)
+            print(f'  baked the lamps into {n} vertices of the interior')
     if wear:
         wear(root)
     return export_model(root, name, ao=False, do_collapse=False)

@@ -719,7 +719,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     const u = _aw.copy(atVec).normalize();
     const w = WORK_BY_ID[kind];
     const padRec = w ? ctx.planet.addPad(u.x, u.y, u.z, w.pad, w.pad * 0.9)
-      : kind === 'greenhouse' ? ctx.planet.addPad(u.x, u.y, u.z, 5.6, 5) : ctx.planet.addPad(u.x, u.y, u.z, 1.4, 2.2);
+      // (the greenhouse's levelled ground runs out into the land over eight and a half metres: over five, on a slope, its
+      //  bank was steep enough to shade as a dark band curving away from the door)
+      : kind === 'greenhouse' ? ctx.planet.addPad(u.x, u.y, u.z, 5.6, 8.5) : ctx.planet.addPad(u.x, u.y, u.z, 1.4, 2.2);
     ctx.terrain.syncPads([padRec]);
   }
   const g = placeAt(atVec, undefined, yaw);

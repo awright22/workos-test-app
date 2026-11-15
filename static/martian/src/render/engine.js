@@ -407,10 +407,13 @@ export class Engine {
     e.sunE = sky.sunE; e.dust = dust; e.up.copy(up); e.age = 0; e.space = sky.space || 0;
     // the ground as the sky sees it: sunlit regolith plus the sky's own light bounced back
     const lit = (sky.sunIntensity * Math.max(sky.sunE, 0)) / Math.PI;
+    // (from orbit the planet is less than half of what a thing sees, and its light on a ship's shaded side is a
+    //  tint, not a coat of paint: the Hermes' unlit flank was orange-brown)
+    const sp = sky.space || 0;
     this.envGround.material.color.setRGB(
-      0.42 * (lit * sky.sunColor.r + sky.ambientSky.r * 0.6),
-      0.21 * (lit * sky.sunColor.g + sky.ambientSky.g * 0.6),
-      0.11 * (lit * sky.sunColor.b + sky.ambientSky.b * 0.6));
+      0.42 * (1 - 0.74 * sp) * (lit * sky.sunColor.r + sky.ambientSky.r * 0.6),
+      0.21 * (1 - 0.58 * sp) * (lit * sky.sunColor.g + sky.ambientSky.g * 0.6),
+      0.11 * (1 - 0.3 * sp) * (lit * sky.sunColor.b + sky.ambientSky.b * 0.6));
     this.envGround.quaternion.setFromUnitVectors(_v.set(0, 1, 0), up);
     const disc = sky.uniforms.uSunDisc.value;
     sky.uniforms.uSunDisc.value = 0.25;                 // a softened sun: no fireflies in rough reflections

@@ -121,7 +121,7 @@ export const OBJECTIVES = [
     pos: () => habPoint(4.2, 1.4, 4.8), shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   // (its reason says what the day brings: with "the Hermes is coming back" alone, nothing on the card said that a
   //  drive stands between him and the rescue)
-  { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}, then drive to the MAV`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
+  { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}, then drive`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
     shown: () => !isBase() && S.pf.connected, done: () => S.sol >= S.rescueSol },
   // ---- The game with no rescue: what a base is made of, a thing at a time. First the line that leads from one
   //      thing to the next (stone, kiln, brick, smelter, glass, power, the pad, quarters, the tower), in the order a
@@ -1199,7 +1199,7 @@ export function updateHud() {
     root.style.setProperty('--al2', Math.max(0, nAl - 1));
     root.classList.toggle('has-alert', nAl > 0);                                      // (on a phone a banner takes the region label's place)
     UI.alerts.innerHTML = banners.map(([cls, ic, title, note, short]) => `<div class="alert ${cls}">${icon(ic)}<span>${title}</span><small>${narrow ? short : note}</small></div>`).join('') +
-      (marks.length ? `<div class="marks" aria-label="${marks.length} more ${marks.length === 1 ? 'warning' : 'warnings'}">${marks.map(([lvl, ic]) => `<i class="mark ${lvl}">${lvl === 'more' ? ic : icon(ic)}</i>`).join('')}</div>` : '');
+      (marks.length ? `<button type="button" class="marks" aria-label="${marks.length} more ${marks.length === 1 ? 'warning' : 'warnings'}: show every gauge">${marks.map(([lvl, ic]) => `<i class="mark ${lvl}">${lvl === 'more' ? ic : icon(ic)}</i>`).join('')}</button>` : '');
   }
 
   // --- screen-edge effects, drawn by the renderer's final pass ---

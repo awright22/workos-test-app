@@ -857,7 +857,7 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | N8 | Gauge rows on a 20 px pitch, values about 12 px, the alarm outline touching the rows either side of it | open |
 | N9 | Onboarding: five NEW cards in 39 game minutes; two bars with one card; trend arrows seen eleven pictures before their card; VIEW, JUMP, the rover and watering never explained; POWER and VITALS with no "at zero"; morale scored before its bar | open |
 | N10 | Vocabulary: "HAB AIR" under the ring beside the "HAB O2" bar, "ROVER AIR" beside "O2 TANK"; fabricate, install, make, build; three names for restarting and for a storm; the meal rule said three ways; "12 SOLS SURVIVED" on Sol 12; the recommended difficulty labelled "HARDER" | part: the dial says "HAB O2" and "ROVER O2" as the gauges do (the rover's row was "O2 TANK"); restarting is "Restart from Sol 1" on the pause menu, its question and the death sheet; the pause card counts the sols he has seen out (11 on Sol 12); the recommended difficulty is "Standard". Left: fabricate, install, make and build are four different acts and keep their words; a storm's names and the meal rule were not traced |
-| N11 | The HUD's "Survive to Sol 25" line names no drive (the journal and the pause card do) | done: "Survive to Sol 25, then drive to the MAV" |
+| N11 | The HUD's "Survive to Sol 25" line names no drive (the journal and the pause card do) | done: "Survive to Sol 25, then drive" (the MAV and how far it is are the line under it; with the MAV in the title it ran to two lines on a phone) |
 | N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
 | N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
@@ -981,7 +981,8 @@ Now (`ui/hud.js`, "one thing leads"; `css/hud.css`): whatever is wrong is put in
   (what to do, where, how far) and no second line.
 - **The rest are marks**: a ring with the thing's own sign, red if critical and amber if low, with no words and no
   bar; two beside the banner, or three under it on the small phone (beside it there the second stood under the task
-  card), and a count past that. A tap on the dial still opens every gauge.
+  card), and a count past that. A ring round a sign is drawn as a button (the audit's rule, from a reviewer), so the
+  marks are one: a press on them opens every gauge, as a press on the dial does.
 - The leading banner is the colour of the task it stands beside: an amber "suit low" beside a red "Get to air" is
   red (not in the first minute, whose leak stays amber).
 - The full HUD (the setting) shows two banners and every gauge, as it did.
@@ -1421,6 +1422,86 @@ What it found, and what was done after it, seen by me in new pictures and by no 
 | L7 | At dusk the rover's dust was brighter than the sky behind it | done: kicked-up dust takes less of a low sun |
 | L8 | In twilight the glow "stops short of the horizon": a darker band 40 px tall at the foot of the sky | done: the band is a fifth weaker; no band shows at dusk or by day |
 | L9 | No lamp casts a shadow behind a rock ("not noticeable at phone size"); the back of his helmet is lit though his lamps face forward | left: a shadow from a lamp is a second shadow map every frame |
+
+## The launch and the rescue (the owner's item d)
+
+The owner: "the launch and the rescue as cutscenes (round 11's V5, V6)", one pass and one re-check. They were
+already a cutscene of eight shots (`game/launch.js`); what the eleventh picture review said of them was that the
+climb "loses scale in the middle" on one angle for six seconds over "a smeared planet" (V6), and that the rescue had
+weak frames: "a sliver of ship and a small figure from behind", "the ship's unlit sides orange-brown", "no visor
+toward the camera at the catch" (V5).
+
+One pass, judged by me from stills taken through it (`tools/tests/film.mjs --phone`):
+
+| | What was wrong | What was done |
+| --- | --- | --- |
+| C1 | The climb was one angle for eight and a half seconds, beside the rocket and above it, looking down at ground that is neither near enough nor far enough to be anything | It is two shots. The first three seconds as before; then a long lens far off to one side and level with the rocket: the rocket and its flame against the sky as it goes from dust to black, the planet's edge sinking under it; then the shot from ahead and above, two seconds sooner |
+| C2 | From the far camera on the ground, the foot of the picture was ground a hundred metres off, and the stones on it stood in front of a rocket three hundred metres up as "boulders far below" | Tried: that camera eight metres up, as from a rise. **Undone after the re-check**: the horizon left the frame with the stones ("about 95% of the frame is flat tan sky with no ground or horizon, so no scale is felt"), and the land under the column is what gives it its size. It stands at eye height again |
+| C3 | From ahead and above, the column it left was a thread "ending in a puff on the surface" | Nothing of the pad is drawn in that shot |
+| C4 | Both men flew belly to the planet under cameras that look down on them: the crossing was a backpack on a string, the catch two backpacks | Their fronts are turned to whichever camera is looking (the turn is under the cut): Beck comes on head first with his visor to the lens; at the catch both visors are in the picture |
+| C5 | In the crossing an arc of the ship's ring hung in a corner of the picture for as long as the shot ran | The camera stands off to the sunlit side of his line, square on to it and above: he crosses the picture with the planet under him and the ship out of it. (Tried first: dead ahead with a wide lens, the whole ship behind him. It was her shaded bow, and no planet.) |
+| C6 | The ship's shaded side was orange-brown: lit from below by the planet as by ground an arm's length away | From orbit the planet's light on a shaded surface is half as strong and less red (`render/engine.js`) |
+
+The re-check (one independent reviewer; 20 stills `now` and 17 `earlier`, every one opened; it had no still
+between 20 and 24 seconds or after 33, and said so):
+
+| Point | Verdict | From the review |
+| --- | --- | --- |
+| The lift-off | NEARLY | the pad shot "is real spectacle"; the wide shot had lost its horizon (C2, since undone) |
+| The climb | NEARLY | "it reads as ground to orbit"; three angles; the side-on run "is at the standard", its frames "the best frames of the climb"; the last shot still has the puff |
+| The rescue | NEARLY | the airlock, the catch and the pull-away "each read in under a second"; the last shot has a ship fragment in its corner; the ship's shade is "brown, like card" |
+| As an ending | NEARLY | "no single frame that looks broken. What keeps it from MET is a cluster of finish items" |
+| Then and now | the climb "better"; the rescue "better, except the last shot" | "Visors now face the camera at the airlock, the catch and the pull-away. Earlier, every one of those showed backpacks" |
+
+What it found (none a blocker), and what was done after it, seen by me in check frames and by no reviewer:
+
+| | Finding | State |
+| --- | --- | --- |
+| C7 | The last shot: the ship "a cropped piece hanging in the top-left corner", the pair "curled into one mass", four fifths of the frame black | done in part: a wide lens that stands off the pair, beyond them from the ship, and looks a fifth of the way from them to her: the ship is whole and the tether runs to her lock. It is still a dark picture (her bow is her shaded end), and the pair are still one clump. It plays behind the win sheet, which comes up a second before it |
+| C8 | From ahead and above the exhaust "ends in a dust-coloured puff that sits on the ground" | done: it was the engine's wide outer plume, which had nothing to light in a vacuum; it gives out with the air |
+| C9 | The crossing: "one stiff figure against black", arms reaching "toward empty space", the vehicle he flies to never in frame | done in part: the shot is 1.3 s shorter (the shot of the whole ship before it, which the reviewer liked, runs that much longer); it is aimed at him until the vehicle's open nose is near enough to share the picture, and then half-way between the two, so its last second is the man in the nose reaching out from one side and Beck in from the other. His pose is one clip: left |
+| C10 | Mars "flips between sunlit and near-black from shot to shot" | left: it is the camera turning toward the night side (the ship stands over the line between day and night); the crossing is lit from the sun's side, which looks at the dark half |
+| C11 | The ship's shaded surfaces brown ("improved, not fixed") | done: the planet's light on a shaded surface in orbit is a quarter of what it is on the ground, and nearer grey |
+| C12 | The ship is flat untextured white beside a capsule with mottled paint; the ship "never seen whole in the stills I was given" | the whole ship is the shot at 21 to 25 seconds, which was not among the stills; the ring's facets are in the built-objects pass; paint on the ship: left |
+| C13 | Smaller: the catch small under a capsule that takes 45% of the frame; the rocket the same size in the same place while the ground changes under it for a second; the smoke trail a flat ribbon, then gone; stretched ground low in the frame from above; Beck's boots rust-brown | left, polish |
+
+
+## Baked lighting and the built objects (the owner's item e, and the fourth addition)
+
+The owner: "baked lighting from the Blender build (AO so props sit in the ground; baked light for Hab and
+greenhouse interiors)", then "a pass on the built objects the reviewers flagged: the greenhouse (chunky struts,
+plain cap, the dark band at its door), glass on the rover's windows, the rescue ship close up (flat-shaded), and the
+faceted soil heap". One pass each; **their one re-check is the next picture review**, which has not been run: what
+follows was seen by me alone, in the pictures named.
+
+**Props sit in the ground** (`tools/build_contact.mjs`, `world/build.js` `contactPatch`). The models already
+carried occlusion baked into their vertices by the Blender build, with the ground counted as a plane under them: their
+undersides were dark and the ground under them was not. The bake now also does the ground's side: for each of the 41
+models that stand out of doors it adds up, from above, the model's shadow cast from 128 directions spread over the
+sky, into a 64 px tile of "how much of the sky does it hide here"; the game lays a model's tile on the ground under
+it as a soft dark patch. One picture of all the tiles, 115 kB. Not on the lightest preset for the eight solar
+panels (eight more things to draw).
+
+**The Hab's own lamps, baked** (`tools/assets/lib.py` `bake_light`, called from `hab.py`). The game lights the room
+with a handful of real lamps that cast no shadows, so the floor under the bunk was as bright as the floor under a
+lamp ("interiors evenly lit", three picture reviews). Each vertex of what is seen only from inside is now asked how
+much of the room's lamps it can see (each lamp a small area, so the edges are soft) and its colour is multiplied by
+that: 0.7 where it sees none, 1 in a lamp's pool. It is paint and stays when the lamps go out; a dark room times 0.7
+is a dark room. Seen in `inside-machines`: the middle of the floor is lighter than its edges, the corners by the
+lockers and behind the racks are darker. The greenhouse was not given it: by day it is lit by the sun through its
+panes, which casts real shadows of its frame, and its own lamps are a glimmer then.
+
+**The built objects:**
+
+| | What the reviewers said | What was done (seen in) |
+| --- | --- | --- |
+| B1 | The greenhouse: "chunky struts" | The ribs are 4 cm by 9 (were 7 by 13), the glazing bars 3 cm wide (were 5), the hubs two thirds the size: a frame, not a cage (`greenhouse-door`, `greenhouse-above`) |
+| B2 | "a plain cap", "a faceted cylinder" | A vent: a collar bolted to the crown hub, a louvred throat, a rain cap standing off it on four posts, a red strobe and a whip (it was a plain disc 88 cm across) |
+| B3 | "no glass seen from above" | The greenhouse's panes are a third more solid looked through squarely and carry more of their film of dust (`world/models.js`, `PANES`) |
+| B4 | "the dark band at its door" | It was the bank of the ground levelled for the dome: on a slope, steep enough over five metres to shade as a band curving away from the door. It runs out over eight and a half |
+| B5 | The rover: "no glass feel to its windows" | Its panes are tinted and mirror the sky: twice as solid squarely, nearly opaque looked along (`rover-park`) |
+| B6 | The rescue ship close up: "flat-shaded", "faceted" | The ring's section is a box with rounded shoulders turned in 72 steps (an octagon in 48), its hub in 40 sides and its spokes in 20 (were 24 and 12) |
+| B7 | "the faceted soil heap" | Twice the columns and nearly twice the rings (96 by 18; it was 48 by 10, and its lumps came out as two or three flat faces each): 5,100 triangles (`pile`) |
 
 ## Sharpness and the frame rate (the owner's item g)
 

@@ -812,11 +812,13 @@ def _gh_shell(K, P, edges, tris, primary):
             if (b - a).length < 0.14:
                 continue
             mid = ((a + b) / 2 - C).normalized()
+            # (slender: an aluminium frame under 0.6 kPa carries next to nothing. At 7 cm by 13 the ribs were timber
+            #  joists, at 5 cm the glazing bars were fence rails, and from any distance the dome was a cage.)
             if e in primary:
-                off = mid * -0.034
-                sweep(sb, [a + off, b + off], rect(0.07, 0.13), up=mid, caps=cut)
+                off = mid * -0.022
+                sweep(sb, [a + off, b + off], rect(0.042, 0.09), up=mid, caps=cut)
             else:
-                sweep(sb, [a, b], [(0.026, 0.022), (-0.026, 0.022), (0.0, -0.075)], up=mid, caps=cut)
+                sweep(sb, [a, b], [(0.016, 0.015), (-0.016, 0.015), (0.0, -0.048)], up=mid, caps=cut)
 
     # hubs: a puck at every node (pentagonal where five struts meet), flats toward the struts
     nbr = {}
@@ -829,12 +831,12 @@ def _gh_shell(K, P, edges, tris, primary):
             continue
         n = (p - C).normalized()
         k = 5 if len(nbr[i]) == 5 else 6
-        r_ = 0.13 if k == 5 else 0.105
+        r_ = 0.082 if k == 5 else 0.064
         M = frame(p, n, P[nbr[i][0]] - p)
         if p.z < ZC + 1e-3:
-            lathe(hb, [(0.0, -0.09), (r_, -0.09), (r_, 0.045), (0.0, 0.045)], k, M, phase=pi / k)
+            lathe(hb, [(0.0, -0.07), (r_, -0.07), (r_, 0.028), (0.0, 0.028)], k, M, phase=pi / k)
         else:
-            lathe(hb, [(0.0, -0.125), (0.05, -0.095), (r_, -0.095), (r_, 0.045), (0.0, 0.045)], k, M, phase=pi / k)
+            lathe(hb, [(0.0, -0.095), (0.035, -0.072), (r_, -0.072), (r_, 0.028), (r_ * 0.55, 0.036), (0.0, 0.036)], k, M, phase=pi / k)
     return in_door
 
 
@@ -1087,10 +1089,26 @@ def _gh_lights(K, P, in_door):
         anchor(f'light_{k}', K.parent, loc=(px, py, ZF))
     # apex: a vent cowl outside, a pendant work lamp inside
     top = ZC + R_
-    K.lathe('painted_white', [(0.0, -0.10), (0.44, -0.10), (0.44, 0.0), (0.36, 0.075), (0.17, 0.115), (0.15, 0.20), (0.22, 0.215),
-                              (0.22, 0.25), (0.10, 0.285), (0.0, 0.285)], 28, T(0, 0, top + 0.02), smooth=40.0)
-    K.lathe('painted_dark', [(0.16, 0.115), (0.16, 0.205)], 28, T(0, 0, top + 0.02), smooth=60.0)
-    K.lathe('painted_orange', [(0.444, -0.05), (0.444, -0.012)], 28, T(0, 0, top + 0.02), smooth=60.0)
+    # (a vent, not a lid: a collar bolted to the crown hub, a louvred throat, a rain cap standing off it on four
+    #  posts, a strobe and a whip. It was a plain disc 88 cm across with a smaller disc on it: "a faceted cylinder",
+    #  "a plain cap", three picture reviews.)
+    Mt = T(0, 0, top + 0.02)
+    K.lathe('painted_white', [(0.0, -0.08), (0.27, -0.08), (0.27, -0.02), (0.24, 0.018), (0.20, 0.018)], 28, Mt, smooth=40.0)
+    K.lathe('painted_orange', [(0.273, -0.06), (0.273, -0.03)], 28, Mt, smooth=60.0)
+    for k in range(8):                                                 # the collar's bolts
+        a_ = TAU * (k + 0.5) / 8
+        K.lathe('aluminium', [(0.0, 0.0), (0.014, 0.0), (0.014, 0.012), (0.0, 0.012)], 6, Mt @ T(0.252 * cos(a_), 0.252 * sin(a_), 0.0))
+    K.lathe('painted_dark', [(0.175, 0.018), (0.175, 0.175)], 28, Mt, smooth=60.0)                  # the throat, dark behind its louvres
+    for k in range(4):
+        z = 0.045 + 0.036 * k
+        K.lathe('aluminium', [(0.18, z + 0.012), (0.222, z - 0.016), (0.222, z - 0.008), (0.18, z + 0.02)], 28, Mt, smooth=40.0)
+    for k in range(4):
+        a_ = TAU * (k + 0.5) / 4
+        K.box('aluminium', (0.02, 0.02, 0.19), (0.202 * cos(a_), 0.202 * sin(a_), 0.10), Mt)
+    K.lathe('painted_white', [(0.0, 0.168), (0.262, 0.168), (0.262, 0.182), (0.21, 0.214), (0.11, 0.246), (0.0, 0.256)], 28, Mt, smooth=50.0)   # the rain cap
+    K.lathe('painted_dark', [(0.0, 0.25), (0.036, 0.25), (0.036, 0.278), (0.0, 0.278)], 10, Mt)
+    K.lathe('light_red', [(0.0, 0.278), (0.022, 0.278), (0.022, 0.305), (0.012, 0.318), (0.0, 0.32)], 10, Mt, smooth=60.0)                  # a strobe
+    K.tube('aluminium', [(0.17, 0.0, top + 0.21), (0.19, 0.0, top + 0.50), (0.20, 0.0, top + 0.86)], 0.005, 4)                               # a whip
     K.tube('aluminium', [(0, 0, top - 0.06), (0, 0, top - 0.52)], 0.016, 6)
     K.lathe('painted_white', [(0.0, -0.035), (0.30, -0.035), (0.32, -0.005), (0.10, 0.10), (0.06, 0.17), (0.0, 0.17)], 20, T(0, 0, top - 0.68), smooth=40.0)
     K.lathe('light_white', [(0.0, -0.045), (0.26, -0.045), (0.26, -0.03)], 20, T(0, 0, top - 0.68))
@@ -2335,7 +2353,10 @@ def build_regolith_pile():
     #  edge to it, not a flat card: at 8 degrees the dug side was a heap of triangles.)
     bm = H.bm('ground_dust', smooth=62.0)
     cut = H.bm('ground_dust', smooth=34.0)                   # the spade cuts: scoops with hard edges between them
-    NA, NR = 48, 10
+    # (twice the columns and nearly twice the rings it had: at 48 by 10 its lumps were sampled a hand apart, and each
+    #  came out as two or three flat faces. The spade's scallops keep their width: they are counted in pairs of old columns.)
+    NA, NR = 96, 18
+    M = NA // 48
     dumps = ((0.55, 0.35, 0.50, 0.36), (-0.50, 0.30, 0.55, 0.40), (-0.15, -0.60, 0.50, 0.30), (0.60, -0.35, 0.42, 0.22), (-0.75, -0.30, 0.40, 0.22),
              (0.05, 0.78, 0.36, 0.20))
     bite = rad(-58)                                 # the side the digging is done from
@@ -2375,13 +2396,13 @@ def build_regolith_pile():
             col = DUG
             if w > 0.0:
                 # the dug face: the heap stops at a lip, drops down the spade cuts to a trodden floor of crumbs
-                lip = edge * (0.60 + 0.035 * (1 if i % 2 else -0.6) + 0.03 * (hash01(i // 2, 7) - 0.5))   # scallops two columns wide
-                back = 0.07 + 0.09 * hash01(i // 2, 3)                # each cut leans back by its own amount
+                lip = edge * (0.60 + 0.035 * (1 if (i // M) % 2 else -0.6) + 0.03 * (hash01(i // (2 * M), 7) - 0.5))   # scallops two columns wide
+                back = 0.07 + 0.09 * hash01(i // (2 * M), 3)                # each cut leans back by its own amount
                 rb = (lip * (j / (NR - 3)) ** 0.9 if j <= NR - 3 else
                       lip + back if j == NR - 2 else lip + back + (edge - lip - back) * (0.55 if j == NR - 1 else 1.0))
                 zb = height(rb * cos(th), rb * sin(th)) if j <= NR - 3 else 0.045 if j == NR - 2 else 0.03 if j == NR - 1 else 0.0
                 if j == NR - 3:
-                    zb = min(max(zb, 0.20), 0.24 + 0.12 * hash01(i // 2, 5))
+                    zb = min(max(zb, 0.20), 0.24 + 0.12 * hash01(i // (2 * M), 5))
                 r_, z = r_ + (rb - r_) * w, z + (zb - z) * w
                 col = lerp(DUG, DAMP, w) if j >= NR - 3 else DUG
             if j == NR:
@@ -2393,7 +2414,7 @@ def build_regolith_pile():
     a1, a2, a3 = [], [], []
     for i in range(NA):
         th = TAU * i / NA
-        reach = 0.22 + 0.26 * (0.5 + 0.5 * noise3((cos(th), sin(th), 0.7), 3.1, 4.0)) + 0.10 * hash01(i, 3)
+        reach = 0.22 + 0.26 * (0.5 + 0.5 * noise3((cos(th), sin(th), 0.7), 3.1, 4.0)) + 0.10 * (hash01(i // M, 3) * (1 - (i % M) / M) + hash01((i // M + 1) % (NA // M), 3) * ((i % M) / M))
         tx, ty, _ = grid[NR][i]
         a1.append(P.add((tx + 0.45 * reach * cos(th), ty + 0.45 * reach * sin(th), 0.012), lerp(DUG, FINES, 0.55)))
         a2.append(P.add((tx + reach * cos(th), ty + reach * sin(th), -0.012), FINES))

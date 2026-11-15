@@ -2004,11 +2004,18 @@ def build_hermes():
     ring = part('ring', root, loc=(0, RING_Y, HERMES_Z))
     white, grey, alu, glass, foil = (bm_new() for _ in range(5))
     Rr = RING_R
-    lathe(white, [(1.9, -3.9), (2.05, -3.75)] + wall(2.05, -3.6, 3.6, pad=0.3, step=2.5) + [(2.05, 3.75), (1.9, 3.9)], 24, AY)
+    lathe(white, [(1.9, -3.9), (2.05, -3.75)] + wall(2.05, -3.6, 3.6, pad=0.3, step=2.5) + [(2.05, 3.75), (1.9, 3.9)], 40, AY)
     for y in (-3.3, -1.25, 1.25, 3.3):
-        lathe(grey, [(2.04, y - 0.12), (2.12, y - 0.09), (2.12, y + 0.09), (2.04, y + 0.12)], 24, AY)
-    sect = [(Rr + 1.2, -1.0), (Rr + 1.2, 1.0), (Rr + 0.75, 1.5), (Rr - 0.75, 1.5), (Rr - 1.2, 1.0), (Rr - 1.2, -1.0), (Rr - 0.75, -1.5), (Rr + 0.75, -1.5)]
-    lathe(white, sect, 48, AY, close=True)
+        lathe(grey, [(2.04, y - 0.12), (2.12, y - 0.09), (2.12, y + 0.09), (2.04, y + 0.12)], 40, AY)
+    # (The ring's section is a box with rounded shoulders, turned in seventy-two steps. It was an octagon turned in
+    #  forty-eight: every shoulder a hard 45-degree crease and every step a flat, so close in the last scene the ring
+    #  was "flat-shaded", a thing folded out of card.)
+    sect = []
+    for (cx, cy, a0) in ((0.75, 1.0, 0), (-0.75, 1.0, 90), (-0.75, -1.0, 180), (0.75, -1.0, 270)):
+        for k in range(4):
+            a_ = rad(a0 + 30 * k)
+            sect.append((Rr + cx + 0.45 * cos(a_), cy + 0.5 * sin(a_)))
+    lathe(white, sect, 72, AY, close=True)
     big = [(Rr + (r - Rr) * 1.05, y * 1.05) for r, y in sect]
     fat = [(Rr + (r - Rr) * 1.22, y * 1.20) for r, y in sect]
     for k in range(8):                                                 # module joints, window strips, floor radiators
@@ -2023,9 +2030,9 @@ def build_hermes():
         lathe(grey, [(Rr + (r - Rr) * 1.25, y * 1.23) for r, y in sect], 1, AY, close=True, arc=rad(2.4), phase=rad(90 * k - 1.2), caps=True)
     for k in range(4):                                                 # spokes with fairings at both ends, tie rods
         M = R('Y', -90 * k) @ AX['X']
-        lathe(white, [(1.25, 1.95), (0.85, 2.7)] + wall(0.65, 2.9, Rr - 2.6, pad=0.3, step=3.0) + [(0.9, Rr - 2.2), (1.35, Rr - 1.4)], 12, M)
+        lathe(white, [(1.25, 1.95), (0.85, 2.7)] + wall(0.65, 2.9, Rr - 2.6, pad=0.3, step=3.0) + [(0.9, Rr - 2.2), (1.35, Rr - 1.4)], 20, M)
         for r in (4.2, 6.6):
-            lathe(grey, [(0.66, r - 0.15), (0.74, r - 0.11), (0.74, r + 0.11), (0.66, r + 0.15)], 12, M)
+            lathe(grey, [(0.66, r - 0.15), (0.74, r - 0.11), (0.74, r + 0.11), (0.66, r + 0.15)], 20, M)
         tube(foil, [(0.80, 0, 2.8), (0.80, 0, Rr - 2.4)], 0.13, 5, M=M)
         for sy in (-1, 1):
             a = rad(90 * k + 45)

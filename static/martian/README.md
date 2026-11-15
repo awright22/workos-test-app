@@ -202,7 +202,10 @@ tools/
                      and film.mjs: the launch photographed shot by shot
   publish.mjs        build, check and publish to gh-pages
   build_mars_data.py NASA data -> assets/mars/
-  assets/            the models, authored in Blender from Python (see assets/SPEC.md)
+  assets/            the models, authored in Blender from Python (see assets/SPEC.md); occlusion is baked
+                     into their vertices, and the Hab's own lamps into its interior (lib.py, bake_light)
+  build_contact.mjs  bakes, for each model that stands out of doors, how much of the sky it hides from the
+                     ground under it (assets/models/contact.png): the soft dark patch a prop sits in
 ```
 
 Rendering is three.js r187 (WebGL 2): HDR with a single final tone-mapping pass, a Mars sky

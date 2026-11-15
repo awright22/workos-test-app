@@ -572,6 +572,83 @@ def bake_ao(root, samples=24, distance=0.9, strength=0.8, floor=True, seed=7):
             pass
 
 
+def bake_light(root, within=None, lamps=None, power=1.7, falloff=3.0, ambient=0.26, low=0.6, spread=0.22, rays=4, seed=11):
+    """Bake the light of a room's own lamps into the vertex colour, on top of the baked occlusion.
+
+    The game lights a room with a handful of real lamps (a phone can afford no more), with no shadows
+    from them: every surface that faces a lamp is lit, whatever stands between. So a room was evenly
+    lit: the floor under a bunk as bright as the floor under a lamp. Here each vertex of the room is
+    asked how much of the room's lamps it can see (each lamp a small area, so the edges of what it
+    cannot see are soft), and its colour is multiplied by that: from `low`, where it sees none and has
+    only what the room bounces (`ambient`), up to 1 where it stands in a lamp's pool. It is paint, so
+    it stays when the lamps go out; but with the lamps out the room is dark, and what is dark times
+    0.7 is dark.
+
+    `within`: bake only meshes under this object (a part that is seen only from inside); everything
+    under `root` still casts. `lamps`: world positions; by default every anchor under `root` named
+    light_* or lamp_*. Panes of glass and the lamps' own fittings cast nothing.
+    """
+    import random
+    rng = random.Random(seed)
+    bpy.context.view_layer.update()
+    every = [o for o in [root] + _descendants(root)]
+    if lamps is None:
+        lamps = [o.matrix_world.translation.copy() for o in every if o.type == 'EMPTY' and (o.name.startswith('light_') or o.name.startswith('lamp_'))]
+    lamps = [Vector(p) for p in lamps]
+    if not lamps:
+        return 0
+    objs = [o for o in every if o.type == 'MESH']
+    verts, polys = [], []
+    for o in objs:
+        base = len(verts)
+        mw = o.matrix_world
+        names = [m.name if m else '' for m in o.data.materials]
+        verts.extend(mw @ v.co for v in o.data.vertices)
+        for p in o.data.polygons:
+            nm = names[p.material_index] if names else ''
+            if nm.startswith('glass_') or nm.startswith('light_'):
+                continue
+            polys.append(tuple(base + i for i in p.vertices))
+    tree = BVHTree.FromPolygons(verts, polys, all_triangles=False, epsilon=0.0)
+    inside = set([within] + _descendants(within)) if within is not None else None
+    # each lamp as a few points about its place
+    spots = []
+    for p in lamps:
+        spots.append([p + Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-0.4, 0.2))) * spread for _ in range(rays)])
+    done = 0
+    for o in objs:
+        if inside is not None and o not in inside:
+            continue
+        me = o.data
+        attr = me.color_attributes.get('Col')
+        if attr is None:
+            continue
+        mw = o.matrix_world
+        nmat = mw.to_3x3().inverted_safe().transposed()
+        for i, v in enumerate(me.vertices):
+            n = (nmat @ v.normal).normalized()
+            p = mw @ v.co + n * 0.012
+            lit = 0.0
+            for pts in spots:
+                for q in pts:
+                    d = q - p
+                    dist = d.length
+                    if dist < 0.3:
+                        lit += power / rays
+                        continue
+                    w = d / dist
+                    facing = 0.2 + 0.8 * max(0.0, n.dot(w))             # (wrapped: what faces away still has the room's bounce of it)
+                    loc, nrm, _, _ = tree.ray_cast(p, w, dist - 0.28)
+                    if loc is not None and nrm.dot(w) < 0.0:
+                        continue
+                    lit += power * facing / (1.0 + (dist / falloff) ** 2) / rays
+            k = low + (1.0 - low) * min(1.0, ambient + lit)
+            c = attr.data[i].color
+            attr.data[i].color = (c[0] * k, c[1] * k, c[2] * k, 1.0)
+        done += len(me.vertices)
+    return done
+
+
 # ----------------------------------------------------------------------------------------------
 # Export
 # ----------------------------------------------------------------------------------------------
