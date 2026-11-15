@@ -19,11 +19,12 @@ const GL_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-s
  * @param {string} [o.quality]  low | medium | high | ultra (default low: software rendering is slow)
  * @param {number} [o.dsf] device scale factor
  * @param {string} [o.query] extra URL parameters, e.g. 'safe=0,47,21,47' to simulate a phone's safe-area insets
+ * @param {string[]} [o.args] more switches for the browser (tests/motion.mjs asks for exact memory figures)
  */
 export async function openGame(o = {}) {
   await mkdir(outDir, { recursive: true });
   const { server, port } = await startServer(0);
-  const browser = await chromium.launch({ args: GL_ARGS });
+  const browser = await chromium.launch({ args: GL_ARGS.concat(o.args || []) });
   const context = await browser.newContext({
     viewport: { width: o.width || 1280, height: o.height || 720 }, deviceScaleFactor: o.dsf || 1,
     hasTouch: !!o.touch, isMobile: !!o.touch,

@@ -205,9 +205,27 @@ function draw(dt, focus) {
   e.render();
 }
 
+/**
+ * One part of a step. With window.__MG.prof set to an object (tests/motion.mjs does), how long each part takes is
+ * kept in it: its worst, its sum and how many times, in milliseconds. Otherwise it only runs the part.
+ */
+function part(name, fn) {
+  const p = window.__MG && window.__MG.prof;
+  if (!p) { fn(); return; }
+  // (and, asked for with prof.heap in a browser that gives exact figures, how much it leaves on the heap)
+  const h0 = p.heap ? performance.memory.usedJSHeapSize : 0;
+  const t0 = performance.now();
+  fn();
+  const ms = performance.now() - t0, e = p[name] || (p[name] = { worst: 0, sum: 0, n: 0, bytes: 0 });
+  if (p.heap) { const d = performance.memory.usedJSHeapSize - h0; if (d > 0) e.bytes += d; }
+  e.n++; e.sum += ms;
+  if (ms > e.worst) e.worst = ms;
+  if (e.all) e.all.push(ms);                             // (every one of them, for a part a test has asked that of)
+}
+
 /** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
 function tick(dt) {
-  updateAudio(dt);
+  part('audio', () => updateAudio(dt));
   ctx.engine.sky.showMoons = S.started;
   if (!S.started) { titleCamera(dt); return null; }
   const focus = S.mode === 'rover' ? World.rover.group.position : player.pos;
@@ -223,18 +241,14 @@ function tick(dt) {
     return (World.launch && World.launch.focus) || World.mav.position;
   }
   if (!S.sleeping) {
-    advanceTime(dt);
-    applyRates(dt, false);
-    if (S.mode === 'walk') updateWalk(dt);
-    else if (S.mode === 'rover') updateRover(dt);
-    updateAstronaut(dt);
-    updateInteract(dt);
-    updateBuildGhost();
-    updateDiscoveries(dt);
-    updatePing();
-    updateEffects(dt);
-    updateDevils(dt);
-    updateSights(dt);
+    part('clock', () => { advanceTime(dt); applyRates(dt, false); });
+    part('move', () => { if (S.mode === 'walk') updateWalk(dt); else if (S.mode === 'rover') updateRover(dt); });
+    part('astronaut', () => updateAstronaut(dt));
+    part('interact', () => { updateInteract(dt); updateBuildGhost(); });
+    part('discover', () => { updateDiscoveries(dt); updatePing(); });
+    part('effects', () => updateEffects(dt));
+    part('devils', () => updateDevils(dt));
+    part('sights', () => updateSights(dt));
   }
   blinkT += dt;
   // how dark it is where the camera is: lamps come on with it (a storm counts as dusk)
@@ -280,10 +294,10 @@ function tick(dt) {
   if (World.padLampMats) setGlow(World.padLampMats, S.pf.loaded && !S.pf.connected ? 0.55 + 0.45 * Math.sin(blinkT * 4) : 0.2);
   updateDoors(dt);
   updateSunDir();
-  updateHud();
-  updateCompass();
-  updateObjectivesHud();
-  updateWaypoint(ctx.engine.camera);
+  part('hud', updateHud);
+  part('compass', updateCompass);
+  part('tasks', updateObjectivesHud);
+  part('marker', () => updateWaypoint(ctx.engine.camera));
   if (UI.mapScreen.style.display === 'block') {
     mapOpenTimer += dt;
     if (mapOpenTimer > 0.7) { mapOpenTimer = 0; renderMap(); }
@@ -314,8 +328,11 @@ function frame() {
     }
     fpsAcc = 0; fpsN = 0;
   }
-  if (!window.__MG.paused) lastFocus = tick(dt);
-  draw(window.__MG.paused ? 0 : dt, lastFocus);
+  // (the main thread's share of a frame: the game's step and the giving of the picture's orders, not the drawing)
+  part('frame', () => {
+    if (!window.__MG.paused) lastFocus = tick(dt);
+    draw(window.__MG.paused ? 0 : dt, lastFocus);
+  });
 }
 
 // pathfinder proximity ping

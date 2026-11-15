@@ -14,6 +14,9 @@
 // does what a person does: turns aside and goes on. Three such turns in a row with nothing gained is "stuck".
 // The times of the steps are of the game's own work on this machine's processor, not of drawing: drawing here is
 // software and says nothing of a phone. A step that takes many times the usual is a hitch a phone would feel too.
+// "Left for the collector" is how fast the heap grows in play. In this browser most of it is not garbage a phone
+// makes: V8 keeps every fraction the terrain code stores in a shared variable as an object of its own, and Safari
+// does not. It is printed to be compared with itself, from one build to the next, and has no bar.
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openGame, sleep, outDir } from './lib.mjs';
@@ -46,10 +49,23 @@ async function play(G, o) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const cam = G.ctx.engine.camera;
   const above = (p) => p.length() - G.surfaceAt(p);
+  // (out of the rover the last route left him in)
+  if (S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); }
+  for (const k of ['w', 'a', 's', 'd', 'shift']) G.input.keys[k] = false;
   if (o.at) await G.tp(o.at[0], o.at[1], o.at[2] || 0); else { G.tpLocal(6, 40, 3.3); await G.settle(); }
   G.setLocalTime(o.hour); G.setStorm(o.storm); if (!o.storm) S.storm.i = 0;
   S.suit = 100; S.health = 100; S.o2 = 96; S.water = 90; S.power = 90;
-  if (o.mode === 'rover') { G.roverTo(G.player.pos, 4); G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.tick(0.05, 4); G.hold(0.8); }
+  G.prof = { heap: !!(performance.memory && window.gc) };
+  if (o.mode === 'rover') {
+    if (o.at) G.roverTo(G.player.pos, 4);
+    else {
+      // (from the base it sets out away from the Hab: pointed at it, the first thing it met was the Hab's wall)
+      G.roverLocal(10, 70, 0);
+      const out = G.World.rover.group.position.clone().sub(G.World.hab.position), fw = new V(0, 0, -1).applyQuaternion(G.roverF.q);
+      if (fw.dot(out) < 0) G.roverLocal(10, 70, Math.PI);
+    }
+    G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.tick(0.05, 4); G.hold(0.8);
+  }
   G.paused = false; await wait(1500); G.paused = true;
   G.tick(dt, 20);
   const rover = S.mode === 'rover';
@@ -59,7 +75,7 @@ async function play(G, o) {
   const ll = () => { const p = body(), r = p.length(); return [+(Math.asin(p.y / r) * 57.2958).toFixed(4), +(((Math.atan2(-p.z, p.x) * 57.2958) + 360) % 360).toFixed(4)]; };
   const fwd = new V();
   const ticks = [];
-  let t = 0, dist = 0, stalls = 0, stuck = 0, steep = 0, turnSign = 1, extraTurn = 0, air = 0;
+  let t = 0, dist = 0, stalls = 0, stuck = 0, steep = 0, turnSign = 1, extraTurn = 0, air = 0, garbage = 0, gsecs = 0;
   let prev = body().clone(), prevCam = cam.position.clone(), prevFwd = new V(0, 0, -1).applyQuaternion(cam.quaternion);
   let hMin = 1e9, hMax = -1e9, camMin = 1e9;
   const key = (k, on) => { G.input.keys[k] = on; };
@@ -68,6 +84,11 @@ async function play(G, o) {
     G.paused = false; await wait(500); G.paused = true;
     S.suit = 100; S.health = 100; if (rover) S.roverPower = 100;
     const from = body().clone();
+    // (how much the two seconds leave behind them for the collector: taken from a heap just collected)
+    if (window.gc) window.gc();
+    const heap0 = performance.memory ? performance.memory.usedJSHeapSize : 0;
+    // (what he coasted while the frames were drawn is not a jump)
+    prev.copy(body()); prevCam.copy(cam.position); prevFwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
     // the way he goes: forward, weaving one way and then the other; aside after a stall
     const weave = (Math.floor(b / 3) % 2 ? -1 : 1) * o.turn * (b % 3 === 2 ? 1 : 0.15) + extraTurn;
     extraTurn = 0;
@@ -86,7 +107,9 @@ async function play(G, o) {
       if (step > speed * dt * 3 + (rover ? 0.7 : 0.6)) flag('jump', t, { step: +step.toFixed(2), speed: +speed.toFixed(1), at: ll() });
       // through the ground or over it
       const h = above(p);
-      if (rover) { hMin = Math.min(hMin, h); hMax = Math.max(hMax, h); if (h < -0.35 || h > 1.6) flag(h < 0 ? 'rover-in-ground' : 'rover-in-air', t, { h: +h.toFixed(2), at: ll() }); }
+      // (the rover is measured at its wheels' plane under its middle: over a crest the ground there stands above that
+      //  plane, and its belly clears half a metre)
+      if (rover) { hMin = Math.min(hMin, h); hMax = Math.max(hMax, h); if (h < -0.6 || h > 1.5) flag(h < 0 ? 'rover-in-ground' : 'rover-in-air', t, { h: +h.toFixed(2), at: ll() }); }
       else if (G.player.onGround) { hMin = Math.min(hMin, h); hMax = Math.max(hMax, h); if (h < -0.25) flag('man-in-ground', t, { h: +h.toFixed(2), at: ll() }); else if (h > 0.4) flag('man-hovering', t, { h: +h.toFixed(2), at: ll() }); }
       else { air += dt; if (air > 6) { flag('man-falling', t, { h: +h.toFixed(2), at: ll() }); air = 0; } }
       if (!rover && G.player.onGround) air = 0;
@@ -108,6 +131,7 @@ async function play(G, o) {
       if (ang > 12) flag('camera-snap', t, { deg: +ang.toFixed(1), at: ll() });
       prev.copy(p); prevCam.copy(cam.position); prevFwd.copy(f);
     }
+    { const heap1 = performance.memory ? performance.memory.usedJSHeapSize : 0; if (heap1 > heap0) { garbage += heap1 - heap0; gsecs += 2; } }
     key('w', false); key('a', false); key('d', false); key('shift', false);
     // progress: with the stick or the throttle held for two seconds he is somewhere else
     const gained = body().distanceTo(from), slope = rover ? G.roverF.slope || 0 : 0;
@@ -115,18 +139,34 @@ async function play(G, o) {
     if (gained < need) {
       if (rover && slope > 0.5) steep++;
       stalls++; stuck++;
-      // (a person turns aside and goes on; a rover backs off a little first)
-      turnSign = -turnSign; extraTurn = turnSign * 1.1;
+      // (a person turns aside and goes on, the same way until he is clear and further each time; a rover backs off a little first)
+      if (stuck === 1) turnSign = -turnSign;
+      extraTurn = turnSign * (0.9 + 0.5 * stuck);
       if (rover) { key('s', true); G.tick(dt, 30); key('s', false); t += 1; }
-      if (stuck >= 3) { flag('stuck', t, { gained: +gained.toFixed(2), slope: +slope.toFixed(2), at: ll() }); stuck = 0; }
+      // (stuck: three turns aside running, and in the last of them less than a metre gained. Sliding slowly round a
+      //  wall is a stall, not this.)
+      if (stuck >= 3) { if (gained < 1) flag('stuck', t, { gained: +gained.toFixed(2), slope: +slope.toFixed(2), at: ll() }); stuck = 0; }
     } else stuck = 0;
   }
   const sorted = ticks.slice().sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)] || 0, p99 = sorted[Math.floor(sorted.length * 0.99)] || 0, worst = sorted[sorted.length - 1] || 0;
   // a step of the game's own work that takes many times the usual: a hitch
-  const limit = Math.max(12, med * 6);
-  ticks.forEach((ms, i) => { if (ms > limit) flag('slow-step', i * dt, { ms: +ms.toFixed(1), usual: +med.toFixed(2) }); });
+  // (30 ms: on this machine the software renderer takes the processor from the game for up to 20 ms at a time, so a
+  //  step under that says nothing; the 99th centile and the worst are printed for every route)
+  ticks.forEach((ms, i) => { if (ms > 30) flag('slow-step', i * dt, { ms: +ms.toFixed(1), usual: +med.toFixed(2) }); });
+  const parts = Object.entries(G.prof || {}).filter(([k, e]) => k !== 'frame' && e && e.n).map(([k, e]) => [k, +e.worst.toFixed(1), +(e.sum / e.n).toFixed(3)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  // which parts of the step leave the most behind them, in kB a second of play
+  const heavy = Object.entries(G.prof || {}).filter(([k, e]) => k !== 'frame' && e && e.bytes).map(([k, e]) => [k, Math.round(e.bytes / 1024 / Math.max(1, t))]).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  // And the game left to run by the wall's clock for eight seconds with the stick held: the main thread's share of
+  // each frame (the game's step and the giving of the picture's orders; the drawing itself is another process's).
+  // A frame of which that share is over 50 ms is a hitch of the game's own making.
+  G.prof = { frame: { worst: 0, sum: 0, n: 0, all: [] } };
+  key('w', true); G.paused = false; await wait(8000); G.paused = true; key('w', false);
+  const fr = G.prof.frame.all.slice(2).sort((a, b) => a - b);
+  G.prof = null;
+  const frames = { n: fr.length, usual: +(fr[Math.floor(fr.length / 2)] || 0).toFixed(1), worst: +(fr[fr.length - 1] || 0).toFixed(1) };
+  if (frames.worst > 50) flag('slow-frame', t, { ms: frames.worst, usual: frames.usual });
   return { mode: S.mode, flags, count, dist: Math.round(dist), secs: Math.round(t), stalls, steep, ground: [+hMin.toFixed(2), +hMax.toFixed(2)], camMin: +camMin.toFixed(2),
-    step: { usual: +med.toFixed(2), p99: +p99.toFixed(2), worst: +worst.toFixed(1) }, end: ll() };
+    step: { usual: +med.toFixed(2), p99: +p99.toFixed(2), worst: +worst.toFixed(1) }, parts, heavy, frames, garbage: gsecs ? +(garbage / gsecs / 1048576).toFixed(2) : null, end: ll() };
 }
 
 /** A strip of frames of a route, as one picture: `n` frames `gap` seconds apart, HUD and all, at phone size. */
@@ -164,8 +204,9 @@ async function strip(g, route, file, n = 12, gap = 0.4) {
   await writeFile(file, Buffer.from(data, 'base64'));
 }
 
-const list = ROUTES.filter((r) => !only || r.name.includes(only));
-const g = await openGame(strips ? { width: 844, height: 390, touch: true, quality: 'low', dsf: 1.5, query: 'safe=0,47,21,47' } : { quality: 'low' });
+const list = ROUTES.filter((r) => !only || only.split(',').some((x) => r.name.includes(x)));
+const ARGS = ['--enable-precise-memory-info', '--js-flags=--expose-gc'];
+const g = await openGame(strips ? { width: 844, height: 390, touch: true, quality: 'low', dsf: 1.5, query: 'safe=0,47,21,47', args: ARGS } : { quality: 'low', args: ARGS });
 await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); await G.settle(); G.paused = true; });
 let bad = 0;
 if (strips) await mkdir(path.join(outDir, 'motion'), { recursive: true });
@@ -177,7 +218,8 @@ for (const route of list) {
   if (kinds || wrong) bad++;
   console.log(`  ${kinds || wrong ? 'FLAG' : 'ok  '} ${route.name.padEnd(15)} ${route.what}: ${r.dist} m in ${r.secs} s, ${r.stalls} turn${r.stalls === 1 ? '' : 's'} aside${r.steep ? ` (${r.steep} on a slope too steep to climb)` : ''}; ` +
     `above the ground ${r.ground[0]} to ${r.ground[1]} m, camera never under ${r.camMin} m; a step of the game ${r.step.usual} ms as a rule, ${r.step.p99} ms at the 99th, ${r.step.worst} ms at worst` +
-    (wrong ? `  [mode ${r.mode}, wanted ${route.mode}]` : '') + (kinds ? `\n         ${kinds}` : ''));
+    (wrong ? `  [mode ${r.mode}, wanted ${route.mode}]` : '') + `\n         left for the collector: ${r.garbage === null ? 'not measured' : r.garbage + ' MB a second of play'}${r.heavy.length ? ' (by part, kB a second: ' + r.heavy.map((q) => q[0] + ' ' + q[1]).join(', ') + ')' : ''}; the main thread's share of a frame, over ${r.frames.n} frames: ${r.frames.usual} ms as a rule, ${r.frames.worst} ms at worst` +
+    `\n         the slowest parts of a step (worst ms, usual ms): ${r.parts.map((q) => `${q[0]} ${q[1]} / ${q[2]}`).join(', ')}` + (kinds ? `\n         ${kinds}` : ''));
   for (const f of r.flags) console.log('         ' + JSON.stringify(f));
   if (strips) { const file = path.join(outDir, 'motion', route.name + '.jpg'); await strip(g, route, file); console.log('         strip: ' + file); }
 }

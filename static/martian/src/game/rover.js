@@ -24,7 +24,7 @@ export const roverF = {
   q: new THREE.Quaternion(), speed: 0, steer: 0,
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
-  slope: 0, slip: 0, throttle: 0, touching: false,
+  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0,
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 const _down = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -297,7 +297,18 @@ export function updateRover(dt) {
   _pv.copy(World.rover.group.position).addScaledVector(_v2, back * Math.cos(RV.camPitch * 0.6)).addScaledVector(_up, lift);
   if (!RV.camInit) { RV.camPos.copy(_pv); RV.camInit = true; }
   RV.camPos.lerp(_pv, damp(0.12, dt));
-  const floor = surfaceAt(RV.camPos) + 1.0;
+  // It keeps a metre over the ground, and rides over a boulder that comes under it: the lift comes on over the last
+  // metre and a half to the rock's edge, and eases, so the picture rises and does not jump. (It went straight
+  // through a three-metre rock on the canyon's rim: tests/motion.mjs found the camera inside it.)
+  let over = 0;
+  _v1.copy(RV.camPos).normalize();
+  for (const rc of rockColliders) {
+    if (rc.h < 0.9) continue;
+    const d = Math.hypot(_v1.x - rc.v.x, _v1.y - rc.v.y, _v1.z - rc.v.z) * R - rc.r;
+    if (d < 1.6) over = Math.max(over, (rc.h - 0.5) * clamp(1 - d / 1.6, 0, 1));
+  }
+  RV.camLift += (over - RV.camLift) * Math.min(1, dt * (over > RV.camLift ? 10 : 2.5));
+  const floor = surfaceAt(RV.camPos) + 1.0 + RV.camLift;
   if (RV.camPos.length() < floor) RV.camPos.normalize().multiplyScalar(floor);
   const c = ctx.engine.camera;
   c.position.copy(RV.camPos);

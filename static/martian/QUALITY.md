@@ -1171,6 +1171,44 @@ only what carried him into it.
 These are the game's own clock stepped by the test, in a browser with software rendering: they say what the rules do,
 not how it feels in the hand. That is for the phone.
 
+**A scripted player** (the owner's direction of 15 November, item a: "check the game in motion, not only in
+stills"). `tests/motion.mjs` (in the suite) walks and drives eleven real routes with the stick or the throttle held,
+turning aside where the way is barred as a person does, and flags what a still cannot show:
+
+- no progress: three turns aside running with under a metre gained in the last;
+- the man through the ground (0.25 m under it) or hovering (0.4 m over it) while he stands on it, or falling for six
+  seconds; the rover's belly in the ground (its wheels' plane 0.6 m under the ground at its middle) or the rover
+  1.5 m in the air;
+- the camera within 12 cm of the ground, inside a rock, inside the rover (on foot), inside the Hab (from outside);
+- a jump of the man, the rover or the camera (further in a step than three times his pace allows), and a snap of the
+  camera's aim (over 12 degrees in a step);
+- a step of the game's own work over 30 ms, and a frame whose share of the main thread is over 50 ms.
+
+| Route | Where | What it does |
+| --- | --- | --- |
+| base-walk, base-run | the Hab and the base | on foot round it, weaving; at a run |
+| boulders-walk, boulders-drive | Ares Vallis | a boulder field on foot, and at full throttle |
+| slope-walk, slope-drive | Olympus Mons | up and across the flank |
+| canyon-walk, canyon-drive | Valles Marineris | along the foot of a wall and onto it; off the rim and along it |
+| night-drive | the base, 01:30 | a drive in the dark |
+| storm-walk, storm-drive | the base, a dust storm at 0.9 | on foot and driving |
+
+What its first runs found (15 November):
+
+| | Finding | State |
+| --- | --- | --- |
+| I1 | The rover's chase camera went straight through a boulder 3 m across and 3.2 m high on the canyon's rim (five steps inside it): it kept a metre over the ground and knew nothing of rocks | fixed: it rides over a boulder that comes under it, the lift coming on over the last metre and a half and easing |
+| I2 | Over a sharp crest at speed the rover's wheel plane stood up to 0.54 m under the ground at its middle for a tenth of a second: its belly, half a metre up, just touched | open, for the driving pass (item b): the body should ride up on a crest |
+| I3 | Against the Hab's wall with the throttle held the rover slides round it at about a metre a second: not pinned, but slow to come off a wall that size | open, for the driving pass |
+| I4 | A step of the game's own work is 0.2 to 1.1 ms as a rule on this machine (5 to 8 ms at the 99th centile, 8 to 13 ms at worst, once 64 ms). No part of the step owns the slow ones: every part's worst is about 8 ms, which is this machine's software renderer taking the processor, not the game. So step times here say nothing under about 20 ms | the bar is 30 ms for a step and 50 ms for a frame's share of the main thread (4 to 10 ms as a rule, 18 ms at worst) |
+| I5 | The heap grows by 2 to 3 MB a second of play in this browser: moving makes most of it (22 kB a step on foot, 60 kB in the rover), then the prompt's lines (about 320 kB a second on foot at the base), the compass (200), the gauges (140), the marker (100) | not chased. Most of the moving's share is V8 keeping every fraction the terrain code stores in a shared variable as an object of its own; Safari's engine does not, and Safari is what the owner's phone runs. The figure is printed to be compared with itself |
+| I6 | The phone's own report (51 fps average, 14 fps at the slowest 1%) is one slow frame a second, more or less: the game looks at its resolution once a second and changes it by steps, and a change re-makes the picture's buffers | a guess from the numbers, not measured: for the sharpness item (g), where the resolution's rule is to be looked at |
+
+Nothing else was flagged on any route after I1: no jump, no snap, nobody through the ground or over it, the camera
+never under 0.39 m on foot or a metre in the rover, no stall on open ground (1.2 to 1.6 km a minute in the rover
+across boulders and down the canyon's rim; 5 m/s on foot, 9 at a run). `--strips` photographs each route as a
+sheet of twelve frames for reviewers; that review is next.
+
 ## Open items
 
 | # | Item | State |
