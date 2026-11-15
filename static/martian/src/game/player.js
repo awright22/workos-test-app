@@ -162,7 +162,8 @@ export let astro = null;
 const AIR_SIGN = 1;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, blob: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
-const WALK_SPEED = 5.1, RUN_SPEED = 9.2;       // ground speeds the Walk and Run clips were made for
+const RUN_SPEED = 9.2;                         // the game's running pace, which the Run clip's stride is made for (he walks at 5.1)
+const STROLL_SPEED = 2.2, LOPE_FROM = 3.1;     // the pace the Walk clip's own stride makes, and the pace from which he lopes
 const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
 
 const _padA = new THREE.Vector3(), _padB = new THREE.Vector3();
@@ -304,8 +305,13 @@ export function updateAstronaut(dt) {
     anim.kneel = 0;                                      // off at once: he is already moving
     const hurt = S.health < 35 || S.suit < 6;
     if (hurt && player.speed < 4) { play('Stagger', 0.3); ts = clamp(player.speed / 2.4, 0.6, 1.3); }
-    else if (player.speed > 7.0) { play('Run', 0.2); ts = clamp(player.speed / RUN_SPEED, 0.7, 1.25); }
-    else { play('Walk', 0.22); ts = clamp(player.speed / WALK_SPEED, 0.45, 1.3); }
+    // Above a stroll he lopes. On Mars a man leaves the ground between steps from little more than a metre a second,
+    // and it is the Run clip that has a flight in it and a stride to match: played slowly at the game's walking pace
+    // it is the long floating step of a man in a third of a gravity. (The Walk clip's stride is under a metre. At
+    // five metres a second its feet slid more than a metre a step: the reviewers of the frame strips measured it.)
+    // The Walk clip is for a stroll, at the pace its own stride makes.
+    else if (player.speed > LOPE_FROM) { play('Run', 0.25); ts = clamp(player.speed / RUN_SPEED, 0.5, 1.25); }
+    else { play('Walk', 0.22); ts = clamp(player.speed / STROLL_SPEED, 0.45, 1.5); }
   } else if (anim.kneel === 1 || anim.kneel === 2) {
     const from = anim.kneel === 1 ? clamp(KNEEL_T - anim.actions.KneelDown.time, 0, KNEEL_T) : 0;
     play('KneelUp', 0.1, true); anim.actions.KneelUp.time = from; anim.kneel = 3; ts = KNEEL_PACE;
@@ -327,7 +333,7 @@ export function updateAstronaut(dt) {
       const a = anim.current, d = a.getClip().duration;
       const ph = (a.time % d) / d;
       const half = ph < 0.5 ? 0 : 1;
-      if (half !== anim.stepPhase) { anim.stepPhase = half; emit('footstep', { run: anim.name === 'Run', inside: S.inside, foot: half }); }
+      if (half !== anim.stepPhase) { anim.stepPhase = half; emit('footstep', { run: anim.name === 'Run' && player.speed > 7, inside: S.inside, foot: half }); }
     }
   }
   // In the air he is not one held pose. He draws his knees up as he tops out, and as the ground comes back his legs
