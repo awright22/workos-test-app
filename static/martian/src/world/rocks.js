@@ -28,6 +28,7 @@ import { R } from '../planet/constants.js';
 import { ctx } from '../game/ctx.js';
 import { ROCK_STRIDE, ROCK_ANGULAR, ROCK_SLAB, ROCK_COBBLE, bareLava, meshPoint, planetGrid } from '../terrain/chunk.js';
 import { rockAtlas } from './rock-shapes.js';
+import { capLocalLights } from './models.js';
 import { ballMesh, ballSnap } from './rock-ball.js';
 
 /** Colliders for large rocks near the player: { v: unit direction, r: metres, h: how high it stands, metres }. */
@@ -156,7 +157,8 @@ function rockMaterial(uniforms, atlas, detail) {
         #ifdef USE_INSTANCING
           transformed.y -= rockTrodden(instanceMatrix) * 2.4;   // (a stone under his boot goes into the dust)
         #endif`);
-    shader.fragmentShader = shader.fragmentShader
+    // (no lamp lights a stone past what the picture holds: in the pool of his lamp the pale ones were lumps of chalk)
+    shader.fragmentShader = capLocalLights(shader.fragmentShader, 0.4, 0.3)
       .replace('#include <common>', `#include <common>
         uniform highp sampler3D uGrain;
         uniform highp sampler2DArray uShapes;

@@ -128,7 +128,7 @@ UI.rover = el('div', 'mg-rover', null, UI.hud,
   '<div class="spd"><b class="t-num">0</b><span>KM/H</span></div>' +
   '<div class="rv">' +
   `<div class="row" data-k="pwr">${icon('battery')}<span class="lb">BATTERY</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
-  `<div class="row" data-k="o2">${icon('suit')}<span class="lb"><span class="chem">O<sub>2</sub></span> TANK</span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
+  `<div class="row" data-k="o2">${icon('suit')}<span class="lb">ROVER <span class="chem">O<sub>2</sub></span></span><span class="tk"><i class="fl"></i></span><span class="val t-num"></span></div>` +
   '</div>');
 UI.roverSpeed = UI.rover.querySelector('.spd b');
 UI.roverBars = {};

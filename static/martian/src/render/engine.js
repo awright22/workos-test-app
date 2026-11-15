@@ -60,9 +60,13 @@ const FINAL_FRAGMENT = /* glsl */`
       // them, lit from within, so the storm has a grain and a direction even in a still frame.
       vec2 wq = vec2(dot(vUv - 0.5, uVeilDir) * 1.78, dot(vUv - 0.5, vec2(-uVeilDir.y, uVeilDir.x)));
       float gust = 0.6 + 0.4 * sin(uTime * 0.8 + vn(vec2(uTime * 0.17, 3.0)) * 6.0);
-      float far = vn(vec2(wq.x * 0.9 - uTime * 0.22, wq.y * 3.2 + 1.7));
-      float mid = vn(vec2(wq.x * 1.6 - uTime * 0.7, wq.y * 9.0 + vn(vec2(wq.x * 2.0 - uTime * 0.5, 4.0)) * 1.4));
-      float near = vn(vec2(wq.x * 2.4 - uTime * 2.1, wq.y * 26.0 + vn(vec2(wq.x * 3.0 - uTime * 1.6, 9.0)) * 2.5));
+      // (the broad sheets at twice the pace they had: in frames a fifth of a second apart they stood where they were, a painted sky)
+      // (and each layer wanders across the wind at its own slow pace, one up and one down, and is bent by a swell that
+      //  passes through it: moved all at one pace along one line, the whole storm slid across the picture as a
+      //  patterned sheet being pulled, its shapes the same from one second to the next)
+      float far = vn(vec2(wq.x * 0.9 - uTime * 0.7, wq.y * 3.2 + 1.7 - uTime * 0.09 + 0.7 * vn(vec2(wq.x * 0.6 - uTime * 0.33, uTime * 0.19))));
+      float mid = vn(vec2(wq.x * 1.6 - uTime * 1.7, wq.y * 9.0 + uTime * 0.21 + vn(vec2(wq.x * 2.0 - uTime * 1.1, 4.0 + uTime * 0.3)) * 1.6));
+      float near = vn(vec2(wq.x * 2.4 - uTime * 2.7, wq.y * 26.0 - uTime * 0.5 + vn(vec2(wq.x * 3.0 - uTime * 1.9, 9.0 + uTime * 0.6)) * 2.5));
       // Grit. The bands are sand, and sand blows in threads: fine across the wind, long along it, faster than the
       // band they are in, and they tear its edge. (Without them each band was a smooth ribbon with a clean edge,
       // like silk under water, and a still frame of a storm had no grain in it.)

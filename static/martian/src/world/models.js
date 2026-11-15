@@ -160,20 +160,35 @@ export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { va
  * night had one burning in it wherever he stood. The cap is on the lamps alone (point and spot lights, which three
  * adds up first); the sun is added after it and keeps its glints. (Sunlit white is about 0.9 on this scale.)
  */
-const LIGHTS_BEGIN = (() => {
-  const chunk = THREE.ShaderChunk.lights_fragment_begin;
-  const cap = `#if ( NUM_POINT_LIGHTS > 0 || NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )
+const lightsBegin = (most, beam) => {
+  let chunk = THREE.ShaderChunk.lights_fragment_begin;
+  // (what the aimed lamps add is taken apart from what the room's lamps add, so that it can be held on its own)
+  const spots = '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )', at = chunk.indexOf(spots);
+  const apart = at >= 0;
+  if (apart) chunk = chunk.slice(0, at) + spots + '\n\tvec3 mgBeforeSpots = reflectedLight.directDiffuse;\n#endif\n' + chunk.slice(at);
+  const cap = (apart ? `${spots}
+	{ vec3 mgSpot = max( reflectedLight.directDiffuse - mgBeforeSpots, vec3( 0.0 ) );
+	reflectedLight.directDiffuse = mgBeforeSpots + ${beam.toFixed(2)} * ( 1.0 - exp( - mgSpot / ${beam.toFixed(2)} ) ); }
+#endif
+` : '') + `#if ( NUM_POINT_LIGHTS > 0 || NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )
 	reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( 0.6 ) );
-	reflectedLight.directDiffuse = min( reflectedLight.directDiffuse, vec3( 0.9 ) );
+	reflectedLight.directDiffuse = min( reflectedLight.directDiffuse, vec3( ${most.toFixed(2)} ) );
 #endif
 `;
   for (const mark of ['#if ( NUM_SUN_LIGHTS > 0 ) && defined( RE_Direct )', '#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )']) {
     const i = chunk.indexOf(mark);
     if (i >= 0) return chunk.slice(0, i) + cap + chunk.slice(i);
   }
-  return chunk;      // (a three that orders its lights otherwise: leave it alone)
-})();
-export const capLocalLights = (fragmentShader) => fragmentShader.replace('#include <lights_fragment_begin>', LIGHTS_BEGIN);
+  return THREE.ShaderChunk.lights_fragment_begin;      // (a three that orders its lights otherwise: leave it alone)
+};
+/**
+ * `most`: the brightest the lamps together may make the surface (0.9 is sunlit white paint; a sunlit stone is about 0.3).
+ * `beam`: what the two aimed lamps (his helmet's, the rover's) may add to it. Those are made to grow stronger with
+ * distance, for the ground's sake, which they strike edge-on; a thing that stands up square in the beam forty metres
+ * off took that many times over, and the rover in his lamp at twilight was a white paper cut-out. Their light comes
+ * up to this softly (shading is kept below it), not as a ceiling.
+ */
+export const capLocalLights = (fragmentShader, most = 0.9, beam = 0.46) => fragmentShader.replace('#include <lights_fragment_begin>', lightsBegin(most, beam));
 
 let plain = null, plainGround = null;
 /** Plain opaque materials differ only in colour, roughness and metalness, so those can live in

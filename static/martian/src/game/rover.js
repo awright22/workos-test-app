@@ -220,7 +220,11 @@ export function roverLights(dt) {
   const rv = World.rover;
   if (!rv) return;
   const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5, driven = S.mode === 'rover';
-  rv.headlight.intensity = lerp(rv.headlight.intensity, driven && dim ? 11 : 0, damp(0.15, dt));
+  // (driven, its wide lamps are its own; on foot that lamp is his, a beam from his helmet: game/player.js, mountLamps)
+  // (its strength is set against how it falls off: game/player.js, LAMPS.flood. It grows with distance, so that the
+  //  ground thirty metres out is lit as it was and the rover itself, six metres from the lamp and square on to it, is
+  //  not floodlit white.)
+  if (driven) rv.headlight.intensity = lerp(rv.headlight.intensity, dim ? 1.2 : 0, damp(0.15, dt));
   // (The headlamps are seen from in front of the rover, not through it: from the chase camera their lit lenses showed
   //  through the cab's glass as two haloed dots, with the road ahead dark between them.)
   let ahead = 1;

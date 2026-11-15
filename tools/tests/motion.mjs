@@ -212,6 +212,32 @@ async function orbit(G) {
   return { hidden, inside, nearest: +nearest.toFixed(2) };
 }
 
+/**
+ * Runs in the page: his head turns to where the camera looks. (It never had: what the game turned was a mesh that
+ * has the head bone's name. The camera is turned 0.9 rad from the way he faces, to each side, and tilted up and down;
+ * his head must come about half-way round after it, and up and down with it.)
+ */
+async function headTurns(G) {
+  const S = G.S, V = G.player.pos.constructor, cam = G.ctx.engine.camera, head = G.player.bones.head;
+  if (S.mode === 'rover') { G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 4); }
+  G.tpLocal(-16, 30, 1.57); await G.settle(); G.setLocalTime(13); G.setStorm(0); S.storm.i = 0; G.look(-0.12); G.tick(1 / 30, 6);
+  let eye = null; head.traverse((o) => { if (o.name === 'eye') eye = o; });
+  const read = () => {
+    head.updateWorldMatrix(true, true);
+    const up = G.player.pos.clone().normalize(), f = eye.getWorldPosition(new V()).sub(head.getWorldPosition(new V()));
+    const el = Math.asin(f.clone().normalize().dot(up)), fh = f.addScaledVector(up, -f.dot(up)).normalize();
+    const cf = new V(0, 0, -1).applyQuaternion(cam.quaternion), ch = cf.addScaledVector(up, -cf.dot(up)).normalize();
+    return { from: Math.atan2(ch.clone().cross(fh).dot(up), ch.dot(fh)), el };
+  };
+  // (each within half a second of the last: before he begins to look about him of his own accord)
+  const level = read();
+  G.input.yaw = 0.9; G.tick(1 / 30, 5); const left = read();
+  G.input.yaw = -1.8; G.tick(1 / 30, 5); const right = read();
+  G.input.yaw = 0.9; G.look(0.5); G.tick(1 / 30, 5); const upward = read();
+  G.look(-0.12); G.tick(1 / 30, 2);
+  return { bone: !!head.isBone, eye: !!eye, left: +left.from.toFixed(2), right: +right.from.toFixed(2), level: +level.el.toFixed(2), up: +upward.el.toFixed(2) };
+}
+
 /** A strip of frames of a route, as one picture: `n` frames `gap` seconds apart, HUD and all, at phone size. */
 async function strip(g, route, file, n = 12, gap = 0.4) {
   const page = g.page, shots = [];
@@ -281,6 +307,20 @@ const EXTRAS = [
       G.tpNear(p.group.getWorldPosition(new V()), 1.7); await G.settle(); G.setLocalTime(13); G.tick(1 / 30, 20);
     },
     each: (G, a) => { G.input.eHeld = a.i < 6; if (!G.input.eHeld) G.S.holdT = 0; G.tick(1 / 30, 9); } },
+  // (two that only frames in a row can settle: whether a storm's dust blows or hangs, and whether he stands or is stood)
+  { name: 'storm-standing', what: 'standing still in a dust storm at its height: what moves is the storm', n: 12, gap: 0.2,
+    setup: async (G) => { if (G.S.mode === 'rover') { G.input.keys.w = false; G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 6); } G.tpLocal(-16, 30, 1.57); await G.settle(); G.setLocalTime(14); G.setStorm(0.9); G.S.suit = 100; G.tick(1 / 30, 60); },
+    each: (G) => { G.tick(1 / 30, 6); } },
+  // (and the same storm with the frames a fifteenth of a second apart: what blows fast is in a new place every fifth
+  //  of a second, and only frames this close show it going)
+  { name: 'storm-close', what: 'the same storm, the frames a fifteenth of a second apart', n: 12, gap: 0.07,
+    setup: async (G) => { G.setStorm(0.9); G.tick(1 / 30, 30); },
+    each: (G) => { G.tick(1 / 30, 2); } },
+  // (he takes a step and stops, so that what he does standing is seen from its start: a man who has stood through
+  //  the strips before this one has done it all already)
+  { name: 'idle', foot: true, what: 'he stops, and stands idle on a clear day for seven seconds', n: 12, gap: 0.6,
+    setup: async (G) => { if (G.S.mode === 'rover') { G.input.keys.w = false; G.roverF.speed = 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' })); G.tick(0.05, 6); } G.setStorm(0); G.S.storm.i = 0; G.tpLocal(-16, 30, 1.57); await G.settle(); G.setLocalTime(13); G.input.keys.w = true; G.tick(1 / 30, 12); G.input.keys.w = false; G.tick(1 / 30, 6); for (let i = 0; i < 9; i++) { G.input.yaw = 0.3; G.tick(1 / 30, 2); } },
+    each: (G) => { G.tick(1 / 30, 18); } },
   { name: 'getting-in', what: 'getting into the rover and setting off', n: 12, gap: 0.3,
     setup: async (G) => { G.roverLocal(10, 70, 0); G.tpNear(G.World.rover.group.position, 3.2); await G.settle(); G.tick(1 / 30, 20); },
     each: (G, a) => { G.input.eHeld = a.i < 4 && G.S.mode !== 'rover'; if (!G.input.eHeld) G.S.holdT = 0; G.input.keys.w = a.i >= 5; G.tick(1 / 30, 9); } },
@@ -328,6 +368,12 @@ if (!only || only.includes('orbit')) {
   const wrong = ob.hidden >= 3 || ob.inside > 0;
   if (wrong) bad++;
   console.log(`  ${wrong ? 'FLAG' : 'ok  '} orbit           the camera turned once round him beside the rover: the rover between it and him for ${ob.hidden} steps running at most, the camera in the rover for ${ob.inside}; the line to his chest never nearer the rover's middle than ${ob.nearest} m`);
+}
+if (!only || only.includes('head')) {
+  const h = await g.eval(headTurns);
+  const wrong = !h.bone || !h.eye || !(Math.abs(h.left) > 0.2 && Math.abs(h.left) < 0.7 && Math.abs(h.right) > 0.2 && Math.abs(h.right) < 0.7 && h.left * h.right < 0 && h.up > h.level + 0.15);
+  if (wrong) bad++;
+  console.log(`  ${wrong ? 'FLAG' : 'ok  '} head            his head turns to where the camera looks: with the camera 0.9 rad round to either side it stands ${Math.abs(h.left)} and ${Math.abs(h.right)} rad short of it, and it lifts ${(h.up - h.level).toFixed(2)} rad when the camera looks up${h.bone ? '' : ' [what is turned is not a bone]'}`);
 }
 if (strips) {
   for (const x of EXTRAS) {

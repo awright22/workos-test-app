@@ -58,6 +58,22 @@ Said on 15 November, after playing on the iPhone (two findings and a direction; 
 9. **Bounds.** "One pass per item and one re-check, not open-ended rounds. If an item hasn't improved after two
    attempts, record it in QUALITY.md as plateaued and move on." "Publish to the preview after the rover fix, again
    after the HUD change, and as later items land."
+10. **Four additions, later on 15 November, "from the reviewers' findings"; the same bounds.**
+    1. **The HUD in an emergency** (part of the quiet-HUD work): "the reviews say the HUD is worst when an emergency
+       is on, with many signals at once during a breach." An emergency shows "one lead alert and what to do about
+       it, with the bar it affects. Other warnings queue behind it or shrink to a marker."
+    2. **Two more in-motion checks**: the dust storm ("painted, not moving", which a still cannot settle) and the
+       astronaut's idle stance ("stiff"). "Judge both from frame strips and fix what they show."
+    3. **After item (b): light for getting around at night.** "The helmet lamp's pool is small with a hard edge and
+       no forward throw, and the rover's beam ends about 30 m out (round 11's V10). Also haze the dark boulders that
+       sit unhazed on the horizon line (V8)."
+    4. **After item (e): a pass on the built objects the reviewers flagged**: "the greenhouse (chunky struts, plain
+       cap, the dark band at its door), glass on the rover's windows, the rescue ship close up (flat-shaded), and
+       the faceted soil heap."
+
+    So the order is now: (a), (b) [done]; the two new motion checks; night light and the horizon's boulders; (c)
+    the interface, the emergency HUD first; (d) cutscenes; (e) baked lighting; the built objects; (f) wear and (g)
+    sharpness [first passes done].
 
 **The phone had not been getting the builds.** The diagnostics the owner sent with that message name build
 `775c4ab5aec2`: the preview of 13 November, the same build as the phone's first report, and nineteen publishes
@@ -836,12 +852,12 @@ difficulty sheet (M14), the planting cards (M15) and "Only at the Hab" four time
 | N3 | Colour-blind-safe mode hatched the empty part of a low gauge in bright vermilion or yellow, so a bar with 9 L in it read as nearly full (667: bug, blocker) | fixed: the hatch is faint and the fill solid and in the safe palette; the figures of a critical row and of the suit's dial take that palette's vermilion |
 | N4 | A falling arrow on the Hab's air after one burn, beside "no Hab air lost now" (both: bug) | fixed: for a few seconds after a single cost or gift a bar carries no arrow; the prompt says "the first costs 7% of the Hab's air" before and "these cost no air" after |
 | N5 | Lists still cut text at the fold: the colony shows one row of cards and the heads of the next at 667, the journal's way-home tiles are cut mid-sentence (both: polish) | open |
-| N6 | At 667 the HUD leaves a window 145 px wide between its two columns and fills it in an emergency: about 40% of the picture under interface with everything at once (667: fix the stacked case before release) | open |
+| N6 | At 667 the HUD leaves a window 145 px wide between its two columns and fills it in an emergency: about 40% of the picture under interface with everything at once (667: fix the stacked case before release) | answered by the quiet HUD and, in an emergency, by one thing leading (see "An emergency: one thing leads"): 21 to 27% of the screen at 667 with three things wrong at once |
 | N7 | "? GUIDE" is bare text of about 47 x 12 px in four places as the bars arrive; at 667 the guide sheet shows four of seven entries (blocker only if its touch area is as small as it is drawn: it is not, the whole panel opens the guide) | open: nothing shows that the panel is the control |
 | N8 | Gauge rows on a 20 px pitch, values about 12 px, the alarm outline touching the rows either side of it | open |
 | N9 | Onboarding: five NEW cards in 39 game minutes; two bars with one card; trend arrows seen eleven pictures before their card; VIEW, JUMP, the rover and watering never explained; POWER and VITALS with no "at zero"; morale scored before its bar | open |
-| N10 | Vocabulary: "HAB AIR" under the ring beside the "HAB O2" bar, "ROVER AIR" beside "O2 TANK"; fabricate, install, make, build; three names for restarting and for a storm; the meal rule said three ways; "12 SOLS SURVIVED" on Sol 12; the recommended difficulty labelled "HARDER" | open |
-| N11 | The HUD's "Survive to Sol 25" line names no drive (the journal and the pause card do) | open |
+| N10 | Vocabulary: "HAB AIR" under the ring beside the "HAB O2" bar, "ROVER AIR" beside "O2 TANK"; fabricate, install, make, build; three names for restarting and for a storm; the meal rule said three ways; "12 SOLS SURVIVED" on Sol 12; the recommended difficulty labelled "HARDER" | part: the dial says "HAB O2" and "ROVER O2" as the gauges do (the rover's row was "O2 TANK"); restarting is "Restart from Sol 1" on the pause menu, its question and the death sheet; the pause card counts the sols he has seen out (11 on Sol 12); the recommended difficulty is "Standard". Left: fabricate, install, make and build are four different acts and keep their words; a storm's names and the meal rule were not traced |
+| N11 | The HUD's "Survive to Sol 25" line names no drive (the journal and the pause card do) | done: "Survive to Sol 25, then drive to the MAV" |
 | N12 | The status strip's left edge moves and its plate is thin over a bright room; the destination is named twice and its distance twice | open |
 | N13 | Smaller: the win sheet scrolls at 667; settings tabs half empty, text size not under INTERFACE; map rings 20 px, a storm circle cut by the footer; pale toasts at the bottom; two styles of refusal; "LOG" three times; ragged inventory rows | open |
 
@@ -947,6 +963,33 @@ Left as they are, with the reason:
   landing pad's orange marks; the banner's wording is shorter at 667; the opened panel is a few pixels wider with
   the rover's rows; the cube on the compass is not named until he faces it.
 
+
+**An emergency: one thing leads** (the owner's first addition of 15 November: "an emergency shows one lead alert and
+what to do about it, with the bar it affects. Other warnings queue behind it or shrink to a marker").
+
+What there was, with several things wrong at once: two banners, every low gauge as a row with the worst boxed in
+red, the task in red, the dial in red; and they could disagree (with the tank at a fifth and the water at nine
+litres the banner said WATER CRITICAL beside a card that said "Get to air").
+
+Now (`ui/hud.js`, "one thing leads"; `css/hud.css`): whatever is wrong is put in one order and the first leads.
+
+- **The order.** What kills in minutes comes first whatever its level (a breach, then an emptying tank); after
+  those, what is critical before what is low; within a level, air, health, water, food, power, the rover's battery,
+  a storm, cold, morale.
+- **What leads shows three things**: its banner (what is wrong, and its stake), the gauge it bears on (the Hab's air
+  for a breach, the dial for the tank, its own bar for a low reserve), and the task card, which gives the one task
+  (what to do, where, how far) and no second line.
+- **The rest are marks**: a ring with the thing's own sign, red if critical and amber if low, with no words and no
+  bar; two beside the banner, or three under it on the small phone (beside it there the second stood under the task
+  card), and a count past that. A tap on the dial still opens every gauge.
+- The leading banner is the colour of the task it stands beside: an amber "suit low" beside a red "Get to air" is
+  red (not in the first minute, whose leak stays amber).
+- The full HUD (the setting) shows two banners and every gauge, as it did.
+
+Measured (`tests/hud-cover.mjs`, states `foot-low`, `foot-many-wrong`, `hab-breach`; no bar is held in an
+emergency): 19 to 25% of the screen at 844 x 390 and 21 to 27% at 667 x 375, against 35 to 38% for the full HUD
+standing at the rover with nothing wrong. Seen by me at 932, 844 and 667; to go to the interface reviewers with the
+rest of item (c).
 
 ## Base mode
 
@@ -1281,6 +1324,104 @@ my own look at new sheets, and by no reviewer: the owner's bound is one pass and
 | K26 | Still there from the first review and left: the second soft shadow on slopes (K11, looked for once and not found); no lean or change of stride on a slope and a run that differs from the lope mostly by pace (K13: clips); footfall dust as pale discs and footprints in side-by-side pairs (K14); the storm changes nothing in how he moves; a prompt over his shins wherever he stands by something usable; the staircase line where a boulder meets sand (terrain item 27) | open, polish; K11 and K13 are **plateaued** for code |
 
 
+**The storm and standing still** (the owner's second addition of 15 November: "painted, not moving" and "stiff",
+which a still cannot settle; judged from frame strips, one pass and one re-check).
+
+What the first strips showed, and what was wrong with the strips themselves:
+
+- The strips had been lying about the storm. Stepped by hand for a test, the game's clock moved and the picture's
+  did not: the storm's dust hung where it was between frames. The picture is now given the time the steps took
+  (`main.js`, `frame`), and two strips are taken standing still in a storm, a fifth and a fifteenth of a second a
+  frame (`storm-standing`, `storm-close`).
+- With that put right, "painted" was still fair: the storm's broad sheets crept straight down the screen, 3 to 5 px
+  a frame, and mostly dissolved where they were; nothing in the picture moved with them, not the man, not the
+  view, not the ground.
+- "Stiff" was a bug. The Idle clip breathes and shifts his weight by a degree and a centimetre, which is under a
+  pixel on a phone; and what should have turned his head to where the camera looks was turning a mesh that has the
+  head bone's name. His head had never moved. `tests/motion.mjs` now checks that it does (`head`).
+
+One pass: the sheets stream along the wind at three to four times their old pace, each layer at its own; he leans
+into the wind from his boots and the gusts rock him; the camera sways; the wind takes dust from round his boots.
+Standing, his head follows the camera (about half-way round, and up and down with it), he looks about him every few
+seconds, and now and then lifts his left forearm and reads the display on it.
+
+The re-check (one independent reviewer; seven sheets, `earlier` and `now`, every one opened, patches of the picture
+measured from frame to frame):
+
+| Point | Verdict | From the review |
+| --- | --- | --- |
+| The storm moves | **MET** | "The dust shapes move right and slightly down by the same step every frame", about 180 px a second, one direction in all eleven steps; "no flicker or noise" |
+| The storm acts on things | NEARLY | through the view (the camera rocks about a degree; a sheet of dust washes him out); "not from the astronaut's body or the ground" |
+| The storm as a picture | NEARLY | every frame reads as a dust storm; walking through it is the best of it; standing, the dust is "flat two-tone patches with sharp edges" |
+| Standing still | NEARLY | "a look, then something done with a hand. That reads as a person"; from the chest down nothing moves |
+| Then and now | both "better, clearly" | of the earlier storm: "'Painted, not moving' was right"; of the earlier stance: "A statue" |
+
+What it found (no bug), and what was done after it, seen by me in new strips and by no reviewer:
+
+| | Finding | State |
+| --- | --- | --- |
+| M1 | The storm slides as one rigid sheet: every part the same 12 px a frame, its shapes unchanged for 0.8 s | done: each layer wanders across the wind at its own pace and is bent by a swell passing through it, and all three go faster |
+| M2 | Nothing happens where the storm meets things: dust passes his boots unchanged | done in part: the dust the wind takes from his boots was in the storm's own colour and could not be seen; it is paler and larger. Nothing yet streams off rocks |
+| M3 | Standing in the storm he barely reacts (his lean is along the wind, so from behind it shows only in a cross-wind) | left: the lean is six degrees into the wind wherever it blows from |
+| M4 | From the chest down nothing moves in seven seconds of standing | done: his weight goes from one leg to the other every few seconds (the whole of him tips about his boots and his spine takes it back out: his hips go six centimetres over) |
+| M5 | The nod to his wrist is about 50 degrees, onto his shoulder | done: a little over half of that |
+| M6 | He keeps a hard cast shadow all through a storm; the storm is on the ground more than round him between gusts; standing, the dust's patches have hard edges | open, polish |
+
+A fault of my own found while doing M4, and fixed: the animation mixer writes a bone only when its clip's value has
+changed, so what was added to a bone on top of a clip (the lean, the glance, the weight on one leg) was added again
+on every frame the clip held still, and his spine went over by twenty degrees for a few frames. Each such bone is
+now put back to the clip's own value before the mixer runs and the addition made afresh after it (`game/player.js`,
+`PROC_BONES`). The standing strip was taken again after it: the look, the wrist and the shift of weight are there
+and nothing jumps.
+
+**Light to get about by at night, and the horizon** (the owner's third addition of 15 November: "The helmet lamp's
+pool is small with a hard edge and no forward throw, and the rover's beam ends about 30 m out (round 11's V10). Also
+haze the dark boulders that sit unhazed on the horizon line (V8)"; one pass and one re-check).
+
+What there was: one spot lamp on his helmet (a disc three paces across, lit to dark in 50 px, ending 12 to 15 m
+ahead), one on the rover (a fan that gave out 30 m ahead: one second at its top speed), and nothing lit him or it.
+
+One pass. The game has two lamps that can be aimed and a phone pays for each on every surface, so the two are
+shared: whoever is travelling has both (`game/player.js`, `LAMPS`, `mountLamps`). On foot the helmet's is a wide soft
+pool and the rover's, borrowed, a narrow beam thrown along where he looks; driving, the rover's is its wide lamps and
+the helmet's, borrowed, a long beam down the road. Each grows stronger with distance, because far ground is struck
+edge-on. The pool's lamp stands above and behind his head so that some of it falls on him. For the horizon: the sky's
+lowest two or three degrees take the haze's colour, so that what stands on the line stands against the colour it is
+hazed towards (`render/sky.js`). `tools/tests/night-shots.mjs` takes the nine pictures.
+
+The re-check (one independent reviewer; nine pictures `now` and eight `earlier`, every one opened, pixel values
+measured):
+
+| Point | Verdict | From the review |
+| --- | --- | --- |
+| Light to walk by | **MET** on level ground, NEARLY on a slope | "a soft keyhole reaching roughly 30 to 45 m, with a wider near field"; on the slope "the player sees what is ahead but not what is underfoot" |
+| The man at night | NEARLY | "no longer a cut-out, but the read is top-heavy": helmet and shoulders lit, pack and legs black |
+| Light to drive by | NEARLY | lit stones to 100 to 110 m, "three and a half to four seconds at 28 m a second"; near ground weak; the rover "a black cut-out" |
+| Still a night | **MET** | unlit ground as dark as before; "nothing looks floodlit" |
+| The horizon | NEARLY | "the same, with a slight gain in twilight only" |
+| Then and now | the night "better, plainly"; the horizon "the same" | |
+
+On the horizon the review settled what V8 was. The dark boulders on the line are already hazed, in the earlier
+pictures and in these: "none stands as a dark cut-out"; the dark ones are in the middle ground, below the line. What
+is left of V8 is the line itself: the ground does not lighten towards the horizon, and rust meets pale sky in "a
+crisp, nearly straight edge 2 to 4 px thick" across two thirds of a plain. That is the ground's haze over twenty
+kilometres of flat plain, not the boulders, and it was not attempted here: **plateaued for this item** (two looks:
+the sky band, then its strength), carried in the open items as the ruled horizon.
+
+What it found, and what was done after it, seen by me in new pictures and by no reviewer (L for light):
+
+| | Finding | State |
+| --- | --- | --- |
+| L1 | On a slope the pool lands ahead and his legs "disappear into black"; the pool's rear edge at his heels is the firmest left | done: the pool looks down more than out and is a little wider; his boots, and the slope under them, are in it |
+| L2 | His pack and legs are black: "a head and shoulders floating" | done with L1: the lower aim falls on all of him from behind |
+| L3 | The rover has "none of the fill the man got"; the near ground is the weakest lit, the farthest the brightest | done: the rover's wide lamps stand above and behind it (where a work light on a mast would be), wider, and reach its sides; the rover is lit and the ground from its tail outward |
+| L4 | The far end of the rover's beam is "horizontal bright streaks, like glitter on water" | done in part: the long beam grows less with distance and is a tenth weaker |
+| L5 | Lit stones go "chalk-pale, where by day the same stones are darker than the soil" | done: what the two aimed lamps add to a stone, or to anything built, comes up softly to a ceiling (`world/models.js`, `capLocalLights`): a stone at most as bright as a sunlit one, paint at half its sunlit white. (Without it the rover in his beam at forty metres was a white paper cut-out.) |
+| L6 | At dusk his and the rover's tracks were paler than the soil (unlit marks coloured by the sun's strength, which at dusk is far more than what falls on level ground) | fixed: by the light on level ground |
+| L7 | At dusk the rover's dust was brighter than the sky behind it | done: kicked-up dust takes less of a low sun |
+| L8 | In twilight the glow "stops short of the horizon": a darker band 40 px tall at the foot of the sky | done: the band is a fifth weaker; no band shows at dusk or by day |
+| L9 | No lamp casts a shadow behind a rock ("not noticeable at phone size"); the back of his helmet is lit though his lamps face forward | left: a shadow from a lamp is a second shadow map every frame |
+
 ## Sharpness and the frame rate (the owner's item g)
 
 The owner: "on the older build it held 60 fps by drawing at about 64% resolution. Show me what a 30 or 40 fps
@@ -1351,7 +1492,7 @@ from the Hab (the map is the base's; elsewhere the last few hundred marks are al
 | 25 | Picture reviews at iPhone size (844x390, touch, the preset a phone starts on); a WebKit check of layout and scripts | next review round; WebKit needs the owner's phone |
 | 26 | Base mode: no rescue, many more resources and buildings (the owner's second mode) | built in four parts, reviewed (every model NEARLY or better; the mode as a whole NEARLY on all five points) and on the title. What is open is polish, listed under "Base mode": F6, F7, F10 to F16, H5 to H8, G11, G14; and an hour of it has not yet been played through by hand |
 | 37 | **The quiet HUD on the phone** (the owner's second finding of 15 November) | built, measured in the suite (`tests/hud-cover.mjs`), reviewed and re-checked: calm MET at all three sizes by every review, the other five points MET or NEARLY, nothing NOT MET (see "The quiet HUD"). Closed under the owner's bounds. Open for the owner: the sol and the clock stand beside the dial, not on the buttons' row (one menu button in place of four would make room there); and whether the quiet HUD suits him on his phone |
-| 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | (a) and (b), the game in motion and how it drives and walks: done, re-checked, and the re-check's bugs fixed (see "In motion", K1 to K26); two things are second attempts not yet seen by anyone but me (getting into the rover, the rover's weight), and K11 and K13 are plateaued for code. (g) sharpness: one pass done (see "Sharpness and the frame rate"); its re-check is the phone's own report. (f) wear: one pass done (see "Wear"); to be looked at in the next picture review. All of that is on the preview. **Next, in the owner's order: (c)** the rest of the interface to MET at both phone sizes (the ninth review's N5 to N13 and the quiet HUD's leftovers), **(d)** the launch and the rescue as cutscenes (V5, V6), **(e)** baked lighting (a contact-shadow bake for every prop is written and not yet run: `tools/build_contact.mjs`; then light baked into the Hab's and the greenhouse's interiors) |
+| 38 | **The owner's direction of 15 November, items (a) to (g)**, one pass and one re-check each | (a) and (b), the game in motion and how it drives and walks: done, re-checked, and the re-check's bugs fixed (see "In motion", K1 to K26); two things are second attempts not yet seen by anyone but me (getting into the rover, the rover's weight), and K11 and K13 are plateaued for code. (g) sharpness: one pass done (see "Sharpness and the frame rate"); its re-check is the phone's own report. (f) wear: one pass done (see "Wear"); to be looked at in the next picture review. All of that is on the preview. **The four additions of the same day**: the storm and the idle stance in motion: done and re-checked (storm moves MET, the rest NEARLY; see "The storm and standing still"). Night light and the horizon: done and re-checked (walking light MET, the rest NEARLY; the horizon's ruled line plateaued; see "Light to get about by at night"). The emergency HUD: built and measured, to go to the interface reviewers (see "An emergency: one thing leads"). **Next, in the owner's order: (c)** the one review of the interface at both phone sizes after this pass (the emergency HUD, the wording of N10 and N11; N5, N7, N9, N12, N13 are polish and are left), **(d)** the launch and the rescue as cutscenes (V5, V6), **(e)** baked lighting (a contact-shadow bake for every prop is written and not yet run: `tools/build_contact.mjs`; then light baked into the Hab's and the greenhouse's interiors), then the built objects (the greenhouse, the rover's glass, the rescue ship close up, the soil heap) |
 | 12 | Publish to `gh-pages` | The preview is at `gh-pages/next/` (the first game is still at the root). It is refreshed only from a commit whose whole suite passes. On 15 November: the rover fix, the update repair and Base mode from `4e281c1` (cache `stranded2-e0658cf9b76a`); the quiet HUD from `3b08503` (cache `stranded2-96466c63e911`); then the cameras, getting in, the frame-rate setting and worn ground from `1105da6` (`gh-pages` `58f3c02`, cache `stranded2-4636a574a41c`; the suite's first thirteen parts ran on `f130007`, which differs only in one test). Replace the root once the preview has been seen running on the owner's phone |
 | 10 | Frame rate on a real phone and laptop (needs the owner's devices or a GPU runner) | measured on the owner's iPhone on an older build (60 fps average at a dynamic scale of 0.64; see the bar); to be measured again on the current build. Laptop: not measured |
 | 11 | WebKit/iOS check: cannot be run here (only Chromium is installed) | blocked on hardware |

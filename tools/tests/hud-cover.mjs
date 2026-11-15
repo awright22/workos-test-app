@@ -7,7 +7,8 @@
 // island's margins). The smallest of them has 16%: it has a third less screen than the owner's for controls that
 // are the same size under a thumb. The other states are measured and printed for the record, with no bar: the
 // gauges opened by a tap, the task opened by a tap, an emergency, and the full HUD (the setting), which is what all
-// of this replaced.
+// of this replaced. The three emergencies are checked for what leads: one banner (the tank before the water, the
+// breach before either), the rest as marks that stand clear of the task card, and one task on the card.
 //
 //   node tools/tests/hud-cover.mjs                  three phones; exits non-zero past the bar
 //   node tools/tests/hud-cover.mjs --size=844       one size (matches by substring)
@@ -27,6 +28,8 @@ export const PHONES = [
 //  corner of the middle by one 2 px cell.)
 export const BAR = { all: 0.15, middle: 0.001, top: 0.35 };
 const pct = (v) => (v * 100).toFixed(1) + '%';
+/** What must lead in each emergency: the tank before the water, the breach before either. */
+const LEADS = { 'foot-low': /suit/i, 'foot-many-wrong': /suit/i, 'hab-breach': /breach/i };
 
 /**
  * Take one phone through the states and measure each.
@@ -45,7 +48,15 @@ export async function measure(size, o = {}) {
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.waitForFunction(settledInPage, null, { timeout: 15000, polling: 100 }).catch(() => {});
     const c = await page.evaluate(coverInPage);
-    rows.push({ state, held, ...c });
+    // what leads, and what waits behind it: the banners' words, the marks, and the task card's lines that show
+    const lead = await page.evaluate(() => ({
+      banners: [...document.querySelectorAll('#mg-alerts .alert')].map((n) => n.textContent),
+      marks: document.querySelectorAll('#mg-alerts .mark').length,
+      tasks: [...document.querySelectorAll('#mg-objectives .obj')].filter((n) => n.getClientRects().length > 0).length,
+      // (a mark must stand clear of the task card: on the small phone the second one stood under it)
+      under: [...document.querySelectorAll('#mg-alerts .mark')].filter((m) => { const a = m.getBoundingClientRect(), t = document.querySelector('#mg-tr'), b = t && t.getBoundingClientRect(); return b && a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom; }).length,
+    }));
+    rows.push({ state, held, lead, ...c });
     if (o.shoot) await page.screenshot({ path: path.join(dir, `${String(++n).padStart(2, '0')}-${state}.png`), timeout: 120000 });
   };
   const quiet = () => page.waitForFunction(() => !document.querySelector('#mg-toast .toast'), null, { timeout: 40000 }).catch(() => {});
@@ -117,7 +128,24 @@ export async function measure(size, o = {}) {
   await sleep(400);
   await ev((G) => { G.tick(0.05, 12); });
   await take('foot-low', false);
-  await ev((G) => { G.S.water = 90; G.S.power = 88; G.S.suit = 100; G.tick(0.05, 12); });
+  // several things wrong at once, out of doors: a storm over the Hab, water and power short, the tank under an eighth.
+  // One of them leads (its banner, and its gauge if it has one); the rest are marks.
+  await ev((G) => { G.setStorm(0.8); G.S.water = 9; G.S.power = 12; G.S.suit = 10; G.tick(0.05, 12); });
+  await quiet();
+  await sleep(2500);
+  await ev((G) => { G.tick(0.05, 12); });
+  await sleep(400);
+  await ev((G) => { G.tick(0.05, 12); });
+  await take('foot-many-wrong', false);
+  // ... and a breach indoors, with the water and the power still short
+  await ev((G) => { G.setStorm(0); G.S.storm.i = 0; G.S.suit = 100; G.tpLocal(-5.0, -6.2); G.S.breach.active = true; G.S.breach.done = false; G.S.o2 = 61; G.tick(0.05, 12); });
+  await quiet();
+  await sleep(2500);
+  await ev((G) => { G.S.o2 = 58; G.tick(0.05, 12); });
+  await sleep(400);
+  await ev((G) => { G.tick(0.05, 12); });
+  await take('hab-breach', false);
+  await ev((G) => { G.S.breach.active = false; G.S.breach.done = true; G.S.o2 = 96; G.S.water = 90; G.S.power = 88; G.S.suit = 100; G.tpLocal(6, 34, 0.4); G.setLocalTime(13); G.tick(0.05, 12); });
 
   // the full HUD (the setting), beside the rover: what the quiet one replaced
   await page.evaluate(() => window.__UI.setSetting('fullHud', true));
@@ -145,6 +173,15 @@ export async function run(o = {}) {
       if (over) bad++;
       console.log(`  ${over ? 'OVER' : r.held ? 'ok  ' : '    '} ${r.state.padEnd(20)} screen ${pct(r.all).padStart(6)}  middle ${pct(r.middle).padStart(6)}  top third ${pct(r.top).padStart(6)}` +
         `   ${r.parts.slice(0, 5).map(([k, v]) => `${k} ${pct(v)}`).join(', ')}`);
+    }
+    // with several things wrong, one leads: one banner, of the thing that kills soonest; the rest are marks clear of
+    // the task card; and the card gives one task
+    for (const r of res.rows) {
+      const want = LEADS[r.state];
+      if (!want) continue;
+      const l = r.lead, ok = l.banners.length === 1 && want.test(l.banners[0]) && l.marks >= 1 && l.under === 0 && l.tasks === 1;
+      if (!ok) bad++;
+      console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.state}: one thing leads (${JSON.stringify(l.banners)}, ${l.marks} marks, ${l.under} under the task card, ${l.tasks} task line${l.tasks === 1 ? '' : 's'})`);
     }
     if (res.errors.length) { bad += res.errors.length; console.log('  console errors: ' + JSON.stringify(res.errors.slice(0, 4))); }
   }

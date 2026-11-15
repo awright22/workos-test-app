@@ -169,7 +169,7 @@ function draw(dt, focus) {
   ctx.outdoor.visible = !sealed;
   e.update({ dt, sealed, dust: S.started ? S.storm.i : 0, inside: S.started && (S.inside || S.inAirlock) && S.mode === 'walk', power: !S.started || S.power > 0.5, focus, exposureBias, wind: ctx.vfx && ctx.vfx.streakU ? ctx.vfx.streakU.uWind.value : null,
     roof: sealed ? _roof.copy(World.hab.position).addScaledVector(World.hab.userData.up, 2.8) : null });
-  ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
+  ctx.vfx.update(dt, e.camera, { storm: S.started ? S.storm.i : 0, sunIntensity: e.sky.sunIntensity, sunE: e.sky.sunE, sunColor: e.sky.sunColor, ambient: e.sky.ambientSky, inside: sealed || (S.started && S.inside), pixelHeight: e.renderer.domElement.height,
     camHeight: e.camera.position.length() - surfaceAt(e.camera.position) });
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
@@ -311,6 +311,7 @@ function tick(dt) {
 let lastFocus = null;
 const secMs = new Float32Array(256);     // this second's frame times (ms), for the resolution's judge
 let secN = 0;
+let owedDraw = 0;                        // time stepped by the debug hook that the picture has not been drawn for yet
 function frame() {
   requestAnimationFrame(frame);
   const now = perf();
@@ -358,7 +359,13 @@ function frame() {
   // (the main thread's share of a frame: the game's step and the giving of the picture's orders, not the drawing)
   part('frame', () => {
     if (!window.__MG.paused) lastFocus = tick(dt);
-    draw(window.__MG.paused ? 0 : dt, lastFocus);
+    // Stood still for a test and stepped by hand, the game's clock moved and the picture's did not: a storm's dust
+    // hung where it was and its veil did not blow, so a strip of frames of a storm was twelve frames of one painting.
+    // The picture is now given the time the steps took since it was last drawn (a quarter of a second at most).
+    let ddt = dt;
+    if (window.__MG.paused) { ddt = Math.min(owedDraw, 0.25); if (ddt > 0 && ctx.vfx) ctx.vfx.time -= ddt; }
+    owedDraw = 0;
+    draw(ddt, lastFocus);
   });
   noteFrame(rawDt * 1000, (perf() - now) * 1000, rate);
 }
@@ -392,7 +399,8 @@ function installDebug() {
     works: worksApi, mail: { MAIL, nextMail, deliverMail }, farm: farmApi, comforts: comfortsApi, gainLoot, sights: { SIGHTS, sights, updateSights }, photoMode: { photo, enterPhoto, exitPhoto, photoSubjects, takePhoto: () => takePhoto(() => draw(0, lastFocus)) }, rockColliders, devils, spawnDevil, machines: { MACHINES, service, serviceCost, wearMachines, wearRover, dawnFaults }, machineEff,
     ready: false, fps: 0, paused: false,
     /** Step the simulation without drawing: n ticks of dt seconds (tests set paused first). */
-    tick(dt, n = 1) { for (let i = 0; i < n; i++) { lastFocus = tick(dt); if (ctx.vfx) ctx.vfx.time += dt; } },     // (dust kicked up in a tick ages by that tick)
+    // (dust kicked up in a tick ages by that tick; and the picture's own clock is owed that time: see `frame`)
+    tick(dt, n = 1) { for (let i = 0; i < n; i++) { lastFocus = tick(dt); if (ctx.vfx) ctx.vfx.time += dt; owedDraw += dt; } },
     fixedResolution: new URLSearchParams(location.search).has('fixed'),
     /** Start a new game at a chosen crash site without the menus. */
     async start(lat, lon, diff = 'survival', kind = 'story') {

@@ -19,7 +19,7 @@ import { rockColliders } from '../world/rocks.js';
 import { model } from '../world/models.js';
 import { input, moveInputMag, sprinting, touchJumpFresh } from './input.js';
 import { interaction } from './interact.js';
-import { clamp, lerp, damp } from '../core/math.js';
+import { clamp, lerp, damp, smoothstep } from '../core/math.js';
 import { emit } from '../core/events.js';
 
 const _lm = new THREE.Matrix4();
@@ -201,8 +201,13 @@ export function buildAstronaut() {
     if (['JumpStart', 'Land', 'Collapse', 'Wave', 'KneelDown', 'KneelUp'].includes(clip.name)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     anim.actions[clip.name] = a;
   }
-  for (const n of ['hips', 'spine', 'chest', 'neck', 'head', 'thigh_L', 'thigh_R', 'shin_L', 'shin_R']) anim.bones[n] = m.part(n);
-  anim.rest = { chest: anim.bones.chest.quaternion.clone(), head: anim.bones.head.quaternion.clone() };
+  // (the bone of that name, not the first thing of that name: the bare head is a mesh called "head", and it came
+  //  first. Everything that was meant to turn his head, to where the camera looks and now to look about him, turned
+  //  that mesh, which skinning ignores: his head had never moved.)
+  const boneNamed = (n) => { let found = null; m.inner.traverse((o) => { if (!found && o.isBone && o.name === n) found = o; }); return found || m.part(n); };
+  for (const n of ['hips', 'spine', 'chest', 'neck', 'head', 'thigh_L', 'thigh_R', 'shin_L', 'shin_R', 'upper_arm_L', 'forearm_L', 'upper_arm_R', 'forearm_R']) anim.bones[n] = boneNamed(n);
+  anim.base = {};
+  for (const k of PROC_BONES) if (anim.bones[k]) anim.base[k] = anim.bones[k].quaternion.clone();
   // helmet lamps: one spotlight at the visor, switched on in the dark
   // (a gentler falloff than a real lamp's: at arm's length a physical one whites out whatever he faces)
   // (and a short reach: carried to fifty metres it floodlit the whole Hab from across the yard, and nothing was dark)
@@ -228,6 +233,8 @@ export function buildAstronaut() {
   at.add(lamp, tgt);
   lamp.target = tgt;
   anim.lamp = lamp;
+  anim.eye = at;
+  anim.lampsFor = null;               // which of the two has the lamps now: see mountLamps
   // the helmet and the head under it are separate meshes: he takes the helmet off where there is air
   m.inner.traverse((o) => {
     if (!o.isMesh) return;
@@ -255,6 +262,87 @@ function play(name, fade = 0.22, restart = false) {
 }
 
 /** The pose an interaction uses: standing at a console, or kneeling at something on the ground. */
+const _iq = new THREE.Quaternion(), _ipq = new THREE.Quaternion(), _idq = new THREE.Quaternion(), _iv = new THREE.Vector3(), _iw = new THREE.Vector3(), _it = new THREE.Vector3();
+/** Turn a bone to point (along its own length, its +Y) at a place in the world group's frame, `w` of the way from where its clip left it. */
+function aimBone(bone, target, w) {
+  if (!bone || w <= 0.001) return;
+  bone.parent.updateWorldMatrix(true, false);
+  bone.parent.getWorldQuaternion(_ipq);
+  _iq.copy(_ipq).multiply(bone.quaternion);
+  _iw.copy(bone.position).applyMatrix4(bone.parent.matrixWorld);
+  _it.copy(target); ctx.world.localToWorld(_it);
+  _iv.set(0, 1, 0).applyQuaternion(_iq);
+  _idq.setFromUnitVectors(_iv, _it.sub(_iw).normalize());
+  _iq.premultiply(_idq);
+  _idq.copy(_ipq).invert().multiply(_iq);
+  bone.quaternion.slerp(_idq, Math.min(1, w));
+}
+/** Turn a bone about an axis given in the world group's frame (whatever its own axes are). */
+function turnBoneWorld(bone, axis, angle) {
+  bone.parent.updateWorldMatrix(true, false);
+  bone.parent.getWorldQuaternion(_ipq);
+  // (the world group may itself be turned: the axis is taken into the world the bones' matrices are in)
+  _iv.copy(axis).transformDirection(ctx.world.matrixWorld);
+  _idq.setFromAxisAngle(_iv, angle);
+  _iq.copy(_ipq).multiply(bone.quaternion).premultiply(_idq);
+  bone.quaternion.copy(_ipq.invert().multiply(_iq));
+}
+const ease = (t) => { const k = clamp(t, 0, 1); return k * k * (3 - 2 * k); };
+const idle = { t: 0, glanceAt: 1.2, glance: null, wristAt: 3.2, wrist: -1, breath: 0, gust: 0, sway: 0 };
+player.idle = idle;                    // (for tests and the debug hook)
+const _wf = new THREE.Vector3(), _wr = new THREE.Vector3(), _wt = new THREE.Vector3();
+/** What is added to a man standing still (see updateAstronaut). `on`: he is standing with nothing to do. */
+function idleLife(dt, on) {
+  const b = anim.bones;
+  if (!on) {
+    // (whatever he was at is let go quickly, not dropped: a head snapped to the front is a puppet's)
+    idle.t = 0; idle.glanceAt = 1.2 + Math.random(); idle.wristAt = 3.2 + Math.random() * 2;
+    if (idle.glance) idle.glance.out = Math.min(idle.glance.out, idle.glance.t + 0.01);
+    if (idle.wrist >= 0 && idle.wrist < 2.6) idle.wrist = 2.6;
+  } else idle.t += dt;
+  idle.breath += dt;
+  // the shift of his weight (see updateAstronaut, where the whole of him is tipped by `sway`): eased in when he has
+  // stood a second, gone at once when he moves; a slow swing with long rests at each end
+  { const want = on && idle.t > 1 ? 0.058 * Math.tanh(2.6 * Math.sin((idle.t - 1) * 0.62)) / Math.tanh(2.6) : 0; idle.sway += (want - idle.sway) * Math.min(1, dt * (on ? 2.2 : 9)); }
+  if (b.spine && Math.abs(idle.sway) > 0.0005) turnBoneWorld(b.spine, _wf.set(0, 0, -1).applyQuaternion(astro.quaternion), -idle.sway * 0.9);
+  // his breath: the chest lifts and the shoulders with it, a little
+  if (on && b.chest) { const br = Math.sin(idle.breath * 1.5); b.chest.rotateX(-0.02 * br); if (b.upper_arm_L && b.upper_arm_R) { b.upper_arm_L.rotateZ(0.018 * br); b.upper_arm_R.rotateZ(-0.018 * br); } }
+  // a look about him
+  if (on && !idle.glance && idle.wrist < 0 && idle.t > idle.glanceAt) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    idle.glance = { t: 0, yaw: side * (0.45 + Math.random() * 0.4), pitch: (Math.random() - 0.4) * 0.22, out: 1.2 + Math.random() * 1.2 };
+  }
+  const g = idle.glance;
+  if (g) {
+    g.t += dt;
+    const k = ease(g.t / 0.4) * (1 - ease((g.t - g.out) / 0.55));
+    // (less of it when his head is already turned to where the camera looks: a neck goes so far)
+    const room = 1 - 0.55 * Math.min(1, Math.abs(wrap(player.face)));
+    if (b.head) { b.head.rotateY(g.yaw * 0.62 * k * room); b.head.rotateX(g.pitch * k); }
+    if (b.neck) b.neck.rotateY(g.yaw * 0.25 * k * room);
+    if (b.chest) b.chest.rotateY(g.yaw * 0.13 * k * room);
+    if (g.t > g.out + 0.55) { idle.glance = null; idle.glanceAt = idle.t + 2.6 + Math.random() * 3.5; }
+  }
+  // the display on his forearm: up in front of his chest, his head down to it, and away again
+  if (on && idle.wrist < 0 && !idle.glance && idle.t > idle.wristAt) idle.wrist = 0;
+  if (idle.wrist >= 0) {
+    idle.wrist += dt;
+    const k = ease(idle.wrist / 0.6) * (1 - ease((idle.wrist - 2.6) / 0.6));
+    if (b.upper_arm_L && b.forearm_L && k > 0.001) {
+      _wf.set(0, 0, -1).applyQuaternion(astro.quaternion); _wr.set(1, 0, 0).applyQuaternion(astro.quaternion);
+      // (the elbow forward and a little out; the forearm across his chest, the wrist at the breastbone)
+      aimBone(b.upper_arm_L, _wt.copy(player.pos).addScaledVector(player.up, 1.02).addScaledVector(_wf, 0.34).addScaledVector(_wr, -0.34), k * 0.85);
+      aimBone(b.forearm_L, _wt.copy(player.pos).addScaledVector(player.up, 1.34).addScaledVector(_wf, 0.36).addScaledVector(_wr, 0.02), k);
+      // (a nod, not a bow: at twice this the helmet lay on his shoulder)
+      if (b.head) { b.head.rotateX(0.26 * k); b.head.rotateY(0.1 * k); }
+      if (b.neck) b.neck.rotateX(0.08 * k);
+    }
+    if (idle.wrist > 3.2) { idle.wrist = -1; idle.wristAt = idle.t + 13 + Math.random() * 9; idle.glanceAt = idle.t + 1.5 + Math.random() * 2; }
+  }
+}
+
+/** The bones the game adds to on top of the clips (see updateAstronaut). */
+const PROC_BONES = ['spine', 'chest', 'neck', 'head', 'thigh_L', 'thigh_R', 'shin_L', 'shin_R', 'upper_arm_L', 'forearm_L', 'upper_arm_R', 'forearm_R'];
 function workPose() {
   const it = interaction.active;
   return it && it.pose === 'stand' ? 'WorkStand' : 'WorkKneel';
@@ -320,16 +408,38 @@ export function updateAstronaut(dt) {
     if (anim.actions.KneelUp.time >= KNEEL_T - 0.02) { anim.kneel = 0; play('Idle', 0.15); }
   } else play('Idle', 0.3);
   if (anim.current) anim.current.setEffectiveTimeScale(ts);
-  // the look-at below is added on top of the clip each frame, so start from the rest pose
-  anim.bones.chest.quaternion.copy(anim.rest.chest);
-  anim.bones.head.quaternion.copy(anim.rest.head);
+  // What is added to a clip's pose below (a look, a lean, a breath, a reach) is added to the pose the clip left, each
+  // frame afresh. The mixer writes a bone only when the clip's value for it has changed, so a bone the clip holds
+  // still for a while is not written again, and whatever was added to it stayed and was added to: his spine went over
+  // by three degrees a frame for a third of a second and sprang back. So each bone that is added to goes back,
+  // before the mixer runs, to where the mixer last left it; and after it has run, where it now is is kept.
+  for (const k of PROC_BONES) { const bn = anim.bones[k]; if (bn && bn.isBone) bn.quaternion.copy(anim.base[k]); }
   anim.mixer.update(dt);
+  for (const k of PROC_BONES) { const bn = anim.bones[k]; if (bn && bn.isBone) anim.base[k].copy(bn.quaternion); }
   player.bones = anim.bones;
   if (!driving) {
     astro.position.copy(player.pos);
     // (going up and in, over the last third of a second of getting into the rover)
     { const b = S.boarding, k = b ? clamp((b.t - (b.dur - 0.32)) / 0.32, 0, 1) : 0; astro.scale.setScalar(1 - 0.4 * k * k); if (k > 0) astro.position.addScaledVector(player.up, 0.7 * k); }
     astro.quaternion.copy(player.q).multiply(_q2.setFromAxisAngle(Y_AXIS, player.face));
+    // Standing, his weight goes from one leg to the other every few seconds: the whole of him tips a few degrees
+    // about his boots, and his spine takes it back out (idleLife), so his hips go six centimetres over and his
+    // shoulders stay where they were. (From the chest down nothing moved in seven seconds of standing.)
+    if (Math.abs(idle.sway) > 0.0005) {
+      _axis.set(0, 0, -1).applyQuaternion(astro.quaternion);
+      astro.quaternion.premultiply(_q2.setFromAxisAngle(_axis, idle.sway));
+    }
+    // In a storm he leans into it, from his boots, and the gusts rock him. (He stood in a gale as he stands in still
+    // air: "the storm changes nothing about how he moves".)
+    {
+      const blow = S.inside || S.inAirlock || !ctx.vfx ? 0 : smoothstep(0.3, 0.9, S.storm.i);
+      if (blow > 0.01 && ctx.vfx.wind.lengthSq() > 1) {
+        idle.gust += dt;
+        const lean = blow * (0.105 + 0.022 * Math.sin(idle.gust * 3.1) + 0.014 * Math.sin(idle.gust * 7.7 + 1.3));
+        _axis.crossVectors(player.up, ctx.vfx.wind).normalize();
+        astro.quaternion.premultiply(_q2.setFromAxisAngle(_axis, -lean));
+      }
+    }
     // footsteps: the Walk and Run clips plant a foot at the start and the middle of the cycle
     if ((anim.name === 'Walk' || anim.name === 'Run') && player.onGround) {
       const a = anim.current, d = a.getClip().duration;
@@ -350,6 +460,11 @@ export function updateAstronaut(dt) {
     anim.bones.shin_L.rotateX(knee); anim.bones.shin_R.rotateX(knee * 0.8);
     anim.bones.chest.rotateX(0.16 * fall * anim.air);
   } else anim.air = 0;
+  // Standing, he is alive. The Idle clip breathes and shifts his weight, by a degree and a centimetre: on a phone he
+  // is a hand's breadth tall and none of it shows, and two reviewers of six seconds of it saw a statue. So, added to
+  // the clip while he stands and nothing is asked of him: every few seconds he looks about him, a real turn of the
+  // head; now and then he lifts his left forearm and reads the display on it; and his shoulders ride his breath.
+  idleLife(dt, !driving && !working && !S.over && !S.sleeping && player.onGround && player.speed < 0.25 && anim.name === 'Idle');
   // look where the camera looks: a little through the chest, more through the head
   // (It is the head that looks, and the chest hardly at all: with a fifth of the camera's tilt in his chest, and a
   // little added when the camera was level, he stood rocked back on his heels five degrees whenever it looked up.)
@@ -379,8 +494,53 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  anim.lamp.intensity = ctx.engine.snapLight > 0 ? lampOn * 1.3 : lerp(anim.lamp.intensity, lampOn * 1.3, damp(0.25, dt));
+  if (anim.lampsFor !== driving && World.rover && World.rover.headlight) mountLamps(driving);
+  const set = (light, to) => { light.intensity = ctx.engine.snapLight > 0 ? to : lerp(light.intensity, to, damp(0.25, dt)); };
+  if (!driving) {
+    set(anim.lamp, lampOn * LAMPS.pool.power);
+    if (anim.lampsFor === false) set(World.rover.headlight, lampOn * LAMPS.throw.power);
+  } else if (anim.lampsFor === true) {
+    // (the rover's wide lamps are roverLights' to switch; its long beam is the helmet's lamp, borrowed)
+    const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5;
+    set(anim.lamp, dim ? LAMPS.high.power : 0);
+  }
   for (const mm of anim.lampMats) mm.emissiveIntensity = 0.15 + lampOn * 5;
+}
+/*
+ * Light to get about by after dark. There are two lamps in the game that can be aimed, his helmet's and the rover's,
+ * and a phone pays for every lamp on every surface whether it is lit or not; so the two are shared out, and whoever
+ * is travelling has both. On foot the helmet's is a wide soft pool at his feet and the rover's, borrowed, is a narrow
+ * beam thrown forty metres ahead along the way he looks. Driving, the rover's is its wide lamps and the helmet's,
+ * borrowed, is a long beam down the road to a hundred metres. (He had a pool three paces across with a hard edge
+ * and nothing beyond it, and the rover's light gave out at thirty metres: at its top speed that is one second ahead.)
+ * Each grows a little stronger with distance: ground far off is lit edge-on and takes a small share of what falls.
+ */
+const LAMPS = {
+  // (the pool's lamp stands a little above and behind his head, where no lamp is: from there some of it falls on his
+  //  own shoulders and pack, and he is a lit man in the dark and not a hole cut in it. Nothing casts a shadow by it.)
+  // (and it looks down more than out: aimed out, its soft edge fell a pace ahead of him, and his own boots, and a slope
+  //  under them, were in the dark)
+  pool: { angle: 0.86, penumbra: 1.0, distance: 26, decay: -0.25, at: [0, 0.62, -0.75], aim: [0, -4.6, 6.0], power: 0.8 },
+  throw: { angle: 0.38, penumbra: 1.0, distance: 64, decay: -0.7, at: [0, 0.12, 0.1], aim: [0, -0.95, 20], power: 0.72 },
+  // (the rover's wide lamps likewise stand above and behind it, where a work light on a mast would be: the rover was a
+  //  black shape with two red lamps on it, in front of the ground it lit)
+  flood: { angle: 0.74, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 4.4, -5.2], aim: [0, -5.0, 16] },
+  // (its far end is ground seen edge-on: stronger than this it was a bright bar drawn along the horizon)
+  high: { angle: 0.2, penumbra: 0.95, distance: 135, decay: -0.6, aim: [0, -1.4, 70], power: 1.0 },
+};
+function mountLamp(light, parent, role, at) {
+  parent.add(light, light.target);
+  light.angle = role.angle; light.penumbra = role.penumbra; light.distance = role.distance; light.decay = role.decay;
+  light.position.set(at[0], at[1], at[2]);
+  light.target.position.set(at[0] + role.aim[0], at[1] + role.aim[1], at[2] + role.aim[2]);
+  light.intensity = 0;                // (it comes up where it now is, not as a flash across the yard)
+}
+function mountLamps(driving) {
+  const rv = World.rover, hl = rv.headlight, inner = rv.model.inner;
+  if (!rv.lampAt) rv.lampAt = [hl.position.x, hl.position.y, hl.position.z];
+  if (driving) { mountLamp(hl, inner, LAMPS.flood, LAMPS.flood.at); mountLamp(anim.lamp, inner, LAMPS.high, rv.lampAt); }
+  else { mountLamp(anim.lamp, anim.eye, LAMPS.pool, LAMPS.pool.at); mountLamp(hl, anim.eye, LAMPS.throw, LAMPS.throw.at); }
+  anim.lampsFor = driving;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
 
@@ -718,6 +878,17 @@ function updateWalkCamera(dt, running) {
   if (S.shake > 0) {
     S.shake = Math.max(0, S.shake - dt * 1.6);
     if (!input.reducedMotion) c.position.addScaledVector(_v1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.4);
+  }
+  // ... and the wind has the camera too: a slow sway and a little roll, more in the gusts
+  {
+    const blow = S.inside || S.inAirlock ? 0 : smoothstep(0.35, 0.9, S.storm.i);
+    if (blow > 0.01 && !input.reducedMotion) {
+      cam.blowT = (cam.blowT || 0) + dt;
+      const t = cam.blowT;
+      c.position.addScaledVector(_v1.set(1, 0, 0).applyQuaternion(c.quaternion), (Math.sin(t * 2.9) * 0.04 + Math.sin(t * 7.3) * 0.014) * blow)
+        .addScaledVector(player.up, Math.sin(t * 3.7 + 1.1) * 0.022 * blow);
+      c.quaternion.multiply(_q2.setFromAxisAngle(_axis.set(0, 0, 1), Math.sin(t * 2.1 + 0.6) * 0.009 * blow));
+    }
   }
   const targetFov = ctx.engine.baseFov + (running ? 7 : 0);
   c.fov = lerp(c.fov, targetFov, damp(0.18, dt));

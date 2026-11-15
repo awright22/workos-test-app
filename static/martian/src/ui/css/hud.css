@@ -868,6 +868,8 @@
 /* --- with his life in the balance (the task that leads is a red one) the log keeps quiet: its line stood over the
    airlock he was being sent to, and said "wipe the panels" beside "get to air" */
 #mg-root.mg-calm.is-urgent #mg-log { display: none; }
+/* (and the card gives that one task: "Make water" stood under "Get to air" while his tank ran out) */
+#mg-root.mg-calm.is-urgent #mg-objectives .obj:not(.first) { display: none; }
 #mg-root.mg-calm.bars-in .suit { align-self: flex-start; }
 /* (a gauge's name stands clear of its bar: the 2 of "HAB O2" ran into it) */
 #mg-root.mg-calm .res .row, #mg-root.mg-calm #mg-rover .row { row-gap: 3px; }
@@ -889,4 +891,18 @@
 @media (max-width: 760px) {
   #mg-root.mg-calm.bars-open #mg-clock .sol { flex-wrap: wrap; row-gap: .1875rem; }
   #mg-root.mg-calm.bars-open #mg-clock .sol .of:not(:empty) { flex-basis: 100%; margin-left: 0; }
+}
+
+/* One thing leads (ui/hud.js): beside the leading banner, or alone, the other warnings wait as marks: each its own
+   sign in its own colour, with no words and no bar. */
+#mg-root.mg-calm #mg-alerts { flex-direction: row; align-items: center; justify-content: center; gap: .375rem; }
+#mg-alerts .marks { display: flex; align-items: center; gap: .25rem; }
+#mg-alerts .mark { display: grid; place-items: center; width: 1.625rem; height: 1.625rem; border-radius: 50%; box-sizing: border-box;
+  background: var(--plate-strong); border: 1.5px solid var(--accent); color: var(--accent); font: 600 var(--t12)/1 var(--f-cond); font-style: normal; }
+#mg-alerts .mark .ic { width: .9375rem; height: .9375rem; }
+#mg-alerts .mark.crit { border-color: var(--danger); color: var(--danger); }
+#mg-alerts .mark.more { border-color: transparent; color: var(--ink); }
+/* (on the small phone there is no room beside the banner: the second mark stood under the task's card. They wait under it.) */
+@media (max-width: 760px) {
+  #mg-root.mg-calm #mg-alerts { flex-direction: column; gap: .25rem; }
 }

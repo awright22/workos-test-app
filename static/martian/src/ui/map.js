@@ -160,7 +160,7 @@ function buildMarkers() {
     title: 'The MAV', type: S.flags.mavRevealed ? 'Objective · Schiaparelli crater' : isBase() ? 'Ares 4 · Schiaparelli crater' : 'The way home · Schiaparelli crater',
     note: S.flags.mavRevealed ? 'Fuelled and waiting. This is the way off the planet.' : isBase() ? 'The next mission’s ascent vehicle, standing ready in Schiaparelli. No ship is coming to meet it.' : `The only rocket on Mars: the next mission’s ascent vehicle, standing ready in Schiaparelli. It cannot launch before Sol ${S.rescueSol}, and Earth has to know you are coming.` });
   if (S.mode !== 'rover') add({ id: 'rover', icon: 'rover', color: col.ink, pos: World.rover.group.position, label: groundDist(World.rover.group.position, World.hab.position) > 400 ? 'Rover' : '', pri: 4,
-    title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 tank ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
+    title: 'Rover', type: 'Vehicle', note: `Battery ${Math.round(S.roverPower / roverPowerCap() * 100)}%, O2 ${Math.round(S.roverO2 / BAL.roverO2Cap * 100)}%.` });
   add({ id: 'hab', icon: 'hab', color: col.accent, pos: World.hab.position, label: 'Hab', pri: 2, home: true,
     title: 'The Hab', type: 'Home', note: 'Air, water, the farm, the fabricator and a bunk.' });
   out.sort((a, b) => b.pri - a.pri);              // drawn back to front: the important ones on top

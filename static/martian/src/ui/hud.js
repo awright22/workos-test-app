@@ -106,7 +106,7 @@ export const OBJECTIVES = [
   { id: 'farm', place: () => (farmStep().heap ? 'Heap' : 'Farm bed'), text: () => `Plant three farm beds (${Math.min(plantedPlots(), 3)} of 3)`, why: () => farmStep().why,
     pos: () => { const f = farmStep(); return f.bed ? above(f.bed.worldPos, 0.9) : f.heap ? above(f.heap.group.position, 1.1) : null; },
     shown: () => S.flags.didMath, done: () => plantedPlots() >= 3 || S.stats.potatoes > 0 },
-  { id: 'hydra', place: 'Rig', text: () => 'Make water: burn hydrazine', why: 'A burn makes 28 L for the beds. The first may cost a little Hab air.',
+  { id: 'hydra', place: 'Rig', text: () => 'Make water: burn hydrazine', why: 'A burn makes 28 L for the beds. The first may cost a little Hab O2.',
     pos: () => habPoint(4.2, 1.3, 2.6), shown: () => S.flags.didMath, done: () => S.stats.booms >= 1 },
   { id: 'panels', place: 'Panels', press: () => S.power < 45, text: () => `Wipe the solar panels (${Math.min(S.stats.panels, 3)} of 3)`, why: 'Dust on the panels starves the Hab of power.',
     pos: () => { const p = World.panels.reduce((a, b) => (!a || b.dust > a.dust ? b : a), null); return p ? above(p.group.getWorldPosition(_wv), 1.2) : null; },
@@ -121,7 +121,7 @@ export const OBJECTIVES = [
     pos: () => habPoint(4.2, 1.4, 4.8), shown: () => S.stats.produce > 0, done: () => !!(S.diet && S.diet.meals > 0) },
   // (its reason says what the day brings: with "the Hermes is coming back" alone, nothing on the card said that a
   //  drive stands between him and the rescue)
-  { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
+  { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}, then drive to the MAV`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
     shown: () => !isBase() && S.pf.connected, done: () => S.sol >= S.rescueSol },
   // ---- The game with no rescue: what a base is made of, a thing at a time. First the line that leads from one
   //      thing to the next (stone, kiln, brick, smelter, glass, power, the pad, quarters, the tower), in the order a
@@ -938,8 +938,18 @@ export function fmtClock() {
 }
 const minus = (n) => (n < 0 ? '−' + Math.abs(n) : String(n));
 
-const hud = { tod: null, prev: {}, rate: {}, jump: {}, last: {}, keep: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null, moveAt: -1e9, mode: '', roverAt: -1e9 };
+const hud = { tod: null, prev: {}, rate: {}, jump: {}, last: {}, keep: {}, want: {}, text: {}, cls: {}, alerts: '', keys: null, danger: 0, cold: 0, day: null, moveAt: -1e9, mode: '', roverAt: -1e9 };
 function setText(key, node, html) { if (hud.text[key] !== html) { hud.text[key] = html; node.innerHTML = html; } }
+/** The gauges, in the order they queue when several are low; and what each says when it leads and is critical. */
+const TROUBLE_ORDER = ['o2', 'health', 'water', 'food', 'power', 'morale'];
+const TROUBLE = {
+  o2: { ic: 'hab', rank: 2, name: 'Hab <span class="chem">O<sub>2</sub></span>', todo: 'the oxygenator needs power', short: 'the oxygenator needs power' },
+  health: { ic: 'vitals', rank: 3, name: 'Health', todo: 'eat, rest, and get to air', short: 'eat, rest, get to air' },
+  water: { ic: 'water', rank: 4, name: 'Water', todo: 'make water at the rig', short: 'make water at the rig' },
+  food: { ic: 'food', rank: 5, name: 'Food', todo: 'harvest what is ready, and ration', short: 'harvest, and ration' },
+  power: { ic: 'power', rank: 6, name: 'Power', todo: 'wipe the solar panels', short: 'wipe the panels' },
+  morale: { ic: 'mood', rank: 10, name: 'Morale', todo: 'cook, sleep, call home', short: 'cook, sleep, call home' },
+};
 function setLevel(key, node, frac, warnAt, critAt) {
   const c = frac < critAt ? 'crit' : frac < warnAt ? 'warn' : '';
   if (hud.cls[key] !== c) { hud.cls[key] = c; node.classList.toggle('warn', c === 'warn'); node.classList.toggle('crit', c === 'crit'); }
@@ -1000,8 +1010,9 @@ export function updateHud() {
   // under the dial: where the air is coming from, or, while the tank is all there is, how long it lasts
   let st;
   if (filling) st = 'Refilling';
-  else if (S.mode === 'rover') st = S.roverO2 > 0 ? 'Rover air' : 'Tank empty';
-  else if (safeAir) st = 'Hab air';
+  // (by the names the gauges have: "HAB AIR" stood under the dial beside a bar called "HAB O2", "ROVER AIR" beside "O2 TANK")
+  else if (S.mode === 'rover') st = S.roverO2 > 0 ? 'Rover <span class="chem">O<sub>2</sub></span>' : 'Rover empty';
+  else if (safeAir) st = 'Hab <span class="chem">O<sub>2</sub></span>';
   // (Minutes and seconds, and it says so: "5:46 of air" was read by three reviewers running as five hours or five
   //  minutes, which is the difference that matters at "1:10". It stands under the dial's own name, so "of air" is said.
   //  Not "left": beside a tank just filled at the airlock door, "5:56 left" read as a countdown to something.)
@@ -1030,7 +1041,7 @@ export function updateHud() {
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small class="pc">%</small>`, S.health],
     ['morale', S.morale / 100, `${Math.round(S.morale)}`, null],
   ];
-  let arrow = null, barsIn = 0;
+  let arrow = null;
   const pt = playTime();
   for (const [k, frac, txt, raw, level] of rows) {
     const b = UI.bars[k];
@@ -1049,9 +1060,8 @@ export function updateHud() {
       const fast = r < -0.0015 && frac > warnAt && (frac - warnAt) * (raw / frac) / -r < 150;
       const step = was !== undefined && Math.abs(is - was) > 0.9;
       if (lvl || fast || step || hud.jump[k] || b.wrap.classList.contains('fresh')) hud.keep[k] = pt + (lvl || fast ? 2 : 5);
-      const on = open || pt < (hud.keep[k] || 0);
-      if (hud.cls[k + 's'] !== on) { hud.cls[k + 's'] = on; b.wrap.classList.toggle('show', on); }
-      if (on && !b.wrap.hidden) barsIn++;
+      // (whether it is shown is settled further down, once it is known what leads: see "one thing leads")
+      hud.want[k] = { lvl, on: pt < (hud.keep[k] || 0), hidden: b.wrap.hidden };
     }
     if (raw !== null) {
       const r = track(k, raw, dt), j = hud.jump[k];
@@ -1066,10 +1076,7 @@ export function updateHud() {
       if (tr && !arrow && !b.wrap.hidden && (!calm || hud.cls[k + 's'])) arrow = b.wrap;
     }
   }
-  if (calm) {
-    const key = barsIn + (open ? 'o' : '');
-    if (hud.cls.barsIn !== key) { hud.cls.barsIn = key; root.classList.toggle('bars-in', barsIn > 0); root.classList.toggle('bars-open', open); measureVitals(); }
-  } else if (hud.cls.barsIn !== '') { hud.cls.barsIn = ''; root.classList.remove('bars-in', 'bars-open'); measureVitals(); }      // (the full HUD's panel is taller: the log and the cards stand under it from this frame)
+  if (!calm && hud.cls.barsIn !== '') { hud.cls.barsIn = ''; root.classList.remove('bars-in', 'bars-open'); measureVitals(); }      // (the full HUD's panel is taller: the log and the cards stand under it from this frame)
   // the arrows are said once, the first time one is on a bar he can see and nothing else is being said
   // (they were explained only in the guide: "what do the arrows mean" was a new player's question at the first bars)
   if (arrow && !S.flags.arrowTold && S.started && !S.flags.coldOpen) {
@@ -1125,28 +1132,74 @@ export function updateHud() {
   const al = [];
   // (the alarm and its stake. What to do about it, where and how far, is the first line of the mission list beside
   //  it: the two used to say the same thing in the same words, "Hab breach / seal it" beside "Hab breach: seal it")
-  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out']);
+  // (each also names the gauge it bears on, if it has one, and its place in the queue when several are up at once)
+  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out', 'o2', 0]);
   if (!filling && !safeAir && S.mode !== 'rover') {
-    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty']);
-    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left']);
+    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty', null, 1]);
+    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left', null, 1]);
   }
-  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge', 'park it in the sun']);
+  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge', 'park it in the sun', null, 7]);
   if (S.storm.i > 0.15) {
     // (what the storm is doing depends on where it is: over the Hab it starves the panels, out here it only blinds)
     const atHab = stormIntensityAt(World.hab.position) > 0.15;
-    al.push(['warn', 'storm', 'Dust storm', atHab ? 'solar power is down' : 'keep the Hab in sight', atHab ? 'solar power is down' : 'keep your bearings']);
+    al.push(['warn', 'storm', 'Dust storm', atHab ? 'solar power is down' : 'keep the Hab in sight', atHab ? 'solar power is down' : 'keep your bearings', atHab ? 'power' : null, 8]);
   }
-  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Extreme cold', 'the suit heater is drawing <span class="chem">O<sub>2</sub></span>', 'the heater burns more <span class="chem">O<sub>2</sub></span>']);
+  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Extreme cold', 'the suit heater is drawing <span class="chem">O<sub>2</sub></span>', 'the heater burns more <span class="chem">O<sub>2</sub></span>', null, 9]);
   const critical = al.some((a) => a[0] === 'crit');
   if (critical !== UI.critical) { UI.critical = critical; root.classList.toggle('is-critical', critical); }
-  const alKey = al.slice(0, 2).map((a) => a[2] + a[3]).join('|') + narrow;
+
+  // --- one thing leads (the quiet HUD) ---
+  // With several things wrong at once the HUD said them all: two banners, every low gauge as a row, the task in red,
+  // the dial in red. ("Worst exactly when an emergency is on", said the reviewer of the small phone.) Now whatever
+  // is wrong is put in order, worst first, and the first of them leads: its banner if it has one, and the gauge it
+  // bears on. The rest wait behind it as marks: each its own sign in its own colour, no words, no bar. A tap on
+  // the dial still opens every gauge. (The full HUD shows two banners and every gauge, as it did.)
+  let banners = al.slice(0, 2), marks = [];
+  if (calm) {
+    const W = al.map((a) => ({ lvl: a[0] === 'crit' ? 'crit' : 'warn', ic: a[1], bar: a[5], rank: a[6], a }));
+    for (const k of TROUBLE_ORDER) {
+      const w = hud.want[k];
+      if (!w || !w.lvl || w.hidden) continue;
+      // (a gauge an alarm already bears on is that alarm's: the breach has the Hab's air, a storm over the Hab its power)
+      const mine = W.find((x) => x.bar === k);
+      if (mine) { if (w.lvl === 'crit') mine.lvl = 'crit'; continue; }
+      const T = TROUBLE[k];
+      W.push({ lvl: w.lvl, ic: T.ic, bar: k, rank: T.rank, a: w.lvl === 'crit' ? ['crit', T.ic, `${T.name} critical`, T.todo, T.short] : null });
+    }
+    // (what kills in minutes, a breach or an emptying tank, leads whatever its level: with the tank at a fifth and the
+    //  water at nine litres the banner said WATER CRITICAL beside a card that said "Get to air")
+    const fast = (x) => (x.rank <= 1 ? 0 : 1), crit = (x) => (x.lvl === 'crit' ? 0 : 1);
+    W.sort((x, y) => fast(x) - fast(y) || crit(x) - crit(y) || x.rank - y.rank);
+    const lead = W[0] || null;
+    // (and it is the colour of the task it stands beside: an amber "suit low" beside a red "Get to air" were two voices.
+    //  Not in the first minute, whose leak is the amber it has always been.)
+    if (lead && lead.a && lead.rank <= 1 && lead.lvl !== 'crit' && objUrgent && !S.flags.coldOpen) { lead.lvl = 'crit'; lead.a = ['crit', ...lead.a.slice(1)]; }
+    banners = lead && lead.a ? [lead.a] : [];
+    // (as many as there is room for: two beside the banner, three under it on the small phone; past that, a count)
+    { const room = narrow ? 3 : 2, rest = W.slice(1);
+      marks = rest.slice(0, rest.length > room ? room - 1 : room).map((x) => [x.lvl, x.ic]);
+      if (rest.length > room) marks.push(['more', '+' + (rest.length - room + 1)]); }
+    // the gauges: asked for, all of them; else the one that leads, and, while nothing is critical, one that has just changed
+    let barsIn = 0;
+    for (const k of TROUBLE_ORDER) {
+      const w = hud.want[k], b = UI.bars[k];
+      if (!w) continue;
+      const on = open || (lead ? lead.bar === k || (lead.lvl !== 'crit' && w.on && !w.lvl) : w.on);
+      if (hud.cls[k + 's'] !== on) { hud.cls[k + 's'] = on; b.wrap.classList.toggle('show', on); }
+      if (on && !w.hidden) barsIn++;
+    }
+    const key = barsIn + (open ? 'o' : '');
+    if (hud.cls.barsIn !== key) { hud.cls.barsIn = key; root.classList.toggle('bars-in', barsIn > 0); root.classList.toggle('bars-open', open); measureVitals(); }
+  }
+  const alKey = banners.map((a) => a[0] + a[2] + a[3]).join('|') + narrow + '/' + marks.join(';');
   if (alKey !== hud.alerts) {
     hud.alerts = alKey;
-    const nAl = Math.min(al.length, 2);                                               // toasts sit below however many alerts there are
+    const nAl = Math.max(banners.length, marks.length ? 1 : 0);                        // toasts sit below however many alerts there are
     root.style.setProperty('--al', nAl);
     root.style.setProperty('--al2', Math.max(0, nAl - 1));
     root.classList.toggle('has-alert', nAl > 0);                                      // (on a phone a banner takes the region label's place)
-    UI.alerts.innerHTML = al.slice(0, 2).map(([cls, ic, title, note, short]) => `<div class="alert ${cls}">${icon(ic)}<span>${title}</span><small>${narrow ? short : note}</small></div>`).join('');
+    UI.alerts.innerHTML = banners.map(([cls, ic, title, note, short]) => `<div class="alert ${cls}">${icon(ic)}<span>${title}</span><small>${narrow ? short : note}</small></div>`).join('') +
+      (marks.length ? `<div class="marks" aria-label="${marks.length} more ${marks.length === 1 ? 'warning' : 'warnings'}">${marks.map(([lvl, ic]) => `<i class="mark ${lvl}">${lvl === 'more' ? ic : icon(ic)}</i>`).join('')}</div>` : '');
   }
 
   // --- screen-edge effects, drawn by the renderer's final pass ---

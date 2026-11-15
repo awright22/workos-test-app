@@ -99,7 +99,8 @@ export function showTitle(o) {
 const DIFF_ORDER = ['story', 'survival', 'iron'];
 const DIFF_TAG = { story: 'Gentle', survival: 'Recommended', iron: 'One life' };
 // (what the three bars under a name count: they stood there with no word, and nothing said a longer wait is the harder game)
-const DIFF_LEVEL = { story: 'Easiest', survival: 'Harder', iron: 'Hardest' };
+// (the one that is recommended is the standard, not "harder")
+const DIFF_LEVEL = { story: 'Easiest', survival: 'Standard', iron: 'Hardest' };
 /**
  * Which game: the story, or the base. (Asked where the title is told to offer both: see showStart in game/flow.js.) The
  * two cards are the difficulty sheet's cards, so the choice looks like the one that follows it.
@@ -224,7 +225,7 @@ export function showPauseMenu(o) {
     '<p class="tag">Progress saved. The potatoes are fine. Probably.</p>' +
     '<nav class="menu" aria-label="Pause menu">' +
     menuItem('resume', 'Resume', '', 'first') + (o.onPhoto ? menuItem('photo', 'Photo mode') : '') + menuItem('settings', 'Settings') + menuItem('controls', 'Controls') +
-    menuItem('quit', 'Save and quit') + menuItem('restart', 'Restart run', '', 'danger') +
+    menuItem('quit', 'Save and quit') + menuItem('restart', 'Restart from Sol 1', '', 'danger') +
     '</nav></div>' +
     '<aside class="pause-side"><div class="kv">' +
     `<span>Rescue</span><b>${o.base ? 'None' : `Sol ${o.rescueSol}`}</b><span>Location</span><b>${esc(o.region || 'Mars')}</b><span>Difficulty</span><b>${esc(o.diffName)}</b></div>` +
@@ -244,7 +245,7 @@ export function showPauseMenu(o) {
     else if (a === 'quit') o.onQuit();
     else if (a === 'restart') {
       showOverlay({
-        kind: 'error', kicker: 'Restart run', title: 'Start over?',
+        kind: 'error', kicker: 'Paused', title: 'Restart from Sol 1?',
         body: `This deletes your saved game — Sol ${o.sol} and everything you have built — and starts again at a new random crash site.`,
         onEscape: again,
         buttons: [

@@ -15,7 +15,7 @@ import { tread, treadPath } from './wear.js';
 import { showPanelDust } from './visuals.js';
 
 const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _q = new THREE.Quaternion(), _d = new THREE.Vector3();
-let trackDist = 0, plumeT = 0, digT = 0.3, wiping = null;
+let trackDist = 0, plumeT = 0, digT = 0.3, wiping = null, blowT = 0;
 
 function onGround(pos) { return pos.normalize().multiplyScalar(surfaceAt(pos)); }
 const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tn = new THREE.Vector3();
@@ -68,6 +68,17 @@ export function updateEffects(dt) {
       ctx.vfx.puff(onGround(_p), { count: 3, speed: 0.9, up: 1.3, spread: 0.3, size: 0.34, life: 0.9 });
     }
   } else digT = 0.3;
+  // In a storm the wind takes the dust from round his boots and carries it off downwind, standing or walking.
+  if (S.mode === 'walk' && !S.inside && !S.inAirlock && S.storm.i > 0.4 && ctx.vfx.wind.lengthSq() > 1) {
+    blowT += dt;
+    if (blowT > 0.16) {
+      blowT = 0;
+      _d.copy(ctx.vfx.wind).normalize();
+      onGround(_p.copy(player.pos).addScaledVector(_d, 0.15));
+      // (paler than the ground and big enough to be seen against it: in the storm's own colour they were not there)
+      ctx.vfx.puff(_p, { count: 3, speed: 1.0, up: 0.35, spread: 0.35, size: 0.7, life: 1.1, tone: 0.8, dir: _d.multiplyScalar(7 * S.storm.i) });
+    }
+  }
   // A panel comes clean under his hand, over the time the wiping takes. (It stayed as dusty as it was for a second
   // and a half of wiping, and was clean between one frame and the next.)
   const pnl = World._activePanel;

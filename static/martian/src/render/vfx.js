@@ -452,7 +452,9 @@ export class Vfx {
     this.streaks.visible = this.air.visible && p.storm > 0.25;
     st.uFall.value = this.fall; st.uCam.value.copy(camera.position); st.uUp.value.copy(up); st.uWind.value.copy(_s); st.uStorm.value = p.storm;
     // marks in the ground are as dark as the light lets them be: at night an unlit mark was paler than the ground round it
-    { const k = Math.min(1, 0.05 + (p.sunIntensity || 0) / 2.6 + (p.ambient ? p.ambient.r : 0) * 0.9); for (const mk of [this.boots, this.tyres]) mk.mesh.material.color.setRGB(0.11 * k, 0.051 * k, 0.024 * k); }
+    // (and the light that counts is what falls on level ground: a low sun is as strong as a high one, and lights the ground
+    //  a tenth as much. Lit by the sun's strength alone, at dusk his tracks were paler than the soil they were pressed into.)
+    { const k = Math.min(1, 0.03 + (p.sunIntensity || 0) * Math.max(0, Math.min(1, (p.sunE === undefined ? 1 : p.sunE) * 1.25)) / 2.6 + (p.ambient ? p.ambient.r : 0) * 0.9); for (const mk of [this.boots, this.tyres]) mk.mesh.material.color.setRGB(0.11 * k, 0.051 * k, 0.024 * k); }
     st.uLight.value.copy(a.uLight.value); st.uLight.value.r *= 0.74; st.uLight.value.g *= 0.60; st.uLight.value.b *= 0.46;      // dust-coloured, never white
     const sh = this.sheetU;
     this.sheets.visible = this.air.visible && p.storm > 0.32;
@@ -463,6 +465,8 @@ export class Vfx {
     if (this.scene.fog) sh.uLight.value.copy(this.scene.fog.color).multiplyScalar(1.04); else sh.uLight.value.copy(a.uLight.value);
     const u = this.puffU;
     u.uTime.value = this.time; u.uUp.value.copy(up); u.uPx.value = px;
-    u.uLight.value.setRGB(lit * 0.75 + p.ambient.r * 0.8, lit * 0.72 + p.ambient.g * 0.8, lit * 0.7 + p.ambient.b * 0.8);
+    // (kicked-up dust hangs a metre off the ground the low sun barely lights: at dusk the rover's was brighter than the sky)
+    const low = 0.4 + 0.6 * Math.max(0, Math.min(1, (p.sunE === undefined ? 1 : p.sunE) / 0.3)), litP = lit * low;
+    u.uLight.value.setRGB(litP * 0.75 + p.ambient.r * 0.8, litP * 0.72 + p.ambient.g * 0.8, litP * 0.7 + p.ambient.b * 0.8);
   }
 }

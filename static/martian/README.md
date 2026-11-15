@@ -160,7 +160,9 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
 - `node tools/tests/hud-cover.mjs` measures how much of a phone's screen the quiet HUD covers
   (standing, walking, at the rover, driving) at three phone sizes and holds it to its bar: 15% of
   the screen, the middle clear, 35% of the top third. `--shoot` photographs each state.
-  `tools/tests/ui-audit.mjs` runs it as its last part.
+  `tools/tests/ui-audit.mjs` runs it as its last part. With several things wrong at once the
+  quiet HUD lets one lead (what kills in minutes first): its banner, the gauge it bears on and
+  the one task; the rest wait beside it as marks.
 - `node tools/tests/motion.mjs` walks and drives eleven real routes with the stick held and
   flags what a still cannot show: no progress, a jump of the man or the camera, the man or the
   rover in the ground or over it, the camera in a rock, the rover hidden from the camera by the
@@ -168,6 +170,10 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   `--strips` photographs each route and each thing he does as a sheet of frames for reviewers.
 - `node tools/tests/sharp-shots.mjs` photographs three views at five resolutions side by side
   (what a phone shows at 60 and what 30 leaves room for).
+- `node tools/tests/night-shots.mjs` photographs getting about after dark (on foot, on a slope,
+  in the rover at rest and at speed) and a plain's horizon at dusk, in twilight and by day. The
+  game has two lamps that can be aimed, his helmet's and the rover's, and whoever is travelling
+  has both: a pool and a throw on foot, wide lamps and a long beam driving (`game/player.js`).
 - Third-party fonts and data are credited in `CREDITS.md`. App icons: `tools/build_icons.py`.
 
 ## How it is built

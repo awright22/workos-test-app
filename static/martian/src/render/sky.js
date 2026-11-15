@@ -81,6 +81,11 @@ const GLSL_SKY = /* glsl */`
     // twilight glow hugging the horizon on the sun's side after sunset
     float tw = smoothstep(-0.34, -0.02, sunE) * (1.0 - sunUp);
     col += vec3(0.20, 0.25, 0.42) * tw * pow(max(cosT * 0.5 + 0.5, 0.0), 3.0) * (0.25 + h) * 0.55;
+    // The foot of the sky is haze: the same haze the far ground fades into (the scene's fog), so that for three degrees
+    // above the horizon line the sky has the ground's own far colour. Without it the land faded to one colour and the
+    // sky began in another along a ruled line, and after sunset, when the sky keeps its light longer than the ground,
+    // every boulder out on that line stood against it as a dark cut-out. (Not from high up: there the line is the limb.)
+    col = mix(col, uFogCol, 0.62 * (1.0 - smoothstep(-0.004, 0.052, mu)) * (1.0 - smoothstep(300.0, 2500.0, uAlt)));
     // storms: flatten everything toward a dim ochre
     // in a storm the sky is the dust itself: the very colour the ground fades into, so no horizon shows
     col = mix(col, uFogCol, smoothstep(0.0, 0.8, uDust));

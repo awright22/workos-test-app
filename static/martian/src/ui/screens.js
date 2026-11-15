@@ -560,7 +560,7 @@ function statsHtml() {
   const st = S.stats;
   const tile = (v, unit, label) => `<div class="stat"><b class="t-num">${v}${unit ? `<small>${unit}</small>` : ''}</b><span>${label}</span></div>`;
   return `<div class="pane-hd">This run <span>${esc(DIFFICULTIES[S.diff].name)} · ${isBase() ? 'no rescue' : `rescue on Sol ${S.rescueSol}`}</span></div><div class="stat-grid">` +
-    tile(S.sol, '', 'Sols survived') + (isBase() ? tile(st.quarried || 0, '', 'Stone and minerals quarried') + tile(st.made || 0, '', 'Made in the works') : tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue')) +
+    tile(Math.max(0, S.sol - 1), '', 'Sols survived') + (isBase() ? tile(st.quarried || 0, '', 'Stone and minerals quarried') + tile(st.made || 0, '', 'Made in the works') : tile(Math.max(0, S.rescueSol - S.sol), '', 'Sols to rescue')) +
     tile((st.walked / 1000).toFixed(1), 'km', 'Walked') + tile((st.driven / 1000).toFixed(1), 'km', 'Driven') +
     tile(st.potatoes + (st.produce || 0), '', 'Meals grown') + tile(st.panels, '', 'Panels wiped') + tile(st.crafted, '', 'Things fabricated') +
     tile(st.mined, '', 'Ice chunks mined') + tile(discoveriesFound(), '', 'Discoveries') + tile(st.sights || 0, '', 'Sights logged') + tile(st.photographed || 0, '', 'Landers photographed') + tile(Object.keys(S.salvaged).length, '', 'Landers salvaged') +
