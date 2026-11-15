@@ -113,8 +113,6 @@ export function continueGame(saved) {
     setTimeout(() => log('Survey update: the planet is now built from real orbital elevation data. Same Mars, truer ground — your colony has been re-seated on it.', 'nasa'), 2500);
   }
 }
-/** Whether the game with no rescue is offered on the title (see showStart). */
-export function baseOffered() { try { return new URLSearchParams(location.search).has('base'); } catch (e) { return false; } }
 export let worldBuilt = false;
 export function buildWorldAtSpawn() {
   if (worldBuilt) return;
@@ -135,9 +133,9 @@ export function showStart() {
   const card = (d) => (d ? { sol: d.sol, diffName: DIFFICULTIES[d.diff || 'survival'].name, region: regionName(llToVec(d.spawn.lat, d.spawn.lon)) } : null);
   showTitle({
     saved: card(saved), savedBase: card(savedBase),
-    // (Base mode is being built. Until it has its own things to gather and build it is offered only to a player who
-    //  asks for it with "?base" on the address, or who already has a base saved.)
-    base: baseOffered() || !!savedBase,
+    // (New Game asks which of the two games. While Base mode was being built it was asked only of a player who put
+    //  "?base" on the address.)
+    base: true,
     unreadable: unreadableSaveExists(),
     onContinue: (kind) => { audio(); return ensureKind(kind).then(() => continueGame(kind === 'base' ? savedBase : saved)); },
     onNewGame: (diffKey, kind) => { audio(); return ensureKind(kind).then(() => newGame(diffKey, kind)); },

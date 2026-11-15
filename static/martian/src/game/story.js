@@ -10,6 +10,7 @@ import { player } from './player.js';
 import { _v1, _v2 } from '../core/scratch.js';
 import { FEATURES } from '../planet/features.js';
 import { R } from '../planet/constants.js';
+import { BUILDINGS } from './base.js';
 import { discoveriesFound } from '../ui/screens.js';
 import { tryReload } from './flow.js';
 import { showComms } from '../ui/menus.js';
@@ -150,6 +151,8 @@ export function updateDiscoveries(dt) {
   discTimer += dt;
   if (discTimer < 1.5) return;
   discTimer = 0;
+  // (a base's works make things and its pad takes drops while he is elsewhere: nothing he does marks the moment)
+  if (isBase()) checkAchievements();
   if (World.deposits) {
     const found = baseState().found, at = S.mode === 'rover' ? World.rover.group.position : player.pos;
     const tower = World.builtMeshes.some((b) => b.kind === 'tower');
@@ -196,17 +199,27 @@ export const ACHIEVEMENTS = [
   { id: 'fiveaday', name: 'Five a Day', desc: 'Harvest all five crops', check: () => !!S.stats.grown && Object.keys(S.stats.grown).length >= 5 },
   { id: 'chef', name: 'Chef de Mars', desc: 'Cook 5 dinners', check: () => !!(S.diet && S.diet.meals >= 5) },
   { id: 'home', name: 'No Place Like Hab', desc: 'Make 6 comforts for the Hab', check: () => !!S.comforts && Object.keys(S.comforts).length >= 6 },
-  { id: 'pirate', name: 'Space Pirate', desc: 'Leave Mars', check: () => S.won },
+  { id: 'pirate', name: 'Space Pirate', desc: 'Leave Mars', story: true, check: () => S.won },
+  // ---- a base's own (the game with no rescue: there is no leaving Mars in it, and these stand in that one's place)
+  { id: 'mason', name: 'Stone Age, Again', desc: 'Build a kiln', base: true, check: () => stands('kiln') },
+  { id: 'industry', name: 'Industrial Revolution of One', desc: 'Build a kiln, a smelter and a glassworks', base: true, check: () => stands('kiln') && stands('smelter') && stands('glassworks') },
+  { id: 'prospector', name: 'Prospector', desc: 'Quarry all five minerals', base: true, check: () => Object.keys(S.stats.minerals || {}).length >= 5 },
+  { id: 'foreman', name: 'Sole Proprietor', desc: 'Make 100 things in the works', base: true, check: () => (S.stats.made || 0) >= 100 },
+  { id: 'signed', name: 'Signed For', desc: 'Receive a supply drop on the landing pad', base: true, check: () => !!(S.base && S.base.drops) },
+  { id: 'town', name: 'Population: One', desc: 'Build one of every building', base: true, check: () => BUILDINGS.every((w) => stands(w.builds || w.id)) },
 ];
+const stands = (kind) => World.builtMeshes.some((b) => b.kind === kind);
+/** The achievements of the game being played: the story's, or a base's (which has its own in place of leaving Mars). */
+export const achievements = () => ACHIEVEMENTS.filter((a) => (a.base ? isBase() : a.story ? !isBase() : true));
 const DONE = { Reach: 'Reached', Restore: 'Restored', Harvest: 'Harvested', Survive: 'Survived', Salvage: 'Salvaged', Stand: 'Stood', Drive: 'Drove', Mine: 'Mined', Spend: 'Spent',
-  Walk: 'Walked', Endure: 'Endured', Catalogue: 'Catalogued', Find: 'Found', Cook: 'Cooked', Make: 'Made', Leave: 'Left' };
+  Walk: 'Walked', Endure: 'Endured', Catalogue: 'Catalogued', Find: 'Found', Cook: 'Cooked', Make: 'Made', Leave: 'Left', Build: 'Built', Quarry: 'Quarried', Receive: 'Received' };
 /**
  * What an achievement was earned for, as a thing done: "Spent 60 seconds outside in a dust storm". Its description
  * says what to do, which is right until it is done. (The card that announces one read "Spend 60 seconds…".)
  */
 export function achievementDone(a) { const w = a.desc.split(' ')[0]; return DONE[w] ? DONE[w] + a.desc.slice(w.length) : a.desc; }
 export function checkAchievements() {
-  for (const a of ACHIEVEMENTS) {
+  for (const a of achievements()) {
     if (S.achieved[a.id]) continue;
     let ok = false;
     try { ok = a.check(); } catch (e) {}
@@ -250,7 +263,7 @@ export function winGame() {
       // (a distance is a figure with its unit, under one word, as on the journal's statistics: "3.4 km / Walked" there
       //  and "3.4 / Km walked" here were the same number written two ways)
       ['Driven', `${(st.driven / 1000).toFixed(1)}<small>km</small>`], ['Walked', `${(st.walked / 1000).toFixed(1)}<small>km</small>`], ['Discoveries', discoveriesFound()],
-      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${Object.keys(S.achieved).length}<small>of ${ACHIEVEMENTS.length}</small>`],
+      ['Landers salvaged', Object.keys(S.salvaged).length], ['Close calls', st.closeCalls], ['Achievements', `${achievements().filter((a) => S.achieved[a.id]).length}<small>of ${achievements().length}</small>`],
     ],
     extra: `<ol class="steps" aria-label="The mission, sol by sol">${steps}</ol>`,
     // (whose words these are comes first, as a log entry's date does: after them it ran on from the last sentence)

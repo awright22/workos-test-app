@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { ctx } from './ctx.js';
+import { surfaceAt } from '../planet/surface.js';
 import { HAB_R, World, buildDeployable, colliders, plotPlants, setSiteShown, siteLocalToWorld } from '../world/build.js';
 import { syncDeposit } from '../world/base-sites.js';
 import { groundDist, tangentBasis } from '../planet/geo.js';
@@ -598,6 +601,7 @@ addI({
     site.left = site.left - 1;
     S.inv[site.dep.gives] = (S.inv[site.dep.gives] || 0) + site.dep.per;
     S.stats.quarried = (S.stats.quarried || 0) + site.dep.per;
+    (S.stats.minerals = S.stats.minerals || {})[site.dep.gives] = 1;         // (which minerals he has quarried: an achievement counts them)
     syncDeposit(site);
     Snd.play('dig');
     if (site.left === 0) log(`${site.dep.name} worked out. There are others in ${site.field.name}.`, 'sys');
@@ -730,7 +734,35 @@ export let buildKind = null;
 export function startBuild(id) {
   buildKind = id; deployKind = null;
   closeScreens();
-  toast('BUILD', WORK_BY_ID[id].name, 'Pick a spot outside, near the Hab, then hold to build it.');
+  toast('BUILD', WORK_BY_ID[id].name, 'Pick a spot outside, near the Hab, then hold to build it. The ring on the ground is where it will stand.');
+}
+/** Think better of it: nothing is being set down. (The Base tab's card for the thing chosen offers this.) */
+export function cancelBuild() { buildKind = null; }
+/**
+ * Where the thing being set down will stand, drawn on the ground: a ring of its own size, pale green where it can
+ * go and red where it cannot. Called every tick. (There was the prompt and nothing else: a kiln appeared three paces
+ * ahead of wherever he happened to be looking.)
+ */
+let ghost = null;
+const _gu = new THREE.Vector3(), _gy = new THREE.Vector3(0, 1, 0), OK_C = new THREE.Color(0.5, 1.0, 0.62), NO_C = new THREE.Color(1.0, 0.33, 0.26);
+export function updateBuildGhost() {
+  const def = buildKind && WORK_BY_ID[buildKind];
+  if (!def || S.inside || S.mode !== 'walk' || S.uiOpen || S.sleeping) { if (ghost) ghost.visible = false; return; }
+  if (!ghost) {
+    ghost = new THREE.Group();
+    const mat = (opacity) => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity, depthWrite: false, fog: false, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.94, 1.0, 72), mat(0.9)), fill = new THREE.Mesh(new THREE.CircleGeometry(0.94, 48), mat(0.14));
+    for (const m of [ring, fill]) { m.rotation.x = -Math.PI / 2; m.renderOrder = 4; m.frustumCulled = false; ghost.add(m); }
+    ghost.userData.mats = [ring.material, fill.material];
+    ctx.engine.scene.add(ghost);
+  }
+  buildSpot(def, _gu);
+  ghost.position.copy(_gu).multiplyScalar(surfaceAt(_gu) + 0.09);
+  ghost.quaternion.setFromUnitVectors(_gy, _gu);
+  ghost.scale.setScalar(def.r);
+  const ok = buildBlock() === true;
+  for (const m of ghost.userData.mats) m.color.copy(ok ? OK_C : NO_C);
+  ghost.visible = true;
 }
 /** Where a works would stand: ahead of him, far enough that he is not built into it. Writes the place into `out`. */
 function buildSpot(def, out) {
@@ -756,8 +788,10 @@ function buildBlock() {
   for (const c of colliders) if (c.r > 0.01 && groundDist(_v3, c.v) < def.r + c.r + 0.8) return 'Something is in the way';
   return true;
 }
+// (the task each of a base's things answers to on the list: see OBJECTIVES in ui/hud.js)
+const BUILD_TASK = { kiln: 'b-kiln', smelter: 'b-smelter', glassworks: 'b-glass', solarField: 'b-solar', battery: 'b-battery', tank: 'b-tank', dome: 'b-dome', quarters: 'b-quarters', tower: 'b-tower', pad: 'b-pad' };
 addI({
-  pos: () => player.pos, r: 99, hold: 2.4, mode: 'walk', priority: 2,
+  pos: () => player.pos, r: 99, hold: 2.4, mode: 'walk', priority: 2, task: () => BUILD_TASK[buildKind] || '',
   visible: () => !!buildKind && !S.inside,
   enabled: buildBlock,
   label: () => `Build the ${WORK_BY_ID[buildKind].name.toLowerCase()} here`,
@@ -773,7 +807,7 @@ addI({
     buildDeployable(def.id, _v1, Math.atan2(_v2.dot(_fe), _v2.dot(_fn)));
     S.stats.built = (S.stats.built || 0) + 1;
     Snd.play('deploy');
-    log(`${def.name} built. ${def.id === 'kiln' ? 'Stone on stone, like the first man who ever wanted a pot. It needs a job: walk up to it.' : 'It needs a job: walk up to it.'}`);
+    log(`${def.name} built. ${def.id === 'kiln' ? 'Stone on stone, like the first man who ever wanted a pot. It needs a job: walk up to it.' : def.jobs ? 'It needs a job: walk up to it.' : `${def.gives}.`}`);
     syncAllVisuals();
     buildKind = null;
     checkAchievements();
@@ -785,7 +819,7 @@ addI({
     const b = nearestOf(works(), (w) => w.group.position, 5.2);
     return b ? (World._activeWork = b).group.position : null;
   },
-  r: 5.2, hold: 0.5, mode: 'walk', pose: 'stand', priority: 1,
+  r: 5.2, hold: 0.5, mode: 'walk', pose: 'stand', priority: 1, task: () => (World._activeWork && World._activeWork.kind === 'kiln' ? 'b-brick' : ''),
   visible: () => isBase() && !S.flags.coldOpen && !buildKind,
   label: () => (World._activeWork ? `Use the ${World._activeWork.def.name.toLowerCase()}` : 'Use'),
   sub: () => (World._activeWork ? jobLine(World._activeWork) : ''),

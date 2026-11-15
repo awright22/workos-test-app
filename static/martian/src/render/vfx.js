@@ -83,7 +83,7 @@ export class Vfx {
     this._initAir(o.air === undefined ? 1400 : o.air);
     this._initSheets(o.sheets === undefined ? 60 : o.sheets);
     this._initStreaks(o.streaks === undefined ? 1800 : o.streaks);
-    this._initPuffs(o.puffs || 500);
+    this._initPuffs(o.puffs || 800);              // (three works smoking hold two hundred of them)
     this._initMarks(o.marks || 900);
   }
 
@@ -295,7 +295,8 @@ export class Vfx {
           // (a tone of 2 is smoke from a fire: it goes on rising, and does not settle)
           float smoke = step(1.5, aInfo.w);
           // fast at first, then hanging in the thin air
-          float travel = (1.0 - exp(-age * 2.2)) / 2.2 + smoke * age * 0.6;
+          // (... and smoke does not leap from the flue as kicked dust leaps from a boot: it rises at one pace)
+          float travel = mix((1.0 - exp(-age * 2.2)) / 2.2, age * 0.55, smoke);
           // (a puff is a disc facing the eye, centred on the dust: kicked up at ground level, its lower half was under
           // the ground and showed as a pale shape cut off in a straight line. It rides up by nearly its own radius.)
           float span = aInfo.z * (0.6 + 1.9 * k);
@@ -303,7 +304,7 @@ export class Vfx {
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           gl_PointSize = clamp(span * uPx / max(-mvPosition.z, 0.3), 1.0, 220.0);
-          vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * mix(1.0 - k, 1.0, smoke * 0.6) * smoothstep(0.0, 0.06, k) * mix(0.34, 0.6, smoke);
+          vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * mix(1.0 - k, 1.0, smoke * 0.6) * smoothstep(0.0, mix(0.06, 0.025, smoke), k) * mix(0.34, 0.7, smoke);
           vTone = aInfo.w; vK = k;
           #include <fog_vertex>
         }`,
@@ -319,7 +320,7 @@ export class Vfx {
           // Smoke is dark against this sky (pale, as dust is, a kiln's smoke was "a faint wisp, visible only if you
           // look for it"), and where it leaves the flue the fire under it lights it: by night that is all of it
           // that shows.
-          if (vTone > 1.5) c = uLight * vec3(0.27, 0.235, 0.22) + vec3(1.0, 0.40, 0.10) * (0.26 * exp(-vK * 9.0));
+          if (vTone > 1.5) c = uLight * vec3(0.27, 0.235, 0.22) + vec3(1.0, 0.40, 0.10) * (0.15 * exp(-vK * 13.0));
           gl_FragColor = vec4(c, a);
           #include <fog_fragment>
         }`,
@@ -333,7 +334,8 @@ export class Vfx {
   /**
    * Kick up dust at a world position.
    * @param {THREE.Vector3} pos
-   * @param {{count?: number, speed?: number, up?: number, spread?: number, size?: number, life?: number, tone?: number, dir?: THREE.Vector3}} [o]
+   * @param {{count?: number, speed?: number, up?: number, spread?: number, size?: number, life?: number, tone?: number, age?: number, dir?: THREE.Vector3}} [o]
+   *   `tone` 0..1 is dust, from the ground's colour to pale; 2 is smoke. `age`: seconds since it should have left.
    */
   puff(pos, o = {}) {
     const count = o.count || 6, speed = o.speed === undefined ? 1.2 : o.speed, up = o.up === undefined ? 0.8 : o.up;
@@ -356,7 +358,7 @@ export class Vfx {
       let vx = _e.x * Math.cos(a) * s + _v.x * Math.sin(a) * s + _n.x * u, vy = _e.y * Math.cos(a) * s + _v.y * Math.sin(a) * s + _n.y * u, vz = _e.z * Math.cos(a) * s + _v.z * Math.sin(a) * s + _n.z * u;
       if (o.dir) { vx += o.dir.x; vy += o.dir.y; vz += o.dir.z; }
       this.pVel.setXYZ(k, vx, vy, vz);
-      this.pInfo.setXYZW(k, this.time, life * (0.7 + Math.random() * 0.6), size * (0.6 + Math.random() * 0.8), o.tone || 0);
+      this.pInfo.setXYZW(k, this.time - (o.age || 0), life * (0.7 + Math.random() * 0.6), size * (0.6 + Math.random() * 0.8), o.tone || 0);
     }
     this.pStart.needsUpdate = true; this.pVel.needsUpdate = true; this.pInfo.needsUpdate = true;
   }

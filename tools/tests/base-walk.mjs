@@ -40,6 +40,8 @@ const tap = (sel) => page.locator(sel).first().tap({ timeout: 120000 });
 const hold = (sec) => ev((G, s) => G.hold(s), sec);
 const prompt = () => ev((G) => (G.interaction.active ? G.interaction.active.label() : ''));
 const closeScreens = async () => { await page.keyboard.press('Escape'); await sleep(300); await ev((G) => { if (G.S.uiOpen) { const b = document.querySelector('#mg-panel [data-act="resume"]'); if (b) b.click(); } }); };
+// (a tap on the task card opens its reason for a few seconds, as a player's thumb would)
+const why = async () => { await page.locator('#mg-objectives').tap({ timeout: 60000 }).catch(() => {}); await ev((G) => { G.tick(0.05, 6); }); };
 const notes = [];
 const expect = (what, ok, got) => { if (!ok) { notes.push(`${what}: ${JSON.stringify(got)}`); console.log('  NOTE', what, JSON.stringify(got)); } };
 
@@ -72,7 +74,8 @@ await page.waitForSelector('#mg-panel .sleep .wake', { timeout: 60000 });
 await shot('first-night', 'The first night\'s account (the first sol\'s chores, which are the story\'s, taken as done).', 2200);
 await tap('#mg-panel .sleep .wake');
 await ev((G) => { G.paused = true; G.tick(0.05, 200); G.tpLocal(0, 14, 0); G.tick(0.05, 20); });
-await shot('sol-2-outside', 'The morning of Sol 2, outside the airlock: the task list now has a base\'s first task on it.', 2500);
+await why();
+await shot('sol-2-outside', 'The morning of Sol 2, outside the airlock: the task card leads with a base\'s first task (he has tapped the card, which opens its reason).', 2500);
 
 // ---- basalt: a boulder gives the sample this ground owes, and after that building stone
 const rock = await ev(async (G) => {
@@ -101,7 +104,8 @@ await ev((G) => {
   for (const p of pods) { G.tpNear(p.group.position, 1.6); G.tick(0.05, 10); G.hold(1.8); G.tick(0.05, 4); }
   G.tpLocal(0, 14, 0); G.tick(0.05, 20);
 });
-await shot('task-build-a-kiln', 'Back at the Hab with twelve basalt and scrap from the wreckage: the next task.', 1800);
+await why();
+await shot('task-build-a-kiln', 'Back at the Hab with twelve basalt and scrap from the wreckage: the next task (card tapped for its reason).', 1800);
 
 // ---- the kiln: chosen on the Colony screen's Base tab, set down outside, given a job
 await tap('#mg-trow [data-t="colony"]');
@@ -128,7 +132,8 @@ await tap('.sheet.work [data-act="done"]');
 await ev((G) => { G.tpAround(G.World.builtMeshes.find((b) => b.kind === 'kiln').group.position, 7.5, 40); G.tick(0.05, 40); });
 await shot('kiln-firing', 'The kiln at work, from a few paces.', 3500);
 await ev((G) => { G.tick(0.5, 250); G.tpLocal(0, 14, 0); G.tick(0.05, 30); });
-await shot('bricks-done', 'Six hours on: the three batches are out, and the log says so.', 1800);
+await why();
+await shot('bricks-done', 'Six hours on: the three batches are out, and the log says so (card tapped for its reason).', 1800);
 
 // ---- the smelter (fourteen brick, six basalt, four scrap, a circuit board): the stores are filled to it here
 await ev((G) => { Object.assign(G.S.inv, { brick: 14, stone: 6, scrap: 4, circuit: 1 }); G.tick(0.05, 4); });
@@ -149,15 +154,19 @@ await shot('map-leads', 'The map: the fields where each mineral was seen from or
 await closeScreens();
 
 // ---- a deposit: found by standing at it, worked by hand
+// (its "DEPOSIT FOUND" card lives a few seconds by the wall's clock, and this machine takes longer than that over one
+//  picture: it is held up until the picture is taken)
+await page.evaluate(() => window.__UI.holdCards(true));
 const dep = await ev(async (G) => {
   const site = G.World.deposits.filter((d) => d.dep.id === 'hematite').sort((a, b) => a.group.position.distanceTo(G.player.pos) - b.group.position.distanceTo(G.player.pos))[0];
   G.roverTo(site.group.position, 9);
   G.setLocalTime(11);
-  G.tpNear(site.group.position, 3.4); await G.settle(); G.tick(0.05, 40);
+  G.tpNear(site.group.position, 3.4); await G.settle(); G.tick(0.05, 12);
   return { found: !!G.S.base.found[site.key], away: Math.round(site.group.position.distanceTo(G.World.hab.position)) };
 });
 expect('standing at a deposit finds it', dep.found, dep);
-await shot('deposit-found', `A hematite pavement ${dep.away} m from the Hab, driven to: found, and its work offered.`, 3500);
+await shot('deposit-found', `A hematite pavement ${dep.away} m from the Hab, driven to: found, and its work offered.`, 1500);
+await page.evaluate(() => window.__UI.holdCards(false));
 await ev((G) => { for (let i = 0; i < 6; i++) { G.hold(2.3); G.tick(0.05, 2); } });
 await shot('deposit-worked', 'Six turns of raking: twelve iron ore.', 1800);
 await tap('#mg-trow [data-t="colony"]');
@@ -180,7 +189,7 @@ await tap('.sheet.work [data-act="done"]');
 
 // ---- the rest of a base: set down for the picture (each is built the way the kiln was)
 await ev(async (G) => {
-  for (const [k, x, z, yaw] of [['glassworks', 46, 15, 2.9], ['solarField', 58, 44, 2.6], ['battery', 44, 56, 2.9], ['tank', 34, 52, 2.4], ['quarters', 88, 40, 2.5], ['pad', 104, 66, 2.6]]) G.build(k, x, z, yaw);
+  for (const [k, x, z, yaw] of [['glassworks', 46, 15, 2.9], ['solarField', 53, 38, 2.6], ['battery', 40, 39, 2.9], ['tank', 29, 39, 2.4], ['quarters', 63, 23, 2.5], ['pad', 76, 46, 2.6]]) G.build(k, x, z, yaw);
   Object.assign(G.S.inv, { regolith: 40, silica: 6, clay: 6, sulfate: 4, salt: 2, brick: 9, iron: 7, glass: 5, cement: 6, stone: 8, circuit: 1 });
   for (const b of G.World.builtMeshes) if (b.def && b.def.jobs && !b.job) G.works.startJob(b, b.def.jobs[0].id, 3);
   G.syncAllVisuals(); G.tick(0.05, 30);
@@ -196,7 +205,7 @@ await tap('#mg-trow [data-t="journal"]');
 await page.waitForFunction(() => getComputedStyle(document.getElementById('mg-hud')).visibility === 'hidden', null, { timeout: 30000 }).catch(() => {});
 await shot('journal-the-long-stay', 'The journal: where a base stands and what comes next.', 1500);
 await closeScreens();
-await ev(async (G) => { G.setLocalTime(15); G.tpAround(G.at(44, 36), 30, 215); await G.settle(); G.tick(0.05, 30); });
+await ev(async (G) => { G.setLocalTime(15); G.tpAround(G.at(44, 30), 30, 215); await G.settle(); G.tick(0.05, 30); });
 await shot('base-by-day', 'The base as he sees it, afternoon, walking back toward it.', 3500);
 await ev(async (G) => { G.setLocalTime(20.8); G.tpAround(G.World.builtMeshes.find((b) => b.kind === 'smelter').group.position, 10, 130); await G.settle(); G.tick(0.05, 40); });
 await shot('works-at-night', 'After dark, at the works.', 3500);
@@ -204,12 +213,12 @@ await shot('works-at-night', 'After dark, at the works.', 3500);
 await ev(async (G) => {
   document.getElementById('mg-root').classList.add('walk-bare');
   G.setLocalTime(16.2);
-  G.tpLocal(30, 38, 0);
-  G.photo(G.at(50, 38), 82, 215, 26, 1.5); G.tick(0.05, 30); await G.settle();
+  G.tpLocal(34, 32, 0);
+  G.photo(G.at(42, 28), 56, 215, 17, 1.5); G.tick(0.05, 30); await G.settle();
 });
 await page.addStyleTag({ content: '#mg-root.walk-bare > *:not(canvas) { opacity: 0 !important; }' });
 await shot('whole-base-day', 'The whole base from above and to the south-west, late afternoon (interface hidden; a camera the player does not have).', 3500);
-await ev(async (G) => { G.setLocalTime(21); G.photo(G.at(42, 30), 46, 150, 11, 1.5); G.tick(0.05, 30); await G.settle(); });
+await ev(async (G) => { G.setLocalTime(21); G.photo(G.at(30, 24), 52, 125, 13, 1.5); G.tick(0.05, 30); await G.settle(); });
 await shot('whole-base-night', 'The same base after dark (interface hidden).', 3500);
 await ev((G) => { G.photo(null); document.getElementById('mg-root').classList.remove('walk-bare'); });
 

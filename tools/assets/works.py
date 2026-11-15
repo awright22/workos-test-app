@@ -337,8 +337,10 @@ def build_bs_glassworks():
     for i in range(3):
         a = rad(120 * i + 90)
         K.tube('steel', [(PX + 0.62 * cos(a), PY + 0.62 * sin(a), 0.02), (PX, PY, 0.75)], 0.02, 6)
-    DM = T(PX, PY - 0.12, PH + 0.05) @ R('X', 134)                              # the dish's axis: down and forward, at the throat
-    # (a mirror: bright, and looking down at the furnace. Dull, and looking at the horizon, it was a radio dish.)
+    # The dish's axis: forward over the furnace and a little up, half-way between the sun and the throat it throws
+    # the sun into, as a mirror must stand. (Looking down at the throat it showed the ground, and was dark brown
+    # whatever it was made of: twice "a satellite dish". Its face is to the sky now, and bright.)
+    DM = T(PX, PY - 0.12, PH + 0.05) @ R('X', 70)
     K.lathe('mirror', [(0.0, 0.0)] + [(1.05 * i / 6, 0.26 * (i / 6) ** 2) for i in range(1, 7)], 36, DM, smooth=70.0)
     K.lathe('aluminium', [(1.05, 0.26), (1.08, 0.275), (1.08, 0.245), (1.05 * 5 / 6, 0.26 * (5 / 6) ** 2 - 0.03), (0.0, -0.03)], 36, DM, smooth=60.0)
     for i in range(1, 3):                                                      # it is made of rings of mirror: the joins between them

@@ -1,4 +1,4 @@
-// Base mode: the game with no rescue. It is offered only where it is asked for (?base on the address, or a base
+// Base mode: the game with no rescue. (While it was being built it was offered only for ?base on the address, or a base
 // already saved); it keeps a save of its own; nothing in it counts down to a rescue; and the story is as it was.
 import { openGame, sleep } from './lib.mjs';
 const fails = [];
@@ -6,18 +6,17 @@ const check = (name, ok, d) => { console.log((ok ? '  ok   ' : '  FAIL ') + name
 const ready = (g) => g.page.waitForFunction(() => window.__MG && window.__MG.ready, null, { timeout: 240000 });
 const menu = async (g) => (await g.page.locator('#mg-panel').innerText()).replace(/\s+/g, ' ');
 
-// ---- the title: without the asking, a new game is the story and nothing else
+// ---- the title: New Game asks which game; the story's way through it is as it was, one sheet later
 let g = await openGame({ quality: 'low' });
 await g.page.locator('#mg-panel button', { hasText: 'NEW GAME' }).click();
 let sheet = await menu(g);
-check('unasked, New Game goes straight to the story\'s difficulties', /choose your mars/i.test(sheet) && /sols to rescue/i.test(sheet) && !/two ways/i.test(sheet), sheet.slice(0, 90));
-await g.close();
-
-// ---- asked for: the choice of game, then a base with no rescue on its difficulty cards
-g = await openGame({ quality: 'low', query: 'base' });
-await g.page.locator('#mg-panel button', { hasText: 'NEW GAME' }).click();
+check('New Game asks which game', /two ways to be stranded/i.test(sheet) && /get home/i.test(sheet) && /stay/i.test(sheet) && !/being built/i.test(sheet), sheet.slice(0, 120));
+await g.page.locator('#mg-panel [data-kind="story"]').click();
 sheet = await menu(g);
-check('asked for, New Game asks which game', /two ways to be stranded/i.test(sheet) && /get home/i.test(sheet) && /stay/i.test(sheet), sheet.slice(0, 120));
+check('Get home: the story\'s difficulties, with a rescue on each', /choose your mars/i.test(sheet) && /sols to rescue/i.test(sheet) && !/two ways/i.test(sheet), sheet.slice(0, 90));
+await g.page.locator('#mg-panel [data-act="back"]').first().click();
+sheet = await menu(g);
+check('Back from the difficulties is the choice of game again', /two ways to be stranded/i.test(sheet), sheet.slice(0, 60));
 await g.page.locator('#mg-panel [data-kind="base"]').click();
 sheet = await menu(g);
 check('the base\'s difficulty cards promise no rescue', /rescue none/i.test(sheet) && !/sols to rescue/i.test(sheet) && /for good/i.test(sheet) && !/fly out/i.test(sheet), sheet.slice(-420));
@@ -168,11 +167,15 @@ const built = await g.eval(async (G) => {
   G.paused = true;
   G.tpLocal(26, 22, 0); await G.settle(); G.tick(0.05, 6);
   const prompt = G.interaction.active ? G.interaction.active.label() : '';
+  // (the ring on the ground that shows where it will stand: the size of the kiln, ahead of him)
+  const gh = G.ctx.engine.scene.children.find((c) => c.userData && c.userData.mats);
+  const ring = gh && gh.visible ? { r: +gh.scale.x.toFixed(1), ahead: +gh.position.distanceTo(G.player.pos).toFixed(1), green: gh.userData.mats[0].color.g > gh.userData.mats[0].color.r } : null;
   G.hold(2.7); G.tick(0.05, 4);
   const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
   const use = G.interaction.active ? G.interaction.active.label() : '';
-  return { prompt, kiln: !!b, stone: G.S.inv.stone, scrap: G.S.inv.scrap, use, away: b ? Math.round(b.group.position.distanceTo(G.player.pos) * 10) / 10 : -1 };
+  return { prompt, ring, ringAfter: !!(gh && gh.visible), kiln: !!b, stone: G.S.inv.stone, scrap: G.S.inv.scrap, use, away: b ? Math.round(b.group.position.distanceTo(G.player.pos) * 10) / 10 : -1 };
 });
+check('a ring on the ground shows where it will stand, green where it can, and goes when it is built', built.ring && built.ring.r > 1.5 && built.ring.ahead > 3 && built.ring.ahead < 7 && built.ring.green && !built.ringAfter, { ring: built.ring, after: built.ringAfter });
 check('set down outside for twelve basalt and two scrap, and it offers itself for use', /build the kiln here/i.test(built.prompt) && built.kiln && built.stone === 0 && built.scrap === 3 && /use the kiln/i.test(built.use), built);
 await g.eval((G) => { G.hold(0.7); });
 await g.page.waitForSelector('.sheet.work', { timeout: 60000 });
@@ -190,6 +193,17 @@ const run = await g.eval((G) => {
   return { text: t.slice(0, 200), start, mid, brick: G.S.inv.brick, job: b.job, working: b.working };
 });
 check('three batches: the soil is taken at once, and a batch comes out every two hours', run.start.regolith === 0 && run.start.left === 3 && run.mid.brick === 2 && run.mid.left === 2 && run.mid.working && run.brick === 6 && run.job === null && !run.working, run);
+const smoke = await g.eval((G) => {
+  const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
+  G.S.inv.regolith = 3; G.works.startJob(b, 'brick', 1);
+  G.tick(0.05, 80);                                                   // four seconds of a 39-second batch
+  const v = G.ctx.vfx, a = v.pInfo.array;
+  let n = 0;
+  for (let i = 0; i < v.puffN; i++) if (a[i * 4 + 3] > 1.5 && v.time - a[i * 4] < a[i * 4 + 1]) n++;
+  G.works.stopJob(b);
+  return { heat: +b.heat.toFixed(2), smoke: n, flue: !!b.flue };
+});
+check('a kiln at work smokes from its flue', smoke.flue && smoke.heat > 0.8 && smoke.smoke >= 15, smoke);
 const more = await g.eval((G) => {
   const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');
   G.S.inv.regolith = 9;
@@ -212,6 +226,21 @@ const more = await g.eval((G) => {
   return { waiting, going, kept, back, regolith: G.S.inv.regolith, kilns: G.World.builtMeshes.filter((x) => x.kind === 'kiln').length };
 });
 check('with no power to spare the job waits; working, it draws on the Hab; the save keeps it; stopped, the unfired soil comes back', more.waiting.t === 0 && !more.waiting.working && /waiting for hab power/i.test(more.waiting.line) && more.going.t > 5 && more.going.working && more.going.draw > 0.6 && more.going.draw < 0.9 && more.kept && more.kept.left === 3 && more.back && more.back.left === 3 && more.regolith === 6 && more.kilns === 1, more);
+
+// ---- a thing chosen and not yet set down can be un-chosen on its card
+await g.eval((G) => { Object.assign(G.S.inv, { brick: 14, stone: 6, scrap: 4, circuit: 1 }); G.paused = false; G.tick(0.05, 4); });
+await g.page.keyboard.press('c');
+await g.page.locator('#mg-colony [data-tab="base"]').click();
+await g.page.locator('#mg-base [data-build="smelter"]').click();
+const chosen = await g.eval((G) => { G.tick(0.05, 4); return G.interaction.active ? G.interaction.active.label() : ''; });
+await g.page.keyboard.press('c');
+await g.page.locator('#mg-colony [data-tab="base"]').click();
+const card = (await g.page.locator('#mg-base [data-card="smelter"]').innerText()).replace(/\s+/g, ' ');
+await g.page.locator('#mg-base [data-unbuild]').click();
+const undone = { cancel: await g.page.locator('#mg-base [data-unbuild]').count(), build: await g.page.locator('#mg-base [data-build="smelter"]').count() };
+await g.page.keyboard.press('Escape');
+undone.prompt = await g.eval((G) => { G.tick(0.05, 4); const l = G.interaction.active ? G.interaction.active.label() : ''; G.paused = true; return l; });
+check('a thing chosen can be un-chosen: its card says it is chosen and offers Cancel, and the prompt for it goes', /build the smelter here/i.test(chosen) && /cancel/i.test(card) && /chosen/i.test(card) && undone.cancel === 0 && undone.build === 1 && !/build the smelter/i.test(undone.prompt), { chosen, card: card.slice(-80), undone });
 
 // ---- the buildings: what is built of what the works make, and what each does for the Hab
 const bld = await g.eval(async (G) => {
@@ -272,7 +301,15 @@ const last = await g.eval((G) => {
   return out;
 });
 check('a comms tower puts every deposit on the map', last.found0 < 47 && last.found1 === 47, { found0: last.found0, found1: last.found1 });
-check('a landing pad: a supply drop on it ten sols on, with circuit boards; none while one stands unopened', last.first === null && last.drop && last.drop.circuit === 2 && last.drop.away < 1 && last.drop.pods === 1 && last.second === null && last.quarters === 1, last);
+check('a landing pad: a supply drop on it ten sols on, with circuit boards; none while one stands unopened', last.first === null && last.drop && last.drop.circuit === 3 && last.drop.away < 1 && last.drop.pods === 1 && last.second === null && last.quarters === 1, last);
+// ---- a base's own achievements: earned by what stands and what has come, without his doing anything at the time
+const ach = await g.eval((G) => {
+  const before = Object.keys(G.S.achieved).filter((k) => /^(mason|industry|town|signed|pirate)$/.test(k)).sort().join(',');
+  G.build('smelter', 20, 70, 0); G.build('glassworks', 34, 74, 0);
+  G.paused = false; G.tick(0.5, 8); G.paused = true;
+  return { before, after: Object.keys(G.S.achieved).filter((k) => /^(mason|industry|town|signed|pirate)$/.test(k)).sort().join(',') };
+});
+check('a base earns its own achievements: the kiln, the three works, every building, the first drop', /industry/.test(ach.after) && /mason/.test(ach.after) && /signed/.test(ach.after) && /town/.test(ach.after) && !/industry/.test(ach.before) && !/pirate/.test(ach.after), ach);
 await g.eval((G) => { G.paused = false; G.tick(0.05, 4); });
 await g.page.keyboard.press('c');
 await g.page.locator('#mg-colony [data-tab="base"]').click();

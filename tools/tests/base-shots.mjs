@@ -63,7 +63,7 @@ if (!only.length || only.includes('works')) {
         G.tpAround(c, 3.6, bear + 58);
         G.setLocalTime(h);
         G.S.power = 90;
-        G.photo(c, 8.2, bear + 22, 2.2, 1.0);
+        G.photo(c, 9.6, bear + 22, 2.4, 1.5);                 // (far enough back to have its smoke in the picture)
         G.tick(0.05, 30);
         await G.settle();
       }, [kind, hr]);

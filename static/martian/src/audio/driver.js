@@ -62,6 +62,10 @@ export function updateAudio(dt) {
     let near = 1e9;
     if (playing) for (const d of devils) near = Math.min(near, where.angleTo(d.u) * R);
     P.devil = playing ? Math.pow(clamp(1 - (near - 6) / 105, 0, 1), 1.6) : 0;
+    // the nearest works with its fire lit: silent beyond thirty metres, full beside it
+    let fire = 0;
+    if (playing) for (const b of World.builtMeshes) if (b.heat > 0.05) fire = Math.max(fire, b.heat * Math.pow(clamp(1 - (where.distanceTo(b.group.position) - 3) / 27, 0, 1), 1.7));
+    P.fire = fire;
     const sunEl = started ? player.up.dot(ctx.engine.sunDir) : 1;
     P.day = smooth(-0.08, 0.3, sunEl);
     // the astronaut

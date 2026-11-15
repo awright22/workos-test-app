@@ -104,7 +104,8 @@ export function padDrop() {
   if (World.pods.some((p) => !p.taken && groundDist(p.group.position, pad.group.position) < 8)) return null;
   S.base.padSol = S.sol;
   S.base.drops = (S.base.drops || 0) + 1;
-  const loot = { circuit: 2, scrap: 4, rations: 4, ...(S.base.drops % 2 ? { seedSoy: 1 } : { seedTomato: 1 }) };
+  // (three boards a drop: a tower takes three, and a second solar field and its battery bank three between them)
+  const loot = { circuit: 3, scrap: 4, rations: 4, ...(S.base.drops % 2 ? { seedSoy: 1 } : { seedTomato: 1 }) };
   const ll = vecToLl(_pad.copy(pad.group.position).normalize());
   const pod = addSupplyPod(placeAt(ll.lat, ll.lon, S.sol * 1.7), loot, 'Open the supply drop');
   Snd.jingle();

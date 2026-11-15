@@ -931,9 +931,9 @@ can each be told apart at a glance. What it found, most damaging first, and what
 | F14 | The tower's guy wires hairlines with no anchors | open |
 | F16 | The pad's surface tarmac-dark and uneven in tone, its cross lines hairlines | open |
 
-**While it is being built it is not on the title.** New Game goes straight to the story unless the
-address ends in `?base` (or a base has already been saved in that browser). The card for it says
-"Being built". The gate comes off when part D has been reviewed.
+**It is on the title.** New Game asks which game: "Get home" (the story) or "Stay" (the base). While it
+was being built it was offered only when the address ended in `?base`; that gate came off on 15 November,
+when its four parts had been built and its models reviewed (`?base` still works, and does nothing now).
 
 **Its bar.** Story mode's bars hold for it unchanged (it is the same world, drawn the same way). Its
 own: an hour of things to do past the story's opening before the player runs out of new things to

@@ -86,7 +86,7 @@ export const WORKS = [
  */
 export const BUILDINGS = [
   { id: 'solarField', name: 'Solar field', model: 'bs_solar', pad: 4.6, r: 3.7, most: 3,
-    desc: 'Twelve panels of his own glass in iron frames.', gives: 'Gathers as much power again as the Hab’s own array',
+    desc: 'Twelve panels of home-cast glass in iron frames.', gives: 'Gathers as much power again as the Hab’s own array',
     cost: { iron: 8, glass: 6, circuit: 2 } },
   { id: 'battery', name: 'Battery bank', model: 'bs_battery', pad: 2.6, r: 1.7, most: 3,
     desc: 'Twelve salt cells in an iron rack, under a roof.', gives: 'Keeps a reserve as big as the Hab’s own store, for the night and the storm',
@@ -105,7 +105,7 @@ export const BUILDINGS = [
     desc: 'A disc of cement on a bed of basalt, a target painted on it, lamps at its rim.', gives: 'Something Earth can hit: a supply drop every ten sols',
     cost: { cement: 18, stone: 24, iron: 4 } },
   { id: 'tower', name: 'Comms tower', model: 'bs_tower', pad: 3.6, r: 1.8, most: 1,
-    desc: 'An iron mast on a cement footing, a dish at its head.', gives: 'Earth’s orbiters can talk him in: every mineral deposit goes on the map',
+    desc: 'An iron mast on a cement footing, a dish at its head.', gives: 'Earth’s orbiters can see for you: every mineral deposit goes on the map',
     cost: { iron: 12, cement: 4, circuit: 3, glass: 2 } },
 ];
 export const WORK_BY_ID = Object.fromEntries(WORKS.concat(BUILDINGS).map((w) => [w.id, w]));

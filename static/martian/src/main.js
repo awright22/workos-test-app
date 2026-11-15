@@ -39,7 +39,7 @@ import { input, initInput } from './game/input.js';
 import { player, astro, updateWalk, updateAstronaut, buildAstronaut, initPlayerAt, playerUnit, camLookAt } from './game/player.js';
 import { roverF, updateRover, roverLights, initRoverAt } from './game/rover.js';
 import { updateInteract, interactables, interaction } from './game/interact.js';
-import './game/interactables.js';
+import { updateBuildGhost } from './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
 import { updateDiscoveries, checkAchievements } from './game/story.js';
 import { startLaunch } from './game/launch.js';
@@ -229,6 +229,7 @@ function tick(dt) {
     else if (S.mode === 'rover') updateRover(dt);
     updateAstronaut(dt);
     updateInteract(dt);
+    updateBuildGhost();
     updateDiscoveries(dt);
     updatePing();
     updateEffects(dt);
@@ -256,13 +257,16 @@ function tick(dt) {
       // (and it smokes: a works at work was a glow and nothing else)
       if (b.flue && b.heat > 0.4 && b.group.visible && !S.sleeping) {
         b.smokeT = (b.smokeT || 0) - dt;
-        if (b.smokeT <= 0) {
-          b.smokeT = 0.15 + Math.random() * 0.09;
-          // (a plume: dark, rising for six seconds from the flue itself, widening, leaning with the wind. Its first
-          //  smoke was pale, rose half a metre and then sank as kicked-up dust does: two reviewers could not find it.)
+        // (a plume: dark, rising for six seconds from the flue itself, widening, leaning with the wind. Its first
+        //  smoke was pale, rose half a metre and then sank as kicked-up dust does: two reviewers could not find it.)
+        // (So many puffs a second of play: a step longer than the gap between two owes several, each as old as it
+        //  is late.)
+        for (let n = 0; b.smokeT <= 0 && n < 10; n++) {
           ctx.vfx.puff(siteLocalToWorld(b.group, b.flue[0], b.flue[1], b.flue[2], _smoke),
-            { count: 1, speed: 0.07, up: 1.1, spread: 0.05, size: 0.42, life: 6.0, tone: 2, dir: _smokeWind.copy(ctx.vfx.wind).multiplyScalar(0.16).clampLength(0, 1.6) });
+            { count: 1, speed: 0.06, up: 1.1, spread: 0.06, size: 0.5, life: 5.2, tone: 2, age: -b.smokeT, dir: _smokeWind.copy(ctx.vfx.wind).multiplyScalar(0.16).clampLength(0, 1.6) });
+          b.smokeT += 0.07 + Math.random() * 0.045;
         }
+        if (b.smokeT <= 0) b.smokeT = 0;
       }
     }
     if (!b.lamp) continue;

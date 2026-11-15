@@ -716,8 +716,9 @@ export function buildDeployable(kind, atVec, yaw = 0) {
       if (fl) { fl.updateWorldMatrix(true, false); const p = g.worldToLocal(fl.getWorldPosition(new THREE.Vector3())); b.flue = [p.x, p.y, p.z]; }
       // (a low orange light at its mouth: the ground and the sill take it, and the works above stays dark stone.
       //  Brighter and higher, it lit the whole front "as if by a floodlight" and a mirror outshone the furnace.)
-      // (... and with a reach of seven metres the smelter's whole shaft glowed evenly, "like a lantern": four and a half, falling off faster)
-      addLamp(m.part('fire') || g, { color: 0xff7a22, power: 4.5, range: 4.5, decay: 2, level: () => b.heat * (0.3 + 0.7 * (World.dark || 0)) });
+      // (... and with a reach of seven metres the smelter's whole shaft glowed evenly, "like a lantern": now it reaches
+      //  three and a half and falls off faster, so the foot of a works is lit and its head is dark)
+      addLamp(m.part('fire') || g, { color: 0xff7a22, power: 4.5, range: 3.5, decay: 2, level: () => b.heat * (0.3 + 0.7 * (World.dark || 0)) });
     } else {
       b.glow = ownMaterials(m.root, /^light_(white|blue|red)/);       // a building's windows and lamps: they come up after dark
     }

@@ -530,6 +530,20 @@ for (const size of SIZES) {
     // new game: every card whole inside the sheet, with a thumb-high Begin on screen (the smallest phone showed none)
     await page.locator('[data-act="new"]').tap();
     await sleep(250);
+    const cards = ([st, sr, sb, sl]) => {
+      const body = document.querySelector('#mg-panel .sheet-bd').getBoundingClientRect();
+      return [...document.querySelectorAll('#mg-panel .diff')].map((c) => {
+        const r = c.getBoundingClientRect(), b = c.querySelector('.go').getBoundingClientRect();
+        return { card: r.top >= body.top - 1 && r.bottom <= Math.min(body.bottom, innerHeight - sb) + 1 && r.left >= sl && r.right <= innerWidth - sr, begin: Math.round(b.height), beginIn: b.bottom <= r.bottom + 1 && b.bottom <= innerHeight - sb && b.top >= st };
+      });
+    };
+    // which game: two whole cards, each with a thumb-high Choose on screen
+    const wg = await page.evaluate(cards, size.safe);
+    check(`${size.name}: which game, two whole cards, each with a Choose 44 px high on screen`, wg.length === 2 && wg.every((c) => c.card && c.beginIn && c.begin >= 44), wg);
+    const badW = await audit();
+    check(`${size.name}: which game, nothing under 11 px or 44 px, nothing cut`, badW.length === 0, badW);
+    await page.locator('#mg-panel [data-kind="story"]').tap();
+    await sleep(250);
     const ng = await page.evaluate(([st, sr, sb, sl]) => {
       const body = document.querySelector('#mg-panel .sheet-bd').getBoundingClientRect();
       return [...document.querySelectorAll('#mg-panel .diff')].map((c) => {
@@ -541,6 +555,8 @@ for (const size of SIZES) {
     let bad0 = await audit();
     check(`${size.name}: new game, nothing under 11 px or 44 px, nothing cut`, bad0.length === 0, bad0);
     await page.locator('#mg-panel [data-act="back"]').first().tap();
+    await sleep(200);
+    await page.locator('#mg-panel [data-act="back"]').first().tap();           // (back to the choice of game, and back again to the title)
     // settings: four tabs, each of which fits without scrolling; Sound and the colour-blind switch can be reached
     await page.locator('[data-act="settings"]').tap();
     const tabs = [];

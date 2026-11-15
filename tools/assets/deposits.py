@@ -246,13 +246,13 @@ def bead8(bm, x, y, z, r, P, col):
         P.add(v.co, col)
 
 
-def rubble(bm, r, n, place, P, col, size=(0.05, 0.16), flat=(0.45, 0.8), subdiv=1):
+def rubble(bm, r, n, place, P, col, size=(0.05, 0.16), flat=(0.45, 0.8), subdiv=1, rough=None):
     """What has come off an outcrop and lies against its foot: n small stones, half sunk. place() -> (x, y);
     col(zf, co) colours each by height."""
     for i in range(n):
         x, y = place()
         s_ = r.uniform(*size)
-        vs = rock(bm, s_, (x, y, s_ * 0.25), seed=r.randint(0, 10 ** 6), scale=(r.uniform(1.0, 1.3), r.uniform(0.75, 1.0), r.uniform(*flat)), subdiv=subdiv, rough=0.28 if subdiv == 1 else 0.2)
+        vs = rock(bm, s_, (x, y, s_ * 0.25), seed=r.randint(0, 10 ** 6), scale=(r.uniform(1.0, 1.3), r.uniform(0.75, 1.0), r.uniform(*flat)), subdiv=subdiv, rough=rough if rough is not None else 0.28 if subdiv == 1 else 0.2)
         zs = [v.co.z for v in vs]
         lo, hi = min(zs), max(zs)
         for v in vs:
@@ -483,17 +483,20 @@ def build_dep_clay():
     for th, _, _ in BEDS:
         FOOT.append((FOOT[-1] if FOOT else 0.0) + th)
     DIP, YB, C0, XL, XR = 0.34, 3.3, -0.55, 3.35, 3.75                        # the beds' dip; where the cap goes under; the lip; the two ends
-    JOINTS = (-2.75, -1.95, -1.15, -0.5, 0.35, 1.05, 1.9, 2.6, 3.15)          # the joints the slab breaks along
+    # the joints the slab breaks along (none near the ends, where the face turns to run back: a notch there is a
+    # sliver of wall side on to the sun, a bright line down the end of the bank)
+    JOINTS = (-1.95, -1.15, -0.5, 0.35, 1.05, 1.9, 2.6)
     BITES = ((-1.95, -1.15, 0.30), (0.35, 1.05, 0.18), (1.9, 2.6, 0.26))      # between two joints, a block gone from the lip: how far back
 
     def yb(x):                                                                # where the cap goes under the sand, behind
         return YB + 0.22 * noise3((x, 3.0, 0.0), 0.7, 4.0) - 0.35 * (x / 3.6) ** 2
 
+    def bite(x):                                                              # how far back the lip stands here for a block that has gone
+        return sum(back * _smooth01(x0 - 0.02, x0 + 0.02, x) * (1.0 - _smooth01(x1 - 0.02, x1 + 0.02, x)) for x0, x1, back in BITES)
+
     def crest(x):                                                             # the lip: a broken line, swinging back to meet yb at each end
         u = (-x / XL) if x < 0 else (x / XR)
-        c = C0 + 0.14 * noise3((x, 0.0, 0.0), 1.1, 2.0) + 0.04 * noise3((x, 0.0, 0.0), 4.3, 8.0)
-        for x0, x1, back in BITES:
-            c += back * _smooth01(x0 - 0.02, x0 + 0.02, x) * (1.0 - _smooth01(x1 - 0.02, x1 + 0.02, x))
+        c = C0 + 0.14 * noise3((x, 0.0, 0.0), 1.1, 2.0) + 0.04 * noise3((x, 0.0, 0.0), 4.3, 8.0) + bite(x)
         b = yb(x)
         # (one end runs out gently, the other is broken short; past an end the lip is behind that line, and all of it is under the ground)
         return c + (b - c) * u ** (1.9 if x < 0 else 3.4) if u < 1.0 else b + (u - 1.0) * 4.0
@@ -511,8 +514,8 @@ def build_dep_clay():
     def face(x):
         """The broken face at x, from the lip down: [(how far out from the lip, how far under the top of the cap,
         colour)]. A bed is a riser, nearly upright, and the ledge at its foot is the top of the bed under it."""
-        rows, r, sd, jn = [], 0.0, 0.0, joint(x)
-        inn = 0.03 * jn                                                       # (a joint is a notch down the face)
+        rows, r, sd, jn, bt = [], 0.0, 0.0, joint(x), bite(x)
+        inn = 0.0                                                             # (a joint is a dark line down the face, not a notch: a notch's side wall caught the sun, a pale thread where the dark line should be)
         for k, (th, col, ledge) in enumerate(BEDS):
             n1 = 0.5 + 0.5 * noise3((x, k * 3.1, 0.0), 0.9, 11.0 + k)
             n2 = 0.5 + 0.5 * noise3((x, k * 1.7, 5.0), 2.3, 3.0 + k)
@@ -525,13 +528,17 @@ def build_dep_clay():
             r += bat
             below = BEDS[k + 1][1] if k + 1 < len(BEDS) else UMBER
             rows.append((r + 0.008 + inn, FOOT[k], mix(below, CRACK, 0.6)))   # the joint it sits on: a dark line under every bed
-            tr = ledge * (0.4 + 1.0 * n1)
+            # (a ledge is wide here and all but gone there: at one even width they were the steps of an amphitheatre)
+            tr = ledge * (0.12 + 1.5 * n1 * n1) + 0.02 * (0.5 + 0.5 * noise3((x, k * 2.3, 1.0), 3.1, 17.0 + k))
             # (the ledge is not the bedding plane, which rises toward the front: it is worn level, and falls a little)
             sd = FOOT[k] + (DIP + 0.03) * tr + 0.012
             rows.append((max(r + tr, r + 0.014 + inn), sd, mix(mix(below, DUSTY, 0.55), CRACK, 0.3 * jn)))      # dust lies on every ledge
             r += tr
         rows.append((r + 0.06, sd + 0.45, UMBER))
-        return rows
+        # (where a block has gone from the lip, only the upper beds stand back: the lower ones run on under the gap,
+        #  and the top of the first of them is the shelf the block left. With every bed standing back alike, the
+        #  gap was a flight of stairs.)
+        return [(r_ + bt * _smooth01(0.24, 0.62, sd_), sd_, cc) for r_, sd_, cc in rows]
 
     def column(x):
         """The rock along one line across the bank, from where the cap has gone under the sand behind, forward over
@@ -546,7 +553,7 @@ def build_dep_clay():
             on = jn * (1.0 if t < run else 0.0)
             z = hc * (1.0 - t)
             if hc > 0.0:
-                z += (0.022 * noise3((x, y, 0.0), 2.2, 7.0) - 0.03 * _smooth01(0.1, 0.5, noise3((x, y, 0.0), 0.8, 13.0))) * _smooth01(0.0, 0.2, hc * (1.0 - t)) * min(1.0, t * 6.0) - 0.03 * on
+                z += (0.022 * noise3((x, y, 0.0), 2.2, 7.0) - 0.03 * _smooth01(0.1, 0.5, noise3((x, y, 0.0), 0.8, 13.0))) * _smooth01(0.0, 0.2, hc * (1.0 - t)) * min(1.0, t * 6.0) - 0.012 * on
             z -= sand(x, y)
             dust = max(0.0, min(1.0, 0.12 + 0.3 * (0.5 + 0.5 * noise3((x, y, 0.0), 1.3, 3.0)) + 0.8 * max(0.0, t) ** 1.6 + 1.2 * (1.0 - _smooth01(0.0, 0.12, z))))
             cc = mix(mix(mix(CAP, WEATH, 0.12 + 0.2 * (0.5 + 0.5 * noise3((x, y, 0.0), 3.0, 2.0))), DUSTY, dust), CRACK, 0.5 * on)
@@ -602,7 +609,7 @@ def build_dep_clay():
             if f is not None:
                 return f[0], f[1] - rng.uniform(-0.06, 0.75)
     for i in range(24):
-        rubble(SCREE, rng, 1, at_foot, PM, bed_col(rng.choice((CAP, CREAM, TAN, PALE, CAP, CREAM))), size=(0.05, 0.15), flat=(0.45, 0.7), subdiv=2)
+        rubble(SCREE, rng, 1, at_foot, PM, bed_col(rng.choice((CAP, CREAM, TAN, PALE, CAP, CREAM))), size=(0.06, 0.16), flat=(0.28, 0.5), subdiv=2, rough=0.34)        # (plates: mudstone breaks flat)
     K.finish()
 
     # ---- six pieces lying out in front: the game takes these. Blocks off the cap and the cream bed under it. ----
@@ -611,14 +618,20 @@ def build_dep_clay():
 
         def piece(bm, at, rk=rk, k=k, big=big):
             base = (CAP, CREAM, PALE, CAP, CREAM, TAN)[k]
-            chunk(bm, rk, big, rk.uniform(0.6, 0.8), at, PM, bed_col(base), rough=0.16)
+            chunk(bm, rk, big, rk.uniform(0.42, 0.6), at, PM, bed_col(base), rough=0.3)
             for _ in range(rk.randint(2, 3)):                                  # and what broke off it
                 a, d = rk.uniform(0, TAU), big * 1.5 + rk.uniform(0.04, 0.16)
-                more = chunk(bm, rk, big * rk.uniform(0.35, 0.6), 0.6, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, bed_col(mix(base, PALE, 0.4)), rough=0.16)
+                more = chunk(bm, rk, big * rk.uniform(0.35, 0.6), 0.6, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, bed_col(mix(base, PALE, 0.4)), rough=0.3)
                 bmesh.ops.transform(bm, matrix=T(d * cos(a), d * sin(a), 0.0), verts=more)
         loose(root, k, (sx, sy), piece, smooth=75.0)
 
-    return finish(root, 'dep_clay', samples=32, distance=0.7, tint=make_tint({'mineral': PM}, CAP, None, floor=0.45))
+    lit = make_tint({'mineral': PM}, CAP, None, floor=0.45)
+
+    def tint(co, name, a):
+        # (what is at the ground or under it is shaded as the ground is, which is not at all: the bake's level floor
+        #  darkened the foot of the face, and where the sand dipped below that level the foot showed as a black pit)
+        return lit(co, name, a + (1.0 - a) * (1.0 - _smooth01(-0.03, 0.22, co[2])))
+    return finish(root, 'dep_clay', samples=32, distance=0.7, tint=tint)
 
 
 # ==============================================================================================

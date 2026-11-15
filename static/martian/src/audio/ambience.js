@@ -82,10 +82,24 @@ function buildHiss(E, L) {
   return { level: E.ctl(out.gain, 0) };
 }
 
+function buildFire(E, L) {
+  // a furnace drawing: a low roar that breathes, and the rush of its draught over it
+  const out = E.gain(L, 0), tr = E.gain(L, 1);
+  const brown = E.loop(L, 'brown'), lp = E.filter(L, 'lowpass', 240, 0.6), hp = E.filter(L, 'highpass', 48, 0.6), g1 = E.gain(L, 1.0);
+  const pink = E.loop(L, 'pink', 0.83), bp = E.filter(L, 'bandpass', 560, 0.7), g2 = E.gain(L, 0.16);
+  brown.connect(hp); hp.connect(lp); lp.connect(g1); g1.connect(tr);
+  pink.connect(bp); bp.connect(g2); g2.connect(tr);
+  E.wobble(L, tr.gain, 0.28, 0.45);
+  E.wobble(L, lp.frequency, 70, 0.19);
+  tr.connect(out); out.connect(E.bus.ambience);
+  return { level: E.ctl(out.gain, 0) };
+}
+
 export class Ambience {
   constructor(E, sys) {
     this.E = E; this.sys = sys;
     this.wind = new Layer(E, buildWind);
+    this.fire = new Layer(E, buildFire);
     this.hab = new Layer(E, buildHab);
     this.hiss = new Layer(E, buildHiss);
     this.gust = 1; this.gustTarget = 1; this.gustTc = 1; this.gustNext = 0;
@@ -181,6 +195,11 @@ export class Ambience {
       this.hab.rest(now);
       this.nextRelay = -1;
     }
+
+    // ---- a works at work (a base's kiln, smelter or glassworks): its fire, heard when he stands near it ----
+    const fire = alive && !p.sleeping && p.place !== 'hab' ? clamp(p.fire || 0, 0, 1) * (p.place === 'rover' ? 0.3 : 1) : 0;
+    if (fire > 0.004) this.fire.use().level.to(0.26 * fire, 0.35);
+    else if (this.fire.on) { this.fire.c.level.to(0, 0.35); this.fire.rest(now); }
 
     // ---- breach: the rush of air, and the klaxon ----
     const near = sys.habNear(p);

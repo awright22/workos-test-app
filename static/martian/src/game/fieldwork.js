@@ -57,7 +57,7 @@ addI({
 // In a base, basalt is building stone, and any boulder is a quarry: once the ground round it has given its sample
 // (or the sample case is full), a boulder gives blocks instead. The boulder stays: there is more Mars than he can carry.
 addI({
-  pos: boulderInReach, r: 99, hold: 2.4, mode: 'walk', priority: 5,
+  pos: boulderInReach, r: 99, hold: 2.4, mode: 'walk', priority: 5, task: 'b-stone',
   visible: () => isBase() && !S.flags.coldOpen && !S.inside && S.flags.didMath && canSample(_rock, 'rock') !== true,
   label: () => 'Break off basalt',
   sub: () => `+2 basalt · ${S.inv.stone || 0} carried`,

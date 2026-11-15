@@ -99,7 +99,7 @@ const DIFF_TAG = { story: 'Gentle', survival: 'Recommended', iron: 'One life' };
 // (what the three bars under a name count: they stood there with no word, and nothing said a longer wait is the harder game)
 const DIFF_LEVEL = { story: 'Easiest', survival: 'Harder', iron: 'Hardest' };
 /**
- * Which game: the story, or the base. (Asked only where Base mode is offered: see showStart in game/flow.js.) The
+ * Which game: the story, or the base. (Asked where the title is told to offer both: see showStart in game/flow.js.) The
  * two cards are the difficulty sheet's cards, so the choice looks like the one that follows it.
  */
 export function showKind(o, back) {
@@ -114,8 +114,8 @@ export function showKind(o, back) {
     '<div class="diffs two">' +
     card('story', 1, 'The book', 'Get home', [['Ends', 'With a rescue'], ['Length', '15 to 35 sols'], ['You build', 'What gets you there']],
       'Hold out until the Hermes comes back, drive to the rocket in Schiaparelli, and fly.') +
-    card('base', 2, 'Being built', 'Stay', [['Ends', 'Never'], ['Length', 'As long as you like'], ['You build', 'A base']],
-      'No ship can reach Mars for four years. Make this somewhere a man can live. More to gather and build is on its way.') +
+    card('base', 2, 'No rescue', 'Stay', [['Ends', 'Never'], ['Length', 'As long as you like'], ['You build', 'A base']],
+      'No ship can reach Mars for four years. Quarry the planet, fire brick, smelt iron, cast glass: make this somewhere a man can live.') +
     '</div></div>' +
     `<footer class="sheet-ft"><button type="button" class="mg-btn" data-act="back">${icon('back')}Back</button><span class="note">Each keeps its own saved run.</span></footer></div>`,
     { label: 'New game: choose which game', onEscape: back });

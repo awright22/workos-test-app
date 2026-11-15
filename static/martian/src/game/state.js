@@ -7,7 +7,7 @@ export const DIFFICULTIES = {
 
 /**
  * The two games. 'story' is the book: hold out until the rescue, drive to the MAV, fly. 'base' has no rescue: the
- * same opening, and then a base to build that can keep him alive for good. (Base mode is being built: see QUALITY.md.)
+ * same opening, and then a base to build that can keep him alive for good. (QUALITY.md, "Base mode", says what is in it.)
  */
 export const KINDS = ['story', 'base'];
 /** In Base mode nobody is coming: the rescue's sol is a number no run reaches. */

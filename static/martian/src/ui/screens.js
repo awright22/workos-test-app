@@ -12,8 +12,8 @@ import { BUILDINGS, BULK, MADE, WORKS } from '../game/base.js';
 import { reserve, reserveCap, waterCap } from '../game/works.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
-import { startBuild, startDeploy } from '../game/interactables.js';
-import { ACHIEVEMENTS, QUEST_DEFS, achievementDone, checkAchievements, questTargetPos } from '../game/story.js';
+import { buildKind, cancelBuild, startBuild, startDeploy } from '../game/interactables.js';
+import { QUEST_DEFS, achievementDone, achievements, checkAchievements, questTargetPos } from '../game/story.js';
 import { icon } from './icons.js';
 import { sightList } from '../game/sights.js';
 import { layout } from './layout.js';
@@ -286,6 +286,9 @@ export function renderColony() {
   let baseHtml = '', baseReady = 0;
   if (isBase()) {
     const cards = [];
+    // (the thing he has chosen and not yet set down: its card says so, and lets him think better of it. Once
+    //  chosen, a thing stayed chosen until it was built, and the prompt for it stood over every other outdoors.)
+    const placing = '<div class="rcp-ft"><button type="button" class="mg-btn small" data-unbuild="1">Cancel</button><span class="why">Chosen: go outside and set it down, near the Hab</span></div>';
     for (const w of WORKS) {
       const n = World.builtMeshes.filter((b) => b.kind === w.id).length, can = hasCost(w.cost);
       if (can) baseReady++;
@@ -293,8 +296,8 @@ export function renderColony() {
       cards.push([can ? 0 : 1, `<article class="rcp ${can ? 'ready' : ''}" data-card="${w.id}"><div class="rcp-hd"><h4>${esc(w.name)}</h4>` +
         tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}Built${n > 1 ? ' ' + n : ''}</span>` : '')) + '</div>' +
         `<p class="ds">${chem(esc(w.desc))} Makes ${esc(makes)}.</p><div class="cost">${costChips(w.cost)}</div>` +
-        `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
-        `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`]);
+        (buildKind === w.id ? placing : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
+        `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div>`) + '</article>']);
     }
     // ... and the buildings: what he builds of what the works make
     const bcards = [];
@@ -306,8 +309,9 @@ export function renderColony() {
         tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}${n} standing</span>` : '')) + '</div>' +
         `<p class="ds">${chem(esc(w.desc))} ${chem(esc(w.gives))}.</p>` + (full ? '' : `<div class="cost">${costChips(w.cost)}</div>`) +
         (full ? `<div class="rcp-ft"><span class="why">${w.most} is as many as are any use.</span></div></article>`
-          : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
-            `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`)]);
+          : buildKind === w.id ? placing + '</article>'
+            : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
+              `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`)]);
     }
     const nWorks = World.builtMeshes.filter((b) => b.def && b.def.jobs).length, nBuilt = World.builtMeshes.filter((b) => b.def && !b.def.jobs).length;
     baseHtml = `<div class="pane-hd">Works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${nWorks} standing</span></div>` +
@@ -344,6 +348,7 @@ export function renderColony() {
   body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { colonyTab = b.dataset.tab; colonyChosen = true; Snd.click(); renderColony(); }));
   body.querySelectorAll('[data-deploy]').forEach((b) => b.addEventListener('click', () => startDeploy(b.dataset.deploy)));
   body.querySelectorAll('[data-build]').forEach((b) => b.addEventListener('click', () => startBuild(b.dataset.build)));
+  body.querySelectorAll('[data-unbuild]').forEach((b) => b.addEventListener('click', () => { cancelBuild(); renderColony(); }));
   const bump = (id) => { const c = UI.colonyScreen.querySelector(`[data-card="${id}"]`); if (c) c.classList.add('bump'); };
   body.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
     const r = RECIPES.find((x) => x.id === b.dataset.r);
@@ -393,6 +398,8 @@ export function renderColony() {
 // ============================================================
 let journalTab = 'tasks';
 const ACH_PROGRESS = {
+  prospector: () => [Object.keys(S.stats.minerals || {}).length, 5, ''], foreman: () => [S.stats.made || 0, 100, ''],
+  town: () => [BUILDINGS.filter((w) => World.builtMeshes.some((b) => b.kind === (w.builds || w.id))).length, BUILDINGS.length, ''],
   botanist: () => [S.stats.potatoes, 50, ''], eyebrows: () => [S.stats.booms, 5, ''], arch: () => [Object.keys(S.salvaged).length, 8, ''],
   circum: () => [S.stats.driven / 1000, 75.4, ' km'], ice: () => [S.stats.mined, 25, ''], storm: () => [S.stats.stormOut, 60, ' s'],
   marathon: () => [S.stats.walked / 1000, 10, ' km'], disco: () => [S.stats.discoTime, 180, ' s'],
@@ -528,9 +535,9 @@ function discoveriesHtml() {
   return h + '</div>';
 }
 function achievementsHtml() {
-  const got = ACHIEVEMENTS.filter((a) => S.achieved[a.id]).length;
-  let h = `<div class="pane-hd">Achievements <span>${got} of ${ACHIEVEMENTS.length}</span></div><div class="jr-grid">`;
-  for (const a of ACHIEVEMENTS) {
+  const all = achievements(), got = all.filter((a) => S.achieved[a.id]).length;
+  let h = `<div class="pane-hd">Achievements <span>${got} of ${all.length}</span></div><div class="jr-grid">`;
+  for (const a of all) {
     const g = !!S.achieved[a.id];
     let prog = '';
     if (!g && ACH_PROGRESS[a.id]) {
@@ -596,7 +603,7 @@ export function renderJournal() {
   const counts = {
     tasks: missionList().filter((e) => !e.done).length || '',
     disc: discoveriesFound() || '',
-    ach: ACHIEVEMENTS.filter((a) => S.achieved[a.id]).length || '', samples: scienceSummary().kinds || '',
+    ach: achievements().filter((a) => S.achieved[a.id]).length || '', samples: scienceSummary().kinds || '',
   };
   const cur = JOURNAL_TABS.find((t) => t[0] === journalTab) || JOURNAL_TABS[0];
   body.innerHTML = '<div class="journal"><div class="tabs" role="tablist">' +

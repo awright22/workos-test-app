@@ -357,7 +357,9 @@ script's own header and in `static/martian/src/game/base.js` (which says where e
 Each carries six loose pieces along its front, parts `block_0` .. `block_5` with their origins on
 the ground, which the game hides one by one as the deposit is worked; and collider anchors (`col_*`)
 where it stands high enough to walk into. There is no hem of drifted soil: the rock goes into the
-terrain at its own edge. The mineral
+terrain at its own edge. Four of them are heightfields on a square grid (`patch()`); the clay bank is
+a slab of dipping beds broken along its joints, and its mesh is laid along the rock: columns across
+the bank, a row at every bed's lip, joint and foot, so bands and ledges are crisp. The mineral
 is the material `mineral` (or `mineral_sheen` for the hematite beads): white in itself, its colour
 painted on the vertices. The script takes its helpers from `props.py`.
 The game loads these five only when a base is begun or continued (`BASE_MODELS` in `base.js`).
@@ -374,18 +376,20 @@ a glory hole, a mirror dish that heats it, a casting table and a rack of panes.
 Every surface that glows when the works is working is in `light_amber`: the game turns it up while
 a job runs and down to nothing when it stands idle. Part `stock` is the product stacked beside it,
 shown when there is some in the stores. Anchor `fire` is where the game hangs its lamp; `col_*`
-anchors are the circles the player cannot walk into. The script takes its helpers from `props.py`.
+anchors are the circles the player cannot walk into; anchor `flue` (kiln, smelter) is where its smoke
+leaves. The glassworks' mirror faces forward and up, half-way between the sun and the furnace's
+throat. The script takes its helpers from `props.py`.
 
 ## Family I — the buildings of a base (`buildings.py`)
 
 `bs_solar.glb` (≤ 9,000), `bs_battery.glb` (≤ 5,000), `bs_tank.glb` (≤ 6,000), `bs_quarters.glb`
-(≤ 5,000), `bs_tower.glb` (≤ 3,000), `bs_pad.glb` (≤ 4,000): what he builds of what the works make (`BUILDINGS` in `static/martian/src/game/base.js` says what each does for the
+(≤ 8,000: its vault is laid brick by brick), `bs_tower.glb` (≤ 3,000), `bs_pad.glb` (≤ 4,000): what he builds of what the works make (`BUILDINGS` in `static/martian/src/game/base.js` says what each does for the
 Hab). Smelted iron, dark and unpainted and rusting at the welds (`iron`, `iron_rust`), cast glass,
 fired brick, salvage where it matters. The solar field is three rows of four glazed panels on iron
 trestles, facing −Y; the battery bank twelve salt cells in a rack under a tin roof; the water tank a
 drum of welded plate on a ring of brick with a ladder, a level gauge and a lagged pipe; the living
-quarters a barrel vault of brick with a round iron hatch and windows that glow after dark
-(`light_white`); the comms tower a guyed iron mast with a dish and a red lamp (`light_red`); the
+quarters a barrel vault of brick (each brick its own tint) on a cement footing, with a round iron
+hatch and windows that are dark glass by day and glow after dark (`light_white_room`); the comms tower a guyed iron mast with a dish and a red lamp (`light_red`); the
 landing pad a disc of cement all but flush with the ground, a target painted on it, lamps at its rim
 (`light_blue`): he walks on it. The game brings these lamps up after dark. Each has the
 works' grey control box and a cable off toward the Hab, and `col_*` anchors. The script takes its

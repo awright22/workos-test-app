@@ -77,13 +77,12 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 - **Structure**: a checkpoint every dawn, automatic saving, three difficulties (rescue on
   Sol 15, 25 or 35).
 
-## The second game: a base (being built)
+## The second game: a base
 
 A second way to play, with no rescue: the same storm and the same Hab, but the next ship is four
-years out, so the long game is a base that can keep one man alive for good. It is being built in
-parts (see `QUALITY.md`), and until it has its own buildings it is offered only when the address
-ends in `?base`, or when a base is already saved in that browser. It keeps a save of its own beside
-the story's.
+years out, so the long game is a base that can keep one man alive for good. New Game asks which of
+the two games ("Get home" or "Stay"). A base keeps a save of its own beside the story's, and the
+title offers "Continue the base". `QUALITY.md` ("Base mode") has its plan, its reviews and its bar.
 
 - **Minerals**: basalt off any boulder, and five minerals quarried at deposits that stand where
   each was really found: hematite on Meridiani, silica in Gusev crater, clay at Mawrth Vallis,
@@ -91,10 +90,17 @@ the story's.
   The map shows where each was seen from orbit.
 - **Works**: a kiln, a smelter and a glassworks, built outside the Hab and given jobs at a sheet
   of their own: brick, cement, iron and glass, made by the batch on the Hab's power while he does
-  something else.
+  something else. A works at work burns, smokes from its flue and can be heard.
 - **Buildings**, of what the works make: a solar field, a battery bank, a water tank, a farm dome,
-  living quarters, a comms tower (every deposit goes on the map) and a landing pad (a supply drop
-  every ten sols: the only source of circuit boards that does not run out).
+  living quarters, a landing pad (a supply drop every ten sols: the only source of circuit boards
+  that does not run out) and a comms tower (every deposit goes on the map).
+- **Building**: a thing is chosen on the Colony screen's Base tab and set down outside; a ring on
+  the ground shows where it will stand, green where it can and red where it cannot, and its card
+  lets it be un-chosen. The task card leads through a base in the order it is built.
+- **Achievements** of its own, in place of the story's "Leave Mars".
+- `tools/tests/base.mjs` tests it; `tools/tests/base-walk.mjs` plays it from New Game to its first
+  supply drop as numbered phone screenshots, and `tools/tests/base-shots.mjs` photographs each
+  deposit, works and building, for review.
 
 ## Controls
 

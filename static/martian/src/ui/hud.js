@@ -67,6 +67,8 @@ const dustiestPanel = (least) => { const p = World.panels.reduce((a, b) => (!a |
  * in the title and the distance beside it, every title on a phone ran to two lines.) An emergency's title is the
  * instruction: the banner at the top of the screen has already said what is wrong, and the two used to say it twice.
  */
+/** Whether a thing of this kind has been built. */
+const stands = (kind) => World.builtMeshes.some((b) => b.kind === kind);
 export const OBJECTIVES = [
   { id: 'reach', urgent: true, place: 'Airlock', icon: 'hab', text: () => 'Suit breach: get to the Hab', why: 'The suit is losing air. Seal it at the airlock door.',
     pos: () => habPoint(0, 1.3, 11.7), shown: () => true, done: () => S.flags.suitSealed },
@@ -121,39 +123,42 @@ export const OBJECTIVES = [
   //  drive stands between him and the rescue)
   { id: 'survive', text: () => `Survive to Sol ${S.rescueSol}`, why: () => `The MAV can launch then: ${fmtDist(groundDist(World.hab.position, World.mav.position))} from the Hab, in Schiaparelli.`,
     shown: () => !isBase() && S.pf.connected, done: () => S.sol >= S.rescueSol },
-  // ---- The game with no rescue: what a base is made of, a thing at a time. (The first of them, with what the
-  //      story's game already has to build with; the list grows as Base mode gets its own materials and buildings.)
-  { id: 'b-dome', place: 'Fabricator', text: () => 'Raise a greenhouse dome', why: 'Four more beds. Build the kit at the fabricator and set it down outside.',
-    pos: () => habPoint(-4.75, 1.3, 4.2), shown: () => isBase() && (S.stats.potatoes >= 4 || S.stats.produce > 0), done: () => World.builtMeshes.some((b) => b.kind === 'greenhouse') },
-  { id: 'b-larder', text: () => `Lay in forty meals (${Math.min(foodTotal(), 40)} of 40)`, why: 'A larder that outlasts a bad month.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'greenhouse'), done: () => foodTotal() >= 40 },
-  { id: 'b-ice', text: () => `Mine ice for the tank (${Math.min(S.stats.mined, 6)} of 6)`, why: 'The hydrazine runs out. An ice drill and an outcrop do not.',
-    shown: () => isBase() && S.pf.connected, done: () => S.stats.mined >= 6 },
+  // ---- The game with no rescue: what a base is made of, a thing at a time. First the line that leads from one
+  //      thing to the next (stone, kiln, brick, smelter, glass, power, the pad, quarters, the tower), in the order a
+  //      base is built; after it the things that can be done at any time. (The greenhouse led this list once, and the
+  //      first thing a base's task card said was to spend two circuit boards on a kit, before a word about stone.)
   { id: 'b-stone', text: () => `Break basalt off boulders (${Math.min(S.inv.stone || 0, 10)} of 10)`, why: 'Building stone. Any boulder will do, once the ground by it has given its sample.',
     shown: () => isBase() && S.sol >= 2 && S.flags.didMath, done: () => (S.stats.quarried || 0) >= 10 },
-  { id: 'b-prospect', text: () => 'Find a mineral deposit', why: 'Iron, glass, brick and cement are lying about the planet. The map marks where orbiters saw them.',
-    shown: () => isBase() && S.pf.connected, done: () => Object.keys(baseState().found).length > 0 },
   { id: 'b-kiln', text: () => 'Build a kiln', why: 'Twelve basalt and two scrap: Colony, the Base tab. Brick is what everything else is built of.',
-    shown: () => isBase() && (S.stats.quarried || 0) >= 10, done: () => World.builtMeshes.some((b) => b.kind === 'kiln') },
+    shown: () => isBase() && (S.stats.quarried || 0) >= 10, done: () => stands('kiln') },
   { id: 'b-brick', text: () => `Fire bricks (${Math.min(S.inv.brick || 0, 14)} of 14)`, why: 'Walk up to the kiln and give it a job. A smelter takes fourteen.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'kiln'), done: () => (S.inv.brick || 0) >= 14 || World.builtMeshes.some((b) => b.kind === 'smelter') },
+    shown: () => isBase() && stands('kiln'), done: () => (S.inv.brick || 0) >= 14 || stands('smelter') },
   { id: 'b-smelter', text: () => 'Build a smelter', why: 'Iron: out of hematite, out of scrap, or slowly out of the soil.',
-    shown: () => isBase() && (S.inv.brick || 0) >= 14, done: () => World.builtMeshes.some((b) => b.kind === 'smelter') },
+    shown: () => isBase() && ((S.inv.brick || 0) >= 14 || stands('smelter')), done: () => stands('smelter') },
   { id: 'b-glass', text: () => 'Build a glassworks', why: 'Twelve brick, four iron and a circuit board. Glass is greenhouses.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'smelter'), done: () => World.builtMeshes.some((b) => b.kind === 'glassworks') },
+    shown: () => isBase() && stands('smelter'), done: () => stands('glassworks') },
   { id: 'b-solar', text: () => 'Build a solar field', why: 'Three works draw more than one array gathers. Eight iron, six glass, two circuit boards.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'glassworks'), done: () => World.builtMeshes.some((b) => b.kind === 'solarField') },
+    shown: () => isBase() && stands('glassworks'), done: () => stands('solarField') },
   { id: 'b-battery', text: () => 'Build a battery bank', why: 'A reserve for the night and the storm. It wants salt: the map shows where.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'solarField'), done: () => World.builtMeshes.some((b) => b.kind === 'battery') },
-  { id: 'b-tank', text: () => 'Build a water tank', why: 'The Hab holds 120 L. A drum of iron plate holds twice that again.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'smelter') && S.stats.mined >= 6, done: () => World.builtMeshes.some((b) => b.kind === 'tank') },
-  { id: 'b-quarters', text: () => 'Build living quarters', why: 'A vault of brick and plaster. Cement is burnt gypsum: the kiln makes it.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'battery'), done: () => World.builtMeshes.some((b) => b.kind === 'quarters') },
-  // (the pad before the tower: it takes no circuit boards and brings two every ten sols, and the tower takes three)
+    shown: () => isBase() && stands('solarField'), done: () => stands('battery') },
+  // (the pad before the tower: it takes no circuit boards and brings three every ten sols, and the tower takes three)
   { id: 'b-pad', text: () => 'Lay a landing pad', why: 'Something Earth can hit: a supply drop every ten sols. Circuit boards do not grow here.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'battery'), done: () => World.builtMeshes.some((b) => b.kind === 'pad') },
+    shown: () => isBase() && stands('battery'), done: () => stands('pad') },
+  { id: 'b-quarters', text: () => 'Build living quarters', why: 'A vault of brick and plaster. Cement is burnt gypsum: the kiln makes it.',
+    shown: () => isBase() && stands('battery'), done: () => stands('quarters') },
   { id: 'b-tower', text: () => 'Raise a comms tower', why: 'With a dish that high, the orbiters can talk me in to every deposit on the planet.',
-    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'pad'), done: () => World.builtMeshes.some((b) => b.kind === 'tower') },
+    shown: () => isBase() && stands('pad'), done: () => stands('tower') },
+  // ... and what can be done at any time
+  { id: 'b-prospect', text: () => 'Find a mineral deposit', why: 'Iron, glass, brick and cement are lying about the planet. The map marks where orbiters saw them.',
+    shown: () => isBase() && (stands('kiln') || S.pf.connected), done: () => Object.keys(baseState().found).length > 0 },
+  { id: 'b-dome', text: () => 'Raise a farm dome', why: 'Four more beds. Ten glass, six iron and six brick: Colony, the Base tab.',
+    shown: () => isBase() && stands('glassworks'), done: () => stands('greenhouse') },
+  { id: 'b-larder', text: () => `Lay in forty meals (${Math.min(foodTotal(), 40)} of 40)`, why: 'A larder that outlasts a bad month.',
+    shown: () => isBase() && stands('greenhouse'), done: () => foodTotal() >= 40 },
+  { id: 'b-ice', text: () => `Mine ice for the tank (${Math.min(S.stats.mined, 6)} of 6)`, why: 'The hydrazine runs out. An ice drill and an outcrop do not.',
+    shown: () => isBase() && S.pf.connected, done: () => S.stats.mined >= 6 },
+  { id: 'b-tank', text: () => 'Build a water tank', why: 'The Hab holds 120 L. A drum of iron plate holds twice that again.',
+    shown: () => isBase() && stands('smelter') && S.stats.mined >= 6, done: () => stands('tank') },
   { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on Mars.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];

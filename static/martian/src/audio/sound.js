@@ -47,6 +47,7 @@ export const DEFAULT_PARAMS = {
   habPower: 1,          // 1 when the Hab has power
   habAmt: 1,            // 1 in the Hab, less in a small greenhouse dome
   habDist: 0,           // metres to the Hab (how loud its alarm is from outside)
+  fire: 0,              // 0..1 how near a works with its fire lit is (a base's kiln, smelter, glassworks)
   breach: false,        // the Hab is open to Mars
   leak: false,          // the suit is leaking (the cold open)
   hold: 0,              // 0..1 progress of a held action
