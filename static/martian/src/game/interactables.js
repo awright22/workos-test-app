@@ -25,7 +25,7 @@ import { showChoice } from '../ui/menus.js';
 import { R } from '../planet/constants.js';
 import { layout } from '../ui/layout.js';
 import { WORK_BY_ID } from './base.js';
-import { jobLine, works } from './works.js';
+import { jobLine, standing, waterCap, works } from './works.js';
 import { showWork } from '../ui/works.js';
 import { costStr, hasCost, payCost } from './inventory.js';
 // Every interaction in the world: farming, Hab stations, vehicles, salvage, building, the MAV.
@@ -342,7 +342,7 @@ addI({
   sub: () => (S.hydrazine > 0 ? `${S.hydrazine} burn${S.hydrazine === 1 ? '' : 's'} left · ` + (S.flags.hydrazineBoom ? 'these cost no air' : 'first costs 7% of Hab air') : ''),
   use: () => {
     S.hydrazine--;
-    S.water = clamp(S.water + BAL.hydrazineWater, 0, BAL.waterMax);
+    S.water = clamp(S.water + BAL.hydrazineWater, 0, waterCap());
     World.hydFlame.visible = true;
     Snd.play('hydrazine');
     setTimeout(() => { World.hydFlame.visible = false; }, 2600);

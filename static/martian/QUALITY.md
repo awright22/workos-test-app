@@ -837,9 +837,9 @@ preview before the next.
 | Part | What | State |
 | --- | --- | --- |
 | A | **A second game with no rescue.** Chosen at New Game ("Two ways to be stranded": Get home, or Stay). It keeps a save of its own (`stranded2-save-base`) beside the story's, and the title offers "Continue the base". Nothing in it counts down: the clock, the dawn sheet, the numbers at the desk, the journal ("The long stay"), the map, the pause card, Houston's first call and the mail all say what is true when no one is coming. | built, tested and on the preview (`tools/tests/base.mjs`) |
-| B | **Materials.** Basalt off any boulder (once the ground by it has given its sample), and five minerals quarried at deposits that stand where each was really found: 47 of them, in 23 fields (hematite pavements, silica beds, clay banks, sulfate ledges, salt pans; `game/base.js`). The map shows from the first sol where each was seen from orbit; a deposit is marked when he has stood at it. Each is a Blender model (`tools/assets/deposits.py`) on level, untrodden ground, with six loose pieces that go as it is worked. The inventory lists them and says where the ones he lacks lie. | built; `base.mjs` covers it; its pictures (`node tests/base-shots.mjs`) have had one look of my own and wait for a reviewer |
-| C | **Works.** A kiln (brick from soil or clay, cement from gypsum), a smelter (iron from hematite, scrap or soil) and a glassworks (glass from silica or soil). Each is chosen on the Colony screen's new Base tab, set down outside within reach of the Hab's power (`game/interactables.js`), and given jobs at a sheet of its own (`ui/works.js`): so many batches, each taking hours and Hab power, going on by itself through the night, waiting when the Hab is under 12% (`game/works.js`). Each is a Blender model with a fire that burns while it works and its product stacked beside it (`tools/assets/works.py`). The fuel plant (oxygen and methane) is moved to part D. | built; `base.mjs` covers building one and running its jobs; pictures and review to come |
-| D | **Buildings and milestones.** A solar field, a battery bank, a water tank, a large greenhouse, a second living module, a garage, a comms tower, a landing pad; set down where the player chooses. Milestones in the journal in place of the story's steps (a larder that lasts a season, water that closes its own loop, power through a dust storm). | not started |
+| B | **Materials.** Basalt off any boulder (once the ground by it has given its sample), and five minerals quarried at deposits that stand where each was really found: 47 of them, in 23 fields (hematite pavements, silica beds, clay banks, sulfate ledges, salt pans; `game/base.js`). The map shows from the first sol where each was seen from orbit; a deposit is marked when he has stood at it. Each is a Blender model (`tools/assets/deposits.py`) on level, untrodden ground, with six loose pieces that go as it is worked. The inventory lists them and says where the ones he lacks lie. | built; `base.mjs` covers it; reviewed three times (below): NEARLY as a set |
+| C | **Works.** A kiln (brick from soil or clay, cement from gypsum), a smelter (iron from hematite, scrap or soil) and a glassworks (glass from silica or soil). Each is chosen on the Colony screen's new Base tab, set down outside within reach of the Hab's power (`game/interactables.js`), and given jobs at a sheet of its own (`ui/works.js`): so many batches, each taking hours and Hab power, going on by itself through the night, waiting when the Hab is under 12% (`game/works.js`). Each is a Blender model with a fire that burns while it works and its product stacked beside it (`tools/assets/works.py`). The fuel plant (oxygen and methane) is moved to part D. | built; `base.mjs` covers building one and running its jobs; reviewed twice (below): NEARLY as a set |
+| D | **Buildings and milestones.** First four built: a solar field (gathers as much again as the Hab's array), a battery bank (a reserve the Hab draws on under three tenths and fills over nine), a water tank (240 L more) and a farm dome (the greenhouse, paid for in glass, iron and brick); three of each are as many as are any use (`BUILDINGS` in `game/base.js`, effects in `game/works.js`, models in `tools/assets/buildings.py`). Then living quarters (morale +2 each dawn), a comms tower (every deposit goes on the map) and a landing pad (a supply drop every ten sols, with the circuit boards nothing on Mars makes); these three are where cement goes. The journal's line for the base says what stands and what comes next. The fuel plant is dropped: nothing in the game wants methane. To come: pictures and a review of the buildings, a review of the whole mode played from its start, and then the gate comes off. | all seven built; `base.mjs` covers them; reviewed (below): MET as a set |
 
 **What is made of what** (the plan for parts C and D; numbers are first guesses, to be tuned by play):
 
@@ -882,6 +882,54 @@ Learnt on the way: a hem of drifted soil in `ground_dust` is the colour of trodd
 dark stain (the deposits have none; they go into the terrain at their own edge, on a pad that is level but not
 trodden); and a height function that jumps (a ridge cut off at its neighbour's edge, a terrace at the end of a
 bank) is drawn on a grid as a saw.
+
+**Second review, of the deposits and the works** (15 November; one independent reviewer, sixteen pictures at
+iPhone size on "medium", all opened; the indie standard). **Deposits NEARLY as a set**: hematite, silica, sulfate
+and salt NEARLY; clay NOT MET, narrowly ("the only one I would send back"). **Works NEARLY as a set**: the kiln
+MET, the smelter and the glassworks NEARLY. Telling the five deposits apart, and the three works: met. What it
+found, most damaging first, and what was done:
+
+| # | Finding | State |
+| --- | --- | --- |
+| E1 | Clay: regular saw-tooth pleats along its base and at both ends | fixed at the cause, for all five: a surface that stopped just under the ground, or was cut to a level there, met the ground in a row of even teeth. Every deposit now goes on down under the ground at the slope it arrived with (`patch()` in `deposits.py` says so), and ledges are cut only where the rock stands clear of the ground |
+| E2 | The glassworks' dish read as a brown radio dish aimed at the horizon, and at night outshone the furnace | a polished mirror in rings, tipped to look down the furnace's throat; the works' own light is lower and dimmer (E4) |
+| E3 | The smelter's shaft and the glassworks' body were rings and slats with no brick bond ("a lighthouse and a crate") | upright joints on every course, broken course to course, on the shaft, its foot and the furnace |
+| E4 | At night all three looked lit by a lamp in front of them, not by their own fire | the light is half as bright, orange, and low at the mouth: it falls on the sill and the ground |
+| E5 | Two glows blown to white: the smelter's mould bars, and the glory hole's core at night | what glows dull (iron in a mould, the glass furnace's mouth) is its own dimmer material, `light_ember` |
+| E6 | Clay read as a free-standing, evenly terraced loaf; its loose stones generic, three-coloured, too big to lift | beds uneven (a hand to half a pace thick), the top bed runs back a pace longer; loose stones a quarter to a third of a metre, in the colours of the beds they came off |
+| E7 | Hematite: beads like the terrain's pebbles, plates uniform tiles, heaps smooth blobs | part: plates now differ in height, tilt and how dusted over they are; beads and heaps as they were (open) |
+| E8 | Sulfate too symmetrical a dome, ribbed on one flank | part: plan more lobed; the ribbing was E1 |
+| E9 | Salt's outer ridges ended in sharp spikes; ridges "piped" | ridges stop short at a ragged edge |
+| E10 | Silica's knobs uniform blobs; a flat tan apron in the middle | knobs of every size and not round; between them the crust is deeper under the sand |
+| E11 | Loose pieces hard-faceted beside smooth, textured outcrops | smooth-shaded, with the outcrop's grain |
+| E12 | Smelter: bare boxes for foot and blower, the runner stopped short of the mould, a prop that could not be read | the run reaches the moulds and goes over the lip; louvres and a lifting eye on the blower; the pigs are stacked on bricks |
+| E13 | The kiln's door did not read as iron | dark plate with a bolt circle |
+| E14 | No smoke, sparks or heat haze: "working" rests on a glow alone | the kiln and the smelter smoke from their flues while they work (see F3) |
+
+**Third review, of the deposits, the works and the buildings** (15 November; one independent reviewer, 22 pictures
+at iPhone size on "medium", all opened; the indie standard). **Buildings MET as a set** (solar field, tank, tower
+and pad MET; battery bank and quarters NEARLY). **Works NEARLY as a set** (kiln MET; smelter and glassworks
+NEARLY). **Deposits NEARLY as a set** (silica and sulfate MET; hematite and salt NEARLY; clay NOT MET, "narrowly;
+the body is acceptable, the base and identity are not"). All five deposits, the three works and the six buildings
+can each be told apart at a glance. What it found, most damaging first, and what was done:
+
+| # | Finding | State |
+| --- | --- | --- |
+| F1 | Clay sat on a rust-coloured "tray" with straight edges and a rounded corner, and had stair-stepped ends | rebuilt (F2): the tray was the lowest bed, spread flat at each end where a loaf-shaped top had cut down through every bed to it |
+| F2 | Clay did not read as banded mudstone or a broken bed edge: a free-standing loaf, blotchy, its rubble in colours the face did not show | rebuilt as what it is: a slab of beds dipping back into the ground, broken off along its joints. The mesh is laid along the rock (rows on the beds' lips, joints and feet), so every band and ledge is crisp; on a square grid a face that steep had one row to 8 cm of height, and beds a hand thick came out as blotches. The ends go under sand. Rubble and loose blocks are the cap's and the cream bed's colours, and smooth |
+| F3 | Smelter smoke could not be found: a detached puff by day, nothing by night | smoke is now a plume: dark against the sky, rising six seconds from the flue, widening, leaning with the wind, and lit by the fire where it leaves the flue (which is what shows at night). It had been pale dust that rose half a metre and sank |
+| F4 | Kiln smoke faint by day, invisible at night | as F3 |
+| F5 | The glassworks' dish read as a satellite dish: dark, matte, copper-brown | the mirror is bright in itself (as a true mirror it showed this renderer's dim surroundings), and the melt glows in the furnace's throat where its light lands |
+| F6 | Salt's lattice ends in blunt prongs, a cog outline; lies on the sand like a net | open |
+| F7 | Hematite's plates fan from one centre in a near-circular patch ("laid paving"); beads sparse angular chips | open |
+| F8 | The quarters' vault one flat saturated orange, no brick legible; the porthole a blank white disc; footing and steps the same orange | the vault is laid brick by brick (26 courses, broken bond), no two one colour, one in seven burnt dark; courses and joints drawn on the end walls; footing and steps cement; the windows are dark glass by day with glazing bars, and light up after dark |
+| F9 | At night the smelter's shaft glowed evenly "like a lantern"; the kiln's upper blocks lit as if by a floodlight | the fire's light reaches four and a half metres, not seven, and falls off faster |
+| F10 | The glassworks' furnace and sand bin near-primitive boxes; the glory hole a flat disc; the pane an opaque board | open |
+| F11 | Battery cells read as gas bottles; the roof as pale boards | open |
+| F12 | Silica: a pale tan apron mid-mound; loose pieces not told from the mound's outlying knobs | open |
+| F13 | Sulfate's tiers too concentric, its speckle uniform, its left flank striated | open |
+| F14 | The tower's guy wires hairlines with no anchors | open |
+| F16 | The pad's surface tarmac-dark and uneven in tone, its cross lines hairlines | open |
 
 **While it is being built it is not on the title.** New Game goes straight to the story unless the
 address ends in `?base` (or a base has already been saved in that browser). The card for it says

@@ -58,10 +58,14 @@ def minerals():
 
 def patch(name, root, half, n, hfun, cfun, P, centre=(0.0, 0.0), cut=-0.03, smooth=42.0, material='mineral', jitter=0.0):
     """Rock as a surface: a square of ground `2 * half` across about `centre`, n by n quads, raised to hfun(x, y).
-    Where that is below `cut` there is nothing (the ground covers it). cfun(x, y, h) is the colour of a vertex.
+    Squares wholly under the ground (height 0) are left out; a vertex is put no deeper than `cut`. cfun(x, y, h)
+    is the colour of a vertex.
     Stepped strata, worn knobs and mounds are all height functions; nothing made this way overhangs.
     `jitter` (a share of a cell) nudges the vertices off the grid: broken rock shaded in facets shows its grid
-    as ruled rows of triangles otherwise."""
+    as ruled rows of triangles otherwise.
+    Where the rock goes into the ground, hfun must go on down under it at the slope it arrived with, and `cut`
+    must be deep enough to keep that part. (Stopped just under the ground, or cut to a level there, the last
+    row of triangles meets the ground in a row of even teeth: two reviews called it pinking shears.)"""
     bm = bm_new()
     cx, cy = centre
     hs, xy = {}, {}
@@ -75,7 +79,7 @@ def patch(name, root, half, n, hfun, cfun, P, centre=(0.0, 0.0), cut=-0.03, smoo
     for i in range(n):
         for j in range(n):
             q4 = ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))
-            if all(hs[q] <= cut for q in q4):
+            if all(hs[q] <= 0.0 for q in q4):                                 # (wholly under the ground: nothing to draw)
                 continue
             for q in q4:
                 if q not in vs:
@@ -242,13 +246,13 @@ def bead8(bm, x, y, z, r, P, col):
         P.add(v.co, col)
 
 
-def rubble(bm, r, n, place, P, col, size=(0.05, 0.16), flat=(0.45, 0.8)):
+def rubble(bm, r, n, place, P, col, size=(0.05, 0.16), flat=(0.45, 0.8), subdiv=1):
     """What has come off an outcrop and lies against its foot: n small stones, half sunk. place() -> (x, y);
     col(zf, co) colours each by height."""
     for i in range(n):
         x, y = place()
         s_ = r.uniform(*size)
-        vs = rock(bm, s_, (x, y, s_ * 0.25), seed=r.randint(0, 10 ** 6), scale=(r.uniform(1.0, 1.3), r.uniform(0.75, 1.0), r.uniform(*flat)), subdiv=1, rough=0.28)
+        vs = rock(bm, s_, (x, y, s_ * 0.25), seed=r.randint(0, 10 ** 6), scale=(r.uniform(1.0, 1.3), r.uniform(0.75, 1.0), r.uniform(*flat)), subdiv=subdiv, rough=0.28 if subdiv == 1 else 0.2)
         zs = [v.co.z for v in vs]
         lo, hi = min(zs), max(zs)
         for v in vs:
@@ -287,29 +291,29 @@ def build_dep_hematite():
         """A plate of the pavement: (how proud of the sand it stands, its tilt, its tone); gone altogether here and
         there, and more often toward the edge, where the sand has it."""
         gone = hash01(ij[0], ij[1], 11.0) < 0.05 + 0.62 * _smooth01(0.66, 1.0, reach(*p))
-        return (0.0 if gone else 0.025 + 0.04 * hash01(ij[0], ij[1], 6.0), (hash01(ij[0], ij[1], 7.0) - 0.5) * 0.04, (hash01(ij[0], ij[1], 8.0) - 0.5) * 0.04, hash01(ij[0], ij[1], 5.0))
+        return (0.0 if gone else 0.012 + 0.085 * hash01(ij[0], ij[1], 6.0) ** 1.6, (hash01(ij[0], ij[1], 7.0) - 0.5) * 0.09, (hash01(ij[0], ij[1], 8.0) - 0.5) * 0.09, hash01(ij[0], ij[1], 5.0))
 
     def hf(x, y):
         r_ = reach(x, y)
         if r_ >= 1.0:
-            return -0.5 * (r_ - 1.0) - 0.03
+            return -0.22
         edge, ij, p = cell(x, y)
         proud, tx, ty, _ = plate_of(ij, p)
         if proud <= 0.0:
-            return -0.03
+            return -0.22
         top = max(0.012, proud + (x - p[0]) * tx + (y - p[1]) * ty + 0.006 * noise3((x, y, 0.0), 4.5, 2.0))
         # (the joints lie under the ground, which is the terrain's own sand: only the plates stand out of it. A plate
         #  is flat to its edge and drops there: drawn rounded over, the pavement was a quilt of cushions.)
-        return -0.03 + (top + 0.03) * _smooth01(0.03, 0.075, edge) ** 0.5
+        return -0.22 + (top + 0.22) * _smooth01(0.0, 0.085, edge) ** 0.45
 
     def cf(x, y, h):
         edge, ij, p = cell(x, y)
         tone = plate_of(ij, p)[3]
         cc = mix(BUFF, PALE, 0.7 * tone + 0.3 * (0.5 + 0.5 * noise3((x, y, 0.0), 1.7, 6.0)))
-        cc = mix(cc, DUSTY, 0.5 * _smooth01(0.1, 0.7, 0.5 + 0.5 * noise3((x, y, 0.0), 2.6, 9.0)))       # dust lies on it in patches
+        cc = mix(cc, DUSTY, (0.25 + 0.6 * hash01(ij[0], ij[1], 12.0)) * _smooth01(0.1, 0.7, 0.5 + 0.5 * noise3((x, y, 0.0), 2.6, 9.0)))       # dust lies on it in patches, on some plates more
         cc = mix(cc, SEAM, 0.55 * (1.0 - _smooth01(0.06, 0.13, edge)))                                    # its worn edges are darker
         return mix(STAIN, cc, _smooth01(0.0, 0.03, h))
-    patch('pavement.rock', root, 4.4, 126, hf, cf, PM, centre=(CX, CY), smooth=50.0)
+    patch('pavement.rock', root, 4.4, 126, hf, cf, PM, centre=(CX, CY), smooth=50.0, cut=-0.2)
 
     # ---- the beads: a scatter on every plate, and thick in the joints ----
     K = Kit('pavement', root)
@@ -397,8 +401,8 @@ def build_dep_silica():
     for (hx, hy, spread, n, big) in ((-0.3, 1.0, 1.1, 46, 0.34), (1.45, 0.25, 0.85, 28, 0.27), (-1.6, 0.2, 0.8, 24, 0.25)):
         for i in range(n):
             a, d = rng.uniform(0, TAU), spread * sqrt(rng.random())
-            r_ = big * rng.uniform(0.35, 1.0) * (1.0 - 0.45 * d / spread)
-            knobs.append((hx + d * cos(a), hy + d * sin(a) * 0.85, r_, rng.uniform(0.8, 1.5)))
+            r_ = big * rng.uniform(0.25, 1.25) ** 1.3 * (1.0 - 0.45 * d / spread)
+            knobs.append((hx + d * cos(a), hy + d * sin(a) * 0.85, max(0.07, r_), rng.uniform(0.6, 1.7)))
     for i in range(110):
         a, d = rng.uniform(0, TAU), 3.0 * sqrt(rng.random())
         x, y = CX + d * cos(a), CY + d * sin(a) * 0.8
@@ -417,13 +421,13 @@ def build_dep_silica():
         pit = 0.02 * noise3((x, y, 0.0), 7.0, 3.0) + 0.012 * noise3((x, y, 0.0), 13.0, 8.0)             # old sinter is pitted
         # (between the knobs the crust is under the sand, but for the middle of the mound: it lay round its own foot
         #  as a flat pale apron, "a puddle of custard poured on the sand")
-        return max(mound(x, y) - 0.10, knob_h(x, y)) + pit - 0.012
+        return max(mound(x, y) - 0.16, knob_h(x, y)) + pit - 0.012
 
     def cf(x, y, h):
-        up = h - (mound(x, y) - 0.10)                                         # how far a knob stands out here
+        up = h - (mound(x, y) - 0.16)                                         # how far a knob stands out here
         cc = mix(mix(CREASE, GREY, _smooth01(0.0, 0.05, up)), WHITE, _smooth01(0.03, 0.13, up) * (0.75 + 0.25 * noise3((x, y, 0.0), 4.0, 1.0)))
         return mix(STAIN, cc, _smooth01(0.0, 0.06, h))
-    patch('bed.crust', root, 3.6, 124, hf, cf, PM, centre=(CX, CY), smooth=55.0, cut=-0.012)
+    patch('bed.crust', root, 3.6, 124, hf, cf, PM, centre=(CX, CY), smooth=55.0, cut=-0.2)
     anchor('col_bed_m', root, loc=(-0.3, 1.0, 0), radius=1.0)
 
     def lcol(zf, co):
@@ -454,94 +458,167 @@ def build_dep_silica():
 # dep_clay.glb
 # ==============================================================================================
 def build_dep_clay():
-    """Clay as it lies at Mawrth Vallis: the broken edge of a bed of banded mudstone, pale and bluish over tan and
-    rust. One side of it is a face a pace high, where the beds show as bands and ledges; from the top of the face
-    the uppermost bed runs back and down into the ground, dried and cracked. What has come off the face lies at
-    its foot. Six pieces lie out in front (`block_0` .. `block_5`)."""
+    """Clay as it lies at Mawrth Vallis: the broken edge of a slab of banded mudstone. The beds dip gently back
+    into the ground. Along the front the slab is broken off at its joints, and the break shows the beds as bands:
+    a pale bluish cap over cream, tan and rust, the thick beds standing out as ledges and the thin dark seams
+    drawn in under them. Behind the lip the cap bed runs back and down until the sand covers it; toward each end
+    the lip swings back to meet that line and the face runs down to nothing, the lower beds going under one by
+    one. What has come off the face lies at its foot. Six pieces lie out in front (`block_0` .. `block_5`).
+
+    The mesh is laid along the rock, not on a square grid: its columns cross the bank and its rows follow the
+    beds, one at every lip, joint and foot. (On a grid a face this steep had a row to every 8 cm of height, so
+    beds a hand thick came out as blotches, ledges as scallops, and the bottom bed spread into a rust-coloured
+    plinth at each end, where a loaf-shaped top had cut down through every bed to the lowest: a third review's
+    "tray".)"""
     minerals()
     root = part('dep_clay')
     rng = random.Random(63)
     PM = Paint()
-    RUST, TAN, BLUE, PALE, BLUE2, CREAM = (0.43, 0.20, 0.11), (0.46, 0.33, 0.19), (0.25, 0.28, 0.33), (0.50, 0.44, 0.35), (0.34, 0.37, 0.41), (0.52, 0.47, 0.38)
-    STAIN, DUSTY, CRACK = (0.30, 0.20, 0.14), (0.40, 0.26, 0.17), (0.19, 0.14, 0.105)
-    TOP, W, BACK = 1.08, 1.05, 3.0                                            # the face's height, its run, and how far the top runs back
-    beds = strata(rng, TOP * (1.0 + W / BACK) + 0.3, 0.17, 0.30, (RUST, PALE, BLUE, TAN, BLUE2, CREAM))
+    CAP, SEAM, CREAM, TAN, PALE, RUST, UMBER = (0.40, 0.42, 0.44), (0.21, 0.24, 0.29), (0.55, 0.49, 0.38), (0.46, 0.33, 0.20), (0.50, 0.44, 0.35), (0.41, 0.23, 0.15), (0.36, 0.27, 0.19)
+    DUSTY, CRACK, WEATH = (0.40, 0.26, 0.17), (0.19, 0.14, 0.105), (0.55, 0.50, 0.45)
+    # the beds, from the cap down: (thickness, colour, how far the bed under it stands out past its foot)
+    BEDS = ((0.24, CAP, 0.03), (0.07, SEAM, 0.20), (0.20, CREAM, 0.08), (0.11, TAN, 0.18), (0.17, PALE, 0.03), (0.07, SEAM, 0.20), (0.22, RUST, 0.12),
+            (0.20, (0.50, 0.42, 0.31), 0.16), (0.7, UMBER, 0.0))
+    FOOT = []                                                                 # (how far under the top of the cap each bed's foot lies)
+    for th, _, _ in BEDS:
+        FOOT.append((FOOT[-1] if FOOT else 0.0) + th)
+    DIP, YB, C0, XL, XR = 0.34, 3.3, -0.55, 3.35, 3.75                        # the beds' dip; where the cap goes under; the lip; the two ends
+    JOINTS = (-2.75, -1.95, -1.15, -0.5, 0.35, 1.05, 1.9, 2.6, 3.15)          # the joints the slab breaks along
+    BITES = ((-1.95, -1.15, 0.30), (0.35, 1.05, 0.18), (1.9, 2.6, 0.26))      # between two joints, a block gone from the lip: how far back
 
-    def face_y(x):                                                            # where the foot of the face lies: a wavering line, drawn back at its ends
-        return -1.05 + 0.32 * noise3((x, 0.0, 0.0), 0.9, 2.0) + 0.5 * (x / 3.5) ** 2
+    def yb(x):                                                                # where the cap goes under the sand, behind
+        return YB + 0.22 * noise3((x, 3.0, 0.0), 0.7, 4.0) - 0.35 * (x / 3.6) ** 2
 
-    def height(x):                                                            # how high the face stands at x: full in the middle, gone at the ends
-        e = 1.0 - (abs(x) / 3.6) ** 2.4
-        return TOP * max(0.0, e) ** 0.55 * (1.0 + 0.12 * noise3((x, 1.0, 0.0), 1.1, 5.0)) if e > 0 else 0.0
+    def crest(x):                                                             # the lip: a broken line, swinging back to meet yb at each end
+        u = (-x / XL) if x < 0 else (x / XR)
+        c = C0 + 0.14 * noise3((x, 0.0, 0.0), 1.1, 2.0) + 0.04 * noise3((x, 0.0, 0.0), 4.3, 8.0)
+        for x0, x1, back in BITES:
+            c += back * _smooth01(x0 - 0.02, x0 + 0.02, x) * (1.0 - _smooth01(x1 - 0.02, x1 + 0.02, x))
+        b = yb(x)
+        # (one end runs out gently, the other is broken short; past an end the lip is behind that line, and all of it is under the ground)
+        return c + (b - c) * u ** (1.9 if x < 0 else 3.4) if u < 1.0 else b + (u - 1.0) * 4.0
 
-    def level(x, y):
-        """(the stratigraphic level of the surface here: its height, plus what the beds have dipped by this far
-        back; how far back; the dip). The beds dip back, and the top of the bank is one of them."""
-        H = height(x)
-        s_ = y - face_y(x)
-        if H <= 0.0 or s_ < 0.0:
-            return None, s_, 0.0
-        dip = H / BACK
-        raw = H * (1.0 - (1.0 - s_ / W) ** 1.5) if s_ < W else H * (1.0 - (s_ - W) / BACK)
-        raw += 0.035 * noise3((x, y, 0.0), 3.0, 7.0) * min(1.0, s_ / 0.3)
-        return raw + dip * s_, s_, dip
+    def sand(x, y):                                                           # how deep the sand lies over the rock: over the ends, and in drifts
+        u = (-x / XL) if x < 0 else (x / XR)
+        return 0.36 * _smooth01(0.45, 1.0, u) ** 1.5 + 0.07 * max(0.0, noise3((x, y, 0.0), 0.9, 31.0))
 
-    def hf(x, y):
-        lv, s_, dip = level(x, y)
-        if lv is None:
-            return -0.03 - 1.5 * max(0.0, -s_) if height(x) > 0 else -0.3
-        # (toward its ends, where the face runs down to nothing, the ledges run out too: cut to the last, a bed a
-        #  hand high stood out of the sand as a fan of thin fins)
-        h = lv + (terrace(beds, lv, 0.45)[0] - lv) * _smooth01(0.18, 0.5, height(x)) - dip * s_
-        if s_ > W:                                                            # the top: dried, and cracked into plates
-            h -= 0.028 * (1.0 - _smooth01(0.0, 0.05, vor(x, y, 0.38, 9.0, 0.42)[0]))
-        return h - 0.02
+    def lean(x, y):                                                           # nothing in rock is ruled: the joints waver and lean, and the mesh with them
+        return 0.13 * noise3((x * 0.35, y * 0.9, 0.0), 1.0, 21.0) + (y - C0) * 0.07 * noise3((x * 0.5, 0.0, 0.0), 1.0, 5.0)
 
-    def cf(x, y, h):
-        lv, s_, dip = level(x, y)
-        if lv is None:
-            return STAIN
-        hh, k, t = terrace(beds, lv, 0.45)
-        face = mix(beds[k][2], mix(beds[k][2], (0.55, 0.50, 0.45), 0.3), 0.5 + 0.5 * noise3((x, y, hh), 3.0, 2.0))
-        tread = mix(beds[max(0, k - 1)][2], DUSTY, 0.5)                        # dust lies on every ledge
-        cc = mix(tread, face, _smooth01(0.30, 0.50, t))
-        cc = mix(cc, CRACK, 0.3 * _smooth01(0.36, 0.45, t) * (1.0 - _smooth01(0.45, 0.58, t)))          # the joint where a bed sits on the one below
-        if s_ > W:
-            edge = vor(x, y, 0.38, 9.0, 0.42)[0]
-            cc = mix(mix(beds[k][2], DUSTY, 0.45 + 0.25 * noise3((x, y, 0.0), 1.5, 3.0)), CRACK, 0.6 * (1.0 - _smooth01(0.0, 0.05, edge)))
-        return mix(STAIN, cc, _smooth01(-0.02, 0.10, h))
-    patch('bank.beds', root, 4.1, 124, hf, cf, PM, centre=(0.0, 1.0), smooth=46.0)
-    anchor('col_bank_l', root, loc=(-1.9, 0.2, 0), radius=1.0)
-    anchor('col_bank_m', root, loc=(0.0, 0.0, 0), radius=1.2)
-    anchor('col_bank_r', root, loc=(1.9, 0.2, 0), radius=1.0)
+    def joint(x):
+        return max(0.0, max(1.0 - abs(x - xj) / 0.02 for xj in JOINTS))
 
-    # ---- what has come off the face, against its foot ----
+    def face(x):
+        """The broken face at x, from the lip down: [(how far out from the lip, how far under the top of the cap,
+        colour)]. A bed is a riser, nearly upright, and the ledge at its foot is the top of the bed under it."""
+        rows, r, sd, jn = [], 0.0, 0.0, joint(x)
+        inn = 0.03 * jn                                                       # (a joint is a notch down the face)
+        for k, (th, col, ledge) in enumerate(BEDS):
+            n1 = 0.5 + 0.5 * noise3((x, k * 3.1, 0.0), 0.9, 11.0 + k)
+            n2 = 0.5 + 0.5 * noise3((x, k * 1.7, 5.0), 2.3, 3.0 + k)
+            bat = th * (0.14 + 0.14 * n2)
+            w = mix(mix(col, WEATH, 0.08 + 0.22 * n2), CRACK, 0.55 * jn)
+            rows.append((r + 0.004 + inn, sd + 0.012, w))
+            if th >= 0.15:
+                rows.append((r + 0.004 + bat * 0.5 + 0.010 * (n1 - 0.5) + inn, 0.5 * (sd + FOOT[k]), mix(w, col, 0.5)))
+            rows.append((r + bat + inn, FOOT[k] - 0.012, mix(w, CRACK, 0.22)))
+            r += bat
+            below = BEDS[k + 1][1] if k + 1 < len(BEDS) else UMBER
+            rows.append((r + 0.008 + inn, FOOT[k], mix(below, CRACK, 0.6)))   # the joint it sits on: a dark line under every bed
+            tr = ledge * (0.4 + 1.0 * n1)
+            # (the ledge is not the bedding plane, which rises toward the front: it is worn level, and falls a little)
+            sd = FOOT[k] + (DIP + 0.03) * tr + 0.012
+            rows.append((max(r + tr, r + 0.014 + inn), sd, mix(mix(below, DUSTY, 0.55), CRACK, 0.3 * jn)))      # dust lies on every ledge
+            r += tr
+        rows.append((r + 0.06, sd + 0.45, UMBER))
+        return rows
+
+    def column(x):
+        """The rock along one line across the bank, from where the cap has gone under the sand behind, forward over
+        the cap to the lip and down the face: [((x, y, z), colour)]."""
+        c, b, jn = crest(x), yb(x), joint(x)
+        hc = DIP * (b - c)
+        run = 0.10 + 0.5 * hash01(round(x, 2), 4.0)                           # (how far back over the cap this joint runs)
+        out = []
+        for j in range(NT + 1):
+            t = 1.12 * (1.0 - j / NT)
+            y = c + t * (b - c)
+            on = jn * (1.0 if t < run else 0.0)
+            z = hc * (1.0 - t)
+            if hc > 0.0:
+                z += (0.022 * noise3((x, y, 0.0), 2.2, 7.0) - 0.03 * _smooth01(0.1, 0.5, noise3((x, y, 0.0), 0.8, 13.0))) * _smooth01(0.0, 0.2, hc * (1.0 - t)) * min(1.0, t * 6.0) - 0.03 * on
+            z -= sand(x, y)
+            dust = max(0.0, min(1.0, 0.12 + 0.3 * (0.5 + 0.5 * noise3((x, y, 0.0), 1.3, 3.0)) + 0.8 * max(0.0, t) ** 1.6 + 1.2 * (1.0 - _smooth01(0.0, 0.12, z))))
+            cc = mix(mix(mix(CAP, WEATH, 0.12 + 0.2 * (0.5 + 0.5 * noise3((x, y, 0.0), 3.0, 2.0))), DUSTY, dust), CRACK, 0.5 * on)
+            out.append(((x + lean(x, y), y, z), cc))
+        for r, sd, cc in face(x):
+            y = c - r
+            z = hc + DIP * r - sd - sand(x, y)
+            out.append(((x + lean(x, y), y, max(-0.5, z)), mix(DUSTY, cc, _smooth01(-0.02, 0.07, z))))
+        return out
+
+    def foot_y(x):                                                            # where the face meets the ground at x (None where it does not stand)
+        col_ = column(x)
+        if col_[NT][0][2] <= 0.12:
+            return None
+        for co, _ in col_[NT + 1:]:
+            if co[2] <= 0.0:
+                return co[0], co[1]
+        return None
+
+    xs = [x for x in (-XL * 1.1 + 0.09 * i for i in range(int((XL + XR) * 1.1 / 0.09) + 2)) if all(abs(x - xj) > 0.035 for xj in JOINTS)]
+    xs = sorted(xs + [xj + d for xj in JOINTS for d in (-0.02, 0.0, 0.02)])
+    NT = 26
+    bm = bm_new()
+    cols = [column(x) for x in xs]
+    vs = {}
+    for i in range(len(cols) - 1):
+        for j in range(len(cols[0]) - 1):
+            q4 = ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))
+            if all(cols[a][b_][0][2] <= 0.0 for a, b_ in q4):                  # (wholly under the ground: nothing to draw)
+                continue
+            for q in q4:
+                if q not in vs:
+                    co, cc = cols[q[0]][q[1]]
+                    vs[q] = bm.verts.new(co)
+                    PM.add(vs[q].co, cc)
+            bm.faces.new([vs[q] for q in q4])
+    if os.environ.get('TRIS'):
+        print(f'    {"bank.beds":28s} {len(bm.faces) * 2:6d}')
+    mesh_obj('bank.beds', bm, 'mineral', parent=root, smooth_angle=46.0)
+    for nm, x, y, r in (('l', -1.9, 0.1, 1.0), ('m', 0.0, -0.1, 1.2), ('r', 2.0, 0.1, 1.0), ('lb', -1.3, 1.5, 1.0), ('mb', 0.3, 1.6, 1.15), ('rb', 1.8, 1.5, 1.0)):
+        anchor(f'col_bank_{nm}', root, loc=(x, y, 0), radius=r)
+
+    # ---- what has come off the face, against its foot: pieces of the beds it shows ----
     K = Kit('bank', root)
-    SCREE = K.bm('mineral', smooth=34.0)
+    SCREE = K.bm('mineral', smooth=75.0)
 
     def bed_col(base):
-        return lambda zf, co: mix(mix(base, CRACK, 0.45), base, _smooth01(0.0, 0.45, zf))
+        return lambda zf, co: mix(mix(base, CRACK, 0.4), base, _smooth01(0.0, 0.45, zf))
 
     def at_foot():
-        x = rng.uniform(-3.0, 3.0)
-        return x, face_y(x) - rng.uniform(-0.12, 0.85) ** 1.0
-    for i in range(34):
-        rubble(SCREE, rng, 1, at_foot, PM, bed_col(rng.choice((RUST, TAN, BLUE, PALE, BLUE2))), size=(0.05, 0.17), flat=(0.3, 0.55))
+        while True:
+            f = foot_y(rng.uniform(-2.9, 3.2))
+            if f is not None:
+                return f[0], f[1] - rng.uniform(-0.06, 0.75)
+    for i in range(24):
+        rubble(SCREE, rng, 1, at_foot, PM, bed_col(rng.choice((CAP, CREAM, TAN, PALE, CAP, CREAM))), size=(0.05, 0.15), flat=(0.45, 0.7), subdiv=2)
     K.finish()
 
-    # ---- six pieces lying out in front: the game takes these ----
-    for k, (sx, sy, big) in enumerate(((-2.7, -2.35, 0.30), (-1.6, -3.1, 0.24), (-0.6, -2.5, 0.33), (0.6, -3.2, 0.25), (1.6, -2.45, 0.31), (2.7, -2.9, 0.26))):
+    # ---- six pieces lying out in front: the game takes these. Blocks off the cap and the cream bed under it. ----
+    for k, (sx, sy, big) in enumerate(((-2.7, -2.75, 0.16), (-1.6, -3.4, 0.13), (-0.6, -2.9, 0.17), (0.6, -3.5, 0.13), (1.6, -2.85, 0.16), (2.7, -3.2, 0.14))):
         rk = random.Random(700 + k)
 
         def piece(bm, at, rk=rk, k=k, big=big):
-            chunk(bm, rk, big, rk.uniform(0.34, 0.46), at, PM, bed_col((RUST, PALE, BLUE2, TAN, RUST, CREAM)[k]), rough=0.2)
-            if rk.random() < 0.7:                                              # and a smaller one fallen by it
-                a, d = rk.uniform(0, TAU), big + rk.uniform(0.12, 0.2)
-                more = chunk(bm, rk, big * rk.uniform(0.4, 0.55), 0.4, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, bed_col((TAN, BLUE2, PALE, RUST, CREAM, TAN)[k]), rough=0.2)
+            base = (CAP, CREAM, PALE, CAP, CREAM, TAN)[k]
+            chunk(bm, rk, big, rk.uniform(0.6, 0.8), at, PM, bed_col(base), rough=0.16)
+            for _ in range(rk.randint(2, 3)):                                  # and what broke off it
+                a, d = rk.uniform(0, TAU), big * 1.5 + rk.uniform(0.04, 0.16)
+                more = chunk(bm, rk, big * rk.uniform(0.35, 0.6), 0.6, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, bed_col(mix(base, PALE, 0.4)), rough=0.16)
                 bmesh.ops.transform(bm, matrix=T(d * cos(a), d * sin(a), 0.0), verts=more)
-        loose(root, k, (sx, sy), piece, smooth=34.0)
+        loose(root, k, (sx, sy), piece, smooth=75.0)
 
-    return finish(root, 'dep_clay', samples=32, distance=0.7, tint=make_tint({'mineral': PM}, TAN, None, floor=0.45))
+    return finish(root, 'dep_clay', samples=32, distance=0.7, tint=make_tint({'mineral': PM}, CAP, None, floor=0.45))
 
 
 # ==============================================================================================
@@ -578,7 +655,7 @@ def build_dep_sulfate():
         ca, sa = cos(rad(28)), sin(rad(28))
         u, v = (x - CX) * ca + (y - CY) * sa, -(x - CX) * sa + (y - CY) * ca
         d = sqrt((u / 2.75) ** 2 + (v / 2.0) ** 2)
-        d *= 1.0 + 0.22 * noise3((x, y, 0.0), 0.8, 3.0) + 0.10 * noise3((x, y, 0.0), 2.2, 9.0)
+        d *= 1.0 + 0.30 * noise3((x, y, 0.0), 0.7, 3.0) + 0.12 * noise3((x, y, 0.0), 2.0, 9.0)
         ang = math.atan2(y - CY, x - CX)
         bite = math.exp(-((((ang - rad(-140) + pi) % TAU) - pi) / 0.5) ** 2)
         return d * (1.0 + 0.55 * bite)
@@ -596,8 +673,10 @@ def build_dep_sulfate():
     def hf(x, y):
         lv, p = level(x, y)
         if lv is None:
-            return 2.5 * p - 0.02
-        return terrace(beds0, lv + 0.6, 0.34)[0] - 0.6 - DIPX * (x - CX) - DIPY * (y - CY) - 0.02
+            return 3.0 * p - 0.02                                              # (on down, at the slope it met the ground with)
+        tilt = DIPX * (x - CX) + DIPY * (y - CY)
+        raw = lv - tilt
+        return raw + (terrace(beds0, lv + 0.6, 0.34)[0] - 0.6 - tilt - raw) * _smooth01(0.08, 0.34, raw) - 0.02
 
     def cf(x, y, h):
         lv, p = level(x, y)
@@ -609,12 +688,12 @@ def build_dep_sulfate():
         cc = mix(tread, face, _smooth01(0.22, 0.40, t))
         cc = mix(cc, JOINT, 0.3 * _smooth01(0.26, 0.34, t) * (1.0 - _smooth01(0.34, 0.46, t)))
         return mix(STAIN, cc, _smooth01(-0.02, 0.12, h))
-    patch('butte.beds', root, 3.5, 112, hf, cf, PM, centre=(CX, CY), smooth=46.0)
+    patch('butte.beds', root, 3.5, 112, hf, cf, PM, centre=(CX, CY), smooth=46.0, cut=-0.4)
     anchor('col_butte', root, loc=(CX, CY, 0), radius=1.9)
 
     # ---- what has come down: a heap under the bite, and stones all round its foot ----
     K = Kit('butte', root)
-    SCREE = K.bm('mineral', smooth=34.0)
+    SCREE = K.bm('mineral', smooth=60.0)
 
     def piece_col(base):
         return lambda zf, co: mix(mix(STAIN, base, _smooth01(0.0, 0.4, zf)), GYPSUM, 0.35 * _smooth01(0.88, 1.0, zf))
@@ -636,7 +715,7 @@ def build_dep_sulfate():
     K.finish()
 
     # ---- six pieces lying out in front: the game takes these ----
-    for k, (sx, sy, big) in enumerate(((-2.8, -1.7, 0.27), (-1.9, -2.7, 0.22), (-0.7, -2.2, 0.30), (0.5, -3.0, 0.23), (1.6, -2.3, 0.28), (2.8, -2.6, 0.22))):
+    for k, (sx, sy, big) in enumerate(((-2.8, -1.7, 0.16), (-1.9, -2.7, 0.13), (-0.7, -2.2, 0.17), (0.5, -3.0, 0.13), (1.6, -2.3, 0.16), (2.8, -2.6, 0.13))):
         rk = random.Random(800 + k)
 
         def piece(bm, at, rk=rk, big=big):
@@ -645,7 +724,7 @@ def build_dep_sulfate():
                 a, d = rk.uniform(0, TAU), big + rk.uniform(0.1, 0.2)
                 more = chunk(bm, rk, big * rk.uniform(0.4, 0.55), 0.6, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, piece_col(mix(STRAW, CREAM, rk.random())), rough=0.22)
                 bmesh.ops.transform(bm, matrix=T(d * cos(a), d * sin(a), 0.0), verts=more)
-        loose(root, k, (sx, sy), piece, smooth=34.0)
+        loose(root, k, (sx, sy), piece, smooth=60.0)
 
     return finish(root, 'dep_sulfate', samples=32, distance=0.9, tint=make_tint({'mineral': PM}, CREAM, None, floor=0.45))
 
@@ -667,7 +746,7 @@ def build_dep_salt():
 
     def reach(x, y):
         d = sqrt(((x - CX) / 3.6) ** 2 + ((y - CY) / 3.1) ** 2)
-        return d * (1.0 + 0.09 * noise3((x, y, 0.0), 0.8, 6.0) + 0.04 * noise3((x, y, 0.0), 2.0, 2.0))
+        return d * (1.0 + 0.16 * noise3((x, y, 0.0), 0.8, 6.0) + 0.08 * noise3((x, y, 0.0), 2.0, 2.0))
 
     cells = {}
 
@@ -685,25 +764,27 @@ def build_dep_salt():
     def hf(x, y):
         r_ = reach(x, y)
         if r_ >= 1.06:
-            return -0.08
-        alive = 1.0 - _smooth01(0.72, 1.0, r_)                                # the ridges sink toward the pan's edge, and are gone
+            return -0.3
+        # (the ridges stop short at the pan's edge: sinking away over a pace, each ended in a long point)
+        alive = 1.0 - _smooth01(0.88, 0.99, r_)
         edge, ij, p = cell(x, y)
-        ridge = math.exp(-(edge / 0.085) ** 2)
+        # (a ridge is a hand and a half wide: narrower than three squares of the grid, its flanks met the sand in teeth)
+        ridge = math.exp(-(edge / 0.125) ** 2)
         lift = 0.075 + 0.05 * noise3((x, y, 0.0), 1.4, 4.0)                   # higher here, lower there
-        dish = (0.022 if crusted(ij, p) else -0.05) + 0.007 * noise3((x, y, 0.0), 7.0, 1.0)
+        dish = (0.022 if crusted(ij, p) else -0.032) + 0.007 * noise3((x, y, 0.0), 7.0, 1.0)
         # (a ridge is as high from either side: where one polygon's ridge was cut off at its neighbour's edge, the
         #  cut was a wall, and a wall drawn on a grid is a saw)
-        return dish + (lift * alive + 0.022 - dish) * ridge - 0.085 * (1.0 - alive)
+        return dish + (lift * alive + 0.022 - dish) * ridge - 0.25 * (1.0 - alive)
 
     def cf(x, y, h):
         edge, ij, p = cell(x, y)
         dust = 0.35 + 0.6 * hash01(ij[0], ij[1], 6.0)
-        cc = mix(WHITE, mix(DISH, DUSTY, dust * _smooth01(0.12, 0.34, edge)), _smooth01(0.05, 0.17, edge))
+        cc = mix(WHITE, mix(DISH, DUSTY, dust * _smooth01(0.16, 0.36, edge)), _smooth01(0.08, 0.22, edge))
         return mix(EDGE, cc, _smooth01(-0.02, 0.03, h))
-    patch('pan.crust', root, 4.0, 116, hf, cf, PM, centre=(CX, CY), smooth=60.0, cut=-0.02)
+    patch('pan.crust', root, 4.0, 128, hf, cf, PM, centre=(CX, CY), smooth=60.0, cut=-0.2)
 
     # ---- six slabs of crust levered up along the front: the game takes these ----
-    for k, (sx, sy, big) in enumerate(((-2.9, -2.1, 0.27), (-1.8, -2.95, 0.22), (-0.6, -2.7, 0.29), (0.6, -3.25, 0.21), (1.8, -2.75, 0.26), (3.0, -2.2, 0.22))):
+    for k, (sx, sy, big) in enumerate(((-2.9, -2.1, 0.17), (-1.8, -2.95, 0.14), (-0.6, -2.7, 0.18), (0.6, -3.25, 0.14), (1.8, -2.75, 0.17), (3.0, -2.2, 0.14))):
         rk = random.Random(900 + k)
 
         def crust(bm, at, rk=rk, big=big):
@@ -712,7 +793,7 @@ def build_dep_salt():
             a, d = rk.uniform(0, TAU), big + rk.uniform(0.1, 0.18)
             more = chunk(bm, rk, big * rk.uniform(0.5, 0.7), 0.3, (at[0] + d * cos(a), at[1] + d * sin(a), 0.0), PM, col, rough=0.2)
             bmesh.ops.transform(bm, matrix=T(d * cos(a), d * sin(a), 0.0), verts=more)
-        loose(root, k, (sx, sy), crust, smooth=40.0)
+        loose(root, k, (sx, sy), crust, smooth=60.0)
 
     return finish(root, 'dep_salt', samples=32, distance=0.4, tint=make_tint({'mineral': PM}, WHITE, None, floor=0.55))
 

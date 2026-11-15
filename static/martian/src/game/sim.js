@@ -1,5 +1,5 @@
 import { comfortCheer } from './comforts.js';
-import { updateWorks } from './works.js';
+import { padDrop, solarFields, standing, updateReserve, updateWorks, waterCap } from './works.js';
 import { CROPS, MORALE_WORD, breakfast, breakfastsLeft, cheer, foodTotal, healRate, hearMusic, moraleBand } from './farm.js';
 import * as THREE from 'three';
 import { BAL, S, isBase, machineEff, roverPowerCap, suitCap } from './state.js';
@@ -98,7 +98,7 @@ export function warnLow(key, val, thresh, msg, voice, o) {
 export function avgPanelOutput() {
   let s = 0;
   for (const p of World.panels) s += 1 - clamp(p.dust, 0, 1);
-  let base = s / World.panels.length;
+  let base = (s / World.panels.length) * (1 + solarFields());          // (a base's solar fields: each as much again, and as dusty)
   // deployed solar panels near the hab boost generation
   for (const b of World.builtMeshes)
     if (b.kind === 'solar' && groundDist(b.group.position, World.hab.position) < 150) base += 0.12;
@@ -121,6 +121,7 @@ export function applyRates(dt, sleeping) {
   let rtgGen = S.upgrades.rtg ? 6 / SL : 0;
   S.power = clamp(S.power + (gen + rtgGen - (baseDraw / SL) * m) * dt, 0, BAL.powerMax);
   updateWorks(dt);                                        // (a base's kiln, smelter and glassworks draw on it too)
+  updateReserve();                                        // (and its battery banks take up the slack)
   const powered = S.power > 0.5;
   // --- panel dust ---
   const dustMult = S.upgrades.wiper ? 0.3 : 1;
@@ -161,7 +162,7 @@ export function applyRates(dt, sleeping) {
   // --- water ---
   let wd = -(BAL.waterDrain / SL) * m;
   if (powered) wd += (BAL.waterRecl / SL) * machineEff('reclaimer');
-  S.water = clamp(S.water + wd * dt, 0, BAL.waterMax);
+  S.water = clamp(S.water + wd * dt, 0, waterCap());
   // --- crops (greenhouse plots pause in a local storm? no — they're sealed domes) ---
   const dtSol = dt / SL;
   for (const pl of World.plots) {
@@ -305,8 +306,10 @@ export function newSol() {
   if (ate === 'skipped') log('No breakfast. The stomach files a formal complaint.', 'sys');
   const sky = S.storm.i > 0.5 ? -2 : 0;
   if (sky) cheer(sky);                                   // another morning with no sky
-  cheer(comfortCheer());                                 // what he has made of the place
-  dawnAccount = { sol: S.sol, ate, took: larder - foodTotal(), alone, meal, sky, home: comfortCheer() };
+  const rooms = isBase() ? 2 * standing('quarters') : 0;  // (a base's living quarters: somewhere that is not the Hab)
+  cheer(comfortCheer() + rooms);                         // what he has made of the place
+  dawnAccount = { sol: S.sol, ate, took: larder - foodTotal(), alone, meal, sky, home: comfortCheer() + rooms };
+  if (isBase()) padDrop();
   // awake at dawn (up all night, or camped far from home), nobody shows him the night's account: say it
   if (!S.sleeping && ate !== 'skipped') toast(`SOL ${S.sol}`, 'Dawn', `Breakfast: ${ate} (${meals(dawnAccount.took)}, ${foodTotal()} left). Another sol alone: morale ${Math.round(S.morale)}.`, { yields: true });
   if (!S.flags.moraleTold) {

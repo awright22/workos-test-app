@@ -212,6 +212,73 @@ const more = await g.eval((G) => {
   return { waiting, going, kept, back, regolith: G.S.inv.regolith, kilns: G.World.builtMeshes.filter((x) => x.kind === 'kiln').length };
 });
 check('with no power to spare the job waits; working, it draws on the Hab; the save keeps it; stopped, the unfired soil comes back', more.waiting.t === 0 && !more.waiting.working && /waiting for hab power/i.test(more.waiting.line) && more.going.t > 5 && more.going.working && more.going.draw > 0.6 && more.going.draw < 0.9 && more.kept && more.kept.left === 3 && more.back && more.back.left === 3 && more.regolith === 6 && more.kilns === 1, more);
+
+// ---- the buildings: what is built of what the works make, and what each does for the Hab
+const bld = await g.eval(async (G) => {
+  const out = {};
+  // a water tank: the tanks hold 240 L more, each, and no more than three are any use
+  out.cap0 = G.works.waterCap();
+  G.build('tank', 36, 30, 0);
+  out.cap1 = G.works.waterCap();
+  G.S.water = 900; G.tick(0.05, 2); out.water = Math.round(G.S.water);
+  for (let i = 0; i < 3; i++) G.build('tank', 36 + 6 * (i + 1), 44, 0);
+  out.cap4 = G.works.waterCap();
+  // a solar field: at noon the Hab gains twice as fast (measured over ten seconds, the works idle)
+  for (const b of G.World.builtMeshes) if (b.def && b.def.jobs) G.works.stopJob(b);
+  G.setLocalTime(12.5); G.tick(0.05, 4);
+  const gain = () => { G.S.power = 40; G.S.base.reserve = 0; const p = G.S.power; G.tick(0.5, 20); return G.S.power - p; };
+  out.gain0 = +gain().toFixed(2);
+  G.build('solarField', 60, 26, 0);
+  out.gain1 = +gain().toFixed(2);
+  // a battery bank: what the Hab has over nine tenths goes into reserve, and comes back when it is under three
+  G.build('battery', 30, 44, 0);
+  out.rcap = G.works.reserveCap();
+  G.S.base.reserve = 0; G.S.power = 99; G.tick(0.05, 2);
+  out.kept = { power: Math.round(G.S.power), reserve: Math.round(G.S.base.reserve) };
+  G.S.base.reserve = 60; G.S.power = 10; G.tick(0.05, 2);
+  out.back = { power: Math.round(G.S.power), reserve: Math.round(G.S.base.reserve) };
+  // a farm dome is a greenhouse, by another road
+  const plots = G.World.plots.length;
+  const dome = G.build('dome', 70, 50, 0);
+  out.dome = { kind: dome.kind, plots: G.World.plots.length - plots };
+  // the save keeps the reserve and what stands
+  G.saveGame();
+  const d = JSON.parse(localStorage.getItem('stranded2-save-base'));
+  out.saved = { reserve: Math.round(d.base.reserve), kinds: [...new Set(d.built.map((b) => b.kind))].sort().join(',') };
+  return out;
+});
+check('a water tank holds 240 L more, and three are as many as are any use', bld.cap0 === 120 && bld.cap1 === 360 && bld.water === 360 && bld.cap4 === 840, bld);
+check('a solar field: the Hab gains power at noon about twice as fast', bld.gain0 > 0.5 && bld.gain1 > bld.gain0 * 1.6, { gain0: bld.gain0, gain1: bld.gain1 });
+check('a battery bank keeps what is over nine tenths and gives it back under three', bld.rcap === 100 && bld.kept.power <= 91 && bld.kept.reserve >= 8 && bld.back.power === 30 && bld.back.reserve === 40, { kept: bld.kept, back: bld.back });
+check('a farm dome is a greenhouse with four beds; the save keeps the reserve and what stands', bld.dome.kind === 'greenhouse' && bld.dome.plots === 4 && bld.saved.reserve === 40 && /battery/.test(bld.saved.kinds) && /solarField/.test(bld.saved.kinds) && /tank/.test(bld.saved.kinds), { dome: bld.dome, saved: bld.saved });
+const last = await g.eval((G) => {
+  const out = {};
+  // a comms tower: every deposit goes on the map
+  out.found0 = Object.keys(G.S.base.found).length;
+  G.build('tower', 52, 62, 0); G.tick(0.5, 6);
+  out.found1 = Object.keys(G.S.base.found).length;
+  // a landing pad: a drop ten sols after it is laid, on the pad, with circuit boards in it; and no second while the first stands
+  const pad = G.build('pad', 84, 30, 0);
+  out.first = G.works.padDrop();
+  const pods = G.World.pods.length;
+  G.S.sol += 10;
+  const pod = G.works.padDrop();
+  out.drop = pod ? { circuit: pod.loot.circuit, away: Math.round(pod.group.position.distanceTo(pad.group.position) * 10) / 10, pods: G.World.pods.length - pods } : null;
+  G.S.sol += 10;
+  out.second = G.works.padDrop();
+  // living quarters stand
+  G.build('quarters', 100, 60, 0);
+  out.quarters = G.works.standing('quarters');
+  return out;
+});
+check('a comms tower puts every deposit on the map', last.found0 < 47 && last.found1 === 47, { found0: last.found0, found1: last.found1 });
+check('a landing pad: a supply drop on it ten sols on, with circuit boards; none while one stands unopened', last.first === null && last.drop && last.drop.circuit === 2 && last.drop.away < 1 && last.drop.pods === 1 && last.second === null && last.quarters === 1, last);
+await g.eval((G) => { G.paused = false; G.tick(0.05, 4); });
+await g.page.keyboard.press('c');
+await g.page.locator('#mg-colony [data-tab="base"]').click();
+const tab2 = (await g.page.locator('#mg-base').innerText()).replace(/\s+/g, ' ');
+check('the Base tab lists the buildings, what each does, and says when one has all the use it can be', /buildings/i.test(tab2) && /solar field/i.test(tab2) && /battery bank/i.test(tab2) && /farm dome/i.test(tab2) && /3 is as many as are any use/i.test(tab2) && /holds 240 l more water/i.test(tab2) && /living quarters/i.test(tab2) && /comms tower/i.test(tab2) && /landing pad/i.test(tab2), tab2.slice(-520));
+await g.page.keyboard.press('Escape');
 const errsBase = g.errors.slice();
 await g.close();
 

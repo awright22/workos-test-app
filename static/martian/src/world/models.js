@@ -137,8 +137,8 @@ const DUST = {
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
   // (a base's mineral deposits: dust on their ledges and in their hollows, as on every rock here; their faces show their colour)
-  dep_hematite: 0.3, dep_silica: 0.26, dep_clay: 0.4, dep_sulfate: 0.4, dep_salt: 0.22,
-  bs_kiln: 0.3, bs_smelter: 0.3, bs_glassworks: 0.26,
+  dep_hematite: 0.3, dep_silica: 0.26, dep_clay: 0.3, dep_sulfate: 0.4, dep_salt: 0.22,
+  bs_kiln: 0.3, bs_smelter: 0.3, bs_glassworks: 0.26, bs_solar: 0.24, bs_battery: 0.26, bs_tank: 0.3, bs_quarters: 0.34, bs_tower: 0.22, bs_pad: 0.3,
   crop_radish: 0, crop_soy: 0, crop_tomato: 0, crop_lettuce: 0, hab_comforts: 0,
 };
 /** Materials that are bare rock (the mineral deposits of Base mode): given a rock's grain and blotches, and dust in its hollows. */

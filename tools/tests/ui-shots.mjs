@@ -436,7 +436,7 @@ export async function walk(size, o = {}) {
   await bshot('base-map', 900);
   await bpage.keyboard.press('Escape');
   // a kiln standing, its sheet idle and then with a job on
-  await b.eval(async (G) => { G.tpLocal(26, 22, 0); await G.settle(); G.build('kiln', 26, 16, 0); G.S.power = 80; G.tick(0.05, 10); G.hold(0.7); });
+  await b.eval(async (G) => { G.tpLocal(26, 22, 0); await G.settle(); G.build('kiln', 26, 18.4, 0); G.S.power = 80; G.tick(0.05, 10); G.hold(0.7); });      // (within reach of it: its prompt is offered inside five metres)
   await bpage.waitForSelector('.sheet.work', { timeout: 60000 });
   await bshot('base-work-sheet', 400);
   await bclick('.sheet.work [data-run="brick"][data-n="3"]');

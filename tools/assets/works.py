@@ -16,7 +16,8 @@ What they are (static/martian/src/game/base.js says what each makes):
 One man built each of them out of what he quarried and what he salvaged, so they are masonry with machinery
 bolted on: dark basalt and red brick, steel fittings, a grey control box with a lamp and a cable that runs off
 toward the Hab. Each has a fire: every surface that glows when it is working is in the material `light_amber`
-(the game turns it up while a job runs and down to nothing when it stands idle). Each has a part `stock`, the
+(the game turns it up while a job runs and down to nothing when it stands idle), or the dimmer `light_ember`
+for what glows dull. Anchor `flue`, where there is one, is where its smoke comes out. Each has a part `stock`, the
 product stacked beside it, which the game shows when there is some in the stores. Anchor `col_body` is the circle
 he cannot walk into; anchor `fire` is where the game hangs its lamp.
 
@@ -40,6 +41,25 @@ def masonry():
     mat('mortar', color=(0.34, 0.27, 0.21), metallic=0.0, roughness=1.0)
     mat('pig_iron', color=(0.13, 0.13, 0.14), metallic=0.85, roughness=0.55)
     mat('void', color=(0.0, 0.0, 0.0), metallic=0.0, roughness=1.0)
+    # what glows dull: iron cooling in a mould, the mouth of a glass furnace (the game drives it with `light_amber`)
+    mat('light_ember', color=(1.0, 0.42, 0.08), metallic=0.0, roughness=0.5, emissive=(1.0, 0.36, 0.05), strength=1.5)
+    # (bright in itself: as a true mirror it showed this renderer's dim surroundings, and a "dark matte copper-brown" dish)
+    mat('mirror', color=(0.80, 0.85, 0.92), metallic=0.3, roughness=0.2)
+
+
+def joints(K, face, w, h0, h1, course=0.112, pitch=0.24, skip=None):
+    """The upright joints of a brick wall, on one flat face of it: `face` is a matrix whose x runs along the wall,
+    y is up and z is out of it. Courses are `course` high from h0 to h1, bricks `pitch` long, each course broken
+    half a brick on from the one under it. skip(x, y) -> True leaves a place out (an arch, a door)."""
+    k, y = 0, h0
+    while y < h1 - 0.01:
+        x = -w / 2 + (pitch / 2 if k % 2 else pitch)
+        while x < w / 2 - 0.03:
+            if not (skip and skip(x, y + course / 2)):
+                K.quad('mortar', (x - 0.006, y + 0.008, 0.003), (x + 0.006, y + 0.008, 0.003), (x + 0.006, y + course - 0.012, 0.003), (x - 0.006, y + course - 0.012, 0.003), face)
+            x += pitch
+        y += course
+        k += 1
 
 
 def control_box(K, at, yaw=0.0, lead=(2.6, 0.9)):
@@ -132,11 +152,13 @@ def build_bs_kiln():
     for i in range(6):                                                         # what is being fired: bricks stood on end in the glow
         K.box('painted_dark', (0.1, 0.07, rng.uniform(0.24, 0.34)), (-0.34 + 0.135 * i, -(R0 - 0.02), 0.36), None)
     K.box('brick', (1.05, 0.5, 0.1), (0, -(R0 + 0.05), 0.19), None, bevel=0.01)                             # the hearth's sill
-    anchor('fire', root, loc=(0, -(R0 + 0.3), 0.6))
+    anchor('fire', root, loc=(0, -(R0 + 0.35), 0.3))
+    anchor('flue', root, loc=(0, 0, H + 0.9))
     # ---- the door, open on its hinge, to the right of the mouth ----
     D = R('Z', 270 + MOUTH + 9) @ T(R0 + 0.06, 0, 0.0) @ R('Z', 58)
-    K.box('steel', (0.035, 0.74, 0.84), (0.0, -0.37, 0.58), D, bevel=0.008)
-    K.box('painted_dark', (0.02, 0.6, 0.7), (0.022, -0.37, 0.58), D)
+    K.box('painted_dark', (0.035, 0.74, 0.84), (0.0, -0.37, 0.58), D, bevel=0.008)
+    K.box('titanium', (0.02, 0.6, 0.7), (0.022, -0.37, 0.58), D)
+    K.bolt_circle('steel', 0.2, 6, 0.014, 0.01, D @ T(-0.018, -0.37, 0.58) @ AX['X'] @ R('X', 180))
     for zz in (0.3, 0.86):
         K.box('steel', (0.05, 0.1, 0.05), (0.0, 0.02, zz), D)
     K.handle('steel', (0.04, -0.62, 0.45), (0.04, -0.62, 0.7), 0.06, 0.012, 6, (1, 0, 0), D)
@@ -178,6 +200,11 @@ def build_bs_smelter():
     # ---- the foot: four courses of brick, a step in half way up ----
     K.box('brick', (2 * FOOT, 2 * FOOT, HF * 0.5), (0, 0, HF * 0.25), None, bevel=0.012)
     K.box('brick', (2 * FOOT - 0.16, 2 * FOOT - 0.16, HF * 0.5), (0, 0, HF * 0.75), None, bevel=0.012)
+    for side in range(4):                                                      # the foot's upright joints
+        Fm = R('Z', 90.0 * side) @ T(0, -FOOT - 0.002, 0) @ R('X', 90)
+        joints(K, Fm, 2 * FOOT, 0.0, HF * 0.5, course=HF * 0.25, pitch=0.3, skip=(lambda x, y: abs(x) < 0.34 and y < 0.5) if side == 0 else None)
+        Fm2 = R('Z', 90.0 * side) @ T(0, -FOOT + 0.078, 0) @ R('X', 90)
+        joints(K, Fm2, 2 * FOOT - 0.16, HF * 0.5, HF, course=HF * 0.25, pitch=0.3, skip=(lambda x, y: abs(x) < 0.34) if side == 0 else None)
     for zz in (HF * 0.25, HF * 0.5, HF * 0.75):                                # its mortar joints, as shallow dark bands
         K.box('mortar', (2 * FOOT - 0.07 - (0.16 if zz > HF * 0.5 else 0), 2 * FOOT - 0.07 - (0.16 if zz > HF * 0.5 else 0), 0.012), (0, 0, zz), None)
     # ---- the shaft: courses of brick, each a ring a hair smaller than the one below, dark joints between ----
@@ -187,6 +214,8 @@ def build_bs_smelter():
         r_ = R1 + (R2 - R1) * t ** 0.85
         K.lathe('brick', [(r_ - 0.2, z), (r_, z), (r_ + 0.004, z + 0.01), (r_ + 0.004, z + 0.094), (r_, z + 0.104), (r_ - 0.2, z + 0.104)], 18, R('Z', 10.0 * (courses % 2)), smooth=30.0)
         K.lathe('mortar', [(r_ - 0.008, z + 0.104), (r_ - 0.008, z + 0.116)], 18, smooth=60.0)
+        for i in range(13):                                                    # its upright joints, broken course to course
+            K.quad('mortar', (0, -0.006, 0.012), (0, 0.006, 0.012), (0, 0.006, 0.092), (0, -0.006, 0.092), R('Z', 360.0 * (i + 0.5 * (courses % 2)) / 13) @ T(r_ + 0.0065, 0, z))
         z += 0.116
         courses += 1
     TOPZ = z
@@ -206,17 +235,19 @@ def build_bs_smelter():
     K.box('steel', (0.5, 0.06, 0.4), (0, -(FOOT + 0.005), 0.3), None, bevel=0.01)
     K.box('void', (0.3, 0.07, 0.22), (0, -(FOOT + 0.012), 0.26), None)
     K.box('light_amber', (0.16, 0.05, 0.1), (0, -(FOOT + 0.03), 0.22), None)
-    for s in (-1, 1):                                                          # the channel's two lips, of fired clay
-        K.box('brick', (0.05, 1.0, 0.09), (s * 0.085, -(FOOT + 0.52), 0.135), R('X', -5), bevel=0.008)
-    K.box('light_amber', (0.11, 0.98, 0.03), (0, -(FOOT + 0.52), 0.13), R('X', -5))
-    anchor('fire', root, loc=(0, -(FOOT + 0.4), 0.5))
+    for s in (-1, 1):                                                          # the channel's two lips, of fired clay, all the way to the moulds
+        K.box('brick', (0.05, 1.12, 0.09), (s * 0.085, -(FOOT + 0.56), 0.15), R('X', -3), bevel=0.008)
+    K.box('light_ember', (0.11, 1.1, 0.03), (0, -(FOOT + 0.56), 0.145), R('X', -3))
+    K.box('light_ember', (0.09, 0.05, 0.06), (0, -(FOOT + 1.11), 0.145), None)                               # and over the lip into them
+    anchor('fire', root, loc=(0, -(FOOT + 0.95), 0.3))
+    anchor('flue', root, loc=(0, 0, TOPZ + 0.78))
     # the mould bed: a tray of sand with a comb of pig moulds, three of them full and glowing dull
     K.box('painted_grey', (1.3, 0.9, 0.12), (0, -(FOOT + 1.5), 0.06), None, bevel=0.01)
     K.box('mortar', (1.2, 0.8, 0.02), (0, -(FOOT + 1.5), 0.125), None)
     for i in range(5):
         x = -0.44 + 0.22 * i
-        K.box('light_amber' if i in (1, 2) else 'pig_iron' if i == 3 else 'void', (0.15, 0.56, 0.03), (x, -(FOOT + 1.5), 0.132), None)
-    K.box('light_amber', (1.0, 0.05, 0.03), (0, -(FOOT + 1.14), 0.132), None)
+        K.box('light_ember' if i in (1, 2) else 'pig_iron' if i == 3 else 'void', (0.15, 0.56, 0.03), (x, -(FOOT + 1.5), 0.132), None)
+    K.box('light_ember', (0.56, 0.05, 0.03), (0.0, -(FOOT + 1.14), 0.132), None)
     # ---- the blower: a box with a fan grille, a duct, two tuyeres into the foot ----
     BX = FOOT + 0.75
     K.box('painted_grey', (0.7, 0.8, 0.7), (BX, 0.1, 0.43), None, bevel=0.02)
@@ -226,6 +257,9 @@ def build_bs_smelter():
     K.lathe('painted_dark', [(0.0, 0.0), (0.24, 0.0), (0.26, 0.02), (0.26, 0.05), (0.0, 0.05)], 16, T(BX + 0.35, 0.1, 0.45) @ AX['X'], smooth=40.0)
     for i in range(5):
         K.box('steel', (0.012, 0.5, 0.02), (BX + 0.405, 0.1, 0.27 + 0.09 * i), None)
+    for i in range(6):                                                         # louvres on its front, a lifting eye on top
+        K.box('painted_dark', (0.5, 0.012, 0.035), (BX, 0.1 - 0.405, 0.24 + 0.075 * i), R('X', 25))
+    K.torus('steel', 0.05, 0.012, 10, 5, T(BX, 0.1, 0.8) @ R('X', 90))
     K.tube('steel', [(BX - 0.35, 0.1, 0.5), (BX - 0.55, 0.1, 0.5), (FOOT + 0.12, 0.1, 0.34)], 0.085, 10, round_r=0.1)
     K.tube('steel', [(FOOT + 0.14, -0.5, 0.34), (FOOT + 0.14, 0.7, 0.34)], 0.07, 10)
     for sy in (-0.45, 0.6):
@@ -245,8 +279,10 @@ def build_bs_smelter():
     rs = random.Random(5)
     for k in range(3):
         for i in range(4 - k):
-            M = T(-(FOOT + 0.95) + (i - (3 - k) / 2) * 0.17, 0.75, 0.05 + 0.085 * k) @ R('Z', 90 * (k % 2) + rs.uniform(-4, 4))
+            M = T(-(FOOT + 0.95) + (i - (3 - k) / 2) * 0.17, 0.75, 0.13 + 0.085 * k) @ R('Z', rs.uniform(-4, 4))
             KS.prism('pig_iron', [(-0.26, -0.065), (0.26, -0.065), (0.24, 0.05), (-0.24, 0.05)], 0.075, M @ R('X', 0), bevel=0.008)
+    for sy in (-0.18, 0.18):
+        KS.box('brick', (0.8, 0.11, 0.08), (-(FOOT + 0.95), 0.75 + sy, 0.04), None, bevel=0.006)
     KS.finish()
     anchor('col_body', root, loc=(0, 0, 0), radius=1.5)
     anchor('col_blower', root, loc=(BX, 0.1, 0), radius=0.6)
@@ -275,30 +311,39 @@ def build_bs_glassworks():
         K.box('mortar', (FW - 0.03, FD - 0.03, 0.014), (FX, FY, z + 0.105), None)
         z += 0.112
         k += 1
+    for side, (wd, off) in enumerate(((FW, FD / 2), (FD, FW / 2), (FW, FD / 2), (FD, FW / 2))):              # its upright joints
+        Fm = T(FX, FY, 0) @ R('Z', 90.0 * side) @ T(0, -off - 0.002, 0) @ R('X', 90)
+        joints(K, Fm, wd, 0.0, z - 0.01, skip=(lambda x, y: (x * x + (y - 0.62) ** 2) < 0.52 ** 2) if side == 0 else None)
     K.box('steel', (FW + 0.06, FD + 0.06, 0.05), (FX, FY, z + 0.02), None, bevel=0.008)                       # an iron curb round its top
     for s in (-1, 1):                                                          # tie rods across its face
         K.tube('steel', [(FX + s * (FW / 2 + 0.03), FY - FD / 2 - 0.02, 0.2), (FX + s * (FW / 2 + 0.03), FY - FD / 2 - 0.02, z)], 0.02, 6)
     # the glory hole: an arch of bricks on end round a glowing mouth
     HX, HZ, HR = FX, 0.62, 0.3
     K.lathe('void', [(0.0, 0.0), (HR + 0.02, 0.0)], 14, T(HX, FY - FD / 2 - 0.004, HZ) @ AX['Y'])
-    K.lathe('light_amber', [(0.0, 0.0), (HR - 0.11, 0.0)], 14, T(HX, FY - FD / 2 - 0.012, HZ) @ AX['Y'])
+    K.lathe('light_ember', [(0.0, 0.0), (HR - 0.11, 0.0)], 14, T(HX, FY - FD / 2 - 0.012, HZ) @ AX['Y'])
     K.lathe('painted_dark', [(HR - 0.11, 0.0), (HR - 0.02, -0.05), (HR + 0.03, -0.05), (HR + 0.03, 0.0)], 14, T(HX, FY - FD / 2 - 0.004, HZ) @ AX['Y'], smooth=50.0)
     for i in range(11):
         a = rad(-20 + 220 * i / 10)
         K.box('brick', (0.1, 0.1, 0.17), (0, 0, 0), T(HX + (HR + 0.1) * cos(a), FY - FD / 2 - 0.02, HZ + (HR + 0.1) * sin(a)) @ R('Y', -math.degrees(a) + 90), bevel=0.008)
     K.box('steel', (0.9, 0.26, 0.03), (HX, FY - FD / 2 - 0.13, HZ - HR - 0.06), None, bevel=0.006)             # a shelf under it
-    anchor('fire', root, loc=(HX, FY - FD / 2 - 0.3, HZ))
+    anchor('fire', root, loc=(HX, FY - FD / 2 - 0.4, 0.35))
     # the throat: a steel collar in the top, lined dark, where the mirror's light goes in
     K.lathe('steel', [(0.2, z + 0.04), (0.3, z + 0.04), (0.3, z + 0.2), (0.2, z + 0.2)], 14, T(FX, FY + 0.15, 0), smooth=50.0)
-    K.lathe('void', [(0.0, z + 0.16), (0.2, z + 0.16)], 14, T(FX, FY + 0.15, 0))
+    K.lathe('void', [(0.13, z + 0.16), (0.2, z + 0.16)], 14, T(FX, FY + 0.15, 0))
+    K.lathe('light_ember', [(0.0, z + 0.16), (0.13, z + 0.16)], 14, T(FX, FY + 0.15, 0))                       # the melt under it, where the mirror's light lands
     # ---- the mirror: a dish on a post behind the furnace, tipped to look down the throat ----
     PX, PY, PH = FX + 0.2, FY + 1.55, 2.5
     K.lathe('steel', [(0.0, 0.0), (0.26, 0.0), (0.26, 0.04), (0.07, 0.07), (0.055, PH), (0.0, PH)], 10, T(PX, PY, 0), smooth=50.0)
     for i in range(3):
         a = rad(120 * i + 90)
         K.tube('steel', [(PX + 0.62 * cos(a), PY + 0.62 * sin(a), 0.02), (PX, PY, 0.75)], 0.02, 6)
-    DM = T(PX, PY - 0.12, PH + 0.05) @ R('X', 118)                              # the dish's axis: down and forward, at the throat
-    K.lathe('aluminium', [(0.0, 0.0)] + [(1.05 * i / 6, 0.26 * (i / 6) ** 2) for i in range(1, 7)] + [(1.07, 0.275), (1.05 * 5 / 6, 0.26 * (5 / 6) ** 2 - 0.025), (0.0, -0.025)], 24, DM, smooth=60.0)
+    DM = T(PX, PY - 0.12, PH + 0.05) @ R('X', 134)                              # the dish's axis: down and forward, at the throat
+    # (a mirror: bright, and looking down at the furnace. Dull, and looking at the horizon, it was a radio dish.)
+    K.lathe('mirror', [(0.0, 0.0)] + [(1.05 * i / 6, 0.26 * (i / 6) ** 2) for i in range(1, 7)], 36, DM, smooth=70.0)
+    K.lathe('aluminium', [(1.05, 0.26), (1.08, 0.275), (1.08, 0.245), (1.05 * 5 / 6, 0.26 * (5 / 6) ** 2 - 0.03), (0.0, -0.03)], 36, DM, smooth=60.0)
+    for i in range(1, 3):                                                      # it is made of rings of mirror: the joins between them
+        r_ = 1.05 * i / 3
+        K.torus('painted_dark', r_, 0.006, 36, 4, DM @ T(0, 0, 0.26 * (r_ / 1.05) ** 2 + 0.004))
     for i in range(6):                                                         # ribs on its back
         a = rad(60 * i)
         K.tube('steel', [tuple(DM @ Vector((0.08 * cos(a), 0.08 * sin(a), -0.05))), tuple(DM @ Vector((1.0 * cos(a), 1.0 * sin(a), 0.2)))], 0.014, 5)
@@ -312,7 +357,7 @@ def build_bs_glassworks():
     K.box('steel', (1.38, 0.04, 0.04), (TX, TY - 0.36, 0.3), None)
     K.box('steel', (1.38, 0.04, 0.04), (TX, TY + 0.36, 0.3), None)
     K.box('glass_clear', (1.05, 0.62, 0.012), (TX - 0.05, TY, 0.893), None)
-    K.box('light_amber', (1.05, 0.02, 0.012), (TX - 0.05, TY + 0.3, 0.893), None)                             # its edge still hot
+    K.box('light_ember', (1.05, 0.02, 0.012), (TX - 0.05, TY + 0.3, 0.893), None)                             # its edge still hot
     K.lathe('steel', [(0.0, -0.4), (0.05, -0.4), (0.05, 0.4), (0.0, 0.4)], 10, T(TX + 0.6, TY, 0.94) @ AX['Y'], smooth=50.0)
     # ---- a bin of sand ----
     BX_, BY_ = FX - 1.25, FY - 0.55

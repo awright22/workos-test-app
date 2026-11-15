@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CROPS, foodTotal } from '../game/farm.js';
 import { BAL, S, isBase, suitCap, roverPowerCap } from '../game/state.js';
 import { baseState } from '../game/base.js';
+import { waterCap } from '../game/works.js';
 import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
 import { player } from '../game/player.js';
@@ -140,6 +141,19 @@ export const OBJECTIVES = [
     shown: () => isBase() && (S.inv.brick || 0) >= 14, done: () => World.builtMeshes.some((b) => b.kind === 'smelter') },
   { id: 'b-glass', text: () => 'Build a glassworks', why: 'Twelve brick, four iron and a circuit board. Glass is greenhouses.',
     shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'smelter'), done: () => World.builtMeshes.some((b) => b.kind === 'glassworks') },
+  { id: 'b-solar', text: () => 'Build a solar field', why: 'Three works draw more than one array gathers. Eight iron, six glass, two circuit boards.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'glassworks'), done: () => World.builtMeshes.some((b) => b.kind === 'solarField') },
+  { id: 'b-battery', text: () => 'Build a battery bank', why: 'A reserve for the night and the storm. It wants salt: the map shows where.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'solarField'), done: () => World.builtMeshes.some((b) => b.kind === 'battery') },
+  { id: 'b-tank', text: () => 'Build a water tank', why: 'The Hab holds 120 L. A drum of iron plate holds twice that again.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'smelter') && S.stats.mined >= 6, done: () => World.builtMeshes.some((b) => b.kind === 'tank') },
+  { id: 'b-quarters', text: () => 'Build living quarters', why: 'A vault of brick and plaster. Cement is burnt gypsum: the kiln makes it.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'battery'), done: () => World.builtMeshes.some((b) => b.kind === 'quarters') },
+  // (the pad before the tower: it takes no circuit boards and brings two every ten sols, and the tower takes three)
+  { id: 'b-pad', text: () => 'Lay a landing pad', why: 'Something Earth can hit: a supply drop every ten sols. Circuit boards do not grow here.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'battery'), done: () => World.builtMeshes.some((b) => b.kind === 'pad') },
+  { id: 'b-tower', text: () => 'Raise a comms tower', why: 'With a dish that high, the orbiters can talk me in to every deposit on the planet.',
+    shown: () => isBase() && World.builtMeshes.some((b) => b.kind === 'pad'), done: () => World.builtMeshes.some((b) => b.kind === 'tower') },
   { id: 'mav', place: 'MAV', icon: 'rocket', text: () => 'Drive to Schiaparelli', why: 'The MAV there is the only rocket on Mars.',
     pos: () => above(World.mav.position, 4), shown: () => S.flags.mavRevealed, done: () => S.won },
 ];
@@ -955,7 +969,7 @@ export function updateHud() {
   const food = foodTotal(), wait = isBase() ? 20 : Math.max(3, S.rescueSol - S.sol);
   const rows = [
     ['o2', S.o2 / 100, `${Math.round(S.o2)}<small class="pc">%</small>`, S.o2],
-    ['water', S.water / BAL.waterMax, `${Math.round(S.water)}<small>L</small>`, S.water],
+    ['water', S.water / waterCap(), `${Math.round(S.water)}<small>L</small>`, S.water],
     ['food', food / wait, `${food}<small>${food === 1 ? 'meal' : 'meals'}</small>`, null, food / 18],
     ['power', S.power / BAL.powerMax, `${Math.round(S.power)}<small class="pc">%</small>`, S.power],
     ['health', S.health / BAL.healthMax, `${Math.round(S.health)}<small class="pc">%</small>`, S.health],

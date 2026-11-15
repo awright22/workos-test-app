@@ -8,7 +8,8 @@ import { Snd } from '../audio/sound.js';
 import { fmtDist, groundDist } from '../planet/geo.js';
 import { FEATURES } from '../planet/features.js';
 import { DIFFICULTIES, S, isBase } from '../game/state.js';
-import { BULK, MADE, WORKS } from '../game/base.js';
+import { BUILDINGS, BULK, MADE, WORKS } from '../game/base.js';
+import { reserve, reserveCap, waterCap } from '../game/works.js';
 import { World } from '../world/build.js';
 import { ITEM_NAMES, RECIPES, UPGRADES, hasCost, nearHab, payCost } from '../game/inventory.js';
 import { startBuild, startDeploy } from '../game/interactables.js';
@@ -169,7 +170,8 @@ export function renderColony() {
   inv += '<div class="pane-hd">Supplies</div>';
   { const packs = PRODUCE.filter((id) => S.seeds[id] > 0), n = packs.reduce((k, id) => k + S.seeds[id], 0);
     inv += row('seed', 'Seed packets', n, '', n ? packs.map((id) => `${CROPS[id].name} ${S.seeds[id]}`).join(' · ') : 'NASA sends seeds with pods and science grants'); }
-  inv += row('water', 'Water', Math.round(S.water), 'L');
+  inv += row('water', 'Water', Math.round(S.water), 'L', waterCap() > 120 ? `The tanks hold ${waterCap()} L` : '');
+  if (reserveCap() > 0) inv += row('battery', 'Battery reserve', Math.round(reserve()), '%', `Of the Hab’s own store · the banks hold ${reserveCap()}%`);
   inv += row('power', 'Hydrazine burns', S.hydrazine, '', 'Each makes water at the rig');
   inv += '<div class="pane-hd">Morale <span>Out of 100</span></div>';
   inv += `<div class="inv-row has morale ${moraleBand()}">${icon('mood')}<span class="nm">Morale<small>${MORALE_WORD[moraleBand()]}. ${moraleBand() === 'high' ? 'Working and mending faster.' : moraleBand() === 'low' ? 'Everything takes longer. Cook, play music, hear from home.' : 'Variety on the plate and a cooked dinner lift it.'}</small></span><span class="ct t-num">${Math.round(S.morale)}</span></div>`;
@@ -294,8 +296,25 @@ export function renderColony() {
         `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
         `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`]);
     }
-    baseHtml = `<div class="pane-hd">Works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${World.builtMeshes.filter((b) => b.def).length} standing</span></div>` +
-      '<p class="pane-note intro">What a base is made with. Each is built outside, within reach of the Hab’s power, and works by itself once it has a job.</p>' + ranked(cards);
+    // ... and the buildings: what he builds of what the works make
+    const bcards = [];
+    let buildReady = 0;
+    for (const w of BUILDINGS) {
+      const kind = w.builds || w.id, n = World.builtMeshes.filter((b) => b.kind === kind).length, full = n >= w.most, can = !full && hasCost(w.cost);
+      if (can) buildReady++;
+      bcards.push([can ? 0 : full ? 2 : 1, `<article class="rcp ${can ? 'ready' : full ? 'done' : ''}" data-card="${w.id}"><div class="rcp-hd"><h4>${esc(w.name)}</h4>` +
+        tags((can ? '<span class="badge ready">Ready</span>' : '') + (n ? `<span class="badge done">${icon('check')}${n} standing</span>` : '')) + '</div>' +
+        `<p class="ds">${chem(esc(w.desc))} ${chem(esc(w.gives))}.</p>` + (full ? '' : `<div class="cost">${costChips(w.cost)}</div>`) +
+        (full ? `<div class="rcp-ft"><span class="why">${w.most} is as many as are any use.</span></div></article>`
+          : `<div class="rcp-ft"><button type="button" class="mg-btn small${can ? ' primary' : ''}" data-build="${w.id}"${can ? '' : ' disabled'}>Build</button>` +
+            `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`)]);
+    }
+    const nWorks = World.builtMeshes.filter((b) => b.def && b.def.jobs).length, nBuilt = World.builtMeshes.filter((b) => b.def && !b.def.jobs).length;
+    baseHtml = `<div class="pane-hd">Works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${nWorks} standing</span></div>` +
+      '<p class="pane-note intro">What a base is made with. Each is built outside, within reach of the Hab’s power, and works by itself once it has a job.</p>' + ranked(cards) +
+      `<div class="pane-hd">Buildings <span>${buildReady ? `${buildReady} ready to build · ` : ''}${nBuilt} standing</span></div>` +
+      '<p class="pane-note intro">What is built of brick, iron and glass. Each does its good by standing there.</p>' + ranked(bcards);
+    baseReady += buildReady;
   }
 
   // (the number is how many things on that tab can be made now; the tab's own heading says so in words. Every tab of
@@ -387,6 +406,15 @@ const num = (v) => (v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.
  * mission list's lines are for. (After ten minutes of play nothing had said that the rescue is a rocket a long drive
  * away, or that Earth has to be told first.) A strip, not a page: each step is a few words and one line.
  */
+/** The journal's line for the base: what stands, and what comes next. Before anything stands, what a base is made of. */
+function baseLine() {
+  const all = WORKS.concat(BUILDINGS), has = (w) => World.builtMeshes.some((b) => b.kind === (w.builds || w.id));
+  // (a greenhouse set down from a kit is a farm dome all the same)
+  const up = all.filter(has), next = all.find((w) => !has(w));
+  if (!up.length) return 'No ship can reach Mars for four years. Make this somewhere a man can live, out of what the planet holds: basalt off any boulder, and the minerals the map marks. A kiln first: Colony, the Base tab.';
+  const names = up.map((w) => w.name.toLowerCase());
+  return `Standing: ${names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]}.` + (next ? ` Next: a ${next.name.toLowerCase()}.` : ' Everything a base has is built. Now keep it running.');
+}
 function wayHomeHtml() {
   const mav = fmtDist(groundDist(World.hab.position, World.mav.position));
   const radio = S.pf.connected ? 'Houston knows. NASA’s tasks are below.'
@@ -398,7 +426,7 @@ function wayHomeHtml() {
     const stay = [
       ['Every sol', 'Stay alive', 'Food, water, air and power.', 'now'],
       [S.pf.connected ? 'Done' : 'Then', 'Tell Earth', radio, S.pf.connected ? 'done' : 'next'],
-      ['For good', 'Build a base', 'No ship can reach Mars for four years. Make this somewhere a man can live, out of what the planet holds: basalt off any boulder, and the minerals the map marks.', S.pf.connected ? 'next' : ''],
+      ['For good', 'Build a base', baseLine(), S.pf.connected ? 'next' : ''],
     ];
     return '<div class="pane-hd">The long stay</div><ol class="way">' +
       stay.map(([k, t, d, cls]) => `<li class="${cls}"><b>${esc(k)}</b><strong>${esc(t)}</strong><span>${chem(esc(d))}</span></li>`).join('') + '</ol>';

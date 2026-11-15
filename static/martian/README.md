@@ -92,6 +92,9 @@ the story's.
 - **Works**: a kiln, a smelter and a glassworks, built outside the Hab and given jobs at a sheet
   of their own: brick, cement, iron and glass, made by the batch on the Hab's power while he does
   something else.
+- **Buildings**, of what the works make: a solar field, a battery bank, a water tank, a farm dome,
+  living quarters, a comms tower (every deposit goes on the map) and a landing pad (a supply drop
+  every ten sols: the only source of circuit boards that does not run out).
 
 ## Controls
 

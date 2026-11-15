@@ -48,6 +48,7 @@ import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
 import { showStart, newGame, continueGame, ensureKind } from './game/flow.js';
 import * as worksApi from './game/works.js';
+const _smoke = new THREE.Vector3(), _smokeWind = new THREE.Vector3();
 import { syncAllVisuals } from './game/visuals.js';
 import { showLoading as loading } from './ui/menus.js';
 const _hero = new THREE.Vector3(), _heroCam = new THREE.Vector3();
@@ -252,6 +253,17 @@ function tick(dt) {
     if (b.fire) {
       b.heat += ((b.working ? 1 : 0) - b.heat) * Math.min(1, dt * 0.8);                  // (a fire takes a moment to draw, and a while to die)
       if (b.group.visible) setGlow(b.fire, b.heat * (0.8 + 0.2 * Math.sin(blinkT * 9 + b.yaw * 7) * Math.sin(blinkT * 3.3)));
+      // (and it smokes: a works at work was a glow and nothing else)
+      if (b.flue && b.heat > 0.4 && b.group.visible && !S.sleeping) {
+        b.smokeT = (b.smokeT || 0) - dt;
+        if (b.smokeT <= 0) {
+          b.smokeT = 0.15 + Math.random() * 0.09;
+          // (a plume: dark, rising for six seconds from the flue itself, widening, leaning with the wind. Its first
+          //  smoke was pale, rose half a metre and then sank as kicked-up dust does: two reviewers could not find it.)
+          ctx.vfx.puff(siteLocalToWorld(b.group, b.flue[0], b.flue[1], b.flue[2], _smoke),
+            { count: 1, speed: 0.07, up: 1.1, spread: 0.05, size: 0.42, life: 6.0, tone: 2, dir: _smokeWind.copy(ctx.vfx.wind).multiplyScalar(0.16).clampLength(0, 1.6) });
+        }
+      }
     }
     if (!b.lamp) continue;
     b.pulse = Math.max(0, Math.sin(blinkT * 2.2)) ** 6;

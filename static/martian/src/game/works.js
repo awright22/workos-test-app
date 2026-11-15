@@ -7,9 +7,12 @@
  * as each batch comes out. It goes on by itself, through the night as well, and stands waiting when the Hab has no
  * power to spare. One job at a time.
  */
-import { S, isBase } from './state.js';
-import { HOUR } from './base.js';
-import { World } from '../world/build.js';
+import { BAL, S, isBase } from './state.js';
+import { HOUR, WORK_BY_ID } from './base.js';
+import * as THREE from 'three';
+import { World, addSupplyPod, placeAt } from '../world/build.js';
+import { groundDist, vecToLl } from '../planet/geo.js';
+const _pad = new THREE.Vector3();
 import { ITEM_NAMES, hasCost, payCost } from './inventory.js';
 import { log } from '../ui/dom.js';
 import { Snd } from '../audio/sound.js';
@@ -18,7 +21,34 @@ import { Snd } from '../audio/sound.js';
 export const WORKS_POWER_FLOOR = 12;
 
 /** The works that stand: the records of World.builtMeshes that are one. */
-export const works = () => World.builtMeshes.filter((b) => b.def);
+export const works = () => World.builtMeshes.filter((b) => b.def && b.def.jobs);
+/** How many of a kind of thing stand (of a building, no more than are any use). */
+export function standing(kind) {
+  let n = 0;
+  for (const b of World.builtMeshes) if (b.kind === kind) n++;
+  const def = WORK_BY_ID[kind];
+  return def && def.most ? Math.min(def.most, n) : n;
+}
+/** What the Hab's water tanks hold between them, litres. */
+export const waterCap = () => BAL.waterMax + 240 * standing('tank');
+/** What the battery banks hold in reserve, in per cent of the Hab's own store. */
+export const reserveCap = () => 100 * standing('battery');
+/** What is in the reserve now. */
+export const reserve = () => (S.base && S.base.reserve) || 0;
+/** How many times over the solar fields gather what the Hab's own array does. */
+export const solarFields = () => standing('solarField');
+/**
+ * The battery banks, each tick after the Hab's own store has been reckoned: what the Hab has above nine tenths goes
+ * into the reserve, and when it falls under three tenths the reserve comes back to hold it there.
+ */
+export function updateReserve() {
+  const cap = reserveCap();
+  if (!cap || !S.base) return;
+  let r = Math.min(S.base.reserve || 0, cap);
+  if (S.power > 90 && r < cap) { const m = Math.min(S.power - 90, cap - r); S.power -= m; r += m; }
+  else if (S.power < 30 && r > 0) { const m = Math.min(30 - S.power, r); S.power += m; r -= m; }
+  S.base.reserve = r;
+}
 /** The job a works is doing (an entry of its `jobs`), or null. */
 export const jobOf = (b) => (b && b.job ? b.def.jobs.find((j) => j.id === b.job.id) || null : null);
 /** What `n` batches of a job take in all. */
@@ -62,13 +92,34 @@ export function jobLine(b) {
 }
 
 /**
+ * The landing pad, each dawn: ten sols after it is built, and every ten after, a supply drop comes down on it
+ * (unless the last one still stands there unopened). Circuit boards come this way and no other: nothing on Mars
+ * makes them.
+ */
+export function padDrop() {
+  const pad = World.builtMeshes.find((b) => b.kind === 'pad');
+  if (!pad || !S.base) return null;
+  if (!S.base.padSol) { S.base.padSol = S.sol; return null; }
+  if (S.sol - S.base.padSol < 10) return null;
+  if (World.pods.some((p) => !p.taken && groundDist(p.group.position, pad.group.position) < 8)) return null;
+  S.base.padSol = S.sol;
+  S.base.drops = (S.base.drops || 0) + 1;
+  const loot = { circuit: 2, scrap: 4, rations: 4, ...(S.base.drops % 2 ? { seedSoy: 1 } : { seedTomato: 1 }) };
+  const ll = vecToLl(_pad.copy(pad.group.position).normalize());
+  const pod = addSupplyPod(placeAt(ll.lat, ll.lon, S.sol * 1.7), loot, 'Open the supply drop');
+  Snd.jingle();
+  log('Supply drop on the pad, dead centre. Somebody at JPL just won a bet.', 'nasa');
+  return pod;
+}
+
+/**
  * The works go on. `dt`: the seconds of play that have passed (game/sim.js calls this from applyRates, so a night
  * slept through counts).
  */
 export function updateWorks(dt) {
   if (!isBase()) return;
   for (const b of World.builtMeshes) {
-    if (!b.def) continue;
+    if (!b.def || !b.def.jobs) continue;
     const job = jobOf(b);
     if (!job) { b.job = null; b.working = false; continue; }
     const dur = job.hours * HOUR;

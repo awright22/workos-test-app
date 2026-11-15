@@ -78,6 +78,7 @@ export class Vfx {
     this.time = 0;
     this.sprite = softSprite();
     this.drift = new THREE.Vector3();          // how far the wind has carried the dust (wrapped), and how far it has settled
+    this.wind = new THREE.Vector3();           // the wind now, metres a second (smoke leans with it)
     this.fall = 0;
     this._initAir(o.air === undefined ? 1400 : o.air);
     this._initSheets(o.sheets === undefined ? 60 : o.sheets);
@@ -287,32 +288,39 @@ export class Vfx {
         #include <fog_pars_vertex>
         attribute vec3 aVel; attribute vec4 aInfo;
         uniform float uTime, uPx; uniform vec3 uUp;
-        varying float vA; varying float vTone;
+        varying float vA; varying float vTone; varying float vK;
         void main() {
           float age = uTime - aInfo.x;
           float k = clamp(age / aInfo.y, 0.0, 1.0);
+          // (a tone of 2 is smoke from a fire: it goes on rising, and does not settle)
+          float smoke = step(1.5, aInfo.w);
           // fast at first, then hanging in the thin air
-          float travel = (1.0 - exp(-age * 2.2)) / 2.2;
+          float travel = (1.0 - exp(-age * 2.2)) / 2.2 + smoke * age * 0.6;
           // (a puff is a disc facing the eye, centred on the dust: kicked up at ground level, its lower half was under
           // the ground and showed as a pale shape cut off in a straight line. It rides up by nearly its own radius.)
           float span = aInfo.z * (0.6 + 1.9 * k);
-          vec3 p = position + aVel * travel - uUp * (0.35 * age * age * 0.5) + uUp * (span * 0.42);
+          vec3 p = position + aVel * travel - uUp * ((1.0 - smoke) * 0.35 * age * age * 0.5) + uUp * (span * 0.42 * (1.0 - smoke));
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           gl_PointSize = clamp(span * uPx / max(-mvPosition.z, 0.3), 1.0, 220.0);
-          vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k) * 0.34;
-          vTone = aInfo.w;
+          vA = (age < 0.0 || k >= 1.0) ? 0.0 : (1.0 - k) * mix(1.0 - k, 1.0, smoke * 0.6) * smoothstep(0.0, 0.06, k) * mix(0.34, 0.6, smoke);
+          vTone = aInfo.w; vK = k;
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */`
         #include <fog_pars_fragment>
         uniform sampler2D uMap; uniform vec3 uLight;
-        varying float vA; varying float vTone;
+        varying float vA; varying float vTone; varying float vK;
         void main() {
           float a = texture2D(uMap, gl_PointCoord).a * vA;
           if (a < 0.004) discard;
           // (dust in the air is paler than the ground it rose from: darker, the rover's tail was a brown smudge)
-          gl_FragColor = vec4(uLight * mix(vec3(0.80, 0.52, 0.34), vec3(1.0, 0.9, 0.8), vTone), a);
+          vec3 c = uLight * mix(vec3(0.80, 0.52, 0.34), vec3(1.0, 0.9, 0.8), min(vTone, 1.0));
+          // Smoke is dark against this sky (pale, as dust is, a kiln's smoke was "a faint wisp, visible only if you
+          // look for it"), and where it leaves the flue the fire under it lights it: by night that is all of it
+          // that shows.
+          if (vTone > 1.5) c = uLight * vec3(0.27, 0.235, 0.22) + vec3(1.0, 0.40, 0.10) * (0.26 * exp(-vK * 9.0));
+          gl_FragColor = vec4(c, a);
           #include <fog_fragment>
         }`,
     });
@@ -430,6 +438,7 @@ export class Vfx {
     const WRAP = 700;
     _s.copy(_e).multiplyScalar(Math.cos(veer)).addScaledVector(_v, Math.sin(veer));
     this.drift.addScaledVector(_s, (1.5 + 24.5 * p.storm) * dt);
+    this.wind.copy(_s).multiplyScalar(1.5 + 24.5 * p.storm);
     this.drift.set(((this.drift.x % WRAP) + WRAP) % WRAP, ((this.drift.y % WRAP) + WRAP) % WRAP, ((this.drift.z % WRAP) + WRAP) % WRAP);
     this.fall = (this.fall + (0.15 + p.storm * 1.2) * dt) % WRAP;
     a.uFall.value = this.fall; a.uCam.value.copy(camera.position); a.uUp.value.copy(up);

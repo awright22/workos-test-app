@@ -86,7 +86,8 @@ export const QUEST_DEFS = [
     desc: 'Find Mars 3, silent since 1971, and recover its film canister. The first one deserves a visitor.',
     ev: ['salvage', 'Mars 3'], loot: { scrap: 5, rations: 5, circuit: 1, seedTomato: 1, seedLettuce: 1 } },
   { id: 'breadcrumbs', name: 'Breadcrumbs', target: null,
-    desc: 'Pre-position the escape: deploy an O2 Cache and a Nav Beacon at least 2 km from the Hab, toward Schiaparelli.',
+    // (a base has no escape to lay a trail for: there the same two things are an outstation)
+    get desc() { return isBase() ? 'Set up an outstation: deploy an O2 Cache and a Nav Beacon at least 2 km from the Hab. Somewhere to run to when a long drive goes wrong.' : 'Pre-position the escape: deploy an O2 Cache and a Nav Beacon at least 2 km from the Hab, toward Schiaparelli.'; },
     ev: ['deploy', null], loot: { rations: 3, candle: 2 } },
 ];
 export function questTargetPos(q) {
@@ -151,8 +152,11 @@ export function updateDiscoveries(dt) {
   discTimer = 0;
   if (World.deposits) {
     const found = baseState().found, at = S.mode === 'rover' ? World.rover.group.position : player.pos;
+    const tower = World.builtMeshes.some((b) => b.kind === 'tower');
     for (const site of World.deposits) {
-      if (found[site.key] || groundDist(at, site.group.position) > 70) continue;
+      if (found[site.key]) continue;
+      if (tower) { found[site.key] = S.sol; continue; }                     // (talked in from orbit: no card for each of forty)
+      if (groundDist(at, site.group.position) > 70) continue;
       found[site.key] = S.sol;
       Snd.discovery();
       toast('DEPOSIT FOUND', site.dep.name.toUpperCase(), site.dep.note);

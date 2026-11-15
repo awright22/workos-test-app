@@ -15,7 +15,7 @@ import { hash3 } from '../core/math.js';
 import { BAL, S } from './state.js';
 
 /** Models only a base needs (loaded when a base is begun or continued, not at boot). */
-export const BASE_MODELS = ['dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfate', 'dep_salt', 'bs_kiln', 'bs_smelter', 'bs_glassworks'];
+export const BASE_MODELS = ['dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfate', 'dep_salt', 'bs_kiln', 'bs_smelter', 'bs_glassworks', 'bs_solar', 'bs_battery', 'bs_tank', 'bs_quarters', 'bs_tower', 'bs_pad'];
 
 /**
  * The bulk materials of a base, in the order the inventory lists them (keys of S.inv).
@@ -47,7 +47,7 @@ export const HOUR = BAL.solLen / (24 + 2 / 3);
  * power cable and, given a job, works by itself: so many batches, each taking `hours` and `power` (per cent of the
  * Hab's store), the product going to the stores. `pad`: the radius of ground levelled for it; `r`: its own radius,
  * for keeping two apart. The first job of each needs nothing a base anywhere cannot find; the rest are what the
- * deposits are for.
+ * deposits are for. (A works has `jobs`; a building, below, has none.)
  */
 export const WORKS = [
   { id: 'kiln', name: 'Kiln', model: 'bs_kiln', pad: 3.0, r: 2.0,
@@ -74,7 +74,41 @@ export const WORKS = [
       { id: 'glass', name: 'Cast clear glass', verb: 'Casting glass', in: { silica: 2 }, out: { glass: 3 }, hours: 2, power: 4 },
     ] },
 ];
-export const WORK_BY_ID = Object.fromEntries(WORKS.map((w) => [w.id, w]));
+/**
+ * The buildings: what he builds of what the works make. Set down like the works; they do their good by standing
+ * there. `gives`: what one does for the Hab, in a few words, for its card; `most`: how many are any use.
+ *  - a solar field gathers as much again as the Hab's own array;
+ *  - a battery bank keeps a reserve the Hab draws on when its own store runs low, and fills when it runs high;
+ *  - a water tank holds water the Hab's own tank has no room for;
+ *  - a farm dome is a greenhouse (the story's, `builds`), paid for in glass and iron and not in salvage;
+ *  - living quarters lift his spirits each dawn; a comms tower puts every deposit on the map; a landing pad brings
+ *    a supply drop every ten sols (and with it the circuit boards nothing on Mars can make).
+ */
+export const BUILDINGS = [
+  { id: 'solarField', name: 'Solar field', model: 'bs_solar', pad: 4.6, r: 3.7, most: 3,
+    desc: 'Twelve panels of his own glass in iron frames.', gives: 'Gathers as much power again as the Hab’s own array',
+    cost: { iron: 8, glass: 6, circuit: 2 } },
+  { id: 'battery', name: 'Battery bank', model: 'bs_battery', pad: 2.6, r: 1.7, most: 3,
+    desc: 'Twelve salt cells in an iron rack, under a roof.', gives: 'Keeps a reserve as big as the Hab’s own store, for the night and the storm',
+    cost: { iron: 6, salt: 6, circuit: 1 } },
+  { id: 'tank', name: 'Water tank', model: 'bs_tank', pad: 2.6, r: 1.6, most: 3,
+    desc: 'A drum of welded iron plate on a ring of brick.', gives: 'Holds 240 L more water',
+    cost: { iron: 8, brick: 6 } },
+  { id: 'dome', name: 'Farm dome', builds: 'greenhouse', pad: 5.6, r: 5.0, most: 6,
+    desc: 'A glass dome on a brick ring: the greenhouse kit’s, made here.', gives: 'Four more farm beds',
+    cost: { glass: 10, iron: 6, brick: 6 } },
+  { id: 'quarters', name: 'Living quarters', model: 'bs_quarters', pad: 4.4, r: 3.4, most: 1,
+    desc: 'A vault of brick with an iron hatch and a window in its end.', gives: 'Somewhere that is not the Hab: morale +2 every dawn',
+    cost: { brick: 24, cement: 8, iron: 6, glass: 4 } },
+  // (the pad before the tower: it takes no circuit boards and brings them, and the tower takes three)
+  { id: 'pad', name: 'Landing pad', model: 'bs_pad', pad: 6.6, r: 5.8, most: 1,
+    desc: 'A disc of cement on a bed of basalt, a target painted on it, lamps at its rim.', gives: 'Something Earth can hit: a supply drop every ten sols',
+    cost: { cement: 18, stone: 24, iron: 4 } },
+  { id: 'tower', name: 'Comms tower', model: 'bs_tower', pad: 3.6, r: 1.8, most: 1,
+    desc: 'An iron mast on a cement footing, a dish at its head.', gives: 'Earth’s orbiters can talk him in: every mineral deposit goes on the map',
+    cost: { iron: 12, cement: 4, circuit: 3, glass: 2 } },
+];
+export const WORK_BY_ID = Object.fromEntries(WORKS.concat(BUILDINGS).map((w) => [w.id, w]));
 
 /**
  * The kinds of deposit. `gives`/`per`: what a turn of work yields; `loads`: turns of work in one deposit;

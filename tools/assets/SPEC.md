@@ -375,3 +375,18 @@ Every surface that glows when the works is working is in `light_amber`: the game
 a job runs and down to nothing when it stands idle. Part `stock` is the product stacked beside it,
 shown when there is some in the stores. Anchor `fire` is where the game hangs its lamp; `col_*`
 anchors are the circles the player cannot walk into. The script takes its helpers from `props.py`.
+
+## Family I — the buildings of a base (`buildings.py`)
+
+`bs_solar.glb` (≤ 9,000), `bs_battery.glb` (≤ 5,000), `bs_tank.glb` (≤ 6,000), `bs_quarters.glb`
+(≤ 5,000), `bs_tower.glb` (≤ 3,000), `bs_pad.glb` (≤ 4,000): what he builds of what the works make (`BUILDINGS` in `static/martian/src/game/base.js` says what each does for the
+Hab). Smelted iron, dark and unpainted and rusting at the welds (`iron`, `iron_rust`), cast glass,
+fired brick, salvage where it matters. The solar field is three rows of four glazed panels on iron
+trestles, facing −Y; the battery bank twelve salt cells in a rack under a tin roof; the water tank a
+drum of welded plate on a ring of brick with a ladder, a level gauge and a lagged pipe; the living
+quarters a barrel vault of brick with a round iron hatch and windows that glow after dark
+(`light_white`); the comms tower a guyed iron mast with a dish and a red lamp (`light_red`); the
+landing pad a disc of cement all but flush with the ground, a target painted on it, lamps at its rim
+(`light_blue`): he walks on it. The game brings these lamps up after dark. Each has the
+works' grey control box and a cable off toward the Hab, and `col_*` anchors. The script takes its
+helpers from `props.py` and `works.py`. (The farm dome is `greenhouse.glb`, by another road.)

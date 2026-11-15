@@ -663,6 +663,7 @@ export function addSupplyPod(g, loot, label) {
 // a panel) to that bearing, east of north.
 export const GREENHOUSE = { wall: 3.93, doorHalf: 0.75, portalOuter: 0.86, portalEnd: 4.62, floor: 0.06 };
 export function buildDeployable(kind, atVec, yaw = 0) {
+  if (WORK_BY_ID[kind] && WORK_BY_ID[kind].builds) kind = WORK_BY_ID[kind].builds;
   {
     // a dome needs level ground under it; the small things need a clear, level spot (no rock under a tripod)
     const u = _aw.copy(atVec).normalize();
@@ -707,10 +708,19 @@ export function buildDeployable(kind, atVec, yaw = 0) {
     // one of a base's works (game/base.js): masonry with a fire in it, which burns while it has a job (game/works.js)
     b.def = WORK_BY_ID[kind];
     const m = addSiteModel(g, b.def.model, { stain: b.def.pad * 0.95, stainOpacity: 0.3 });
-    b.fire = ownMaterials(m.root, /^light_amber/);
-    b.stock = m.part('stock');
-    b.job = null; b.working = false; b.heat = 0;
-    addLamp(m.part('fire') || g, { color: 0xff8a30, power: 10, range: 9, decay: 1.4, level: () => b.heat * (0.35 + 0.65 * (World.dark || 0)) });
+    if (b.def.jobs) {
+      b.fire = ownMaterials(m.root, /^light_(amber|ember)/);
+      b.stock = m.part('stock');
+      b.job = null; b.working = false; b.heat = 0;
+      const fl = m.part('flue');                             // where its smoke comes out, in the site's own frame
+      if (fl) { fl.updateWorldMatrix(true, false); const p = g.worldToLocal(fl.getWorldPosition(new THREE.Vector3())); b.flue = [p.x, p.y, p.z]; }
+      // (a low orange light at its mouth: the ground and the sill take it, and the works above stays dark stone.
+      //  Brighter and higher, it lit the whole front "as if by a floodlight" and a mirror outshone the furnace.)
+      // (... and with a reach of seven metres the smelter's whole shaft glowed evenly, "like a lantern": four and a half, falling off faster)
+      addLamp(m.part('fire') || g, { color: 0xff7a22, power: 4.5, range: 4.5, decay: 2, level: () => b.heat * (0.3 + 0.7 * (World.dark || 0)) });
+    } else {
+      b.glow = ownMaterials(m.root, /^light_(white|blue|red)/);       // a building's windows and lamps: they come up after dark
+    }
   }
   World.builtMeshes.push(b);
   return b;

@@ -8,6 +8,7 @@ import { screenOpen } from '../ui/screens.js';
 import { log } from '../ui/dom.js';
 import { CROPS, farm } from './farm.js';
 import { BULK, MADE } from './base.js';
+import { waterCap } from './works.js';
 // Items, recipes, upgrades and loot.
 export const ITEM_NAMES = {
   scrap: 'Scrap Metal', circuit: 'Circuit Board', regolith: 'Regolith', ice: 'Ice Chunk',
@@ -21,7 +22,7 @@ export const RECIPES = [
   { id: 'candle', name: 'O2 Candle', desc: `+${airTime(40)} of suit air in the field`, how: ['press X to crack one', 'tap the O2 button to crack one'], cost: { scrap: 2, regolith: 1 }, gives: { candle: 1 } },
   { id: 'meltIce', name: 'Melt Ice', desc: '+10 L of water (uses 2% of Hab power)', cost: { ice: 1 }, run: () => {
       if (S.power < 2) return 'Not enough Hab power';
-      S.power -= 2; S.water = clamp(S.water + BAL.iceWater, 0, BAL.waterMax);
+      S.power -= 2; S.water = clamp(S.water + BAL.iceWater, 0, waterCap());
       return true;
     } },
   { id: 'kitSolar', name: 'Portable Solar Panel', desc: 'Deployable: recharges the rover nearby; boosts Hab power if placed at home', cost: { scrap: 4, circuit: 1 }, gives: { kitSolar: 1 } },
@@ -56,7 +57,7 @@ export function gainLoot(loot) {
   const got = [];
   for (const k in loot) {
     if (k === 'rations') { S.food += loot[k]; got.push(`${loot[k]} rations`); }
-    else if (k === 'water') { S.water = clamp(S.water + loot[k], 0, BAL.waterMax); got.push(`${loot[k]} L water`); }
+    else if (k === 'water') { S.water = clamp(S.water + loot[k], 0, waterCap()); got.push(`${loot[k]} L water`); }
     else if (k === 'hydrazine') { S.hydrazine += loot[k]; got.push(`${loot[k]} hydrazine`); }
     else if (SEED_LOOT[k]) { farm().seeds[SEED_LOOT[k]] += loot[k]; got.push(`${loot[k]} ${CROPS[SEED_LOOT[k]].one} seed packet${loot[k] > 1 ? 's' : ''}`); }
     else { S.inv[k] = (S.inv[k] || 0) + loot[k]; got.push(`${loot[k]} ${ITEM_NAMES[k] || k}`); }

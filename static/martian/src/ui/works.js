@@ -6,7 +6,7 @@ import { Snd } from '../audio/sound.js';
 import { S } from '../game/state.js';
 import { HOUR } from '../game/base.js';
 import { ITEM_NAMES } from '../game/inventory.js';
-import { WORKS_POWER_FLOOR, batchesInHand, hoursText, jobLine, jobOf, startJob, stopJob } from '../game/works.js';
+import { WORKS_POWER_FLOOR, batchesInHand, hoursText, jobLine, jobOf, reserve, reserveCap, startJob, stopJob } from '../game/works.js';
 import { costChips, missingText } from './screens.js';
 
 const on = (scope, sel, fn) => scope.querySelectorAll(sel).forEach((n) => n.addEventListener('click', (ev) => { ev.stopPropagation(); fn(n, ev); Snd.click(); }));
@@ -47,7 +47,7 @@ export function showWork(b, after) {
       `<div class="sheet-bd mg-scroll"><div class="work-jobs">${cards}</div></div>` +
       `<footer class="sheet-ft"><button type="button" class="mg-btn" data-act="done" data-autofocus>${icon('check')}Done</button>` +
       `<span class="note${low ? ' warn' : ''}">${low ? `Hab power is at ${Math.round(S.power)}%: the works wait until it is back above ${WORKS_POWER_FLOOR}%.`
-        : `It works by itself, through the night too. Hab power: ${Math.round(S.power)}%.`}</span></footer></div>`,
+        : `It works by itself, through the night too. Hab power: ${Math.round(S.power)}%${reserveCap() ? `, and ${Math.round(reserve())}% in reserve` : ''}.`}</span></footer></div>`,
       { label: `${b.def.name}: give it a job`, onEscape: close });
     on(p, '[data-act="done"]', close);
     on(p, '[data-run]', (n) => { if (startJob(b, n.dataset.run, +n.dataset.n)) { if (after) after(); draw(); } });
