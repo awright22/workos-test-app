@@ -24,6 +24,39 @@
         <div class="mg-boot-sub">Loading</div>
     </div>
     <noscript><p style="color:#f5f0e8;font-family:sans-serif;text-align:center;margin-top:40vh">Stranded II needs JavaScript and WebGL to run.</p></noscript>
-    <script type="module" src="game.js"></script>
+    <script>
+    /* Which build this page belongs to (stamped by tools/build.mjs), and a check before the game is loaded.
+     * The page itself comes from the network whenever there is one; everything else comes from the offline copy
+     * the service worker keeps. If that copy is another build's, the worker has not taken this one. (An installed
+     * copy on an iPhone stayed on one build through nineteen newer ones.) Then the old copy and its worker are
+     * dropped and the page is loaded again, from the network. Saved games are in local storage and are not touched. */
+    (function () {
+      var BUILD = /*BUILD*/'e0658cf9b76a'/*END*/;
+      window.__BUILD = BUILD;
+      function start() {
+        var s = document.createElement('script');
+        s.type = 'module';
+        s.src = 'game.js' + (BUILD ? '?v=' + BUILD : '');
+        document.body.appendChild(s);
+      }
+      try {
+        var sw = navigator.serviceWorker;
+        if (!BUILD || !window.caches || !sw || !sw.controller || sessionStorage.getItem('mg-fresh') === BUILD) { start(); return; }
+        caches.keys().then(function (keys) {
+          var stale = keys.filter(function (k) { return k.indexOf('stranded2-') === 0 && k !== 'stranded2-' + BUILD; });
+          if (!stale.length) { start(); return; }
+          // (only with the network to load from: a HEAD request is not answered from the offline copy)
+          return fetch('game.js', { method: 'HEAD', cache: 'no-store' }).then(function (r) {
+            if (!r.ok) throw new Error('offline');
+            var here = new URL('.', location.href).href;
+            return Promise.all([
+              Promise.all(stale.map(function (k) { return caches.delete(k); })),
+              sw.getRegistrations().then(function (rs) { return Promise.all(rs.filter(function (x) { return x.scope === here; }).map(function (x) { return x.unregister(); })); })
+            ]);
+          }).then(function () { sessionStorage.setItem('mg-fresh', BUILD); location.reload(); });
+        }).catch(start);
+      } catch (e) { start(); }
+    })();
+    </script>
 </body>
 </html>
