@@ -46,7 +46,9 @@ const SHOTS = [
   ['day-drive', 'at speed by day', async (G) => { G.lookSeat(0, -0.2); G.input.keys.w = true; G.tick(1 / 30, 120); await G.settle(); G.tick(1 / 30, 4); }],
   ['day-turn', 'at speed, turning', async (G) => { G.input.keys.a = true; G.tick(1 / 30, 30); await G.settle(); G.tick(1 / 30, 3); G.input.keys.a = false; }],
   ['behind-day', 'the view from behind it, the same moment', async (G) => { G.S.cockpit = false; G.tick(1 / 30, 60); await G.settle(); G.tick(1 / 30, 4); G.input.keys.w = false; }],
-  ['low-sun', 'driving toward a low sun', async (G) => { await G.seat(17.6, -1.45); }],
+  // (at five to six, with the sun a hand's breadth over the horizon: at 17:36 it stood well up the windscreen, and the
+  //  picture named for a low sun had none)
+  ['low-sun', 'driving toward a low sun', async (G) => { await G.seat(17.93, -1.45); }],
   ['storm', 'parked in a dust storm at noon', async (G) => { await G.seat(12); G.setStorm(1); G.S.storm.i = 1; G.tick(1 / 30, 60); await G.settle(); }],
   ['night-parked', 'parked at one in the morning', async (G) => { G.setStorm(0); G.S.storm.i = 0; await G.seat(1); }],
   ['night-dash', 'the same, looking down at the dashboard', async (G) => { G.lookSeat(0, -0.6); }],

@@ -26,7 +26,7 @@ const FINAL_FRAGMENT = /* glsl */`
   #include <common>
   #include <tonemapping_pars_fragment>
   uniform sampler2D tDiffuse;
-  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil;
+  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil, uKnee;
   uniform float uSharp;
   uniform vec2 uTexel;
   uniform vec3 uTint, uVeilCol;
@@ -94,6 +94,16 @@ const FINAL_FRAGMENT = /* glsl */`
       col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick)) * (1.0 - cabHere);
     }
     col *= uExposure;
+    // After dark the only light is lamps, and a lamp lights white cloth a pace from it many times as brightly as the
+    // sand at its foot: with the eye opened up for the night, a white wall under a porch lamp, a pale rock in the
+    // headlamps and the Hab's dome in the helmet's beam all burnt out to one flat white. So at night what a lamp
+    // falls on has a shoulder: it rises as before up to a third of white and then ever more slowly, and a lit
+    // wall keeps its shading. (Lamps themselves, windows and screens are many times white and still read as lit.)
+    if (uKnee > 0.0) {
+      float l0 = max(col.r, max(col.g, col.b));
+      float l1 = l0 < 0.36 ? l0 : 0.36 + (l0 - 0.36) / (1.0 + (l0 - 0.36) / 0.60);
+      col *= mix(1.0, l1 / max(l0, 0.0001), uKnee);
+    }
     // scene-referred grade
     float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
     col = mix(vec3(lum), col, uSaturation) * uTint;
@@ -138,7 +148,7 @@ class FinalPass extends Pass {
   constructor() {
     super();
     this.uniforms = {
-      tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
+      tDiffuse: { value: null }, uExposure: { value: 1 }, uKnee: { value: 0 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
       uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
@@ -365,7 +375,8 @@ export class Engine {
     // (how the dust thins with height is in the shader, see airHaze: this is the haze at the datum; from orbit it goes)
     // (On Mars a clear day's dust dims things by a third over thirty kilometres. At this planet's scale that is a hundred
     // metres or so: the haze was a third of what the scale asks, and a flat plain's horizon was a ruler's edge.)
-    fog.density = (0.0019 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-Math.max(0, alt - 600) / 500) + 0.0000015;
+    // (`thinAir`: the launch's cameras climb out of the dust faster than this reckons, see game/launch.js)
+    fog.density = (0.0019 + 0.006 * dust + 0.034 * dust * dust) * gust * Math.exp(-Math.max(0, alt - 600) / 500) * (this.thinAir === undefined ? 1 : this.thinAir) + 0.0000015;
     // exposure, eased like an eye adapting: opened up as the sun sinks (the ground gets little
     // light at a low angle), wider still at night, and steady indoors
     // ... and metered like a camera: stopped down when it looks into a low sun, and under a high one
@@ -381,6 +392,7 @@ export class Engine {
     if (this.snapLight > 0) this.snapLight--;
     const fu = this.final.uniforms;
     fu.uExposure.value = this.exposure;
+    fu.uKnee.value = (1 - sky.day) * (1 - this.indoor) * (1 - (sky.space || 0));      // (out of doors at night, on the ground)
     fu.uTime.value = this.time;
     // the storm's veil: the colour everything fades into, blown across the screen the way the wind goes
     fu.uVeil.value = p.inside ? 0 : smoothstep(0.3, 0.9, dust) * Math.exp(-alt / 500);
@@ -394,7 +406,9 @@ export class Engine {
     // sand it stood on: so the fill falls to a third there. The rim light is the other half of the same picture.)
     // (At night a sixth: at a fifth the whole dome stood evenly pale with nothing to light it. And at midday under
     // two thirds, not four fifths: with the sun ahead, his shaded back measured as bright as the lit sand.)
-    this.modelAmbient = lerp(lerp(0.17, lerp(0.32, 0.62, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
+    // (A seventh at night now, not a sixth: a lander two hundred metres off, outside every beam, stood out pale against
+    //  ground the same starlight left dark.)
+    this.modelAmbient = lerp(lerp(0.14, lerp(0.32, 0.62, smoothstep(0.1, 0.65, sky.sunE)), sky.day), 1, io);
     // (the rim is strongest under a low sun, when the sun itself is weakest: at dawn and dusk a man against the light
     // had no edge at all)
     this.modelRim = (1 - io) * sky.day * (1 + 1.0 * (1 - smoothstep(0.08, 0.5, sky.sunE)));

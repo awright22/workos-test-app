@@ -2480,8 +2480,8 @@ def _beagle_petal(k, w, M, tints, bosses=False):
 
 def build_beagle2():
     """Beagle 2 as it was found: the pocket-watch lander lying open, base and lid side by side on
-    their hinge, with only two of the four solar discs unfolded from the lid. One of those stands
-    out level on its hinge tower, the other has sagged until its edge rests on the soil; the third
+    their hinge, with only two of the four solar discs unfolded from the lid. Both of those have
+    sagged on their hinge towers until an edge rests on the soil; the third
     sprang a hand's breadth and jammed, and the fourth never moved, so the two still cover the lid
     (and the radio antenna under them, which is why it was never heard from). The base is full to
     the brim: the instrument arm folded across it with its cluster of instruments (the two camera
@@ -2646,7 +2646,10 @@ def build_beagle2():
             rod(alu, M0 @ Vector((0.0, -0.08, (HL + zh) / 2 - 0.01)), M0 @ Vector((0.0, 0.08, (HL + zh) / 2 - 0.01)), 0.005, 5)
         return M0 @ T(0, 0, zh)
 
-    for beta, level, pose, skew in ((40, 3, 3.5, 0), (118, 2, 12.5, 0), (-40, 1, 180 + 18.0, 5.0), (-118, 0, 180.0, 0)):
+    # (both of the unfolded discs have sagged on their hinges until an edge rests on the soil. One stood out level,
+    #  a hand's breadth clear of the ground on its tower, and with its shadow lying apart from it under a high sun it
+    #  read as a disc hovering.)
+    for beta, level, pose, skew in ((40, 3, 17.0, 0), (118, 2, 12.5, 0), (-40, 1, 180 + 18.0, 5.0), (-118, 0, 180.0, 0)):
         Mh = tower(beta, level)
         Mp = Mh @ R('Z', skew) @ R('Y', pose)
         _beagle_petal(k, w, Mp, tints, bosses=pose > 90)
@@ -3397,7 +3400,9 @@ def build_schiaparelli_wreck():
     a torn edge (bright, fresh metal). Every sheet has thickness and both its faces."""
     weathered()
     mat('carbon', color=(0.035, 0.035, 0.04), metallic=0.3, roughness=0.5)             # carbon-fibre skins of the deck and walls
-    mat('ejecta', color=(0.50, 0.36, 0.265), metallic=0.0, roughness=1.0)              # soil from under the dust, thrown out in rays
+    # (the ground's own red-brown, a shade paler than the soot it lies on: at a pale beige the clods were a handful of
+    #  cream pebbles scattered round the wreck, too small to throw a shadow and too bright to be soil)
+    mat('ejecta', color=(0.37, 0.238, 0.165), metallic=0.0, roughness=1.0)             # soil from under the dust, thrown out in rays
     mat('aluminium_bare', color=(0.70, 0.71, 0.74), metallic=0.6, roughness=0.5)       # torn structure: brighter than a lander that has only stood in the dust
     root = part('schiaparelli_wreck')
     k, w = Kit(root), Wound(root)
@@ -3787,7 +3792,8 @@ def build_schiaparelli_wreck():
                 # (soot over soil is a dark grey-brown, patchy where the wind has been at it: at nine tenths black it was a
                 # hole airbrushed into the picture)
                 burn *= 0.80 + 0.20 * smear
-                attr.data[i].color = (c[0] * (1 - 0.76 * burn), c[1] * (1 - 0.72 * burn), c[2] * (1 - 0.64 * burn), 1.0)
+                # (and no darker than that: as dark as a shadow, the scorch and the shadow of whoever stands on it are one shape)
+                attr.data[i].color = (c[0] * (1 - 0.63 * burn), c[1] * (1 - 0.61 * burn), c[2] * (1 - 0.55 * burn), 1.0)
                 continue
             if name == 'ejecta':
                 attr.data[i].color = (c[0] * (0.82 + 0.18 * smear), c[1] * (0.82 + 0.18 * smear), c[2] * (0.82 + 0.18 * smear), 1.0)

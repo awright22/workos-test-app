@@ -64,7 +64,7 @@ export const MATERIALS = [
     note: 'Some of the youngest lava on Mars: rafted plates, like pack ice made of rock. InSight felt the ground still twitching near here.' },
   { id: 'hematite', kind: 'soil', name: 'Hematite spherules', value: 26,
     at: (p) => 15 * near(p, -1.9, 354.5, 9) + 7 * near(p, 2.6, 338.6, 4), lead: 'Meridiani Planum, where Opportunity landed.',
-    note: 'Blueberries. Little grey beads of hematite that grew in rock soaked with groundwater. Opportunity landed in a bowl of them and NASA lost its mind, correctly.' },
+    note: 'Little grey beads of hematite that grew in rock soaked with groundwater: NASA calls them blueberries. Opportunity landed in a bowl of them and NASA lost its mind, correctly.' },
   { id: 'sulfate', kind: 'rock', name: 'Layered sulfates', value: 22,
     at: (p) => 13 * inCanyon(p) + 5 * near(p, -1.9, 354.5, 9) + 6 * near(p, -5.4, 137.8, 2.5), lead: 'The walls and floors of Valles Marineris.',
     note: 'Pale banded salts, kilometres thick, left by water that was acid and then was gone. The canyon walls are a calendar nobody has finished reading.' },

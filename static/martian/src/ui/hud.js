@@ -135,7 +135,7 @@ export const OBJECTIVES = [
     shown: () => isBase() && S.sol >= 2 && S.flags.didMath, done: () => (S.stats.quarried || 0) >= 12 || stands('kiln') },
   { id: 'b-kiln', text: () => 'Build a kiln', why: 'Twelve basalt and two scrap (the wreckage by the Hab has scrap). Colony, the Base tab.',
     shown: () => isBase() && ((S.stats.quarried || 0) >= 12 || stands('kiln')), done: () => stands('kiln') },
-  { id: 'b-brick', text: () => `Fire bricks (${Math.min(S.inv.brick || 0, 14)} of 14)`, why: 'Dig soil on open ground, then give the kiln a job. A smelter takes fourteen bricks.',
+  { id: 'b-brick', text: () => `Fire bricks (${Math.min(S.inv.brick || 0, 14)} of 14)`, why: 'Dig regolith on open ground, then give the kiln a job. A smelter takes fourteen bricks.',
     shown: () => isBase() && stands('kiln'), done: () => (S.inv.brick || 0) >= 14 || stands('smelter') },
   { id: 'b-smelter', text: () => 'Build a smelter',
     why: () => ((S.inv.circuit || 0) >= 1 ? 'Fourteen brick, six basalt, four scrap, a circuit board. It makes iron.' : 'It wants a circuit board. NASA sends two for the first samples analysed at the Hab; old landers have them.'),
@@ -266,6 +266,7 @@ export function objectiveThen(o, where) {
 export const objDone = new Set();
 let objUrgent = false;
 let leadShown = '';
+let bannerActs = false, objByBanner = false;
 let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null, objWatch = null;
 /** How long the reason under the first line stays open on a phone, in seconds of play, after it changes or is asked for. */
 const WHY_OPEN = 9;
@@ -445,7 +446,7 @@ export const BAR_UNLOCKS = [
   { id: 'power', flag: 'barPower', when: () => plantedPlots() > 0 || S.stats.panels > 0 || S.power < 55,
     card: () => ['Power', 'The Hab’s battery. Sun on clean panels fills it; the machines and the night drain it. Empty, the machines stop.', 'Runs the machines. Clean panels fill it by day.'] },
   { id: 'health', flag: 'barHealth', when: () => S.health < 96 || bedtime(),
-    card: () => ['Vitals', 'Your body. Air, water, food and sleep keep it up. At zero the run is over.', 'Your body. At zero the run is over.'] },
+    card: () => ['Health', 'Your body. Air, water, food and sleep keep it up. At zero the run is over.', 'Your body. At zero the run is over.'] },
   { id: 'morale', flag: 'barMorale', when: () => S.sol > 1 || S.morale < 40,
     card: () => ['Morale', 'Your spirits, out of 100. Variety on the plate, music and comforts lift them. High, work goes faster.', 'Your spirits, out of 100. Low, work goes slower.'] },
 ];
@@ -486,7 +487,7 @@ function updateUnlocks() {
         //  them all back. Nothing did, and a new player never saw the rest: "the biggest onboarding gap", two reviewers.)
         if (unlocksSeeded && met && !legacy && layout.calm && !S.flags.dialTaught) {
           S.flags.dialTaught = true;
-          toast('TIP', 'Every gauge', 'Tap the dial to see them all.', { lit: UI.suit, life: 6000 });
+          toast('TIP', 'Every gauge', 'Tap the suit gauge to see them all.', { lit: UI.suit, life: 6000 });
         }
       }
     }
@@ -636,7 +637,14 @@ function rebuildObjectives(now) {
   // new step of the same one) and then the card closes to its title and its place; a press on the card opens it
   // again. (Open always, the card was a hundred pixels of a small screen, and its grey detail was read once.)
   const head = rows.find((r) => r.lead), hk = head ? `${head.key}|${head.why}${layout.calm ? '|' + head.text : ''}` : '';
-  if (hk !== whyKey) { whyKey = hk; whyAt = playTime(); }
+  // (Beside a banner that has said what to do, the card is its one line and that line is the place and how far: RUN TO
+  //  THE HAB beside "Run for air / Hab 23 m / The airlock refills the suit…" was the same thing twice, the second
+  //  time at four lines. A press still opens it.)
+  const byBanner = layout.calm && bannerActs && !!head && /urgent/.test(head.cls) && !!head.o && !!objectivePlace(head.o);
+  if (byBanner !== objByBanner) { objByBanner = byBanner; UI.objectives.classList.toggle('by-banner', byBanner); if (byBanner) whyAt = -1e9; }
+  // (And at the wheel a new task is given the time it takes to read its title and its place, not the nine seconds a
+  //  man on foot is given for its reason as well: the reason is a press away, and the road is behind the card.)
+  if (hk !== whyKey) { whyKey = hk; if (!byBanner) whyAt = playTime() - (layout.calm && S.mode === 'rover' && Math.abs(roverF.speed) > 3 ? WHY_OPEN - 4.5 : 0); }
   const whyOpen = !layout.compact || playTime() - whyAt < WHY_OPEN;
   // (the quiet HUD's card is shut whenever it is not open, reason or none: one line, the title and how far)
   UI.objectives.classList.toggle('shut', !!head && (layout.calm || !!head.why) && !whyOpen);
@@ -936,7 +944,9 @@ let openUntil = -1e9;
 /** True while every gauge is showing because he asked. */
 export function gaugesOpen() { return layout.calm && playTime() < openUntil; }
 /** Show every gauge for a while (the dial was tapped); `sec` = 0 puts them away. */
-export function openGauges(sec = OPEN_FOR) { openUntil = sec > 0 ? playTime() + sec : -1e9; }
+// (and the task card shuts as they open: he has asked for the gauges, and the two open together were a column of
+//  panels down each side of a phone)
+export function openGauges(sec = OPEN_FOR) { openUntil = sec > 0 ? playTime() + sec : -1e9; if (sec > 0 && layout.calm) { whyAt = -1e9; fitKey = ''; } }
 /** Local solar time where the astronaut stands, as hh:mm (a sol has 24 h 40 m). */
 export function fmtClock() {
   const ll = vecToLl(_v1.copy(player.pos).normalize());
@@ -952,12 +962,14 @@ function setText(key, node, html) { if (hud.text[key] !== html) { hud.text[key] 
 /** The gauges, in the order they queue when several are low; and what each says when it leads and is critical. */
 const TROUBLE_ORDER = ['o2', 'health', 'water', 'food', 'power', 'morale'];
 const TROUBLE = {
-  o2: { ic: 'hab', rank: 2, name: 'Hab <span class="chem">O<sub>2</sub></span>', todo: 'the oxygenator needs power', short: 'the oxygenator needs power' },
-  health: { ic: 'vitals', rank: 3, name: 'Health', todo: 'eat, rest, and get to air', short: 'eat, rest, get to air' },
-  water: { ic: 'water', rank: 4, name: 'Water', todo: 'make water at the rig', short: 'make water at the rig' },
-  food: { ic: 'food', rank: 5, name: 'Food', todo: 'harvest what is ready, and ration', short: 'harvest, and ration' },
-  power: { ic: 'power', rank: 6, name: 'Power', todo: 'wipe the solar panels', short: 'wipe the panels' },
-  morale: { ic: 'mood', rank: 10, name: 'Morale', todo: 'cook, sleep, call home', short: 'cook, sleep, call home' },
+  // (`act`: what the banner says when this gauge leads, in a few words: the thing to do. The gauge's name and that
+  //  it is critical go under it. See the alerts, below.)
+  o2: { ic: 'hab', rank: 2, name: 'Hab <span class="chem">O<sub>2</sub></span>', act: 'Restore power', todo: 'the oxygenator needs power', short: 'the oxygenator needs power' },
+  health: { ic: 'vitals', rank: 3, name: 'Health', act: 'Eat and rest', todo: 'eat, rest, and get to air', short: 'eat, rest, get to air' },
+  water: { ic: 'water', rank: 4, name: 'Water', act: 'Make water', todo: 'make water at the rig', short: 'make water at the rig' },
+  food: { ic: 'food', rank: 5, name: 'Food', act: 'Harvest, ration', todo: 'harvest what is ready, and ration', short: 'harvest, and ration' },
+  power: { ic: 'power', rank: 6, name: 'Power', act: 'Wipe the panels', todo: 'wipe the solar panels', short: 'wipe the panels' },
+  morale: { ic: 'mood', rank: 10, name: 'Morale', act: 'Cook, then sleep', todo: 'cook, sleep, call home', short: 'cook, sleep, call home' },
 };
 function setLevel(key, node, frac, warnAt, critAt) {
   const c = frac < critAt ? 'crit' : frac < warnAt ? 'warn' : '';
@@ -1164,24 +1176,28 @@ export function updateHud() {
   hud.mode = S.mode;
 
   // --- alerts: at most two, worst first. Each says what is wrong and what to do (in fewer words where the screen is narrow) ---
-  const al = [];
+  // An alarm leads with what to do about it, in capitals, and says what is wrong under that: RUN TO THE HAB over
+  // "suit O2 critical". (It was the other way about, the alarm in capitals and its stake under it, with the thing to
+  // do left to the task card beside it: a reviewer holding it to a higher standard found that the largest words on
+  // the screen in an emergency named the problem and not the way out of it.)
+  const al = [], O2 = 'suit <span class="chem">O<sub>2</sub></span>', airAt = airAtRover() ? 'rover' : 'Hab';
   // (the alarm and its stake. What to do about it, where and how far, is the first line of the mission list beside
   //  it: the two used to say the same thing in the same words, "Hab breach / seal it" beside "Hab breach: seal it")
   // (each also names the gauge it bears on, if it has one, and its place in the queue when several are up at once)
   // (the tank before the breach: out of doors with half a minute of air and the Hab holed behind him, the banner said
   //  HAB BREACH over a full Hab, beside a dial at 9% and a card that said "Run for air". Two reviewers, one bug.)
-  if (S.breach.active) al.push(['crit', 'warning', 'Hab breach', 'the Hab is losing its air', 'the air is leaking out', 'o2', 1]);
+  if (S.breach.active) al.push(['crit', 'warning', 'Seal the breach', 'the Hab is losing its air', 'the Hab is losing air', 'o2', 1]);
   if (!filling && !safeAir && S.mode !== 'rover') {
-    if (sf < 0.12) al.push(['crit', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> critical', 'the tank is almost empty', 'the tank is almost empty', null, 0]);
-    else if (sf < 0.25) al.push(['warn', 'suit', 'Suit <span class="chem">O<sub>2</sub></span> low', 'under a quarter of a tank left', 'under a quarter left', null, 0]);
+    if (sf < 0.12) al.push(['crit', 'suit', `Run to the ${airAt}`, `${O2} critical`, `${O2} critical`, null, 0]);
+    else if (sf < 0.25) al.push(['warn', 'suit', `Go to the ${airAt}`, `${O2} low: under a quarter left`, `${O2} under a quarter`, null, 0]);
   }
-  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Rover battery low', 'park in daylight to recharge', 'park it in the sun', null, 7]);
+  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Park in the sun', 'rover battery low: it charges by day', 'rover battery low', null, 7]);
   if (S.storm.i > 0.15) {
     // (what the storm is doing depends on where it is: over the Hab it starves the panels, out here it only blinds)
     const atHab = stormIntensityAt(World.hab.position) > 0.15;
     al.push(['warn', 'storm', 'Dust storm', atHab ? 'solar power is down' : 'keep the Hab in sight', atHab ? 'solar power is down' : 'keep your bearings', atHab ? 'power' : null, 8]);
   }
-  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Extreme cold', 'the suit heater is drawing <span class="chem">O<sub>2</sub></span>', 'the heater burns more <span class="chem">O<sub>2</sub></span>', null, 9]);
+  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Get indoors', 'extreme cold: the suit heater burns <span class="chem">O<sub>2</sub></span>', 'the cold burns <span class="chem">O<sub>2</sub></span>', null, 9]);
   const critical = al.some((a) => a[0] === 'crit');
   if (critical !== UI.critical) { UI.critical = critical; root.classList.toggle('is-critical', critical); }
 
@@ -1201,7 +1217,7 @@ export function updateHud() {
       const mine = W.find((x) => x.bar === k);
       if (mine) { if (w.lvl === 'crit') mine.lvl = 'crit'; continue; }
       const T = TROUBLE[k];
-      W.push({ lvl: w.lvl, ic: T.ic, bar: k, rank: T.rank, a: w.lvl === 'crit' ? ['crit', T.ic, `${T.name} critical`, T.todo, T.short] : null });
+      W.push({ lvl: w.lvl, ic: T.ic, bar: k, rank: T.rank, a: w.lvl === 'crit' ? ['crit', T.ic, T.act, `${k === 'o2' ? T.name : T.name.toLowerCase()} critical`, `${k === 'o2' ? T.name : T.name.toLowerCase()} critical`] : null });
     }
     // (what kills in minutes, a breach or an emptying tank, leads whatever its level: with the tank at a fifth and the
     //  water at nine litres the banner said WATER CRITICAL beside a card that said "Get to air")
@@ -1212,6 +1228,8 @@ export function updateHud() {
     //  Not in the first minute, whose leak is the amber it has always been.)
     if (lead && lead.a && lead.rank <= 1 && lead.lvl !== 'crit' && objUrgent && !S.flags.coldOpen) { lead.lvl = 'crit'; lead.a = ['crit', ...lead.a.slice(1)]; }
     banners = lead && lead.a ? [lead.a] : [];
+    // (the task card beside a banner that has said what to do gives where and how far, and no more: see rebuildObjectives)
+    bannerActs = !!(lead && lead.a && lead.rank <= 1 && !S.flags.coldOpen);
     // (as many as there is room for: two beside the banner, three under it on the small phone; past that, a count)
     { const room = narrow ? 3 : 2, rest = W.slice(1);
       marks = rest.slice(0, rest.length > room ? room - 1 : room).map((x) => [x.lvl, x.ic]);
@@ -1236,7 +1254,8 @@ export function updateHud() {
     root.style.setProperty('--al2', Math.max(0, nAl - 1));
     root.classList.toggle('has-alert', nAl > 0);                                      // (on a phone a banner takes the region label's place)
     UI.alerts.innerHTML = banners.map(([cls, ic, title, note, short]) => `<div class="alert ${cls}">${icon(ic)}<span>${title}</span><small>${narrow ? short : note}</small></div>`).join('') +
-      (marks.length ? `<button type="button" class="marks" aria-label="${marks.length} more ${marks.length === 1 ? 'warning' : 'warnings'}: show every gauge">${marks.map(([lvl, ic]) => `<i class="mark ${lvl}">${lvl === 'more' ? ic : icon(ic)}</i>`).join('')}</button>` : '');
+      // (the marks say what they are: two bare signs in a pill beside the banner "look tappable and say nothing")
+      (marks.length ? `<button type="button" class="marks" aria-label="${marks.length} more ${marks.length === 1 ? 'warning' : 'warnings'}: show every gauge">${banners.length ? '<small>ALSO</small>' : ''}${marks.map(([lvl, ic]) => `<i class="mark ${lvl}">${lvl === 'more' ? ic : icon(ic)}</i>`).join('')}</button>` : '');
   }
 
   // --- screen-edge effects, drawn by the renderer's final pass ---
@@ -1266,7 +1285,11 @@ export function updateHud() {
   if (calm) {
     const now = perf();
     if (UI.joy.classList.contains('live') || S.flags.coldOpen) hud.moveAt = now;
-    const feet = now - hud.moveAt < 2.5;
+    // (and for as long as the tank is what is wrong: the banner says RUN, and the button it means was not on the screen
+    //  while he stood reading it)
+    const lowAir = !filling && !safeAir && S.mode === 'walk' && sf < 0.25;
+    const feet = now - hud.moveAt < 2.5 || lowAir;
+    { const urge = lowAir && sf < 0.12 && player.speed < 6.5; if (hud.cls.urgeRun !== urge) { hud.cls.urgeRun = urge; UI.tSprint.classList.toggle('urge', urge); } }
     if (hud.cls.feet !== feet) { hud.cls.feet = feet; UI.tSprint.classList.toggle('show', feet); UI.tJump.classList.toggle('show', feet); }
   }
   const candleOn = candles > 0 && (!calm || (!safeAir && !filling && S.mode !== 'rover' && sf < 0.5));

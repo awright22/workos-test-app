@@ -688,6 +688,7 @@ for (const size of SIZES) {
     return {
       way: on(way), tag: way ? way.querySelector('b').textContent : '', line: (document.querySelector('#mg-objectives .obj:not(.done) .ds') || {}).textContent || '',
       notes: [...document.querySelectorAll('#mg-alerts .alert small')].map((n) => ({ t: n.textContent, on: on(n) })), why: why ? why.textContent : '',
+      place: (() => { const n = document.querySelector('#mg-objectives .obj:not(.done) .pl'); return on(n) ? n.textContent : ''; })(), byBanner: document.getElementById('mg-objectives').classList.contains('by-banner'),
       marks: document.querySelectorAll('#mg-alerts .mark').length, calm: document.getElementById('mg-root').classList.contains('mg-calm'),
     };
   });
@@ -711,8 +712,9 @@ for (const size of SIZES) {
     });
     check(`${size.name}: a card stands 8 px under the bars and at least 8 px over the stick, and its note ends with a sentence`, !!gaps && gaps.under >= 7.5 && gaps.under <= 9 && gaps.over >= 7.5 && (!gaps.note || /[.!?]$/.test(gaps.note)), gaps);
     // (the quiet HUD: one thing leads, with its instruction, and the other waits beside it as a mark; the full HUD: two banners)
-    check(`${size.name}: the banner that leads keeps its instruction, the other waits as a mark, and the first mission line keeps its reason`,
-      (hn.calm ? hn.notes.length === 1 && hn.marks >= 1 : hn.notes.length === 2) && hn.notes.every((n) => n.on && n.t.length > 5) && hn.why.length > 8, hn);
+    // (and where the banner has said what to do, the card beside it gives the place and how far and keeps its reason for a press)
+    check(`${size.name}: the banner that leads keeps its instruction, the other waits as a mark, and the first mission line keeps its reason or gives the place`,
+      (hn.calm ? hn.notes.length === 1 && hn.marks >= 1 : hn.notes.length === 2) && hn.notes.every((n) => n.on && n.t.length > 5) && (hn.byBanner ? hn.place.length > 1 : hn.why.length > 8), hn);
     const a = await audit();
     check(`${size.name}: the busy HUD has nothing under 11 px or 44 px, and nothing cut`, a.length === 0, a);
     // every prompt is a line, and at most one line under it (three-line prompts stood over the stick at 667 wide)
@@ -848,7 +850,7 @@ for (const size of SIZES) {
       });
       await page.locator('#mg-vitals').tap();
       await sleep(250);
-      const guide = await page.evaluate(() => !!document.querySelector('#mg-panel .guide, #mg-panel .bars-guide, #mg-panel [data-guide]') || /what the bars mean|suit o|hab o/i.test((document.querySelector('#mg-panel') || { textContent: '' }).textContent));
+      const guide = await page.evaluate(() => !!document.querySelector('#mg-panel .guide, #mg-panel .bars-guide, #mg-panel [data-guide]') || /what the gauges mean|suit o|hab o/i.test((document.querySelector('#mg-panel') || { textContent: '' }).textContent));
       await page.keyboard.press('Escape');
       await sleep(200);
       await page.evaluate(() => window.__UI.openGauges(0));

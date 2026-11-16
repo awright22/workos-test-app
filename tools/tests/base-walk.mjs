@@ -147,7 +147,7 @@ await shot('base-tab-smelter-ready', 'Sols later (stores filled for the picture:
 await tap('#mg-base [data-build="smelter"]');
 await ev(async (G) => { G.paused = true; G.tpLocal(37, 30, 0); await G.settle(); G.tick(0.05, 8); G.hold(2.7); G.tick(0.05, 6); G.S.inv.scrap = 3; G.S.inv.regolith = 6; G.hold(0.7); });
 await page.waitForSelector('.sheet.work', { timeout: 60000 });
-await shot('smelter-sheet', 'The smelter is built (it is behind this sheet) and he has walked up to it: iron three ways. (Three scrap and six soil put in the stores for the picture.)', 1200);
+await shot('smelter-sheet', 'The smelter is built (it is behind this sheet) and he has walked up to it: iron three ways. (Three scrap and six regolith put in his inventory for the picture.)', 1200);
 await tap('.sheet.work [data-act="done"]');
 
 // ---- the map: where orbiters saw each mineral
@@ -171,7 +171,7 @@ expect('standing at a deposit finds it', dep.found, dep);
 await shot('deposit-found', `A hematite pavement ${dep.away} m from the Hab, driven to: found, and its work offered.`, 1500);
 await page.evaluate(() => window.__UI.holdCards(false));
 await ev((G) => { for (let i = 0; i < 6; i++) { G.hold(2.3); G.tick(0.05, 2); } });
-await shot('deposit-worked', 'Six turns of raking: twelve iron ore.', 1800);
+await shot('deposit-worked', 'Six turns of raking: twelve hematite.', 1800);
 await tap('#mg-trow [data-t="colony"]');
 await page.waitForSelector('#mg-colony [data-tab="inv"]', { timeout: 60000 });
 await tap('#mg-colony [data-tab="inv"]');
@@ -190,13 +190,13 @@ await ev((G) => { G.tick(0.5, 30); });
 await shot('smelter-ore-running', 'Home with the ore: the smelter making iron from it.', 1200);
 await tap('.sheet.work [data-act="done"]');
 
-// ---- a building, set down as the kiln was: a water tank (eight iron and six brick put in the stores)
+// ---- a building, set down as the kiln was: a water tank (eight iron and six brick put in his inventory)
 await ev((G) => { G.S.sol = 9; G.setLocalTime(10.5); Object.assign(G.S.inv, { iron: 8, brick: 6 }); G.tick(0.05, 4); });
 await tap('#mg-trow [data-t="colony"]');
 await page.waitForSelector('#mg-colony [data-tab="base"]', { timeout: 60000 });
 await tap('#mg-colony [data-tab="base"]');
 await page.evaluate(() => { const c = document.querySelector('#mg-base [data-card="tank"]'); if (c) c.scrollIntoView({ block: 'center' }); });
-await shot('base-tab-tank-ready', 'Sols later (eight iron and six brick put in the stores for the picture): the Base tab, scrolled to the water tank.', 1200);
+await shot('base-tab-tank-ready', 'Sols later (eight iron and six brick put in his inventory for the picture): the Base tab, scrolled to the water tank.', 1200);
 await tap('#mg-base [data-build="tank"]');
 await ev(async (G) => { G.paused = true; G.tpLocal(29, 43, 0); await G.settle(); G.tick(0.05, 8); });
 expect('the place for the tank is offered', /build the water tank here/i.test(await prompt()), await prompt());

@@ -542,16 +542,24 @@ const LAMPS = {
   //  own shoulders and pack, and he is a lit man in the dark and not a hole cut in it. Nothing casts a shadow by it.)
   // (and it looks down more than out: aimed out, its soft edge fell a pace ahead of him, and his own boots, and a slope
   //  under them, were in the dark)
-  pool: { angle: 0.86, penumbra: 1.0, distance: 26, decay: -0.25, at: [0, 0.62, -0.75], aim: [0, -4.6, 6.0], power: 0.8 },
-  throw: { angle: 0.38, penumbra: 1.0, distance: 64, decay: -0.7, at: [0, 0.12, 0.1], aim: [0, -0.95, 20], power: 0.72 },
+  // (and forward of his heels: it was a circle with him at its centre, as much of it behind him as ahead, which is
+  //  a lamp on a pole and not one on a helmet)
+  pool: { angle: 0.84, penumbra: 1.0, distance: 26, decay: -0.25, at: [0, 0.62, -0.75], aim: [0, -4.2, 6.6], power: 0.8 },
+  // (the beam grows less with distance than it did: ground far off is lit edge-on and wants it, but a white wall
+  //  twenty metres off stands square on to it, and the Hab's dome was floodlit from his helmet)
+  throw: { angle: 0.38, penumbra: 1.0, distance: 64, decay: -0.55, at: [0, 0.12, 0.1], aim: [0, -0.95, 20], power: 0.74 },
   // (the rover's wide lamps likewise stand above and behind it, where a work light on a mast would be: the rover was a
   //  black shape with two red lamps on it, in front of the ground it lit)
-  flood: { angle: 0.74, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 4.4, -5.2], aim: [0, -5.0, 16] },
+  // (over its tail and not a rover's length behind it: from there they lit its back square on, as a camera's flash
+  //  would, and from above they light its roof and graze its back, as a lamp on a mast does)
+  flood: { angle: 0.86, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 5.1, -3.9], aim: [0, -6.2, 13] },
   // (seen from the driver's seat they are where they are, on the roof's edge over the windscreen: from behind, with
   //  nothing to cast a shadow, they lit the inside of the cab through its roof as bright as day)
   floodSeat: { angle: 0.8, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 2.95, 2.45], aim: [0, -4.4, 12] },
   // (its far end is ground seen edge-on: stronger than this it was a bright bar drawn along the horizon)
-  high: { angle: 0.2, penumbra: 0.95, distance: 135, decay: -0.6, aim: [0, -1.4, 70], power: 1.0 },
+  // (and it grows less with distance than it did: a slope sixty metres off that faces the rover stands square on to
+  //  the beam, and was a bright block with the crest for its top edge and the slope's foot for its bottom)
+  high: { angle: 0.22, penumbra: 1.0, distance: 135, decay: -0.42, aim: [0, -1.4, 70], power: 1.0 },
 };
 function mountLamp(light, parent, role, at) {
   parent.add(light, light.target);

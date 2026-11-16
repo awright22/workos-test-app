@@ -116,8 +116,8 @@ const dug = await g.eval(async (G) => {
   for (let i = 0; i < 6; i++) { G.hold(2.3); G.tick(0.05, 2); }
   return { key: site.key, found, prompt, ore: G.S.inv.ore, left: site.left, before, after: shown() };
 });
-check('standing at a deposit finds it, and the prompt offers its work', dug.found && /rake up hematite/i.test(dug.prompt) && /iron ore/i.test(dug.prompt), dug.prompt);
-check('six turns of work: twelve iron ore, six loads gone, and one of its heaps', dug.ore === 12 && dug.left === 24 && dug.before === 6 && dug.after === 5, dug);
+check('standing at a deposit finds it, and the prompt offers its work', dug.found && /rake up hematite/i.test(dug.prompt) && /hematite/i.test(dug.prompt), dug.prompt);
+check('six turns of work: twelve hematite, six loads gone, and one of its heaps', dug.ore === 12 && dug.left === 24 && dug.before === 6 && dug.after === 5, dug);
 const stone = await g.eval(async (G) => {
   // the nearest boulder: the first hold at it is the sample this ground owes, the next is stone
   // (boulders near the camera become colliders when a frame is drawn: look round until one turns up)
@@ -153,7 +153,7 @@ await g.eval((G) => { G.paused = false; G.tick(0.05, 4); });
 await g.page.keyboard.press('c');
 await g.page.locator('#mg-colony [data-tab="inv"]').click();
 const larder = (await g.page.locator('#mg-inv').innerText()).replace(/\s+/g, ' ');
-check('the inventory lists a base\'s minerals, and says where the ones he lacks lie', /minerals/i.test(larder) && /iron ore 12/i.test(larder) && /basalt 2/i.test(larder) && /gusev crater/i.test(larder), larder.slice(-420));
+check('the inventory lists a base\'s minerals, and says where the ones he lacks lie', /minerals/i.test(larder) && /hematite 12/i.test(larder) && /basalt 2/i.test(larder) && /gusev crater/i.test(larder), larder.slice(-420));
 await g.page.keyboard.press('Escape');
 
 // ---- the works: built from the Colony screen's Base tab, set down outside, given a job at their own sheet
@@ -180,7 +180,7 @@ check('set down outside for twelve basalt and two scrap, and it offers itself fo
 await g.eval((G) => { G.hold(0.7); });
 await g.page.waitForSelector('.sheet.work', { timeout: 60000 });
 const sheet2 = (await g.page.locator('.sheet.work').innerText()).replace(/\s+/g, ' ');
-check('its sheet lists its jobs, what a batch takes and makes, and what is missing', /fire bricks from soil/i.test(sheet2) && /fire bricks from clay/i.test(sheet2) && /burn gypsum to cement/i.test(sheet2) && /missing 2 clay/i.test(sheet2) && /standing idle/i.test(sheet2), sheet2.slice(0, 400));
+check('its sheet lists its jobs, what a batch takes and makes, and what is missing', /fire bricks from regolith/i.test(sheet2) && /fire bricks from clay/i.test(sheet2) && /burn gypsum to cement/i.test(sheet2) && /missing 2 clay/i.test(sheet2) && /standing idle/i.test(sheet2), sheet2.slice(0, 400));
 await g.page.locator('.sheet.work [data-run="brick"][data-n="3"]').click();
 const run = await g.eval((G) => {
   const b = G.World.builtMeshes.find((x) => x.kind === 'kiln');

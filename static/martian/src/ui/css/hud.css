@@ -452,6 +452,13 @@
    --t11 is kept for the rules that use it: what they set is now 12 px.) */
 .mg-compact { --t11: max(.75rem, 12px); --t12: max(.75rem, 12px); --t13: max(.8125rem, 13px); --t14: max(.875rem, 14px); --tcap: max(.875rem, 14px); }
 #mg-root:not(.mg-compact) { --tcap: max(.8125rem, 13px); }
+/* (A review held to a higher standard: the floor is 13 px on every phone wider than the smallest, and the step above
+   it 14. Secondary text, the body of a card, the second line of a pill, a hint, a warning under a button, was 12 px
+   in grey and "read as 10 or 11". It is also a shade lighter, on every phone: grey text is read against a picture
+   of Mars through a sheet that is not quite opaque. The smallest phone (667 wide) keeps the 12 px floor: its
+   sheets were fitted to it line by line.) */
+@media (min-width: 761px) { .mg-compact { --t11: max(.8125rem, 13px); --t12: max(.8125rem, 13px); --t13: max(.875rem, 14px); --t14: max(.9375rem, 15px); } }
+.mg-compact { --ink-2: rgba(245, 240, 232, .85); --ink-3: rgba(245, 240, 232, .68); }
 .mg-compact .suit .dial { width: 3.375rem; height: 3.375rem; }
 .mg-compact .suit .lb { font-size: var(--t11); letter-spacing: .02em; margin-top: 0; }
 .mg-compact .suit .st { font-size: var(--t13); }
@@ -920,3 +927,12 @@
   #mg-root.mg-calm #mg-alerts { flex-direction: column; gap: .25rem; }
   #mg-alerts .marks { justify-content: center; }
 }
+
+/* Beside a banner that has said what to do (ui/hud.js: bannerActs), the task card's one line is the place and how far,
+   in the banner's own red: RUN TO THE HAB, and beside it HAB · 23 m. A press opens the card as ever. */
+#mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first { grid-template-columns: .75rem auto; }
+#mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .tx { display: none; }
+#mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .at { grid-column: 2; margin-left: 0; }
+#mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .pl { display: inline; font-size: var(--t14); }
+/* (the marks beside a banner say what they are: the other things that are low) */
+#mg-alerts .marks small { font: 600 var(--t11)/1 var(--f-cond); letter-spacing: .1em; color: var(--ink-2); margin: 0 .0625rem 0 .125rem; }

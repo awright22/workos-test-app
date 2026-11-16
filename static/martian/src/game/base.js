@@ -23,10 +23,10 @@ export const BASE_MODELS = ['dep_hematite', 'dep_silica', 'dep_clay', 'dep_sulfa
  */
 export const BULK = [
   { id: 'stone', name: 'Basalt', icon: 'rock', from: 'break it off any boulder' },
-  { id: 'ore', name: 'Iron ore', icon: 'ore', from: 'rake it up at a hematite pavement (Meridiani Planum, Aram Chaos)' },
+  { id: 'ore', name: 'Hematite', icon: 'ore', from: 'rake it up at a hematite pavement (Meridiani Planum, Aram Chaos)' },
   { id: 'silica', name: 'Silica', icon: 'ore', from: 'dig it at a silica bed (Gusev crater, Nili Patera)' },
   { id: 'clay', name: 'Clay', icon: 'ore', from: 'cut it from a clay bank (Mawrth Vallis, Nili Fossae, Gale)' },
-  { id: 'sulfate', name: 'Gypsum', icon: 'ore', from: 'break it from a sulfate ledge (Valles Marineris, Olympia Undae)' },
+  { id: 'sulfate', name: 'Gypsum', icon: 'ore', from: 'break it from a gypsum ledge (Valles Marineris, Olympia Undae)' },
   { id: 'salt', name: 'Salt', icon: 'ore', from: 'lift it from a salt pan (the northern plains, Terra Sirenum)' },
 ];
 export const BULK_BY_ID = Object.fromEntries(BULK.map((b) => [b.id, b]));
@@ -51,26 +51,26 @@ export const HOUR = BAL.solLen / (24 + 2 / 3);
  */
 export const WORKS = [
   { id: 'kiln', name: 'Kiln', model: 'bs_kiln', pad: 3.0, r: 2.0,
-    desc: 'A beehive of basalt blocks with a fire in it. Fires soil and clay to brick, and burns gypsum to cement.',
+    desc: 'A beehive of basalt blocks with a fire in it. Fires regolith and clay to brick, and burns gypsum to cement.',
     cost: { stone: 12, scrap: 2 },
     jobs: [
-      { id: 'brick', name: 'Fire bricks from soil', verb: 'Firing bricks', in: { regolith: 3 }, out: { brick: 2 }, hours: 2, power: 3 },
+      { id: 'brick', name: 'Fire bricks from regolith', verb: 'Firing bricks', in: { regolith: 3 }, out: { brick: 2 }, hours: 2, power: 3 },
       { id: 'brickClay', name: 'Fire bricks from clay', verb: 'Firing clay bricks', in: { clay: 2 }, out: { brick: 6 }, hours: 1.5, power: 2 },
       { id: 'cement', name: 'Burn gypsum to cement', verb: 'Burning cement', in: { sulfate: 2, stone: 1 }, out: { cement: 3 }, hours: 2, power: 3 },
     ] },
   { id: 'smelter', name: 'Smelter', model: 'bs_smelter', pad: 3.2, r: 2.1,
-    desc: 'A brick shaft furnace. Melts the iron out of hematite, out of scrap, and slowly out of the soil itself.',
+    desc: 'A brick shaft furnace. Melts the iron out of hematite, out of scrap, and slowly out of the regolith itself.',
     cost: { brick: 14, stone: 6, scrap: 4, circuit: 1 },
     jobs: [
-      { id: 'ironSoil', name: 'Smelt iron from soil', verb: 'Smelting soil', in: { regolith: 6 }, out: { iron: 1 }, hours: 3, power: 6 },
-      { id: 'ironOre', name: 'Smelt iron from ore', verb: 'Smelting iron ore', in: { ore: 2 }, out: { iron: 3 }, hours: 2, power: 4 },
+      { id: 'ironSoil', name: 'Smelt iron from regolith', verb: 'Smelting regolith', in: { regolith: 6 }, out: { iron: 1 }, hours: 3, power: 6 },
+      { id: 'ironOre', name: 'Smelt iron from hematite', verb: 'Smelting hematite', in: { ore: 2 }, out: { iron: 3 }, hours: 2, power: 4 },
       { id: 'ironScrap', name: 'Melt down scrap', verb: 'Melting scrap', in: { scrap: 3 }, out: { iron: 2 }, hours: 1, power: 3 },
     ] },
   { id: 'glassworks', name: 'Glassworks', model: 'bs_glassworks', pad: 3.2, r: 2.1,
-    desc: 'A furnace, a casting table and a rack of panes. Melts silica to clear glass, or soil to dark.',
+    desc: 'A furnace, a casting table and a rack of panes. Melts silica to clear glass, or regolith to dark.',
     cost: { brick: 12, iron: 4, circuit: 1 },
     jobs: [
-      { id: 'glassSoil', name: 'Cast dark glass from soil', verb: 'Casting dark glass', in: { regolith: 5 }, out: { glass: 1 }, hours: 3, power: 5 },
+      { id: 'glassSoil', name: 'Cast dark glass from regolith', verb: 'Casting dark glass', in: { regolith: 5 }, out: { glass: 1 }, hours: 3, power: 5 },
       { id: 'glass', name: 'Cast clear glass from silica', verb: 'Casting glass', in: { silica: 2 }, out: { glass: 3 }, hours: 2, power: 4 },
     ] },
 ];
@@ -118,7 +118,7 @@ export const WORK_BY_ID = Object.fromEntries(WORKS.concat(BUILDINGS).map((w) => 
 export const DEPOSITS = [
   { id: 'hematite', gives: 'ore', per: 2, loads: 30, name: 'Hematite pavement', model: 'dep_hematite', verb: 'Rake up hematite',
     seen: 'Grey hematite, mapped from orbit by Mars Global Surveyor.',
-    note: 'Pale pavement strewn with grey beads of hematite: blueberries. Hematite is seventy per cent iron by weight, and here it lies loose on the ground.',
+    note: 'Pale pavement strewn with grey beads of hematite. It is seventy per cent iron by weight, and here it lies loose on the ground.',
     fields: [
       { name: 'Meridiani Planum', lat: -1.9, lon: 354.5, r: 3.6, n: 5 },
       { name: 'Aram Chaos', lat: 2.6, lon: 338.6, r: 1.4, n: 2 },
@@ -134,7 +134,7 @@ export const DEPOSITS = [
     ] },
   { id: 'clay', gives: 'clay', per: 2, loads: 30, name: 'Clay bank', model: 'dep_clay', verb: 'Cut clay', blockR: 0.34,
     seen: 'Phyllosilicate clays, found from orbit by Mars Express.',
-    note: 'A low bank of banded mudstone, cracked into plates. Clay fires to brick with half the heat that bare soil wants.',
+    note: 'A low bank of banded mudstone, cracked into plates. Clay fires to brick with half the heat that bare regolith wants.',
     fields: [
       { name: 'Mawrth Vallis', lat: 22.6, lon: 343.5, r: 1.6, n: 3 },
       { name: 'Nili Fossae', lat: 22.0, lon: 77.0, r: 1.5, n: 2 },

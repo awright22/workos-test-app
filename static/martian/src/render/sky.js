@@ -38,12 +38,23 @@ const GLSL_SKY = /* glsl */`
     float cosT = dot(v, uSun);
     float day = smoothstep(-0.16, 0.10, sunE);
     float low = 1.0 - smoothstep(0.0, 0.45, sunE);           // 1 at the horizon, 0 high sun
-    // base dome: zenith to horizon
-    // (butterscotch overhead, not khaki: more red than a first guess says, and a clearly paler band at the horizon)
-    float h = pow(1.0 - clamp(mu, 0.0, 1.0), 2.5);
-    vec3 zen = mix(vec3(0.345, 0.182, 0.080), vec3(0.135, 0.115, 0.105), low);
-    vec3 hor = mix(vec3(0.860, 0.560, 0.300), vec3(0.34, 0.25, 0.20), low);
-    vec3 col = mix(zen, hor, h);
+    // base dome: three tones, not two. A pale bright band lying on the horizon (the last ten degrees, where the eye
+    // looks through the most dust), butterscotch above it, and a deep red-brown overhead that is reached by half way
+    // up. (It was one tone graded into another over the whole dome, and a level camera sees only the lowest quarter
+    // of a dome: on the screen that was a single mustard wash from the horizon to the top of the picture.)
+    float m0 = clamp(mu, 0.0, 1.0);
+    float h = pow(1.0 - m0, 2.5);                              // (what the haze terms below are weighted by)
+    float band0 = pow(1.0 - smoothstep(0.0, 0.17, m0), 1.5);
+    float mid0 = pow(1.0 - smoothstep(0.0, 0.52, m0), 1.5);
+    vec3 zen = mix(vec3(0.305, 0.142, 0.058), vec3(0.098, 0.086, 0.104), low);
+    vec3 mdl = mix(vec3(0.580, 0.325, 0.152), vec3(0.235, 0.172, 0.160), low);
+    vec3 hor = mix(vec3(0.900, 0.615, 0.350), vec3(0.420, 0.270, 0.196), low);
+    vec3 col = mix(mix(zen, mdl, mid0), hor, band0);
+    // ... and it is not the same all the way round. The side the sun is on is brighter and paler, the side away from
+    // it deeper and a shade redder: half of what gives a daytime sky its depth is which way one is looking.
+    float toSun = cosT * 0.5 + 0.5;
+    col *= 1.0 + (0.46 * toSun * toSun * toSun - 0.10 * (1.0 - toSun) * (1.0 - toSun)) * (1.0 - 0.5 * low);
+    col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * vec3(1.16, 1.0, 0.80), 0.22 * pow(max(cosT, 0.0), 3.0) * (1.0 - low));
     // the dust is not even: slow broad bands of thicker and thinner haze
     float band = vnoise(v * vec3(2.2, 7.0, 2.2) + vec3(uTime * 0.004, 0.0, uTime * 0.002)) - 0.5;
     col *= (1.0 + band * 0.16 * (1.0 - uDust)) * (0.90 * day);
@@ -61,8 +72,10 @@ const GLSL_SKY = /* glsl */`
       vec3 c = (q - wAx * (dot(q, wAx) * 0.46)) * 2.6 + vec3(uTime * 0.0016, 0.0, uTime * 0.0011);
       c += (vnoise(c * 0.7 + 9.3) - 0.5) * 1.2;
       float wn = vnoise(c) * 0.50 + vnoise(c * 2.4 + 5.1) * 0.32 + vnoise(c * 6.1 + 2.7) * 0.18;
-      float wisp = smoothstep(0.52, 0.84, wn) * smoothstep(0.12, 0.46, mu) * (1.0 - smoothstep(0.55, 0.95, mu) * 0.6) * (1.0 - uDust) * day;
-      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * 1.26, 0.17 * wisp) * (1.0 + 0.05 * wisp);
+      // (they begin a little lower than they did, a sixth of the way up: against the deeper sky above the pale band
+      //  they are what shows that the upper sky is air and not a painted card. Under a low sun they catch its light.)
+      float wisp = smoothstep(0.52, 0.84, wn) * smoothstep(0.09, 0.36, mu) * (1.0 - smoothstep(0.55, 0.95, mu) * 0.6) * (1.0 - uDust) * day;
+      col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * mix(vec3(1.30), vec3(1.55, 1.30, 1.20), low), 0.24 * wisp) * (1.0 + 0.06 * wisp);
     }
     // night: the faint cool light of a dusty sky under the stars, a little brighter at the horizon
     col += mix(vec3(0.0110, 0.0140, 0.0235), vec3(0.0260, 0.0290, 0.0400), h) * (1.0 - day);
@@ -70,14 +83,30 @@ const GLSL_SKY = /* glsl */`
     float g = 0.80;
     float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosT, 1.5) * 0.25;
     float wide = pow(max(cosT, 0.0), 6.0);
-    vec3 aur = mix(vec3(1.0, 0.86, 0.66), vec3(0.34, 0.52, 0.92), smoothstep(0.30, 0.02, sunE));
+    vec3 aur = mix(vec3(1.0, 0.86, 0.66), vec3(0.30, 0.50, 0.95), smoothstep(0.30, 0.02, sunE));
     float sunUp = smoothstep(-0.10, 0.04, sunE);
     // near the horizon the sun shines through far more dust: the glow shrinks and dims with it
     // (kept tight: a broad white aureole veils the whole frame when he looks toward the sun, and Mars turns beige)
-    col += aur * (hg * mix(0.17, 0.045, sqrt(low)) + wide * mix(0.07, 0.04, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
-    // ... and what is left of it close to a low sun is blue: fine dust scatters blue light forward
+    col += aur * (hg * mix(0.17, 0.026, sqrt(low)) + wide * mix(0.07, 0.02, sqrt(low))) * sunUp * (0.35 + 0.65 * h + 0.5 * low);
+    // Under a low sun the sky round it is blue: fine dust scatters blue light forward, and it is the one thing every
+    // picture of a Martian sunset has. The blue takes the place of the brown there, and is not laid over it: added to
+    // a grey-brown sky it summed to a pale grey-white dome with no colour in it at all. It is an oval lying along the
+    // horizon, deepest a hand's breadth from the sun and thinning into a dusty rose further round.
     float ang0 = acos(clamp(cosT, -1.0, 1.0));
-    col += vec3(0.20, 0.40, 0.95) * exp(-ang0 * 6.5) * 0.55 * smoothstep(0.38, 0.04, sunE) * smoothstep(-0.10, 0.02, sunE);
+    float lowK = smoothstep(0.40, 0.05, sunE) * smoothstep(-0.13, 0.01, sunE);
+    vec3 dSun = v - uSun * cosT;                                  // (which way from the sun: up counts for more than along)
+    float dUp = dot(dSun, uUp);
+    float oval = length(dSun + uUp * (dUp * 0.6));               // (1.6 times as far, measured upward)
+    float glowB = exp(-(ang0 * 0.55 + oval * 0.45) * 2.9);
+    vec3 blue = vec3(0.190, 0.400, 0.860) * (0.50 + 0.95 * exp(-ang0 * 7.0));
+    col = mix(col, blue, lowK * min(glowB * 1.25, 0.94));
+    // (and beyond the blue, low down on the sun's side, the dust the light has passed through is warm: a rose belt)
+    col += vec3(0.150, 0.048, 0.030) * lowK * band0 * smoothstep(0.25, 0.9, ang0) * toSun;
+    // (the far side at sunrise is not blank either: a cool dusk still lying on the horizon under a sky the first light
+    //  has reached, the planet's own shadow going down)
+    float away = (1.0 - toSun) * (1.0 - toSun) * lowK;
+    col = mix(col, col * vec3(0.70, 0.78, 1.06), away * band0 * 0.9);
+    col += vec3(0.085, 0.036, 0.040) * away * mid0 * (1.0 - band0);
     // twilight glow hugging the horizon on the sun's side after sunset
     float tw = smoothstep(-0.34, -0.02, sunE) * (1.0 - sunUp);
     col += vec3(0.20, 0.25, 0.42) * tw * pow(max(cosT * 0.5 + 0.5, 0.0), 3.0) * (0.25 + h) * 0.55;
@@ -100,9 +129,11 @@ const GLSL_SKY = /* glsl */`
     // the glow stopped at a visible corner in the planet's outline)
     float limbLit = pow(smoothstep(-0.55, 0.30, dot(nearest, uSun)), 1.6);
     // (thin: a line of haze, tan against the planet and bluer where it thins into space)
-    float above = max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.16).toFixed(1)};
+    // (a hair of light on the planet's edge, as the air of Mars is from orbit: at a sixth of the haze's own depth it
+    //  was a yellow band a finger wide round the ball the rocket climbed from)
+    float above = max(b - ${R.toFixed(1)}, 0.0) / ${(ATMO_H * 0.105).toFixed(1)};
     float limb = (mu < 0.0 ? 1.0 : 0.0) * exp(-above);
-    vec3 fromSpace = mix(vec3(0.70, 0.48, 0.33), vec3(0.36, 0.46, 0.66), smoothstep(0.3, 2.2, above)) * limb * limbLit * 0.75;
+    vec3 fromSpace = mix(vec3(0.70, 0.48, 0.33), vec3(0.36, 0.46, 0.66), smoothstep(0.3, 2.2, above)) * limb * limbLit * 0.66;
     // On the way up the day sky is the dust still left along each line of sight: overhead it thins with the camera's
     // own height, and below the level it thins with the height at which that line passes the planet. So the sky
     // goes dark from the top down, and what is left at the end is a bright band lying on the limb.
@@ -111,7 +142,7 @@ const GLSL_SKY = /* glsl */`
     float passes = mu >= 0.0 ? max(uAlt, 0.0) : max(b - ${R.toFixed(1)}, 0.0);
     // (and from well out the band is thin: the air is a hundredth of the planet's radius deep. Its depth here is what
     // the climb needs, and seen from orbit and from the title's distance that was a fat halo: a third of it there.)
-    float deep = ${(ATMO_H * 0.55).toFixed(1)} * mix(1.0, 0.30, smoothstep(${(ATMO_H * 1.5).toFixed(1)}, ${(ATMO_H * 6).toFixed(1)}, uAlt));
+    float deep = ${(ATMO_H * 0.55).toFixed(1)} * mix(1.0, 0.19, smoothstep(${(ATMO_H * 1.5).toFixed(1)}, ${(ATMO_H * 6).toFixed(1)}, uAlt));
     fromSpace = max(fromSpace, col * exp(-passes / deep) * h * mix(1.0, limbLit, step(mu, 0.0)));
     col = mix(col, fromSpace, space);
     return col;
@@ -214,17 +245,24 @@ export class Sky {
           float earthVis = (1.0 - uDust) * max(1.0 - smoothstep(-0.12, -0.02, sunE), airless) * smoothstep(0.0, 0.10, dot(v, uUp) + airless);
           // (a star, not a disc: drawn four tenths of a degree across it was a white ball with a halo high in the dusk)
           col += vec3(0.72, 0.86, 1.0) * (smoothstep(0.9999930, 0.9999992, dot(v, uEarth)) * 3.4 * earthVis);
-          // the sun: a small hard disc (0.35 degrees across on Mars) with a tight halo
+          // The sun: a small hard disc with a tight halo. On Mars it is a third of a degree across, which on a phone is
+          // three pixels: a bright bead, and at sunset, where it is the subject of the picture, a pin-point. It is
+          // drawn at about twice that by day and three times under a low sun (as the moons are drawn large), with a
+          // clean edge, and dim enough low down that it is a pale disc one can look at and not a flare.
           float cosT = dot(v, uSun);
           float ang = acos(clamp(cosT, -1.0, 1.0));
-          float disc = smoothstep(0.0052, 0.0036, ang);
+          float lowS = smoothstep(0.40, 0.02, sunE);
+          float rad = mix(0.0062, 0.0098, lowS);
+          float disc = smoothstep(rad, rad * 0.86, ang);
           float halo = exp(-ang * 70.0) * 0.5 + exp(-ang * 16.0) * 0.03;
           // (in a storm the dust between scatters the sun's light wide: a pale patch with a dim disc in it, not a white bead)
           halo += uDust * (exp(-ang * 26.0) * 0.9 + exp(-ang * 7.0) * 0.35);
-          float lowDim = mix(1.0, 0.16, smoothstep(0.40, 0.02, sunE));        // through a long path of dust the sun is a pale disc
+          float lowDim = mix(1.0, 0.16, lowS);                               // through a long path of dust the sun is a pale disc
           float through = (1.0 - uDust * 0.90) * smoothstep(-0.03, 0.03, sunE);
-          vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.72, 0.84, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
-          col += sunCol * (disc * 70.0 * lowDim * uSunDisc * mix(1.0, 0.16, uDust) + halo * 5.0 * lowDim * uSunDisc) * through;
+          vec3 sunCol = mix(vec3(1.0, 0.93, 0.82), vec3(0.80, 0.90, 1.0), smoothstep(0.25, 0.0, sunE) * 0.7);
+          // (the low disc is held to a few times white, enough for its glow and no more: at eleven times white the bloom
+          //  swallowed its edge)
+          col += sunCol * (disc * mix(70.0, 26.0, lowS) * lowDim * uSunDisc * mix(1.0, 0.16, uDust) + halo * 5.0 * mix(lowDim, lowDim * 0.6, lowS) * uSunDisc) * through;
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -280,12 +318,15 @@ export class Sky {
     //  light at dawn is the sky's, and the sky's share is raised instead (see the engine's environment light).)
     this.sunIntensity = 3.3 * through * (1 + 0.3 * low * low) * (1 - dust * 0.94);
     this.lowSun = low * low * day;
-    this.sunColor.setRGB(lerp(0.80, 1.0, 1 - low * 0.6), lerp(0.80, 0.93, 1 - low), lerp(0.86, 0.80, 1 - low));
+    // (Low, its light is warm: what reaches the ground has come through the most dust, and the dust takes the blue
+    //  out of it and throws it forward as the glow round the disc. It was a cool white at the horizon, and a plain at
+    //  dawn took no colour from its own sunrise.)
+    this.sunColor.setRGB(1.0, lerp(0.93, 0.74, low * low), lerp(0.80, 0.50, low * low));
     // sky light: the dome's average colour above, the lit ground's bounce below
     const k = 0.90 * day, nk = 1 - day;
     this.ambientSky.setRGB(lerp(0.52, 0.24, low) * k + 0.019 * nk, lerp(0.32, 0.18, low) * k + 0.022 * nk, lerp(0.16, 0.15, low) * k + 0.032 * nk);
     this.ambientGround.setRGB(0.30 * k * (0.3 + 0.7 * through), 0.15 * k * (0.3 + 0.7 * through), 0.08 * k * (0.3 + 0.7 * through));
-    this.fogColor.setRGB(lerp(0.76, 0.34, low) * k + 0.026 * nk, lerp(0.47, 0.25, low) * k + 0.029 * nk, lerp(0.235, 0.20, low) * k + 0.040 * nk);
+    this.fogColor.setRGB(lerp(0.76, 0.37, low) * k + 0.026 * nk, lerp(0.47, 0.255, low) * k + 0.029 * nk, lerp(0.235, 0.205, low) * k + 0.040 * nk);
     if (dust > 0) {
       _c.setRGB(0.40 * (0.02 + 0.40 * day), 0.215 * (0.02 + 0.40 * day), 0.095 * (0.02 + 0.40 * day));
       this.fogColor.lerp(_c, dust * 0.94);

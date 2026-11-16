@@ -202,6 +202,17 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float fAir = smoothstep(250.0, 900.0, viewDist) * (1.0 - smoothstep(5000.0, 14000.0, viewDist));
         vec4 nAir = texture(uGrain, (vPlanetPos * DETAIL_T) / 1100.0 + vec3(0.37, 0.11, 0.73));
         tone += (hFar * 0.38 + (nAir.a - 0.5) * 0.62 + (nAir.r - 0.5) * (nFar.g - 0.5) * 1.2) * fAir;
+        // ... and a finer grain under those again, from a few hundred metres up to orbit. What tells the eye that ground is
+        // far off is detail too small to make out: with nothing in it finer than a quarter of a kilometre, the land under
+        // the climbing rocket was a smooth ball that a toy hung over. (Ninety metres and twenty-seven: the texture's own
+        // smaller copies take each of them out as it shrinks under a pixel.)
+        float fHigh = smoothstep(320.0, 1300.0, viewDist);
+        if (fHigh > 0.004) {
+          vec4 nHi = texture(uGrain, (vPlanetPos * DETAIL_T) / 88.0 + vec3(0.19, 0.57, 0.31));
+          vec4 nHi2 = texture(uGrain, (vPlanetPos * DETAIL_T) / 27.0 + vec3(0.61, 0.23, 0.47));
+          grad += ((nHi.rgb - 0.5) * 0.30 + (nHi2.rgb - 0.5) * 0.22) * fHigh;
+          tone += ((nHi.a - 0.5) * 0.44 + (nHi2.a - 0.5) * 0.30) * fHigh;
+        }
         // lava that ponded and froze level: a caldera floor (its edge broken up by the noise: drawn from the mesh's own
         // vertices alone it followed their triangles in a saw-tooth)
         float pond = lava * (1.0 - smoothstep(0.004, 0.05, landSlope + (hMid * 0.03 + hLump * 0.015) * fMid));
@@ -361,7 +372,9 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
         float hardBed = 1.0 - smoothstep(0.36, 0.60, beds * 0.68 + band.a * 0.32);
         // (And only where the land itself stands steep, as the elevation data has it: a dune's slip face is steep
         //  enough to count as "rock" by its slope, and the joints lay across loose sand as a net of cracks.)
-        float faceW = smoothstep(0.30, 0.75, rock) * smoothstep(0.045, 0.12, landSlope) * (1.0 - lava) * (1.0 - ice) * (1.0 - smoothstep(380.0, 800.0, viewDist)) * mix(0.22, 1.0, hardBed);
+        // (and steeper than a hollow in a dune: at a slope of one in twenty the wall of a small crater in sand took the
+        //  joints, a scribble of dark grooves in a smooth drift)
+        float faceW = smoothstep(0.30, 0.75, rock) * smoothstep(0.085, 0.19, landSlope) * (1.0 - lava) * (1.0 - ice) * (1.0 - smoothstep(380.0, 800.0, viewDist)) * mix(0.22, 1.0, hardBed);
         if (faceW > 0.004) {
           vec3 tw = abs(geoN * DETAIL_T);
           tw *= tw; tw *= tw; tw /= tw.x + tw.y + tw.z;
@@ -561,6 +574,6 @@ export function makeTerrainMaterial(albedoCube, o = {}) {
           normal = normalize(normal + (T * terrainFlat.x + B * terrainFlat.y) * inv);
         }`);
   };
-  mat.customProgramCacheKey = () => 'terrain53' + (o.fine !== false ? 'F' : '');
+  mat.customProgramCacheKey = () => 'terrain54' + (o.fine !== false ? 'F' : '');
   return mat;
 }

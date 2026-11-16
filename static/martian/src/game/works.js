@@ -144,7 +144,7 @@ export function updateWorks(dt) {
           b.job = null;
           b.working = false;
           Snd.pickup();
-          log(`The ${b.def.name.toLowerCase()} is done: ${things(jobCost({ in: job.out }, n))} in the stores.`, 'sys');
+          log(`The ${b.def.name.toLowerCase()} is done: you carry ${things(jobCost({ in: job.out }, n))} more.`, 'sys');
         }
       }
     }

@@ -195,7 +195,7 @@ export function showBarsGuide(onDone) {
     ['water', 'Water', 'Litres in the tank.', 'You and the farm drink it. Burning hydrazine makes more.'],
     ['food', 'Food', 'Meals left.', `Breakfast takes one each dawn, two with a side. The bar is full ${isBase() ? 'at twenty sols of meals' : 'when there is enough to reach the rescue'}.`],
     ['power', 'Power', 'The Hab’s battery.', 'Sun on clean panels fills it. The machines and the night drain it.'],
-    ['vitals', 'Vitals', 'Your body.', 'It falls without air, water, food or sleep. At zero the run is over.'],
+    ['vitals', 'Health', 'Your body.', 'It falls without air, water, food or sleep. At zero the run is over.'],
     ['mood', 'Morale', 'Your spirits, out of 100.', 'Good food, music and comforts lift them. High, work goes a fifth faster; low, a fifth slower.'],
     ['chart', 'Arrows', 'Rising or falling.', 'An arrow beside a number shows which way it is going now.'],
   ];
@@ -203,10 +203,10 @@ export function showBarsGuide(onDone) {
   // every size. (As a plain dialog it was taller than a phone, and its one button was below the fold.)
   const done = () => { hideOverlay(); if (onDone) onDone(); };
   const p = openOverlay('sheet',
-    '<div class="sheet wide"><header class="sheet-hd"><h1 id="mg-dlg-title">Guide: what the bars mean</h1></header>' +
+    '<div class="sheet wide"><header class="sheet-hd"><h1 id="mg-dlg-title">Guide: what the gauges mean</h1></header>' +
     `<div class="sheet-bd mg-scroll"><ul class="guide">${rows.map(([ic, name, lead, text]) => `<li>${icon(ic)}<b>${name}</b><span><em>${lead}</em> ${text}</span></li>`).join('')}</ul></div>` +
     `<footer class="sheet-ft"><button type="button" class="mg-btn primary" data-act="back" data-autofocus>${icon('check')}Got it</button></footer></div>`,
-    { label: 'Guide: what the bars mean', onEscape: done, guard: true });
+    { label: 'Guide: what the gauges mean', onEscape: done, guard: true });
   on(p, '[data-act="back"]', done);
 }
 
@@ -233,7 +233,7 @@ export function showPauseMenu(o) {
     (o.base ? `<h3>The long stay</h3><p>${o.uplink ? 'Stay fed, and build' : 'Stay fed, find a radio and tell Earth, and build'}: no ship can reach Mars for four years. Make this somewhere a man can live.</p>`
       : `<h3>The way home</h3><p>${o.uplink ? 'Stay fed, and reach the MAV in Schiaparelli' : 'Stay fed, find a radio and tell Earth, then reach the MAV in Schiaparelli'}: the only rocket on Mars. It can launch on Sol ${o.rescueSol}.</p>`) +
     '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab.</p>' +
-    '<button type="button" class="mg-btn side-btn" data-act="bars">Guide: what the bars mean</button></aside>',
+    '<button type="button" class="mg-btn side-btn" data-act="bars">Guide: what the gauges mean</button></aside>',
     { label: 'Paused', onEscape: resume });
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;

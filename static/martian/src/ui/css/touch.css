@@ -139,6 +139,11 @@
 .mg-tbtn.nudge span, .mg-tbtn.nudge .ic { color: var(--accent); }
 @keyframes mg-nudge { 50% { box-shadow: 0 0 0 5px var(--accent-wash), 0 0 0 6px rgba(255, 180, 84, .55); } }
 .mg-still .mg-tbtn.nudge, .mg-reduced .mg-tbtn.nudge { animation: none; }
+/* The tank nearly empty and he is not running: RUN is ringed in the banner's red until he is (ui/hud.js: urgeRun). */
+.mg-tbtn.urge { border-color: var(--danger); box-shadow: 0 0 0 2px rgba(255, 107, 94, .2), 0 0 0 3px var(--danger); animation: mg-urge 1s ease-in-out infinite; }
+.mg-tbtn.urge span, .mg-tbtn.urge .ic { color: var(--danger); }
+@keyframes mg-urge { 50% { box-shadow: 0 0 0 5px rgba(255, 107, 94, .2), 0 0 0 6px rgba(255, 107, 94, .55); } }
+.mg-still .mg-tbtn.urge, .mg-reduced .mg-tbtn.urge { animation: none; }
 
 /* A slider's handle is still a thumb each way to press, and is drawn as a round knob a little over half that size:
    as a solid 44 px block it was the largest thing on the sheet, four of them in a column on the Sound page. */

@@ -49,7 +49,7 @@ export const MAIL = [
     ['n', 'Mark, the iron meteorite. It predates the planet you are standing on. The curator at Johnson cried. Please do not use it as a hammer.'],
     ['w', 'Too late. It is an excellent hammer.'] ] },
   { id: 'hematite', when: () => S.science && S.science.found.hematite, lines: [
-    ['n', 'You found the blueberries. The Opportunity team, the ones who are left, gathered in the old control room to watch your analysis come in. Nobody said anything for a while.'],
+    ['n', 'You found the hematite beads, our blueberries. The Opportunity team, the ones who are left, gathered in the old control room to watch your analysis come in. Nobody said anything for a while.'],
     ['w', 'Tell them she picked a good spot.'] ] },
   { id: 'lander', when: () => Object.keys(S.salvaged).length >= 1, lines: [
     ['n', 'Legal has asked us to remind you that the hardware you are salvaging is the property of several space agencies.'],

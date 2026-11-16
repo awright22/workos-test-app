@@ -77,7 +77,7 @@ export function bagSoilHere() {
   if (canSample(player.pos, 'soil') !== true) return;
   const bag = takeSample(player.pos, 'soil');
   if (!bag) return;
-  log(`Soil sample #${bag.n} bagged — ${bag.place}.`, 'sys');
+  log(`Regolith sample #${bag.n} bagged — ${bag.place}.`, 'sys');
   hintOnce();
 }
 

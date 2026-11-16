@@ -193,7 +193,7 @@ export function applyRates(dt, sleeping) {
     warnLow('water', S.water, 10, 'Water reserves critical. Hydrazine, ice, or thirst — pick one.', 'alarm');
     warnLow('power', S.power, 15, 'Hab power low. Life support idles at zero. Wipe the panels.', 'alarm');
     warnLow('rpow', S.roverPower, 20, 'Rover battery low. It solar-trickles when parked in daylight.', 'alarm');
-    warnLow('health', S.health, 40, 'Vitals degrading. Eat. Drink. Sleep. In any order.', 'suit');
+    warnLow('health', S.health, 40, 'Health failing. Eat. Drink. Sleep. In any order.', 'suit');
     if (S.suit <= 12 || S.o2 <= 10) { if (!S.flags.closeCall) { S.flags.closeCall = true; S.stats.closeCalls++; cheer(-3); } }
     else S.flags.closeCall = false;
   }

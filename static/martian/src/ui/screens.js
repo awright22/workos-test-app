@@ -232,7 +232,7 @@ export function renderColony() {
   craft = ranked(craftCards);
   // (with nothing to build, the first sol's fabricator was a page of greyed buttons under "0 ready to build": it says
   //  where its materials come from instead)
-  craft = `<div class="pane-hd">Fabricator <span>${!ready ? (atHome ? 'Needs materials' : 'Out of range') : atHome ? `${ready} ready to build` : `${ready} ready · only at the Hab`}</span></div>` +
+  craft = `<div class="pane-hd">Fabricator <span>${!ready ? (atHome ? 'Needs materials' : 'Out of range') : atHome ? `${ready} ready to fabricate` : `${ready} ready · only at the Hab`}</span></div>` +
     (atHome && !ready ? '<p class="pane-note">Nothing to build yet. The fabricator works in scrap metal and circuit boards: salvage the debris lying around the Hab, and the old landers further out.</p>' : '') + craft;
 
   // --- upgrades: what can still be installed first; what is in, under its own heading (among the others an installed
@@ -318,9 +318,9 @@ export function renderColony() {
               `<span class="why${can ? '' : ' bad'}">${can ? 'Then set it down outside, near the Hab' : chem(esc(missingText(w.cost)))}</span></div></article>`)]);
     }
     const nWorks = World.builtMeshes.filter((b) => b.def && b.def.jobs).length, nBuilt = World.builtMeshes.filter((b) => b.def && !b.def.jobs).length;
-    baseHtml = `<div class="pane-hd">Works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${nWorks} standing</span></div>` +
+    baseHtml = `<div class="pane-hd">Base works <span>${baseReady ? `${baseReady} ready to build · ` : ''}${nWorks} standing</span></div>` +
       '<p class="pane-note intro">What a base is made with. Each is built outside, within reach of the Hab’s power, and works by itself once it has a job.</p>' + ranked(cards) +
-      `<div class="pane-hd">Buildings <span>${buildReady ? `${buildReady} ready to build · ` : ''}${nBuilt} standing</span></div>` +
+      `<div class="pane-hd">Base buildings <span>${buildReady ? `${buildReady} ready to build · ` : ''}${nBuilt} standing</span></div>` +
       '<p class="pane-note intro">What is built of brick, iron and glass. Each does its good by standing there.</p>' + ranked(bcards);
     baseReady += buildReady;
   }
@@ -584,18 +584,18 @@ function samplesHtml() {
   let h = `<div class="pane-hd">Field samples <span>${s.kinds} of ${s.of} materials catalogued</span></div>` +
     (s.nextGrant ? `<p class="pane-note">${s.points >= s.nextGrant ? `${s.points} science points: NASA has a supply grant for you. Analyse any sample at the Hab’s work table to receive it.`
       : `${s.points} science points. NASA sends a supply grant at ${s.nextGrant}; a material you have not catalogued is worth the most.`}</p>` : '');
-  if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder; on new ground, bag a scoop of soil too. The analyser on the Hab work table says what each is. What you find depends on where on Mars you are standing.</div>`;
+  if (!s.kinds && !s.bagged) h += `<div class="empty">${icon('layers')}<b>Nothing catalogued yet</b>Chip a sample off any boulder; on new ground, bag a scoop of regolith too. The analyser on the Hab work table says what each is. What you find depends on where on Mars you are standing.</div>`;
   else if (s.bagged) h += `<p class="jr-note">${s.bagged} of ${s.limit} sample bags are full and waiting for the analyser in the Hab.</p>`;
   h += '<div class="jr-grid">';
   for (const m of list.filter((x) => x.count).sort((a, b) => b.value - a.value)) {
-    h += `<article class="card got"><div class="card-hd">${icon('layers')}<h4><span class="nm">${esc(m.name)}</span> <small>${m.kind === 'soil' ? 'Soil' : 'Rock'}</small></h4>${tags(`<span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span>`)}</div><p>${chem(esc(m.text))}</p></article>`;
+    h += `<article class="card got"><div class="card-hd">${icon('layers')}<h4><span class="nm">${esc(m.name)}</span> <small>${m.kind === 'soil' ? 'Regolith' : 'Rock'}</small></h4>${tags(`<span class="badge done">${m.count} sample${m.count > 1 ? 's' : ''}</span>`)}</div><p>${chem(esc(m.text))}</p></article>`;
   }
   h += '</div>';
   // what is still to find: one list of leads (a card apiece was a wall of identical question marks)
   const leads = list.filter((x) => !x.count);
   if (leads.length) {
     h += `<div class="pane-hd">Still to find <span>${leads.length} material${leads.length > 1 ? 's' : ''}: where to look</span></div><ul class="leads">` +
-      leads.map((m) => `<li><b>${m.kind === 'soil' ? 'Soil' : 'Rock'}</b><span>${chem(esc(m.text))}</span></li>`).join('') + '</ul>';
+      leads.map((m) => `<li><b>${m.kind === 'soil' ? 'Regolith' : 'Rock'}</b><span>${chem(esc(m.text))}</span></li>`).join('') + '</ul>';
   }
   return h;
 }

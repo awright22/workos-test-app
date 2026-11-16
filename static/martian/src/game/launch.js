@@ -491,7 +491,8 @@ export function startLaunch() {
   World.launch = { burning: false, alt: 0, focus: World.mav.position };
 
   const rocket = World.mavRocket, restY = World.mavRocketY;
-  const nozzle = new THREE.Vector3();
+  const nozzle = new THREE.Vector3(), focusAt = new THREE.Vector3();
+  e.thinAir = 1;
   let t = 0, shot = '', skirtDue = 0, orbit = null;
   const setShot = (name, fov) => { shot = name; if (cam.fov !== fov) { cam.fov = fov; cam.updateProjectionMatrix(); } };
   // (the canvas is already at the render scale. The 0.8 is the size the smoke was drawn and judged at: the same on every preset.)
@@ -520,11 +521,16 @@ export function startLaunch() {
       const thin = smoothstep(150, 2600, alt);                       // the air gives out: the plume spreads and pales
       const flick = 0.9 + Math.random() * 0.2;
       F.flame.scale.setScalar(Math.max(0.001, burn));
-      parts.flame.scale.set(1 + thin * 0.5, flick * (1 + thin * 0.6), 1 + thin * 0.5);
+      // (and high up it is short: a long flame that pointed straight down at the planet, seen from ahead of the rocket,
+      //  was a flame that reached the ground)
+      const high = smoothstep(900, 2600, alt);
+      parts.flame.scale.set(1 + thin * 0.5, flick * (1 + thin * 0.6) * (1 - 0.52 * high), 1 + thin * 0.5);
       parts.core.scale.set(1, 0.9 + Math.random() * 0.25, 1);
       parts.wide.scale.set(1 + thin * 3.2, (0.95 + Math.random() * 0.1) * (1 + thin * 1.4), 1 + thin * 3.2);
       // (in a vacuum there is nothing for it to light: over lit ground it was a tan puff that sat on the surface under the flame)
-      parts.wide.material.uniforms.uGain.value = 1.5 * (1 - 0.93 * thin);
+      // (and from the camera ahead of it, which looks down its length, nothing at all: there the last of it was a pale
+      //  ring lying on the ground round the tip of the flame)
+      parts.wide.material.uniforms.uGain.value = 1.5 * (1 - 0.93 * thin) * (1 - smoothstep(CUT_LEAVE - 0.6, CUT_LEAVE, lt));
       parts.glow.scale.setScalar((3.6 + thin * 2.4) * (0.92 + Math.random() * 0.16));
       F.flame.getWorldPosition(nozzle);
       F.glow = burn * (1 - smoothstep(6, 90, alt)) * (0.85 + Math.random() * 0.15);
@@ -546,6 +552,15 @@ export function startLaunch() {
       F.column.material.uniforms.uLt.value = Math.max(lt, 0);
       F.column.material.uniforms.uTop.value = Math.min(alt, 950);
     }
+
+    // (the air thins under the cameras that climb: at the dust's full depth the ground a few hundred metres down was a
+    //  tan smear, and what the climb is a picture of is the land falling away)
+    e.thinAir = orbit ? 1 : Math.exp(-Math.max(0, cam.position.length() - pad.length() - 60) / 420);
+
+    // (The ground is drawn for the height the rocket is at, once it has left: drawn for the pad, the land for half a
+    //  kilometre round it kept its close-range grain and colour, and from the cameras that look down from a height
+    //  that was a grey patch under the rocket, which read as a ring of dust where the flame met the ground.)
+    if (!orbit && lt > CUT_CHASE) World.launch.focus = focusAt.copy(pad).addScaledVector(up, alt);
 
     // ---- the camera
     const rocketAt = _d.copy(pad).addScaledVector(up, alt + 9);
@@ -592,10 +607,12 @@ export function startLaunch() {
       // 5. From ahead of it and above, looking back down: the rocket climbing toward the lens out of the curve of
       //    the planet, the plume spread wide in the vacuum behind it; the engine burns out, and it coasts.
       //    (Nothing of the pad is in it: from here the column it left was a thread ending in a puff on the ground.)
-      setShot('above', 46);
+      //    (A long lens, from twice as far: through a wide one the planet behind it was a ball a few rocket-lengths
+      //    across. Through this one its edge is a shallow arc across the top of the picture and its surface fills the rest.)
+      setShot('above', 27);
       F.column.visible = false; smoke.points.visible = false;
       const k = (lt - CUT_LEAVE) / (CUT_ORBIT - CUT_LEAVE);
-      const lead = 42 - 24 * k, off = 40 - 20 * k;
+      const lead = 76 - 40 * k, off = 70 - 32 * k;
       cam.position.copy(pad).addScaledVector(up, alt + 9 + lead).addScaledVector(nearDir, off * 0.94).addScaledVector(side, off * 0.34);
       _b.copy(up).applyAxisAngle(nearDir, 0.16);
       camLookAt(rocketAt.addScaledVector(up, -3), _b);
@@ -670,7 +687,7 @@ export function startLaunch() {
       // seen from behind, they were two copies of one figure)
       const side2 = O.side2.copy(_d);                                    // level, to Beck's right as he flies
       const markAt = O.markAt.copy(nose).addScaledVector(noseDir, 0.30)
-        .lerp(_b.copy(beckAt).addScaledVector(side2, 0.66).addScaledVector(ahead, -0.06), carried);
+        .lerp(_b.copy(beckAt).addScaledVector(side2, 0.84).addScaledVector(ahead, -0.10), carried);       // (shoulder to shoulder: at two thirds of a metre their packs and helmets stood in each other)
       const markUp = O.markUp.copy(noseDir).lerp(ahead, carried).normalize();
       const face = (fig, head, front) => {
         _a.crossVectors(head, front).normalize();                         // his right... (x = y cross z)
@@ -695,6 +712,11 @@ export function startLaunch() {
         crew.beck.root.updateWorldMatrix(true, true); crew.mark.root.updateWorldMatrix(true, true);
         const reaching = smoothstep(0.55, 0.92, out), hold = carried;
         const chestB = _b.copy(beckAt).addScaledVector(ahead, 0.25), chestM = _c.copy(markAt).addScaledVector(markUp, 0.25);
+        // (one arm out ahead of him from the moment he leaves the lock, the other at the line on his chest: both arms
+        //  wide and both legs straight, all the way across, he was a doll thrown from the ship)
+        const fly = smoothstep(2.0, 3.2, ot) * (1 - reaching) * (1 - hold);
+        reach(crew.beck, 'R', _a.copy(beckAt).addScaledVector(way, 3.0).addScaledVector(up, 0.25), fly * 0.85);
+        reach(crew.beck, 'L', _a.copy(beckAt).addScaledVector(ahead, 0.45).addScaledVector(O.frontB, 0.34), fly * 0.7);
         reach(crew.beck, 'L', chestM, reaching);
         reach(crew.beck, 'R', chestM, reaching * (1 - 0.25 * hold));
         reach(crew.mark, 'L', chestB, smoothstep(0.7, 0.98, out));
@@ -732,8 +754,11 @@ export function startLaunch() {
         // (aimed at him until the open nose of the ascent vehicle is near enough to share the picture, then half-way
         //  between the two: the man in the nose reaching out from one side and Beck in from the other. Aimed at him
         //  to the end, it was a man reaching into empty space.)
-        const gap = _c.copy(to).sub(beckAt).length(), lead = lerp(1.0, gap * 0.5, 1 - smoothstep(8, 11, gap));
-        stand(_d.copy(beckAt).addScaledVector(O.f, lead), _a, O.crossPitch, 7.6 - ct * 0.4, O.crossRoll);
+        // (and from far enough off to hold both: aimed between them from seven metres, the man in the nose was cut by
+        //  the edge of the picture and two thirds of it was empty. The camera now stands back by the width of the gap
+        //  and closes with it.)
+        const gap = _c.copy(to).sub(beckAt).length(), share = 1 - smoothstep(9, 15, gap), lead = lerp(1.0, gap * 0.5, share);
+        stand(_d.copy(beckAt).addScaledVector(way, lead), _a, O.crossPitch, lerp(7.6 - ct * 0.4, Math.max(6.2, (gap + 4.6) / 1.4), share), O.crossRoll);
       } else if (ot >= HOME_AT) {
         // behind the two of them and above, on the way home: the tether drawing them in, the ship and her open lock ahead
         // (a wide lens aimed between them and the ship, so that she is whole in the picture and they are near the lens:
@@ -743,9 +768,12 @@ export function startLaunch() {
         _a.copy(O.f).multiplyScalar(Math.cos(O.homeAz)).addScaledVector(O.x, -Math.sin(O.homeAz));
         // (the camera stands off the pair, beyond them from the ship, and looks a fifth of the way from them to her)
         _d.copy(beckAt).lerp(markAt, 0.5);
-        const off = 6.6 + Math.min(ct, 8) * 0.12;
+        // (and from well above them, looking down along the line: the planet's lit face under the two men and its edge
+        //  across the picture, the ship above it against the stars. Level with them, the last picture of the game was
+        //  two grey figures and a grey ship on black.)
+        const off = 7.4 + Math.min(ct, 8) * 0.12;
         cam.position.copy(_d).addScaledVector(_a, Math.cos(O.homePitch) * off).addScaledVector(up, Math.sin(O.homePitch) * off);
-        _d.lerp(_c.copy(O.centre).addScaledVector(O.f, 4), 0.2);
+        _d.lerp(_c.copy(O.centre).addScaledVector(O.f, 4), 0.15);
         _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(_d).normalize(), O.homeRoll);
         camLookAt(_d, _b);
       } else {
@@ -795,13 +823,18 @@ export function startLaunch() {
 function enterOrbit(up, F) {
   const e = ctx.engine;
   // Hours later, where the sun stands low over the place: the line between day and night crosses the ground behind her.
-  S.tod = todForSunHeight(up, 0.38);
+  // (Not so low as it was: at twenty-two degrees every camera that looked away from the sun, which is every camera
+  //  that sees a lit face, looked at the night side, and the rescue was played against black. At forty the ground
+  //  under those cameras is in morning light, and the line of the night lies across it toward the planet's edge.)
+  S.tod = todForSunHeight(up, 0.64);
   updateSunDir();
   const s = e.sunDir.clone().addScaledVector(up, -e.sunDir.dot(up)).normalize();       // toward the sun, level
   const h = new THREE.Vector3().crossVectors(up, s);                                    // level, square to the sun
   // She flies square to the sun and a little away from it, so one flank is lit along its whole length; the camera
   // stands off her bow on that side and above, and sees her three-quarters on.
-  const f = h.clone().multiplyScalar(Math.cos(-25 * DEG)).addScaledVector(s, Math.sin(-25 * DEG)).normalize();
+  // (toward it, not away: the cameras of the rescue stand ahead of her and look back, and with the sun astern what
+  //  they saw of her, of the ascent vehicle and of the two men was the shaded side)
+  const f = h.clone().multiplyScalar(Math.cos(25 * DEG)).addScaledVector(s, Math.sin(25 * DEG)).normalize();
   const x = new THREE.Vector3().crossVectors(up, f);
   const centre = up.clone().multiplyScalar(ORBIT_R);
   hermes.scale.setScalar(1);
@@ -864,8 +897,11 @@ function enterOrbit(up, F) {
   const V = () => new THREE.Vector3();
   return { centre, dock, f, x, s, h, rocketWorldQ, parentInvQ, stageLength, tether, debris, debrisVel, ventQ, said: 0,
     mavAt: V(), nose: V(), noseDir: V(), beckAt: V(), markAt: V(), markUp: V(), from: V(), to: V(), ahead: V(), way: V(), lat: V(), side2: V(), clip: V(), camDir: V(), frontB: V(), frontM: V(),
-    dist: 106, pitch: 50 * DEG, swing: 25 * DEG, roll: -0.14,
-    crossAz: 112 * DEG, crossPitch: 34 * DEG, crossRoll: -0.2,
+    // (swing: fifty degrees off her bow on the sunlit side, as it was before she was turned to the sun)
+    dist: 106, pitch: 50 * DEG, swing: 75 * DEG, roll: -0.14,
+    // (square on to his line again, which the higher sun allows: from ahead of him the line of the crossing ran corner to
+    //  corner of the picture, and the man in the nose was cut by its edge)
+    crossAz: 108 * DEG, crossPitch: 44 * DEG, crossRoll: -0.2,
     reachAz: 60 * DEG, reachPitch: 50 * DEG, reachRoll: -0.2,
-    homeAz: 52 * DEG, homePitch: 23 * DEG, homeRoll: 0.08 };
+    homeAz: 52 * DEG, homePitch: 38 * DEG, homeRoll: 0.1 };
 }

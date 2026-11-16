@@ -306,7 +306,7 @@ function digReason() {
   //  ground is worth digging anywhere, three loads to a turn)
   // (not on the Hab's own doorstep: at the airlock at nightfall the button said DIG where the task said sleep)
   if (isBase() && carried < 12 && groundDist(player.pos, World.hab.position) > HAB_R + 9 && works().some((w) => !w.job && w.def.jobs.some((j) => j.in.regolith)))
-    return { label: 'Dig regolith here', sub: `+${BASE_DIG} for the works · ${carried} in the stores` };
+    return { label: 'Dig regolith here', sub: `+${BASE_DIG} for the works · ${carried} carried` };
   if (!World.soilPiles.some((s) => s.left > 0 && groundDist(player.pos, s.group.position) < 400)) {
     const why = (what) => ({ label: 'Dig a load of regolith here', sub: `For ${what} · no heap near` });
     if (World.plots.filter((p) => p.state === 'empty').length > carried) return why('an empty farm bed');
@@ -323,7 +323,7 @@ function digReason() {
   //  first sol it would be one more thing offered before he has heard of samples)
   const sc = scienceSummary();
   if (canSample(player.pos, 'soil') === true && (sc.kinds + sc.bagged > 0 || groundDist(player.pos, World.hab.position) > 300))
-    return { label: 'Bag a soil sample here', sub: `New ground · bag ${sc.bagged + 1} of ${sc.limit}` };
+    return { label: 'Bag a regolith sample here', sub: `New ground · bag ${sc.bagged + 1} of ${sc.limit}` };
   return null;
 }
 addI({
@@ -373,7 +373,9 @@ addI({
 addI({
   pos: () => siteLocalToWorld(World.hab, -5.0, 0, -4.9, _v2),
   r: 2.3, hold: 1.2, mode: 'walk', pose: 'stand', task: 'sleep',
-  visible: () => !S.flags.coldOpen && S.inside,
+  // (not while the Hab is holed: its button then read NO SLEEP YET, the one thing on the screen that was not about the
+  //  breach. The banner, the card and the marker say where to go.)
+  visible: () => !S.flags.coldOpen && S.inside && !S.breach.active,
   enabled: () => {
     // (it names what is refused, and leaves where the breach is to the task that leads the list: "Breach first: seal
     //  the far wall, behind the comms desk" was the sixth time the screen said breach, and its button, BREACH FIRST,
@@ -396,7 +398,7 @@ addI({
   enabled: () => S.health > 92 ? statusText('The food shelf. Not hungry right now') : foodTotal() > 0 ? true : statusText('The food shelf is bare'),
   label: () => `Eat a ${SNACK[nextSnack()] || 'ration'}`,
   // what it gives; and once there is produce, what a cooked dinner still wants
-  sub: () => (S.stats.produce > 0 ? `Dinner ${dinnerPlan().why.toLowerCase()}` : '+12 vitals'),
+  sub: () => (S.stats.produce > 0 ? `Dinner ${dinnerPlan().why.toLowerCase()}` : '+12 health'),
   use: () => {
     if (!snack()) return;
     S.health = clamp(S.health + 12, 0, BAL.healthMax);

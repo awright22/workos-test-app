@@ -1979,8 +1979,8 @@ def _mav_ascent(root):
     lathe(white, [(R2 + 0.01, 7.40), (R2 + 0.032, 7.42), (R2 + 0.032, 7.80), (R2 + 0.032, 8.20), (R2 + 0.01, 8.22)], 5,
           arc=rad(2 * ha), phase=rad(270 - ha))
     Mh = radial_frame(R2 + 0.032, 270, 7.95)
-    lathe(alu, [(0.17, 0.0), (0.17, 0.018), (0.13, 0.018), (0.13, 0.006)], 16, Mh)
-    lathe(glass, [(0.13, 0.008), (0.0, 0.008)], 16, Mh)
+    lathe(alu, [(0.17, 0.0), (0.17, 0.018), (0.13, 0.018), (0.13, 0.006)], 28, Mh)
+    lathe(glass, [(0.13, 0.008), (0.0, 0.008)], 28, Mh)
     box(orange, (0.04, 0.22, 0.025), (0.24, -0.32, 0.03), Mh)
     lathe(alu, [(0.05, 0.0), (0.05, 0.03), (0.0, 0.035)], 10, Mh @ T(0.24, -0.23, 0))
     for sy in (-0.28, 0.20):
@@ -1997,8 +1997,8 @@ def _mav_ascent(root):
         prism(alu, [(-R2, 6.98), (-R2, 7.275), (-R2 - step_d, 7.275)], 0.03, T(sx * 0.40, 0, 0) @ YZX)
     for a in (232, 308):                                                                      # cabin windows
         M = radial_frame(R2 - 0.004, a, 7.95)
-        plate(alu, 0.40, 0.32, 0.016, 0.09, M, n=3)
-        plate(glass, 0.32, 0.24, 0.006, 0.07, M @ T(0, 0, 0.016), n=3)
+        plate(alu, 0.40, 0.32, 0.016, 0.11, M, n=7)
+        plate(glass, 0.32, 0.24, 0.006, 0.085, M @ T(0, 0, 0.016), n=7)
     # strobe lamp sockets
     for k in range(4):
         lathe(alu, [(0.07, 0.0), (0.07, 0.025), (0.05, 0.035)], 8, radial_frame(R2 + 0.018, 45 + 90 * k, 8.18))
@@ -2009,9 +2009,11 @@ def _mav_ascent(root):
     for k in range(4):
         a = 45 + 90 * k
         M = cone_frame(1.15 - 0.004, a, 9.055, 0.808, 0.589)
-        plate(alu, 0.34, 0.30, 0.014, 0.08, M, n=3)
-        plate(glass, 0.26, 0.22, 0.006, 0.06, M @ T(0, 0, 0.014), n=3)
-        lathe(alu, [(0.15, 0.0), (0.15, 0.02), (0.0, 0.03)], 12, cone_frame(0.90 - 0.004, a + 45, 9.398, 0.808, 0.589))   # parachute bay covers
+        # (round corners and round covers: with three facets to a corner and twelve to a disc, the windows and the
+        #  covers on the nose were octagons in the last close picture of the game)
+        plate(alu, 0.34, 0.30, 0.014, 0.10, M, n=7)
+        plate(glass, 0.26, 0.22, 0.006, 0.075, M @ T(0, 0, 0.014), n=7)
+        lathe(alu, [(0.15, 0.0), (0.15, 0.02), (0.0, 0.03)], 28, cone_frame(0.90 - 0.004, a + 45, 9.398, 0.808, 0.589))   # parachute bay covers
 
     obj('asc_white', white, 'painted_white', asc, smooth=40)
     obj('asc_alu', alu, 'aluminium', asc, smooth=50)

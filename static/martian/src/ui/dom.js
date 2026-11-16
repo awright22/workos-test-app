@@ -48,7 +48,7 @@ const ring = (r, vb) => `<svg class="ring" viewBox="0 0 ${vb} ${vb}" aria-hidden
 
 UI.vitals = el('div', 'mg-vitals', null, UI.hud);
 // (on a touch screen the panel is a control: pressed, it opens the guide to what it shows)
-if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'Guide: what the bars mean'); }
+if (layout.touch) { UI.vitals.setAttribute('role', 'button'); UI.vitals.setAttribute('aria-label', 'Guide: what the gauges mean'); }
 UI.suit = el('div', null, 'suit', UI.vitals,
   `<div class="dial">${ring(28, 64).replace('</svg>', '<circle class="ticks" cx="32" cy="32" r="23.5" pathLength="120" stroke-dasharray="0.7 9.3"/></svg>')}<div class="in"><i class="si">${icon('suit')}</i><b class="num t-num">100</b><span class="lb">SUIT <span class="chem">O<sub>2</sub></span></span></div></div>` +
   // (on a phone the dial holds the figure alone and its name stands under it, at a size that can be read:
@@ -75,7 +75,7 @@ export const BARS = [
   ['water', 'water', 'WATER'],
   ['food', 'food', 'FOOD'],
   ['power', 'power', 'POWER'],
-  ['health', 'vitals', 'VITALS'],
+  ['health', 'vitals', 'HEALTH'],
   ['morale', 'mood', 'MORALE'],
 ];
 UI.res = el('div', null, 'res', UI.vitals);
@@ -117,7 +117,7 @@ onLayout(() => {
   const home = layout.calm ? UI.res : UI.tr;
   if (UI.clock.parentNode !== home) home.insertBefore(UI.clock, layout.calm ? UI.res.firstChild : UI.objectives);
   // (a tap on the quiet panel shows every gauge for a few seconds; a second tap, or a tap on the full one, opens the guide)
-  if (layout.touch) UI.vitals.setAttribute('aria-label', layout.calm ? 'Show every gauge' : 'Guide: what the bars mean');
+  if (layout.touch) UI.vitals.setAttribute('aria-label', layout.calm ? 'Show every gauge' : 'Guide: what the gauges mean');
 });
 
 UI.log = el('div', 'mg-log', null, UI.hud);
@@ -188,7 +188,7 @@ for (const [k, label] of [['journal', 'Journal'], ['map', 'Map'], ['colony', 'Co
 // Full screens: map, colony, journal (filled by ui/screens.js)
 // ------------------------------------------------------------------------------------------
 // (in the order of their buttons on the HUD, left to right)
-export const SCREENS = [['colony', 'Colony', 'Colony'], ['map', 'Map', 'Orbital Survey'], ['journal', 'Journal', 'Mission Journal']];
+export const SCREENS = [['colony', 'Colony', 'Colony'], ['map', 'Map', 'Map'], ['journal', 'Journal', 'Journal']];
 function screenShell(key, title) {
   const s = el('section', 'mg-' + key, 'mg-screen', root,
     `<header class="scr-hd"><div class="scr-title">${icon(key)}<h1>${title}</h1></div>` +
@@ -200,9 +200,9 @@ function screenShell(key, title) {
   s.setAttribute('aria-label', title);
   return s;
 }
-UI.mapScreen = screenShell('map', 'Orbital Survey');
+UI.mapScreen = screenShell('map', 'Map');
 UI.colonyScreen = screenShell('colony', 'Colony');
-UI.journalScreen = screenShell('journal', 'Mission Journal');
+UI.journalScreen = screenShell('journal', 'Journal');
 /** True while the map, colony or journal screen is open. */
 export function anyScreenOpen() {
   return UI.mapScreen.style.display === 'block' || UI.colonyScreen.style.display === 'block' || UI.journalScreen.style.display === 'block';

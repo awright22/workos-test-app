@@ -363,7 +363,9 @@ export function buildHabColony(spawn) {
   }
   // outside: the porch lamps and the work light by the tanks come on as it gets dark
   const outside = () => dark() * (S.power > 0.5 ? 1 : 0);
-  for (const [n, power, range] of [['lamp_door_L', 5, 20], ['lamp_door_R', 5, 20], ['lamp_tanks', 5, 16]]) {
+  // (a porch lamp lights a porch: at twenty metres' reach and half as strong again, the pair of them lit the whole
+  //  near side of the dome evenly, top to bottom)
+  for (const [n, power, range] of [['lamp_door_L', 3.6, 12], ['lamp_door_R', 3.6, 12], ['lamp_tanks', 3.6, 11]]) {
     const a = hab.part(n);
     if (a) {
       // The light itself hangs a pace out from the wall under its fitting. At the wall's own face it burnt the

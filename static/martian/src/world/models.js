@@ -222,7 +222,7 @@ const DUST = {
   default: 0.3,
   // (the second review: decades-old landers were a uniform beige wash, and his own gear showroom-clean.
   //  Dust now lies mostly on what faces up and near the ground, so less of it goes further.)
-  hab: 0.46, rover: 0.5, astronaut: 0.34, mav: 0.38, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
+  hab: 0.46, rover: 0.5, astronaut: 0.34, mav: 0.31, hermes: 0, farm_plot: 0, solar_panel: 0.34, uplink_dish: 0.4, uplink_pad: 0.16,
   pathfinder: 0.4, viking: 0.44, mars3: 0.64, beagle2: 0.6, mer: 0.6, phoenix: 0.56, msl: 0.48, m2020: 0.4, insight: 0.54, ingenuity: 0.46, zhurong: 0.5,
   schiaparelli_wreck: 0.2, debris_a: 0.55, debris_b: 0.55, debris_c: 0.55, rtg: 0.5, supply_pod: 0.3,
   greenhouse: 0.26, solar_kit: 0.22, beacon: 0.22, o2_cache: 0.22, regolith_pile: 0, ice_outcrop: 0,
@@ -411,6 +411,8 @@ function setUpPlain(plain, ground) {
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         if (vPbr.z < -0.5) {
+          // (the sun reaches the cab's fittings through its glass: a quarter of it, on what faces up and forward)
+          reflectedLight.directDiffuse *= 0.26; reflectedLight.directSpecular *= 0.26;
           // (the cab's lamp is in its roof over the windscreen, and its light falls off: laid on evenly, every wall was
           //  one flat tone with no source to it)
           vec3 toLamp = vec3(0.0, 2.62, 1.6) - vObjPos;
@@ -432,7 +434,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust19' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust20' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -614,14 +616,20 @@ function prepare(gltf, name) {
     o.castShadow = true;
     o.receiveShadow = true;
     // (the rover's cab fittings are inside its hull, which casts for them)
-    for (let a = o.parent; a && a !== gltf.scene; a = a.parent) if (a.userData && a.userData.part && CABIN_PARTS.test(a.name || '')) { o.castShadow = false; break; }
+    // (nor is the sun's shadow laid on them: seen from the seat they are a pace from the eye, where the shadow map's
+    //  grain is as wide as a finger, and it lay across the floor and the seat in fine stripes. They take a fixed share
+    //  of the sun instead: see the shader, where vPbr.z says a part is the cab's.)
+    for (let a = o.parent; a && a !== gltf.scene; a = a.parent) if (a.userData && a.userData.part && CABIN_PARTS.test(a.name || '')) { o.castShadow = false; o.receiveShadow = false; break; }
     const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const model = name;
     for (const m of mats) {
       const name = m.name || '';
       // What belongs to the mesh is set on every mesh. (It was set with the material, once: of a model's panes of glass
       // only the first cast no shadow, so a glass dome shaded its own floor like a tin one, and of its monitors only
       // the first had a picture laid on it.)
-      if (name.startsWith('glass_clear') || EMISSIVE.test(name) || name.startsWith('solar_cell')) o.castShadow = false;
+      // (the rover's panel wings are cells in an open frame, with no sheet behind them: left out of its shadow, the
+      //  shadow of each wing was its frame alone, a ladder drawn on the ground behind the rover)
+      if (name.startsWith('glass_clear') || EMISSIVE.test(name) || (name.startsWith('solar_cell') && model !== 'rover')) o.castShadow = false;
       if (name.startsWith('screen')) screenUVs(o, name === 'screen_drive');
       if (seen.has(m)) continue;
       seen.add(m);
@@ -710,7 +718,7 @@ function prepare(gltf, name) {
       } else if (name === 'void') {
         m.color.set(0x000000); m.roughness = 1;
       } else if (name.startsWith('solar_cell')) {
-        o.castShadow = false;                     // cells lie on a backing sheet that already casts
+        o.castShadow = model === 'rover';         // cells lie on a backing sheet that already casts (the rover's wings have none)
         if (dust >= 0.45) { m.color.lerp(_dustTint, dust * 0.75); m.roughness = Math.max(m.roughness, 0.7); m.metalness *= 0.4; }   // decades of dust on the old landers
       } else if (name === 'ice') {
         // water ice: cold, with a soft sheen, and never quite as dark as rock in shadow
