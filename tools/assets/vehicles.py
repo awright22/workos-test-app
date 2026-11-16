@@ -713,7 +713,9 @@ def _rover_cab(root):
             f.material_index = 4
     for name, tags in panes.items():
         faces = _pane_faces(bm, tag, set(tags), normals)
-        margin = 0.05 if name != 'rear' else 0.042
+        # (the frames round the panes a driver looks out between are slim: at a hand and a half each side, the pillar
+        #  between the windscreen and the corner pane stood a fifth of a metre wide in the middle of his view)
+        margin = 0.042 if name == 'rear' else 0.05 if name == 'brow' else 0.032
         bmesh.ops.inset_region(bm, faces=faces, thickness=margin, depth=0.0, use_even_offset=True, use_boundary=True)
         rim = bmesh.ops.inset_region(bm, faces=faces, thickness=0.028, depth=-0.022, use_even_offset=True,
                                      use_boundary=True)['faces']
@@ -744,7 +746,7 @@ def _cab_lining(cabin, levels, panes):
         f.material_index = 0 if f.calc_center_median().z > 1.56 else 1
     for name, tags in panes.items():
         faces = _pane_faces(bm, tag, set(tags), normals)
-        bmesh.ops.inset_region(bm, faces=faces, thickness=0.066 if name != 'rear' else 0.058, depth=0.0, use_even_offset=True,
+        bmesh.ops.inset_region(bm, faces=faces, thickness=0.058 if name == 'rear' else 0.066 if name == 'brow' else 0.046, depth=0.0, use_even_offset=True,
                                use_boundary=True)
         rim = bmesh.ops.inset_region(bm, faces=faces, thickness=0.006, depth=0.03, use_even_offset=True, use_boundary=True)['faces']
         for f in rim:
@@ -958,15 +960,11 @@ def _rover_cab_interior(root, levels, panes):
     for lx in (-0.17, 0.17):                                                              # the cab's two lamps
         lathe(bm, [(0.0, 0.0), (0.045, 0.0), (0.04, 0.012), (0.0, 0.016)], 12, Mo2 @ T(lx, -0.085, 0.0))
     obj('cab_lamps', bm, 'plastic_white', cabin, smooth=60)
-    bm, bm2 = bm_new(), bm_new()
+    bm = bm_new()
     for sx in (-1, 1):
-        # a handle on each windscreen pillar (dark: orange, it was a bar across the driver's view), and one over each side window
-        a = Vector((sx * 0.70, -2.325, 2.02)); b = Vector((sx * 0.645, -2.225, 2.24))
-        nrm = Vector((-sx * 0.75, 0.66, 0.0)).normalized()
-        handle(bm2, a + nrm * 0.02, b + nrm * 0.02, 0.045, 0.011, 6, normal=nrm)
+        # a handle over each side window (none on the windscreen's pillars: there it was a bar across the driver's view)
         handle(bm, (sx * 0.83, -1.55, 2.52), (sx * 0.83, -1.25, 2.52), 0.05, 0.012, 6, normal=(-sx * 0.5, 0, -0.86))
     obj('cab_handles', bm, 'painted_orange', cabin, smooth=60)
-    obj('pillar_handles', bm2, 'cab_trim', cabin, smooth=60)
     bm = bm_new()
     for sx in (-1, 1):                                                                    # cable runs along the roof's edge
         tube(bm, [(sx * 0.66, -1.86, ZR - 0.02), (sx * 0.70, -1.50, ZR - 0.02), (sx * 0.70, -0.66, ZR - 0.02)], 0.014, 6, round_r=0.05)
