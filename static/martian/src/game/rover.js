@@ -287,11 +287,11 @@ export function roverLights(dt) {
   if (rv.cabin && cam) rv.cabin.visible = seated || cam.position.distanceToSquared(rv.group.position) < 70 * 70;
   const cabin = dustUniforms.uCabin.value, lamp = driven && dim ? 1 : 0;
   RVL.cab = lerp(RVL.cab, lamp, damp(0.25, dt));
-  cabin.set(0.078 * RVL.cab, 0.058 * RVL.cab, 0.04 * RVL.cab, 0.62);
+  cabin.set(0.05 * RVL.cab, 0.036 * RVL.cab, 0.024 * RVL.cab, 0.62);
   // (and its screens are turned down after dark: at their day's strength they were the brightest thing in the night)
   // (and its tell-tales more than that: a row of green lamps under the display outshone the display)
   if (!rv.screens) { rv.screens = []; rv.cabin && rv.cabin.traverse((o) => { if (o.isMesh && o.material && /^(screen|light_green|light_amber)/.test(o.material.name || '') && !rv.screens.includes(o.material)) rv.screens.push(o.material); }); }
-  for (const m of rv.screens) m.emissiveIntensity = (m.userData.baseEmissive || 1) * lerp(1, /^screen/.test(m.name) ? 0.5 : 0.28, clamp(World.dark || 0, 0, 1));
+  for (const m of rv.screens) m.emissiveIntensity = (m.userData.baseEmissive || 1) * lerp(1, 0.5, clamp(World.dark || 0, 0, 1));
 }
 const RVL = { cab: 0 };
 
@@ -436,7 +436,8 @@ const _seatP = new THREE.Vector3(), _seatQ = new THREE.Quaternion(), _halfTurn =
 function seatCamera(dt) {
   const RV = roverF, rv = World.rover, c = ctx.engine.camera;
   if (input.yaw || input.pitch) {
-    RV.seatYaw = clamp(RV.seatYaw + input.yaw, -2.25, 2.25);
+    // (112 degrees each way: at 129 a third of the picture was the back of his own seat and his shoulder)
+    RV.seatYaw = clamp(RV.seatYaw + input.yaw, -1.95, 1.95);
     RV.seatPitch = clamp(RV.seatPitch + input.pitch * (input.invertY ? -1 : 1), -0.85, 0.7);
     RV.camIdle = 0;
   }

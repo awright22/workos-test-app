@@ -265,6 +265,7 @@ export function objectiveThen(o, where) {
 }
 export const objDone = new Set();
 let objUrgent = false;
+let leadShown = '';
 let objSeeded = false, objThrottle = 0, objCalls = 0, objHead = null, sleepTold = false, fitKey = '', fitAt = 0, whyKey = '', whyAt = -1e9, objTap = false, objLead = null, objWatch = null;
 /** How long the reason under the first line stays open on a phone, in seconds of play, after it changes or is asked for. */
 const WHY_OPEN = 9;
@@ -543,6 +544,7 @@ export function updateObjectivesHud() {
         // (on the place itself the first line says so: "RIG · 0 m" read as a reading gone wrong)
         dist = !w ? '' : (n.lead || n.o.id === inHand) && !w.via && w.near < 2.4 ? 'here' : fmtDist(n.lead ? w.show : w.d);
         // (the quiet HUD gives one distance, the first line's: the compass has the rest, for the turning)
+        if (n.lead) leadShown = dist;                // (the rover's own display says the same figure: see drawDash's caller)
         if (layout.calm && !n.lead) dist = '';
         if (n.lead) { place = objectivePlace(n.o, w); const t = objectiveThen(n.o, w); if (t) then = `then <b>${esc(t[0])}</b> ${t[1]}`; }
       } else if (n.q) { const p = questTargetPos(n.q); dist = p && !layout.calm ? fmtDist(distTo(p)) : ''; }
@@ -1118,14 +1120,16 @@ export function updateHud() {
     setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed) * 3.6)));
     const pf = S.roverPower / roverPowerCap(), of = S.roverO2 / BAL.roverO2Cap;
     // (and on the rover's own display, which is the speedometer when the picture is taken from its seat: a few times a second)
-    if (S.cockpit && playTime() - (hud.dashT || 0) > 0.16) {
-      hud.dashT = playTime();
+    // (and at once when the card's figure for how far has changed: for a sixth of a second the two could differ)
+    if (S.cockpit && (playTime() - (hud.dashT || 0) > 0.16 || hud.dashLead !== leadShown)) {
+      hud.dashT = playTime(); hud.dashLead = leadShown;
       const rp = World.rover.group.position, lead = leadTask(), w = lead ? objectiveWhere(lead.o) : null;
       drawDash({
         kmh: Math.abs(roverF.speed) * 3.6, power: pf, o2: of, heading: headingOf(rp, roverF.q) * R2D,
         gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D',
         // (the task in hand, as the HUD's own line has it: how far, and which way off the nose)
-        to: w ? { dist: fmtDist(w.show), bearing: bearingTo(rp, w.pos, roverF.q) * R2D, here: w.show < 12 } : null,
+        // (the figure is the card's own, as it last drew it: worked out afresh here it could say 5.9 km beside the card's 6.0)
+        to: w ? { dist: leadShown && leadShown !== 'here' ? leadShown : fmtDist(w.show), bearing: bearingTo(rp, w.pos, roverF.q) * R2D, here: leadShown === 'here' || w.show < 12 } : null,
       });
     }
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
@@ -1139,7 +1143,8 @@ export function updateHud() {
     // (and for a few seconds on getting in: what it has in it is the first thing a driver wants, and it is how he
     //  learns the panel has them)
     if (hud.mode !== 'rover') hud.roverAt = pt;
-    const fresh = pt - hud.roverAt < 6;
+    // (not from the driver's seat: there the rover's own display has them, and the panel lay over it)
+    const fresh = pt - hud.roverAt < 6 && !S.cockpit;
     const showP = !calm || open || fresh || pf < 0.34, showO = !calm || open || fresh || of < 0.34, rk = (showP ? 'p' : '') + (showO ? 'o' : '');
     if (hud.cls.rv !== rk) { hud.cls.rv = rk; a.wrap.classList.toggle('show', showP); b.wrap.classList.toggle('show', showO); UI.rover.classList.toggle('bars', showP || showO); }
     // (VIEW, on a phone, is the way into the driver's seat: the first time he is under way, say so)

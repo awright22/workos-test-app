@@ -121,16 +121,23 @@ export function drawDash(d) {
   bar(110, 'POWER', d.power, pw);
   bar(170, 'AIR', d.o2, o2);
   g.fillStyle = rule; g.fillRect(556, 76, 2, 128);
-  // the task in hand: how far, and where it lies off the nose
-  g.textAlign = 'left'; g.fillStyle = dim; g.font = `600 28px ${cond}`; g.fillText(to ? 'TO GO' : 'NO FIX', 576, 106);
+  // the task in hand: how far, and where it lies off the nose (an arrow large enough to steer by)
+  g.textAlign = 'left'; g.fillStyle = dim; g.font = `600 28px ${cond}`; g.fillText(to ? 'TO GO' : 'NO TARGET', 576, 106);
   if (to) {
-    g.fillStyle = warm; g.font = `600 58px ${cond}`; g.fillText(to.here ? 'HERE' : to.dist.toUpperCase(), 576, 164);
-    const cx = 716, cy = 184, r = 26, a = brg * Math.PI / 180;
+    const m = /^([\d.,]+)\s*(.*)$/.exec(to.dist) || [0, to.dist, ''];
+    g.fillStyle = warm; g.font = `600 62px ${cond}`;
+    if (to.here) g.fillText('HERE', 576, 170);
+    else {
+      g.fillText(m[1], 576, 170);
+      const wv = g.measureText(m[1]).width;
+      g.font = `600 30px ${cond}`; g.fillText(m[2].toUpperCase(), 576 + wv + 6, 170);
+    }
+    const cx = 712, cy = 150, r = 38, a = brg * Math.PI / 180;
     g.strokeStyle = rule; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
-    g.fillStyle = rule; g.fillRect(cx - 1.5, cy - r - 8, 3, 10);
+    g.fillStyle = dim; g.fillRect(cx - 1.5, cy - r - 9, 3, 12);
     if (!to.here) {
       g.save(); g.translate(cx, cy); g.rotate(a);
-      g.fillStyle = warm; g.beginPath(); g.moveTo(0, -r + 3); g.lineTo(12, 13); g.lineTo(0, 6); g.lineTo(-12, 13); g.closePath(); g.fill();
+      g.fillStyle = warm; g.beginPath(); g.moveTo(0, -r + 4); g.lineTo(19, 20); g.lineTo(0, 10); g.lineTo(-19, 20); g.closePath(); g.fill();
       g.restore();
     }
   }
@@ -669,6 +676,8 @@ function prepare(gltf, name) {
                   #if NUM_DIR_LIGHTS > 0
                     glare = pow(max(dot(-toEye, directionalLights[0].direction), 0.0), 5.0);
                   #endif
+                  // (after dark it is lit by nothing and shows only as what it hides: thin, or the swept arc is a dark band across the stars)
+                  film *= mix(0.3, 1.0, smoothstep(0.012, 0.09, dot(uGroundLit, vec3(0.333))));
                   float veil = film + 0.3 * glance + 0.2 * glare * (0.35 + 4.0 * film);
                   if (veil < 0.006) discard;
                   gl_FragColor = vec4(mix(uGroundLit * 1.25, uSkyHor * 1.3, clamp(glare * 0.8 + glance * 0.5, 0.0, 1.0)), min(veil, 0.62));
@@ -689,7 +698,7 @@ function prepare(gltf, name) {
                 }
               #include <opaque_fragment>`);
         };
-        m.customProgramCacheKey = () => `glass9:${pane.film}:${pane.top}:${cab}`;
+        m.customProgramCacheKey = () => `glass10:${pane.film}:${pane.top}:${cab}`;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;
