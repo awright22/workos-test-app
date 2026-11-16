@@ -1791,6 +1791,115 @@ pillar faces, getting in as a blink and not a climb (CB12), and the HUD's compas
 the seat (CC4). Not measured on a phone: what the seat's view costs in frames. It adds no light and no pass to an
 ordinary frame and its glass is cheaper than the same glass seen from outside, but that is reasoning, not a number.
 
+## Against a higher bar: a high-end indie or premium mobile release (the owner, 16 November)
+
+The owner, after the driver's seat: "Before you change anything: run one picture review and one interface review of
+the current preview build, at iPhone size, held to a higher bar than before: 'a high-end indie or premium mobile
+release', one step above 'solid indie'. Use a fresh reviewer and give them the bar, not past findings. For every
+finding, mark whether it can be fixed in code with the current pipeline or needs sourced art (for example CC0
+scanned textures), and estimate the effort as small, medium or large. Record it in QUALITY.md as a separate section,
+don't act on it yet, and send me the summary: the verdict per area and the code-fixable list ranked by impact. Then
+stop."
+
+**Nothing in this section has been acted on.** It is a record of two reviews of the build on the preview
+(`gh-pages/next` `f4231a0` from `ff12ab5`, cache `stranded2-fd502c3ff815`), photographed again for the purpose on
+the preset a phone starts on. The bars reached under the target of 14 November ("a solid indie release") stand as
+they were: these verdicts are against a standard one step above it, and are not a change to those.
+
+The standard, as both reviewers were given it: "the level of the best-looking games a small studio ships, the kind
+an app store features for its art and people pay a premium price for ... one step above 'a solid indie release'".
+Each was asked to name the released games used as a yardstick, to grade each area MET, NEARLY or NOT MET against that
+standard only, and for every finding to say CODE (it can be put right with the game's own pipeline) or SOURCED ART
+(it needs assets that pipeline cannot make), an effort (small: a tuning pass or a few hours; medium: a day or two;
+large: a system or a family of assets) and an impact (high, medium, low). Each was told how the game is made, so as
+to be able to say which: nothing bought or scanned, textures procedural, models built by script in Blender with
+colour and occlusion per vertex, the terrain Mars's own elevation with procedural detail, the interface HTML and CSS
+with line icons written in code.
+
+### The interface review (one fresh reviewer; 844 x 390; 162 pictures, all opened)
+
+Given: the 78 interface states of `tests/ui-audit.mjs --shoot`, a new player's first 29 steps (`tests/first-ten.mjs`),
+the HUD on its own in 14 situations (`tests/hud-cover.mjs --shoot`), 4 pictures of driving from the rover's seat and
+from behind it with the interface on, and Base mode's 37 steps (`tests/base-walk.mjs`); the bar below; how the
+interface is made (HTML and CSS over the canvas, line icons written as SVG paths, two type families, no drawn art),
+so that each finding could be marked. Not given: any earlier review, finding or verdict. The small phone (667 x 375)
+and the owner's (932 x 430) were not part of this review.
+
+Its yardsticks: The Long Dark (a survival HUD that hides, emergencies that lead), Subnautica (fabricator, PDA and
+base-building sheets with a picture for every item), Alto's Odyssey (premium mobile finish in type, motion and key
+art).
+
+**Overall: NOT MET.** "A clean, consistent, well-written solid-indie interface. The cold open and the quiet HUD are
+at the standard; the sheets, the Base screens and the absence of any authored art are not." "A player would take
+this for a good indie, not a premium release."
+
+| Area | Verdict | What decided it |
+| --- | --- | --- |
+| Layout | NEARLY | Clear of the notch and home bar throughout. Lists slice cards through chips and buttons; several things touch or overlap (the cab at night parked, a Base deposit, the map) |
+| Legibility and touch | NEARLY | Main controls are thumb-size. Secondary text is 10 to 11 pt grey everywhere; the collapsed task pill is about 30 pt tall |
+| Visual design | NEARLY | "One coherent family of panels, chips and type. It is a tidy kit with no art direction": repeated generic glyphs, dead half-cards, two "selected" colours |
+| Wording | **NOT MET** | The voice is good and the verbs plain, but one thing often has several names and several labels read as bugs. "All cheap to fix" |
+| The HUD in play | NEARLY | The quiet state "excellent", gauges one tap away. The four-line task card stays open for long stretches, driving included |
+| Emergencies | NEARLY | One red thing leads and it is the right thing. The banner says what is wrong, not what to do; RUN is off screen; a toast competes |
+| First ten minutes | NEARLY, "closest to MET" | Teaches by doing, gauges arrive with a card each, the goal is stated. New things pile up from step 14 to 17 |
+| The sheets | NEARLY | Journal, marker card, dialogs and the farm chooser work at a glance. Colony cards, settings, the win sheet and photo mode "read as web forms" |
+| Base mode | NEARLY, "low" | The same family, but its new screens are the weakest in the game, and it drops the "where" that Story always gives |
+| Overall | **NOT MET** | |
+
+Already at the standard, by its account: the cold open, gauge-by-gauge teaching, the quiet HUD, the hold prompt with
+its consequence line, the mode and difficulty cards, the marker card, the journal's way home, the writing voice. Its
+five best screens: the crash's first seconds, Sol 2's morning (the HUD at rest), a gauge taught as it appears, the
+choice of game, what to plant. Its five worst: the Base tab with a kiln ready, the full HUD at the rover, everything
+wrong at once, the cab at night parked (a pill and three buttons over the dashboard), the win sheet ("25 sols end in
+a table").
+
+The findings, in the reviewer's order (most damaging first). FIX, EFFORT and IMPACT are the reviewer's. "Mine" is my
+own note where I know something the pictures do not show; it is not the reviewer's and not a decision.
+
+| # | Finding | Fix | Effort | Impact | Mine |
+| --- | --- | --- | --- | --- | --- |
+| I1 | **No authored art in the interface.** Every sheet is text in boxes on near-black: the title is the UI face, the ending a table of figures, every lander shares one glyph, five minerals share a pickaxe, no item or building has a picture | CODE (part): thumbnails rendered from the game's own 3D models, a glyph for each mineral, CSS transitions. SOURCED ART for the rest: a drawn icon family (about 60), key art for title, win, death and dawn, a licensed display face, authored motion | large | high | The thumbnails are within the pipeline: every item and building is already a model the game can draw to a small canvas |
+| I2 | **One thing, several names:** soil and regolith; hematite pavement, blueberries, hematite and iron ore; "carried" and "in the stores"; bars, gauges and dial, and VITALS for health; the tab COLONY, the rail BASE, the header WORKS or BUILDINGS; MAP and ORBITAL SURVEY; JOURNAL and MISSION JOURNAL; "READY TO BUILD" over FABRICATE buttons | CODE | small | high | |
+| I3 | **Emergencies name the problem, not the action:** the banner says "SUIT O2 CRITICAL / the tank is almost empty" and "Run for air" is in the task card beside it; RUN is hidden while he stands still; a WARNING toast competes with the banner; two bare icon chips beside it look tappable and say nothing; in a breach indoors the action button reads "NO SLEEP YET" | CODE | medium | high | The two chips are the marks of the other warnings and are a button (they open every gauge): that is not said on them |
+| I4 | **The task card does not get out of the way:** open at about 245 x 100 pt with pinned gauge rows and a toast across the top third, and through a drive | CODE | small | high | To be checked in play before anything is changed: the card opens itself for some seconds whenever the task changes, and both walks photograph just after each change; the Base walk taps it open on purpose in two steps |
+| I5 | **The Base tab and the works' sheets:** a disabled BUILD beside a six or seven line "Missing..." paragraph in a narrow column, cut by the fade; ready cards half empty and of uneven height; the third recipe's button sliced; "0 STANDING" with a kiln and a smelter standing; the running recipe jumps from third to first | CODE | medium | high (for Base) | "0 STANDING" may be the walk's doing (it sets buildings down by the debug hook) or a real count that is wrong: not looked into |
+| I6 | **Secondary type too small:** card bodies, the second lines of pills, hints, the LATER line that carries the whole goal, the "replaces your saved run" warning, at 10 to 11 pt grey | CODE | medium (layouts must grow) | high | |
+| I7 | **Lists slice content:** "MORE BELOW" is shown, but rows are cut mid-sentence and section headers half-clipped; two colony cards to a screen | CODE | medium | medium | The fold has been tried twice before as a fade and as a shelf; snapping to rows has not |
+| I8 | **New things pile up in minutes three to six:** two gauges, a four-line task with "then HEAP" and a second task at once; then three NEW button cards in three chores running; the water arrow unexplained for eleven game-hours | CODE | small | medium | |
+| I9 | **The first hold is unexplained:** SEAL, INSPECT, CHECK, RAKE and OPEN show no line saying what they do, the first of them with the air running out; tapping the task card to open it is never taught | CODE | small | medium | |
+| I10 | **The floating target arrow** wanders the picture, sometimes with a distance and sometimes without, lies over the cab's dashboard, and repeats the compass's diamond: "it reads as a stray cursor" | CODE | small | medium | |
+| I11 | **Top-centre pile-up:** compass, one or two chips, a region label printed across the Hab's dome, a banner touching the chip above it | CODE | small | medium | |
+| I12 | **The cab view fights its own dashboard** ("the best interface art in the game"): the camp pill is drawn over it, the stick and buttons cover both side screens, and the dash says "NO TARGET" while the card lists tasks | CODE | medium | medium | "NO TARGET" is what the display says when the leading task has no place (camping until dawn) |
+| I13 | **Two HUDs:** the full one covers about 40 percent and gives the sol and the hour twice; its labelled buttons are better than the quiet one's bare icons. "Pick one" | CODE | small | medium | The full HUD is a setting, off on a phone unless the player asks for it |
+| I14 | **Settings:** selected is cream in segments and amber in switches; switches carry no on or off; sheets half empty | CODE | small | medium | |
+| I15 | **The ending and the dawn sheets are tables;** the log's quotation runs into its heading; buttons small and left-aligned | CODE (part): layout and a staged reveal. SOURCED ART: key art | medium | medium | |
+| I16 | **The map:** "MARS AT 1/282 SIZE" reads as debug text; the zoom pill covers a region's name, markers sit on latitude labels, one IRON ORE label is detached from its marker, a stray dot has no label | CODE | small | medium | |
+| I17 | **Base lacks "where" and feedback:** the first task gives no place or distance; a running job shows no progress away from the works; nothing visible says the bricks are done; the supply drop is not announced, and opened it shows only a food row | CODE | medium | medium | |
+| I18 | **The grey action ring looks disabled,** with digging the task in hand | CODE | small | medium | |
+| I19 | **Small targets:** the collapsed task pill, the gauge's chevron, "? GUIDE", all under 44 pt | CODE | small | medium | |
+| I20 | **Numbers and labels that read as bugs:** 106 and 83 km/h in a rover; "makes 2 brick"; "Sol 25" in a capitals cell | CODE | small | low | The rover's speed is the game's own (the planet is a scale model and a drive of real length would take hours); whether it should be shown as it is, is a design question |
+| I21 | Lower-case banner lines and a comma splice | CODE | small | low | |
+| I22 | Four styles of message at the foot of the screen | CODE | small | low | |
+| I23 | Rail badges: two styles with no stated meaning; still lit when the fabricator is out of reach | CODE | small | low | |
+| I24 | Setting a building down has no cancel, and the open card names another task | CODE | small | low | |
+| I25 | Base reuses the Story's sheet: "FARM OR STARVE", "Find a radio" | CODE | small | low | |
+| I26 | Photo mode is three buttons | CODE | medium | low | |
+| I27 | The comms terminal: a third typeface, and the first message leaves most of the sheet empty | CODE | small | low | |
+
+Also from its report: `base/03-the-numbers` came back with a green cast over the whole screen. I looked at the
+picture: it is green. Whether that is the game (Base mode at the comms desk) or the capture has not been looked into.
+
+Its first-ten-minutes walk, where a new player would hesitate: at the airlock ("SEAL / HOLD, no explanation: tap or
+hold?"), and after the numbers (two gauges, a four-line card and a second task at once: "which first? What is the
+water arrow?"). The three interruptions by NEW cards (journal, map, colony) come at steps 15 to 17.
+
+What would move it furthest, in its words: (1) "An art pass: a drawn icon family, key art for title, win, death and
+dawn, a display face and authored motion. Thumbnails rendered from the game's own models are the stopgap code can
+provide. This is the only part of the gap code cannot close." (2) "A wording and type pass: one name per thing,
+secondary text raised from 10 to 11 pt, and banners that say what to do with RUN on screen. This alone moves Wording
+to MET." (3) "HUD and card discipline: the task card always collapses, one HUD variant, the top-centre stack and cab
+view cleared, and the Base tab cards rebuilt around a short 'needs' line."
+
 ## Open items
 
 | # | Item | State |
