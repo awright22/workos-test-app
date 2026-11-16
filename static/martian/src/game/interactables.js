@@ -633,6 +633,9 @@ addI({
     Snd.play(p.kind === 'pod' ? 'podOpen' : 'salvage');
     const got = gainLoot(p.loot);
     log(`Recovered: ${got}.`);
+    // (and as a card: on the quiet HUD a line of the log is a few seconds of small type, and a reviewer of the base
+    //  mode opened a supply drop and saw "nothing of its contents": a gauge moved, and that was all)
+    toast(p.kind === 'pod' ? 'SUPPLIES' : 'SALVAGE', 'Recovered', `${got.charAt(0).toUpperCase()}${got.slice(1)}.`, { life: 6000 });
     if (p.blueprint) { S.blueprints[p.blueprint] = true; log(`NASA attached schematics: ${p.blueprint.toUpperCase()} blueprint unlocked.`, 'nasa'); }
   },
 });
