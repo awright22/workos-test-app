@@ -381,7 +381,7 @@ export function updateAstronaut(dt) {
   const bare = anim.head.length > 0 && anim.airT > 1.1 && !S.dead;
   // (and from the driver's own seat the picture is taken from inside his head: neither is drawn then, and his arms
   //  and knees are what he sees of himself)
-  const own = driving && !!S.cockpit && anim.eye && ctx.engine && _v1.setFromMatrixPosition(anim.eye.matrixWorld).distanceTo(ctx.engine.camera.position) < 0.75;
+  const own = driving && !!World.rover.seatView && !S.photo;
   const headKey = own ? 2 : bare ? 1 : 0;
   if (headKey !== anim.headKey) {
     anim.headKey = headKey; anim.bare = bare;
@@ -393,7 +393,9 @@ export function updateAstronaut(dt) {
   let ts = 1;
   if (driving || !player.onGround || S.over) anim.kneel = 0;
   if (S.over && S.dead) play('Collapse', 0.25);
-  else if (driving) { play('Drive', 0.3); holdDrive(World.rover.wheelTurn || 0); }
+  // (seen from his own seat he is in it at once: for the third of a second it took him to settle from the climb, his
+  //  own helmet stood in front of the camera)
+  else if (driving) { play('Drive', World.rover.seatView ? 0.01 : 0.3); holdDrive(World.rover.wheelTurn || 0); }
   else if (!player.onGround) {
     if (player.airT < 0.12 && player.vy > 0 && anim.name !== 'Air') play('JumpStart', 0.08);
     else play('Air', 0.18);

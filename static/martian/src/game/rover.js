@@ -26,7 +26,7 @@ export const roverF = {
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
   slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, camSee: 0, camRise: 0, leaving: false, accel: 0, lat: 0, camBlend: 1, camFromQ: null, camFromP: null,
-  camSeat: false, seatYaw: 0, seatPitch: -0.14,      // the driver's own view: see seatCamera
+  camSeat: false, camSnap: false, seatYaw: 0, seatPitch: -0.14,      // the driver's own view: see seatCamera
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 /** The yoke turns about its column (tools/assets/vehicles.py: along (0, 0.85, 0.527) there, toward the driver), by no
@@ -180,6 +180,7 @@ export function updateBoarding(dt) {
   const b = S.boarding;
   if (!b) return;
   b.t += dt;
+  if (S.cockpit && b.t >= b.dur - BLINK_OUT && blink.t < 0) blinkView(null);
   // (anything that took him from the rover meanwhile, a checkpoint restored, calls it off)
   const near = World.rover && player.pos.distanceTo(World.rover.group.position) < 6;
   if (b.t >= b.dur || S.mode !== 'walk' || S.over || !near) { S.boarding = null; if (S.mode === 'walk' && !S.over && near) enterRover(); }
@@ -189,6 +190,9 @@ export function enterRover() {
   S.mode = 'rover';
   roverF.camInit = false; roverF.camYaw = 0; roverF.camPitch = 0; roverF.camRise = 0; roverF.camSee = 0;
   roverF.seatYaw = 0; roverF.seatPitch = SEAT_REST;
+  roverF.camSeat = !!S.cockpit; roverF.camSnap = !!S.cockpit;
+  if (World.rover) World.rover.seatView = !!S.cockpit && !!World.rover.seat;
+  if (S.cockpit) { blink.t = BLINK_OUT; blink.done = true; blink.swap = null; }      // (the picture comes up in the seat)
   input.yaw = 0; input.pitch = 0;
   Snd.play('roverEnter');
   emit('rover-enter', {});
@@ -200,7 +204,32 @@ export function enterRover() {
  */
 export function leaveRover() {
   if (S.mode !== 'rover') return;
-  if (Math.abs(roverF.speed) < 2.5) exitRover(); else roverF.leaving = true;
+  if (Math.abs(roverF.speed) < 2.5) getOut(); else roverF.leaving = true;
+}
+/** Out of the seat: from the seat's own view the picture blinks on the way to where it stands behind him. */
+function getOut() { if (roverF.camSeat) blinkView(() => { if (S.mode === 'rover') exitRover(); }); else exitRover(); }
+
+/**
+ * Between the driver's seat and the camera outside, the picture blinks: dark for a tenth of a second, and it is in the
+ * other place. (Carried there, it went through the hull, the tanks on the roof and the back of his own seat on the
+ * way: tests/cockpit-shots.mjs --strips.) `swap` is run in the dark. Stepped every frame, driven or not (roverLights),
+ * so that a blink is never left half done.
+ */
+const BLINK_OUT = 0.11, BLINK_IN = 0.2;
+const blink = { t: -1, done: false, swap: null };
+export function blinkView(swap) {
+  if (blink.t >= 0 && !blink.done) return false;                       // (one is on its way to the dark already)
+  blink.t = 0; blink.done = false; blink.swap = swap;
+  return true;
+}
+function stepBlink(dt) {
+  if (blink.t < 0 || !ctx.engine) return;
+  blink.t += dt;
+  if (!blink.done && blink.t >= BLINK_OUT) { blink.done = true; const f = blink.swap; blink.swap = null; if (f) f(); }
+  const u = ctx.engine.final.uniforms.uFade;
+  if (blink.t >= BLINK_OUT + BLINK_IN) { blink.t = -1; u.value = 0; return; }
+  const x = blink.t < BLINK_OUT ? blink.t / BLINK_OUT : 1 - (blink.t - BLINK_OUT) / BLINK_IN;
+  u.value = x * x * (3 - 2 * x);
 }
 
 export function exitRover() {
@@ -225,6 +254,7 @@ export function exitRover() {
 export function roverLights(dt) {
   const rv = World.rover;
   if (!rv) return;
+  stepBlink(dt);
   const dim = (World.dark || 0) > 0.4 || S.storm.i > 0.5, driven = S.mode === 'rover';
   // (driven, its wide lamps are its own; on foot that lamp is his, a beam from his helmet: game/player.js, mountLamps)
   // (its strength is set against how it falls off: game/player.js, LAMPS.flood. It grows with distance, so that the
@@ -247,6 +277,7 @@ export function roverLights(dt) {
   // From the seat its panes are looked out through (world/models.js, paneView), and the storm's veil stays off what
   // of the picture is the cab (render/engine.js, cabMask). Here, where every frame comes, and not with the driving:
   // a driver who dies in the seat, or is taken from it by a checkpoint, leaves neither behind him.
+  if (!driven) rv.seatView = false;
   const seated = driven && !!S.cockpit && !!rv.seat;
   paneView.value = lerp(paneView.value, seated ? 1 : 0, Math.min(1, dt * 6));
   if (seated && !rv.cabThings) rv.cabThings = [rv.model.part('cabin'), rv.seat].filter(Boolean);
@@ -256,7 +287,7 @@ export function roverLights(dt) {
   if (rv.cabin && cam) rv.cabin.visible = seated || cam.position.distanceToSquared(rv.group.position) < 70 * 70;
   const cabin = dustUniforms.uCabin.value, lamp = driven && dim ? 1 : 0;
   RVL.cab = lerp(RVL.cab, lamp, damp(0.25, dt));
-  cabin.set(0.075 * RVL.cab, 0.062 * RVL.cab, 0.048 * RVL.cab, 0.5);
+  cabin.set(0.078 * RVL.cab, 0.058 * RVL.cab, 0.04 * RVL.cab, 0.62);
 }
 const RVL = { cab: 0 };
 
@@ -270,7 +301,7 @@ export function updateRover(dt) {
   // (asked to stop and let him out: it brakes, and he is out as it comes to a crawl; the throttle takes it back)
   if (RV.leaving) {
     if (throttle !== 0) RV.leaving = false;
-    else if (Math.abs(RV.speed) < 2.5) { exitRover(); return; }
+    else if (Math.abs(RV.speed) < 2.5) { RV.leaving = false; getOut(); if (S.mode !== 'rover') return; }
   }
   RV.throttle = throttle;
   const dead = S.roverPower <= 0.5;
@@ -382,9 +413,10 @@ export function updateRover(dt) {
   if (rv.yoke) rv.yoke.quaternion.setFromAxisAngle(YOKE_AXIS, -rv.wheelTurn);
 
   // --- camera: from behind the rover, or from the driver's seat ----------------------------
-  // (changed on the way, the picture goes from the one to the other: it does not cut)
-  if (!!S.cockpit !== RV.camSeat) { RV.camSeat = !!S.cockpit; if (RV.camInit) RV.camInit = false; RV.seatYaw = 0; RV.seatPitch = SEAT_REST; }
-  if (S.cockpit && World.rover.seat) seatCamera(dt); else chaseCamera(dt);
+  // (changed on the way, the picture blinks and is in the other place: see blinkView)
+  if (!!S.cockpit !== RV.camSeat) blinkView(() => { RV.camSeat = !!S.cockpit; RV.camInit = false; RV.camSnap = true; RV.seatYaw = 0; RV.seatPitch = SEAT_REST; });
+  World.rover.seatView = RV.camSeat && !!World.rover.seat;            // (the picture is being taken from the seat: game/player.js draws no head)
+  if (World.rover.seatView) seatCamera(dt); else chaseCamera(dt);
   S.inside = false;
 }
 
@@ -417,8 +449,8 @@ function seatCamera(dt) {
   if (!RV.camInit) {
     RV.camFromP = (RV.camFromP || new THREE.Vector3()).copy(c.position);
     RV.camFromQ = (RV.camFromQ || new THREE.Quaternion()).copy(c.quaternion);
-    RV.camBlend = c.position.distanceTo(_seatP) < 40 ? 0 : 1;
-    RV.camInit = true;
+    RV.camBlend = !RV.camSnap && c.position.distanceTo(_seatP) < 40 ? 0 : 1;
+    RV.camInit = true; RV.camSnap = false;
   }
   if (RV.camBlend < 1) {
     RV.camBlend = Math.min(1, RV.camBlend + dt / SEAT_T);
@@ -459,9 +491,9 @@ function chaseCamera(dt) {
   // it does not cut. (From further off than a getting-in can be, a saved game opened in the seat, it starts in place.)
   if (!RV.camInit) {
     const c0 = ctx.engine.camera;
-    if (c0.position.distanceTo(_pv) < 30) { RV.camPos.copy(c0.position); RV.camFromQ = (RV.camFromQ || new THREE.Quaternion()).copy(c0.quaternion); RV.camBlend = 0; }
+    if (!RV.camSnap && c0.position.distanceTo(_pv) < 30) { RV.camPos.copy(c0.position); RV.camFromQ = (RV.camFromQ || new THREE.Quaternion()).copy(c0.quaternion); RV.camBlend = 0; }
     else { RV.camPos.copy(_pv); RV.camBlend = 1; }
-    RV.camInit = true;
+    RV.camInit = true; RV.camSnap = false;
   }
   RV.camPos.lerp(_pv, damp(RV.camBlend < 1 ? 0.045 : 0.12, dt));      // (slower while it comes round from where it stood behind him)
   // ... but it is not left behind. Eased alone, it trailed by a dozen metres at speed: down the canyon's wall at

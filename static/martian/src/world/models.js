@@ -214,14 +214,14 @@ const GROUND = /^ground_dust/;
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
 /**
  * The rover's cab, inside (tools/assets/vehicles.py, the part `cabin`). It is a room with walls of glass: no dust,
- * half the sky's light (the roof and the walls hide the rest), and a lamp of its own after dark (uCabin, set by
+ * six tenths of the sky's light (the roof and the walls hide the rest), and a lamp of its own after dark (uCabin, set by
  * game/rover.js: a light in the shader, not one more lamp for every surface on Mars to be worked out under).
  */
 const CABIN_PARTS = /^cabin/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
 export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 },
   // (how much more dust lies on things than when the game began, 0..1: game/wear.js, dustAge)
-  uDustAge: { value: 0 }, uCabin: { value: new THREE.Vector4(0, 0, 0, 0.5) } };
+  uDustAge: { value: 0 }, uCabin: { value: new THREE.Vector4(0, 0, 0, 0.62) } };
 /** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
 export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { value: new THREE.Color(0.76, 0.47, 0.235) }, uSkyTop: { value: new THREE.Color(0.52, 0.32, 0.16) }, uGroundLit: { value: new THREE.Color(0.3, 0.15, 0.08) } };
 
@@ -605,7 +605,22 @@ function prepare(gltf, name) {
         // it read as an open frame with nothing in it.)
         const cab = pane === PANES.rover;
         m.onBeforeCompile = (sh) => {
-          if (cab) { sh.uniforms.uPaneView = paneView; sh.fragmentShader = 'uniform float uPaneView;\n' + sh.fragmentShader; }
+          if (cab) {
+            sh.uniforms.uPaneView = paneView;
+            // From the seat the windscreen is most of the picture, and looked through squarely there is nothing on it
+            // to draw: those pixels leave at once, before any of the lighting is worked out. (A pane is a whole
+            // surface's worth of shading laid over the picture; on a phone that is paid for at every pixel.)
+            sh.fragmentShader = 'uniform float uPaneView;\n' + sh.fragmentShader.replace('void main() {', `float paneVeil() {
+                float glance = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 3.0);
+                float veil = 0.3 * glance - 0.02;
+                #if NUM_DIR_LIGHTS > 0
+                  veil += 0.2 * pow(max(dot(-normalize(vViewPosition), directionalLights[0].direction), 0.0), 5.0);
+                #endif
+                return veil;
+              }
+              void main() {
+                if (uPaneView > 0.5 && paneVeil() <= 0.0) discard;`);
+          }
           sh.fragmentShader = sh.fragmentShader
             .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.07, vec3(0.5));')      // (and never bright enough to bloom: the dome's own lamp still starred a pane at night)
             .replace('#include <opaque_fragment>', `{ vec3 paneN = normalize(vNormal);
@@ -620,13 +635,14 @@ function prepare(gltf, name) {
                 ${cab ? `// From the driver's seat a pane is what he sees Mars through: nearly nothing looked through squarely, and its
                 // dust a thin veil that the sun lights, thicker where the pane is looked along.
                 if (uPaneView > 0.0) {
-                  float veil = 0.035 + 0.3 * glance;
+                  // (thicker looked along, and toward the sun the dust on it glows: the glare of a windscreen driven into a low sun)
+                  float veil = max(paneVeil(), 0.0);
                   outgoingLight = mix(outgoingLight, vec3(0.34, 0.24, 0.16) * filmLit * 1.6, uPaneView);
                   diffuseColor.a = mix(diffuseColor.a, veil, uPaneView);
                 }` : ''} }
               #include <opaque_fragment>`);
         };
-        m.customProgramCacheKey = () => `glass6:${pane.film}:${pane.top}:${cab}`;
+        m.customProgramCacheKey = () => `glass8:${pane.film}:${pane.top}:${cab}`;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;

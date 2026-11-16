@@ -10,7 +10,7 @@ import { screenUnlocked, gaugesOpen, openGauges } from '../ui/hud.js';
 import { showPause } from './flow.js';
 import { leaveRover } from './rover.js';
 import { useCandle } from './inventory.js';
-import { settings, onSettingsChange } from '../ui/settings.js';
+import { settings, onSettingsChange, setSetting } from '../ui/settings.js';
 import { layout } from '../ui/layout.js';
 
 /** Set by the modules that own these actions (the input module must not import them). */
@@ -28,7 +28,11 @@ export const input = {
   invertY: false,
 };
 // the player's control settings (ui/settings.js), now and whenever they change
-function applyControlSettings() { input.sensitivity = settings.sensitivity; input.invertY = !!settings.invertY; }
+function applyControlSettings(s, key) {
+  input.sensitivity = settings.sensitivity; input.invertY = !!settings.invertY;
+  // (which view the rover is driven from is a setting, so that it is the same the next time the game is opened)
+  if (key === undefined || key === null || key === 'cabView') S.cockpit = !!settings.cabView;
+}
 applyControlSettings();
 onSettingsChange(applyControlSettings);
 const lookY = () => (input.invertY ? -1 : 1);
@@ -38,7 +42,7 @@ let pointerLocked = false, dragMode = false, dragging = false, lastMX = 0, lastM
 
 /** VIEW, or V: on foot, the helmet's view or the camera behind him; in the rover, the driver's seat or the camera behind it. */
 function switchView(say) {
-  if (S.mode === 'rover') S.cockpit = !S.cockpit;
+  if (S.mode === 'rover') setSetting('cabView', !S.cockpit);
   else if (S.mode === 'walk') { S.firstPerson = !S.firstPerson; if (say) log(S.firstPerson ? 'Helmet cam. Just you and the visor.' : 'Suit cam deployed. Looking good, Watney. Ish.', 'sys'); }
 }
 

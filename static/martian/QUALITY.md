@@ -92,6 +92,9 @@ start the game afresh once** (swipe it away and open it again) for the new page 
    before the work listed under them): NOT MET were the poles, the interface's finish at 667 x 375,
    and "overall" as judged against AAA. Everything else was NEARLY or MET.
 
+6. **The driver's seat** (16 November): "Would be dope to have 1P view in the rover (need to be able to see the
+   cockpit etc)". Built: see "The rover from the driver's seat" below.
+
 ## How to check
 
 ```
@@ -1651,6 +1654,43 @@ it more; the save keeps the map and gives it back).
 
 Left: dirt in the creases of props from their baked occlusion, a furrow behind a dragged thing, and paths away
 from the Hab (the map is the base's; elsewhere the last few hundred marks are all there is).
+
+## The rover from the driver's seat (the owner, 16 November)
+
+"Would be dope to have 1P view in the rover (need to be able to see the cockpit etc)."
+
+What there was: one camera for the rover, ten metres behind it. A cab had been modelled to be seen through the glass
+from there: a lining whose openings were a hand wider than the panes with nothing between them and the glass, a
+plain box of a dashboard, two seats, a yoke. Seen from the seat (the first pictures, `tests/cockpit-shots.mjs`): bare
+tan walls that stopped short of the windows, nothing in the picture but glass unless he looked at his knees, and at
+night the whole cab floodlit white through its own roof by the lamps that light the rover for the camera behind it.
+
+**The bar** (a phone held sideways, "medium"; judged from pictures and the frame strips):
+
+| | Point | Bar |
+| --- | --- | --- |
+| K1 | The view | The picture is taken from his eyes in the seat. The cab stands still in it and Mars moves in the glass. Resting, the horizon is in the upper half, the bonnet and the wipers under it, and along the foot of the picture the driver's display and the top of the wheel: the cockpit is seen without looking down. A drag looks round the cab as far as a seated man can turn; nothing of his own head or helmet is in the way, and no wall has a hole in it |
+| K2 | The cab | It reads as the inside of this rover, built for it: a dashboard wall to wall, instruments, a wheel in his hands, seats, window frames with depth, fittings overhead and behind. Nothing in it reads as a bare box or a placeholder |
+| K3 | Instruments that are true | The display behind the wheel shows the real speed, heading, which way it is set to go, power and air, and the speed can be read at phone size. His hands are on the wheel and go with the steering |
+| K4 | Light | By day the cab is darker than Mars and its parts can still be told apart. At night it is dim, lit by its own lamp and its screens, the display readable and not blown out, the road lit ahead, and the headlamps do not light the cab. A low sun is seen through the glass. A storm is outside the glass and not inside the cab |
+| K5 | On the phone | One tap changes the view and one tap changes it back, the button is found without being told where it is, and a new driver is told once what it does. With it the quiet HUD stays under its cover bar at all three phones |
+| K6 | The change of view | Into the seat and out of it, the picture never shows the inside of a wall, a tank or his own seat |
+| K7 | Cost | No light added to the scene and no pass added to an ordinary frame; the cab's fittings under 9,000 triangles |
+
+**What was built** (commit `040b076` and after):
+
+| | What | Where |
+| --- | --- | --- |
+| D1 | **The seat's camera.** At his eyes (the astronaut's own `eye` anchor in the Drive pose, measured, 0.716 m over the seat's anchor), fixed to the sprung body and not to his head: the dashboard is still and the horizon rolls and pitches with the rover. It rests looking eight degrees down, with a lens twelve degrees wider than the one behind the rover (60 degrees up and down on a phone): the horizon is at a third of the picture and the display at its foot. A drag turns his head 129 degrees each way and 49 down, 40 up. Under way and left alone for two seconds the look returns to the road; parked it stays where it was put. His helmet and head are not drawn while the picture is taken from inside them; his arms and knees are | `game/rover.js` (seatCamera), `game/player.js` |
+| D2 | **The cab, rebuilt as a part of its own** (`cabin`, 8,190 triangles, with the yoke 436 more). A lining whose openings are the size of the panes, each with a reveal out to the glass; dark trim below the belt line and a cool dark padded liner above (a mid grey, under this sky, was brown card). A dashboard that is a hull of its own, wall to wall, leaning over the knees. The driver's display in a hood on top of it, behind the wheel. A centre screen standing on the dash, turned to the driver; switch panels with toggles and lit tell-tales under it, on the tunnel and on the driver's sill; a drive lever and a brake handle; a passenger's screen and grab bar. Seats with bolsters and headrests, a harness over the empty one. Pedals. An overhead console of switches with two lamp lenses, roof ribs, cable runs, grab handles. Behind the seats the bulkhead's door with its wheel, and racks either side. A fire extinguisher and a locker on the passenger's side | `tools/assets/vehicles.py` (_cab_lining, _rover_cab_interior) |
+| D3 | **A display that is true.** The one screen in the game that shows what is so: the speed in large figures, a heading tape with the figure in its middle, P, D or R, and power and air as bars with their figures (amber under a quarter, red under a tenth). Drawn into a 512 x 256 picture six times a second while he is in the seat, and only when a figure has changed | `world/models.js` (drawDash), `ui/hud.js` |
+| D4 | **The wheel in his hands.** The astronaut's Drive clip was authored against a yoke at a known place and already carried three seconds of small steering; left to run, his hands sawed at the wheel while the rover went straight and held it still through a turn. The yoke is now a part pivoted at that hub, turned by the steering asked for (11.5 degrees each way), and the clip is not run but held at the moment its wheel is that far over: his hands, and his head a little, go with the steering, from the seat and from behind alike. Measured: his hand follows the horn to within a centimetre | `game/rover.js`, `game/player.js` (holdDrive), `tests/drive.mjs` |
+| D5 | **The cab's light.** Its parts carry no dust and take six tenths of the sky's light (the roof and walls hide the rest); the sun comes in through the panes by the shadow map as it does everywhere. After dark, with a driver, a low warm lamp: a term in the shader of the cab's own surfaces, not a fourth point light for every surface on Mars to be worked out under. From the seat the rover's wide lamps stand on the roof's edge over the windscreen and light the road, not the cab (from behind and above, where they stand for the camera behind the rover, they lit the cab through its roof) | `world/models.js` (CABIN_PARTS, uCabin), `game/player.js` (LAMPS.floodSeat), `game/rover.js` |
+| D6 | **Glass to look out through.** From outside the rover's panes are half dark and mirror a quarter of the sky, which is what makes them glass; from inside that is a welder's mask. From the seat they are nearly nothing looked through squarely and a thin veil of lit dust looked along | `world/models.js` (paneView) |
+| D7 | **The storm stays outside.** The storm's veil is laid over the finished picture and knew nothing of depth: its streamers ran across the dashboard and his hands. From the seat, while there is a veil, the cab's parts and the driver are drawn once more, flat white, at half size, and the veil is kept off where they are. No other frame pays for it | `render/engine.js` (cabMask) |
+| D8 | **The phone.** VIEW stands above EXIT on the quiet HUD while driving, lit while the picture is in the seat; V on a keyboard; a switch in Settings, Controls ("Cab view" in the rover, "Helmet view" on foot). The choice is a setting and is kept between visits. The first time a driver is under way a card says "Tap VIEW to drive from inside the cab", once. From the seat the HUD's speed plate stands down (the dash has it), and comes back with a reserve when one is low. On the smallest phone VIEW took driving to 16.3% of the screen against a bar of 16: EXIT and VIEW are a thumb and no more there, the speed plate tighter, and it is 15.7% | `ui/css/touch.css`, `ui/css/hud.css`, `ui/hud.js`, `game/input.js`, `game/flow.js`, `ui/menus.js` |
+| D9 | **The change of view is a blink.** Carried from one place to the other, the picture went through the tanks on the roof, the hull and the back of his own seat (the first strips). Now it goes dark for a tenth of a second and is in the other place, on the switch and on getting in and out with the seat's view chosen | `game/rover.js` (blinkView) |
+| D10 | **Cost.** No light added. The cab's fittings cast no shadow (the hull casts for them) and are not drawn from further than seventy metres. The mask in D7 is the only pass added, in a storm, from the seat | |
 
 ## Open items
 

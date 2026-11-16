@@ -16,6 +16,7 @@ import { regionName } from '../planet/features.js';
 import { llToVec } from '../planet/geo.js';
 import { initRoverAt } from './rover.js';
 import { initWear } from './wear.js';
+import { setSetting } from '../ui/settings.js';
 import { _v1 } from '../core/scratch.js';
 import { applyAudioSettings, menuHooks, showPauseMenu, showTitle } from '../ui/menus.js';
 // Starting, continuing, pausing, dying.
@@ -66,7 +67,7 @@ menuHooks.save = saveGame;
 // (on foot it is the helmet's view; in the rover, the driver's seat)
 menuHooks.view = {
   can: () => S.started && !S.over && (S.mode === 'walk' || S.mode === 'rover'), seat: () => S.mode === 'rover',
-  get: () => (S.mode === 'rover' ? !!S.cockpit : !!S.firstPerson), set: (on) => { if (S.mode === 'rover') S.cockpit = !!on; else S.firstPerson = !!on; },
+  get: () => (S.mode === 'rover' ? !!S.cockpit : !!S.firstPerson), set: (on) => { if (S.mode === 'rover') setSetting('cabView', !!on); else S.firstPerson = !!on; },
 };
 
 // ============================================================

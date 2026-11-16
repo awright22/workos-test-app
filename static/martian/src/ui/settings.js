@@ -12,6 +12,7 @@ export const DEFAULTS = {
   reducedMotion: null,   // null = follow the system setting
   colorBlind: false,
   fullHud: false,        // a phone's HUD: false = the quiet one (what is not needed just now is put away), true = everything, always
+  cabView: false,        // in the rover: the picture from the driver's seat, not from behind it (VIEW, or V); kept between visits
   fps: 60,               // the frame rate the picture is held to: 60 (smooth), 40 or 30 (sharper: the resolution rises to what that rate leaves room for)
 };
 

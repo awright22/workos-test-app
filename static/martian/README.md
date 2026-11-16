@@ -69,6 +69,10 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 - **Exploration**: a six-wheeled rover with its own power and air; a journal of landmarks,
   landers and catalogued samples; achievements; an orbital map drawn from the same data as the
   ground. He wears his helmet outside and takes it off wherever there is air.
+- **The driver's seat**: the rover can be driven from inside its cab. The picture is taken from
+  his eyes: the wheel is in his hands and turns with the steering, the display behind it shows
+  the real speed, heading, power and air, and Mars goes by in the glass. Drag to look round the
+  cab; under way the look comes back to the road. Which view the rover is driven from is remembered.
 - **Making things**: scrap and circuits from salvage become oxygen candles, a folding solar
   array, a greenhouse dome you can farm in anywhere, navigation beacons, oxygen caches and ten
   permanent upgrades. Some need blueprints that NASA sends for survey work.
@@ -113,7 +117,7 @@ title offers "Continue the base". `QUALITY.md` ("Base mode") has its plan, its r
 | `E` (hold) | Interact: one verb for everything |
 | `X` | Crack an oxygen candle |
 | `F` | Leave the rover |
-| `V` | Helmet view / suit view |
+| `V` | On foot: helmet view / suit view. In the rover: the driver's seat / the camera behind it |
 | `M` / `C` / `J` | Map · Colony and crafting · Journal |
 | `P` | Photo mode: free camera, lens, looks, saves a PNG |
 | `Esc` | Pause (saves): settings, controls, save and quit, restart |
@@ -129,7 +133,10 @@ stick. A gauge shows itself when it is low, falling fast or has just changed; a 
 shows them all, with the rescue sol and the temperature, for a few seconds, and a second tap
 opens the guide to them. A tap on the task line opens the task (where, why, what comes after)
 and it closes itself. Run and jump are there while the stick is held, the oxygen candle when the
-tank is under half, and the view (helmet or behind) is a switch in Settings, Controls. Getting
+tank is under half, and on foot the view (helmet or behind) is a switch in Settings, Controls.
+Driving, **VIEW** stands above EXIT: it puts the picture in the driver's seat, and back behind the
+rover. From the seat the speed is read off the rover's own display, and the HUD's speed plate
+stands down unless a reserve is low. Getting
 into the rover shows its battery and tank for a few seconds. Alarms take the room they always did. **Settings, Interface, Full HUD** brings back everything, always on.
 Four quick taps in the top-left corner open the diagnostics.
 
@@ -158,7 +165,7 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   overlaps or leaves the safe area at seven window sizes). `node tools/tests/ui-shots.mjs`
   saves a screenshot of every state at every size to `tools/tests/.cache/ui/`.
 - `node tools/tests/hud-cover.mjs` measures how much of a phone's screen the quiet HUD covers
-  (standing, walking, at the rover, driving) at three phone sizes and holds it to its bar: 15% of
+  (standing, walking, at the rover, driving from behind it and from its seat) at three phone sizes and holds it to its bar: 15% of
   the screen, the middle clear, 35% of the top third. `--shoot` photographs each state.
   `tools/tests/ui-audit.mjs` runs it as its last part. With several things wrong at once the
   quiet HUD lets one lead (what kills in minutes first): its banner, the gauge it bears on and
@@ -174,6 +181,14 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   in the rover at rest and at speed) and a plain's horizon at dusk, in twilight and by day. The
   game has two lamps that can be aimed, his helmet's and the rover's, and whoever is travelling
   has both: a pool and a throw on foot, wide lamps and a long beam driving (`game/player.js`).
+- `node tools/tests/cockpit-shots.mjs` photographs the rover from the driver's seat: parked and
+  at speed by day, the head turned each way, down at the dashboard, toward a low sun, in a storm
+  and at night. `--hud` leaves the interface on, `--size=667|844|932` picks the phone, `--strips`
+  takes the changes of view frame by frame. The cab is the part `cabin` of the rover's model
+  (`tools/assets/vehicles.py`): the game keeps it clean of dust, gives it six tenths of the sky's light and
+  a low lamp of its own after dark (a term in the shader, `uCabin`, not another light), and in a
+  storm masks the veil off it (`render/engine.js`, `cabMask`). The yoke is where the astronaut's
+  Drive clip holds it (`tools/assets/astronaut.py`, `YOKE_C`): if either moves, both must.
 - Third-party fonts and data are credited in `CREDITS.md`. App icons: `tools/build_icons.py`.
 
 ## How it is built
