@@ -289,8 +289,9 @@ export function roverLights(dt) {
   RVL.cab = lerp(RVL.cab, lamp, damp(0.25, dt));
   cabin.set(0.078 * RVL.cab, 0.058 * RVL.cab, 0.04 * RVL.cab, 0.62);
   // (and its screens are turned down after dark: at their day's strength they were the brightest thing in the night)
-  if (!rv.screens) { rv.screens = []; rv.cabin && rv.cabin.traverse((o) => { if (o.isMesh && o.material && /^screen/.test(o.material.name || '') && !rv.screens.includes(o.material)) rv.screens.push(o.material); }); }
-  for (const m of rv.screens) m.emissiveIntensity = (m.userData.baseEmissive || 1) * lerp(1, 0.5, clamp(World.dark || 0, 0, 1));
+  // (and its tell-tales more than that: a row of green lamps under the display outshone the display)
+  if (!rv.screens) { rv.screens = []; rv.cabin && rv.cabin.traverse((o) => { if (o.isMesh && o.material && /^(screen|light_green|light_amber)/.test(o.material.name || '') && !rv.screens.includes(o.material)) rv.screens.push(o.material); }); }
+  for (const m of rv.screens) m.emissiveIntensity = (m.userData.baseEmissive || 1) * lerp(1, /^screen/.test(m.name) ? 0.5 : 0.28, clamp(World.dark || 0, 0, 1));
 }
 const RVL = { cab: 0 };
 
