@@ -1767,8 +1767,17 @@ What it found new, and what was done (no further review: one pass and one re-che
 | CC10 | POLISH: pillars still a third too wide | Left: they are the hull's corner posts; thinner, the lining no longer covers the glass's edge |
 | CB7 again | Night's pillars "an even khaki", lighter than the sky; the lamp rows "washed-out mint" | The cab's lamp is two thirds of what it was; the tell-tales are turned down by half, not to a quarter |
 
-After the re-check the two strips were taken again from the middle seat (`tests/cockpit-shots.mjs --strips`): my own
-look, recorded with the results below.
+After the re-check the two strips were taken again from the middle seat (`tests/cockpit-shots.mjs --strips`, 26
+frames a fifteenth of a second apart). My own look, not a reviewer's: from behind the rover the picture dims, is dark
+for one frame, and comes up in the seat with the display already lit; the same back out; getting in on foot he goes
+up and in, one dark frame, the seat; getting out, one dark frame, and the picture stands behind him beside the rover.
+No frame shows the inside of a wall, a tank or the seat.
+
+**Tested and published.** The whole suite passed on `275a519` (17 parts, no failure, no console error: 208 interface
+checks, 156 screen states with nothing found, the drive test's five checks of the seat). `tests/hud-cover.mjs`,
+driving from behind the rover and from its seat: 14.4% and 13.4% of the screen at 844 x 390, 15.7% and 15.0% at
+667 x 375 (bar 16), 11.8% and 11.0% at 932 x 430. The preview is `gh-pages/next` `752729b`, cache
+`stranded2-4b4fbf08bb91`. The root of `gh-pages` is as it was: it waits for the owner's word.
 
 **Where it stands:** K2 to K6 MET, K1 NEARLY, no blocker. Open, for a later pass: the nose and the parked wipers out
 of sight (CC2), the two side screens as set dressing (CB9), the storm's banded sky (CB8, the storm's own), plain
