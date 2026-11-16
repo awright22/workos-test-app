@@ -1776,8 +1776,14 @@ No frame shows the inside of a wall, a tank or the seat.
 **Tested and published.** The whole suite passed on `275a519` (17 parts, no failure, no console error: 208 interface
 checks, 156 screen states with nothing found, the drive test's five checks of the seat). `tests/hud-cover.mjs`,
 driving from behind the rover and from its seat: 14.4% and 13.4% of the screen at 844 x 390, 15.7% and 15.0% at
-667 x 375 (bar 16), 11.8% and 11.0% at 932 x 430. The preview is `gh-pages/next` `752729b`, cache
-`stranded2-4b4fbf08bb91`. The root of `gh-pages` is as it was: it waits for the owner's word.
+667 x 375 (bar 16), 11.8% and 11.0% at 932 x 430. Published as `gh-pages/next` `752729b`.
+
+Two things were then seen in the pictures of that build, at the owner's phone size: the display's "KM" ran under the
+arrow's ring, and the display was drawn before the task card in each frame, so that at the moment the card turned
+from 5.9 to 6.0 km the display still said 5.9. The unit now rides with the label ("KM TO GO") and the display is
+drawn after the card (`ui/hud.js`, updateRoverDash). The whole suite passed again on `ff12ab5` (the same counts and
+the same cover figures). **The preview is `gh-pages/next` `f4231a0` from `ff12ab5`, cache `stranded2-fd502c3ff815`.**
+The root of `gh-pages` is as it was: it waits for the owner's word.
 
 **Where it stands:** K2 to K6 MET, K1 NEARLY, no blocker. Open, for a later pass: the nose and the parked wipers out
 of sight (CC2), the two side screens as set dressing (CB9), the storm's banded sky (CB8, the storm's own), plain
