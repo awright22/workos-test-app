@@ -849,6 +849,15 @@
 #mg-root.mg-calm #mg-rover .spd { min-width: 0; }
 #mg-root.mg-calm #mg-rover:not(.bars) .rv { display: none; }
 #mg-root.mg-calm #mg-rover .row:not(.show) { display: none; }
+/* (from the driver's seat the speed is on the rover's own display, behind the wheel: the plate stands down, and comes
+   back with a reserve when one is low) */
+#mg-root.mg-calm.is-cab #mg-rover:not(.bars) { display: none; }
+/* (on the smallest phone the speed alone is a tighter plate: it gives back the screen that VIEW took. tests/hud-cover.mjs) */
+@media (max-width: 760px) {
+  #mg-root.mg-calm #mg-rover:not(.bars) { gap: .25rem; padding: .0625rem .4375rem; }
+  #mg-root.mg-calm #mg-rover:not(.bars) .spd { gap: .25rem; }
+  #mg-root.mg-calm #mg-rover:not(.bars) .spd b { font-size: 1.4375rem; }
+}
 
 /* --- the pill beside the action button says what the button cannot: HOLD is the button's */
 #mg-root.mg-calm #mg-prompt .ph { display: none; }

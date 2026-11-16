@@ -599,7 +599,7 @@ export function buildRover(group) {
   m.inner.add(hl, hlT); hl.target = hlT;
   const lamps = [];
   m.inner.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && /^light_(white|red|amber)/.test(o.material.name)) { o.material = o.material.clone(); o.material.userData.baseEmissive = o.material.emissiveIntensity || 1; o.material.userData.marker = !/^light_white/.test(o.material.name); lamps.push(o.material); } });
-  World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish'), markers: 0 };
+  World.rover = { group, wheels, steer, headlight: hl, lamps, speed: 0, model: m, cargo: m.part('cargo'), seat: m.part('seat'), dish: m.part('dish'), markers: 0, yoke: m.part('cabin_yoke'), wheelTurn: 0 };
   // what its red and amber markers put on the ground behind it after dark (drawn, as the buildings' pools are: lamps
   // that glowed and lit nothing looked painted on)
 // (laid on the ground afresh as it goes: a flat patch carried behind a rover on rough ground was cut by every ripple

@@ -7,6 +7,7 @@ import { plantedPlots } from '../game/interactables.js';
 import { fmtDist, groundDist, tangentBasis, vecToLl } from '../planet/geo.js';
 import { player } from '../game/player.js';
 import { HAB_R, World, siteLocalToWorld } from '../world/build.js';
+import { drawDash } from '../world/models.js';
 import { clamp, perf } from '../core/math.js';
 import { Snd } from '../audio/sound.js';
 import { QUEST_DEFS, questTargetPos } from '../game/story.js';
@@ -303,7 +304,7 @@ function readZones(w, h) {
   add(UI.rover, 1);
   // the astronaut, or the rover, in a third-person view: an arrow is never parked on him
   // (he stands a little left of centre; indoors the camera is close behind him and he fills more of the picture)
-  if (!(S.firstPerson && S.mode === 'walk')) {
+  if (!(S.firstPerson && S.mode === 'walk') && !(S.cockpit && S.mode === 'rover')) {
     if (S.mode === 'rover') zones.push([w / 2 - h * 0.18, h * 0.4, w / 2 + h * 0.18, h * 0.74, 2]);
     else if (S.inside || S.inAirlock) zones.push([w / 2 - h * 0.44, h * 0.34, w / 2 + h * 0.1, h, 2]);
     else zones.push([w / 2 - h * 0.21, h * 0.46, w / 2 + h * 0.03, h * 0.9, 2]);
@@ -1116,6 +1117,11 @@ export function updateHud() {
   if (S.mode === 'rover') {
     setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed) * 3.6)));
     const pf = S.roverPower / roverPowerCap(), of = S.roverO2 / BAL.roverO2Cap;
+    // (and on the rover's own display, which is the speedometer when the picture is taken from its seat: a few times a second)
+    if (S.cockpit && playTime() - (hud.dashT || 0) > 0.16) {
+      hud.dashT = playTime();
+      drawDash({ kmh: Math.abs(roverF.speed) * 3.6, power: pf, o2: of, heading: headingOf(World.rover.group.position, roverF.q) * R2D, gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D' });
+    }
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
     a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`; a.wrap.style.setProperty('--f', clamp(pf, 0, 1).toFixed(3));
     b.fill.style.transform = `scaleX(${clamp(of, 0, 1).toFixed(3)})`; b.wrap.style.setProperty('--f', clamp(of, 0, 1).toFixed(3));
@@ -1130,6 +1136,13 @@ export function updateHud() {
     const fresh = pt - hud.roverAt < 6;
     const showP = !calm || open || fresh || pf < 0.34, showO = !calm || open || fresh || of < 0.34, rk = (showP ? 'p' : '') + (showO ? 'o' : '');
     if (hud.cls.rv !== rk) { hud.cls.rv = rk; a.wrap.classList.toggle('show', showP); b.wrap.classList.toggle('show', showO); UI.rover.classList.toggle('bars', showP || showO); }
+    // (VIEW, on a phone, is the way into the driver's seat: the first time he is under way, say so)
+    if (calm && layout.touch && !S.flags.cabTaught && !S.cockpit && !fresh && Math.abs(roverF.speed) > 2 && !UI.critical) {
+      S.flags.cabTaught = true;
+      toast('TIP', 'The driver\'s seat', 'Tap VIEW to drive from inside the cab.', { lit: UI.tCam, life: 6500 });
+    }
+    const cab = !!S.cockpit;
+    if (hud.cls.cab !== cab) { hud.cls.cab = cab; UI.tCam.classList.toggle('on', cab); UI.tCam.setAttribute('aria-pressed', cab); }
   }
 
   hud.mode = S.mode;

@@ -737,6 +737,7 @@ export function syncFlags() {
   flag('is-cutscene', S.mode === 'cutscene');
   flag('is-cold', !!S.flags.coldOpen);
   flag('is-fp', S.firstPerson && S.mode === 'walk');
+  flag('is-cab', !!S.cockpit && S.mode === 'rover');
   return modal;
 }
 function syncChrome() {

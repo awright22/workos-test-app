@@ -63,7 +63,11 @@ export function showPause() {
 // the interface pauses the game itself in two cases: a phone turned upright, and before a reload
 uiHooks.pause = showPause;
 menuHooks.save = saveGame;
-menuHooks.view = { can: () => S.started && !S.over && S.mode === 'walk', get: () => !!S.firstPerson, set: (on) => { S.firstPerson = !!on; } };
+// (on foot it is the helmet's view; in the rover, the driver's seat)
+menuHooks.view = {
+  can: () => S.started && !S.over && (S.mode === 'walk' || S.mode === 'rover'), seat: () => S.mode === 'rover',
+  get: () => (S.mode === 'rover' ? !!S.cockpit : !!S.firstPerson), set: (on) => { if (S.mode === 'rover') S.cockpit = !!on; else S.firstPerson = !!on; },
+};
 
 // ============================================================
 // 33. BOOT & START

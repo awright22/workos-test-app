@@ -147,6 +147,53 @@ const leave = await g.eval(async (G) => {
 check('asked to get out at speed, the rover pulls up and he is out as it stops; the throttle takes the asking back',
   leave.v0 > 15 && leave.still === 'rover' && leave.mode === 'walk' && leave.t < 4 && leave.vOut < 3 && leave.again === 'rover' && leave.kept === 'rover' && leave.vKept > 15, leave);
 
+// ---- the driver's seat: V puts the picture in the cab, and back --------------------------------------------------
+const cab = await g.eval(async (G) => {
+  const frames = (ms) => new Promise((r) => setTimeout(r, ms));
+  const V3 = G.player.pos.constructor, rv = G.World.rover, cam = G.ctx.engine.camera, out = {};
+  const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
+  const part = (name) => { let f = null; rv.seat.traverse((o) => { if (o.name === name) f = o; }); return f; };
+  const at = (o) => new V3().setFromMatrixPosition(o.matrixWorld);
+  const drawn = (re) => { let n = 0; rv.seat.traverse((o) => { if (o.isMesh && o.visible && re.test(o.name)) n++; }); return n; };
+  G.roverF.speed = 0; G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 30);
+  out.before = { cockpit: !!G.S.cockpit, off: +cam.position.distanceTo(rv.group.position).toFixed(1) };
+  key('v'); G.tick(1 / 30, 45);
+  rv.group.updateWorldMatrix(true, true);
+  out.seat = { cockpit: !!G.S.cockpit, fromEye: +cam.position.distanceTo(at(part('eye'))).toFixed(3), heads: drawn(/^(helmet|head|visor)/), fov: +cam.fov.toFixed(1) };
+  // the wheel goes over with the steering, and his hand goes with it
+  const hand = part('hand_L'), horn = () => new V3(0.15, 0, 0).applyQuaternion(rv.yoke.quaternion).add(rv.yoke.position);
+  const local = (v) => rv.yoke.parent.worldToLocal(v);
+  G.tick(1 / 30, 10); rv.group.updateWorldMatrix(true, true);
+  const h0 = local(at(hand)), y0 = horn();
+  G.input.keys.w = true; G.input.keys.a = true; G.tick(1 / 30, 40); G.input.keys.a = false; G.input.keys.w = false;
+  rv.group.updateWorldMatrix(true, true);
+  const h1 = local(at(hand)), y1 = horn();
+  out.wheel = { turn: +(rv.wheelTurn * 180 / Math.PI).toFixed(1), hornMoved: +y1.distanceTo(y0).toFixed(3), handMoved: +h1.distanceTo(h0).toFixed(3), apart: +h1.clone().sub(h0).distanceTo(y1.clone().sub(y0)).toFixed(3) };
+  // a look to the side stays where it is put while parked; a storm's veil is kept off the cab
+  G.roverF.speed = 0; G.tick(1 / 30, 20);
+  G.input.yaw = 0.9; G.tick(1 / 30, 120);
+  out.look = +G.roverF.seatYaw.toFixed(2);
+  G.setStorm(1); G.S.storm.i = 1; G.tick(1 / 30, 20);
+  G.paused = false; await frames(900); G.paused = true;
+  out.storm = { veil: +G.ctx.engine.final.uniforms.uVeil.value.toFixed(2), mask: G.ctx.engine.final.uniforms.uCab.value };
+  G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 10);
+  // back out behind it
+  key('v'); G.tick(1 / 30, 90);
+  G.paused = false; await frames(300); G.paused = true;
+  out.back = { cockpit: !!G.S.cockpit, off: +cam.position.distanceTo(rv.group.position).toFixed(1), heads: drawn(/^(helmet|head|visor)/), mask: G.ctx.engine.final.uniforms.uCab.value };
+  // and out of the rover from the seat's view: the picture goes back to him on foot
+  key('v'); G.tick(1 / 30, 45); G.roverF.speed = 0; key('f'); G.tick(1 / 30, 60);
+  out.afoot = { mode: G.S.mode, off: +cam.position.distanceTo(G.player.pos).toFixed(1), things: !!G.ctx.engine.cabThings };
+  G.S.cockpit = false;
+  return out;
+});
+check('V in the rover puts the picture at the driver\'s eyes, with neither his helmet nor his head drawn',
+  !cab.before.cockpit && cab.before.off > 5 && cab.seat.cockpit && cab.seat.fromEye < 0.06 && cab.seat.heads === 0, { before: cab.before, seat: cab.seat });
+check('the wheel goes over with the steering and his hand goes with it (within 3 cm)', Math.abs(cab.wheel.turn) > 8 && cab.wheel.hornMoved > 0.02 && cab.wheel.apart < 0.03, cab.wheel);
+check('parked, a look to the side stays where it was put; in a storm the veil is kept off the cab', cab.look > 0.6 && cab.storm.veil > 0.3 && cab.storm.mask === 1, { look: cab.look, storm: cab.storm });
+check('V again puts it back behind the rover, his head drawn again; out of the rover it is behind him on foot',
+  !cab.back.cockpit && cab.back.off > 5 && cab.back.heads > 0 && cab.back.mask === 0 && cab.afoot.mode === 'walk' && cab.afoot.off < 9 && !cab.afoot.things, { back: cab.back, afoot: cab.afoot });
+
 console.log(`\n${fails.length ? 'FAILED: ' + fails.length : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));
 await g.close();
 process.exit(fails.length || g.errors.length ? 1 : 0);

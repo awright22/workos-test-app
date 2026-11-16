@@ -55,12 +55,75 @@ function screenTexture() {
   _screenTex.anisotropy = 4;
   return _screenTex;
 }
+/**
+ * The rover's driving display, on the dash behind the wheel (the model's material `screen_drive`): the one screen in
+ * the game that shows what is so. From the driver's seat it is the speedometer, and the HUD's own stands down.
+ * 2:1, drawn a few times a second while he is in the seat (ui/hud.js), and once to begin with so that a parked
+ * rover seen through its glass has a display that is on.
+ */
+let _dash = null;
+function dashTexture() {
+  if (_dash) return _dash.tex;
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  _dash = { c, g: c.getContext('2d'), tex, key: '' };
+  drawDash({ kmh: 0, power: 1, o2: 1, heading: 0, gear: 'P' });
+  return tex;
+}
+const COMPASS_PTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+/** @param {{ kmh: number, power: number, o2: number, heading: number, gear: string }} d  power and o2 as shares, heading in degrees */
+export function drawDash(d) {
+  if (!_dash) return;
+  const kmh = Math.round(d.kmh), pw = Math.round(d.power * 100), o2 = Math.round(d.o2 * 100), hd = ((Math.round(d.heading) % 360) + 360) % 360;
+  const key = `${kmh}|${pw}|${o2}|${Math.round(hd / 2)}|${d.gear}`;
+  if (key === _dash.key) return;
+  _dash.key = key;
+  const g = _dash.g, W = 512, H = 256, ink = '#c9f4ff', dim = '#5fb4cc', rule = '#1d5068', warm = '#ffb45a', bad = '#ff6a4a';
+  const cond = '"Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif';
+  g.fillStyle = '#0b2a3c'; g.fillRect(0, 0, W, H);
+  // the heading, along the top: a tape that slides, the figure in the middle of it
+  g.save(); g.beginPath(); g.rect(16, 10, W - 32, 44); g.clip();
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let deg = Math.floor((hd - 70) / 15) * 15; deg <= hd + 70; deg += 15) {
+    const x = W / 2 + (deg - hd) * 3.4, m = ((deg % 360) + 360) % 360;
+    g.fillStyle = rule; g.fillRect(x - 1, 40, 2, m % 45 === 0 ? 14 : 8);
+    if (m % 45 === 0 && Math.abs(deg - hd) > 14) { g.fillStyle = m === 0 ? warm : dim; g.font = `600 26px ${cond}`; g.fillText(COMPASS_PTS[m / 45], x, 25); }
+  }
+  g.restore();
+  g.fillStyle = '#0b2a3c'; g.fillRect(W / 2 - 44, 8, 88, 40);
+  g.strokeStyle = dim; g.lineWidth = 2; g.strokeRect(W / 2 - 42, 10, 84, 36);
+  g.fillStyle = ink; g.font = `600 30px ${cond}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(hd).padStart(3, '0') + '\u00b0', W / 2, 29);
+  g.fillStyle = rule; g.fillRect(16, 58, W - 32, 2);
+  // the speed, large: what the display is for
+  g.fillStyle = ink; g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+  g.font = `600 150px ${cond}`; g.fillText(String(kmh), 232, 204);
+  g.fillStyle = dim; g.font = `600 30px ${cond}`; g.textAlign = 'left'; g.fillText('KM/H', 244, 204);
+  // which way it is set to go
+  g.font = `600 44px ${cond}`; g.fillStyle = d.gear === 'R' ? warm : ink; g.fillText(d.gear, 246, 130);
+  g.strokeStyle = rule; g.lineWidth = 2; g.strokeRect(238, 90, 44, 50);
+  // the battery and the cab's air
+  const bar = (y, label, v, pct) => {
+    const low = pct <= 25, col = pct <= 10 ? bad : low ? warm : ink;
+    g.fillStyle = dim; g.font = `600 26px ${cond}`; g.textAlign = 'left'; g.fillText(label, 336, y);
+    g.fillStyle = col; g.textAlign = 'right'; g.font = `600 34px ${cond}`; g.fillText(String(pct), 496, y);
+    g.fillStyle = rule; g.fillRect(336, y + 10, 160, 14);
+    g.fillStyle = col; g.fillRect(336, y + 10, 160 * Math.max(0, Math.min(1, v)), 14);
+  };
+  bar(108, 'POWER', d.power, pw);
+  bar(184, 'AIR', d.o2, o2);
+  g.fillStyle = rule; g.fillRect(316, 76, 2, 150);
+  _dash.tex.needsUpdate = true;
+}
+
 const _sp = new THREE.Vector3(), _sn = new THREE.Vector3(), _sm = new THREE.Matrix3();
 /**
  * Texture coordinates for a mesh of flat screens (the models carry none). Each separate screen in the mesh is
  * laid on one of the four panels, the right way up and the right way round for whoever stands facing it.
  */
-function screenUVs(o) {
+function screenUVs(o, whole = false) {
   const geo = o.geometry, pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, n = pos.count;
   if (!nor) return;
   o.updateWorldMatrix(true, false);
@@ -112,6 +175,8 @@ function screenUVs(o) {
       const du = u1 - u0 || 1, dv = v1 - v0 || 1;
       for (const i of list) {
         const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
+        // (a screen with a picture of its own, the rover's driving display, has the whole of it)
+        if (whole) { uv[i * 2] = (a - u0) / du; uv[i * 2 + 1] = (b - v0) / dv; continue; }
         uv[i * 2] = ((tile & 1) + 0.03 + 0.94 * (a - u0) / du) / 2;
         uv[i * 2 + 1] = (1 - (tile >> 1) + 0.03 + 0.94 * (b - v0) / dv) / 2;
       }
@@ -147,10 +212,16 @@ const ROCK = /^mineral$/;
 const GROUND = /^ground_dust/;
 /** Parts that are indoors, whatever their model's dust. */
 const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
+/**
+ * The rover's cab, inside (tools/assets/vehicles.py, the part `cabin`). It is a room with walls of glass: no dust,
+ * half the sky's light (the roof and the walls hide the rest), and a lamp of its own after dark (uCabin, set by
+ * game/rover.js: a light in the shader, not one more lamp for every surface on Mars to be worked out under).
+ */
+const CABIN_PARTS = /^cabin/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
 export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 },
   // (how much more dust lies on things than when the game began, 0..1: game/wear.js, dustAge)
-  uDustAge: { value: 0 } };
+  uDustAge: { value: 0 }, uCabin: { value: new THREE.Vector4(0, 0, 0, 0.5) } };
 /** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
 export const mirrorUniforms = { uDustHere: dustUniforms.uDustHere, uSkyHor: { value: new THREE.Color(0.76, 0.47, 0.235) }, uSkyTop: { value: new THREE.Color(0.52, 0.32, 0.16) }, uGroundLit: { value: new THREE.Color(0.3, 0.15, 0.08) } };
 
@@ -219,6 +290,7 @@ function setUpPlain(plain, ground) {
         uniform float uFill;
         uniform float uRim;
         uniform float uDustAge;
+        uniform vec4 uCabin;
         #ifndef USE_NORMALMAP_OBJECTSPACE
         uniform mat3 normalMatrix;
         #endif
@@ -250,7 +322,7 @@ function setUpPlain(plain, ground) {
             float low2 = 1.0 - smoothstep(0.1, 1.5, vObjPos.y);
 // (and more of it as the sols go by and after each storm: game/wear.js, dustAge)
             // (his own things: a lander that has stood for decades has all the dust it will ever have)
-            float laid = vPbr.z + uDustAge * 0.16 * step(0.01, vPbr.z) * (1.0 - smoothstep(0.42, 0.62, vPbr.z));
+            float laid = max(vPbr.z, 0.0) + uDustAge * 0.16 * step(0.01, vPbr.z) * (1.0 - smoothstep(0.42, 0.62, vPbr.z));
             dustAmount = clamp(laid * (0.05 + 1.25 * facing * facing + 0.55 * low + 0.45 * low2) * (0.15 + 1.9 * patchy * patchy) * 1.25 + laid * (fine - 0.5) * 0.3, 0.0, 0.94);
             dust *= 0.86;
             // no real surface is one flat colour: a broad mottle and a fine grain, fixed in the model's own space
@@ -290,6 +362,7 @@ function setUpPlain(plain, ground) {
       // bright as the sunlit sand.)
       .replace('#include <lights_fragment_maps>', `
         float skyFill = uFill;
+        if (vPbr.z < -0.5) skyFill *= uCabin.w;          // (inside the rover's cab: see CABIN_PARTS)
         #if NUM_DIR_LIGHTS > 0
         // (most of it gone, not under half: seen from behind with the sun ahead, his white back was still the
         // brightest thing in the picture, lit alike from every side)
@@ -312,6 +385,7 @@ function setUpPlain(plain, ground) {
       // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        if (vPbr.z < -0.5) reflectedLight.indirectDiffuse += uCabin.rgb * diffuseColor.rgb;
         #if NUM_DIR_LIGHTS > 0
         {
           vec3 rimV = normalize(vViewPosition);
@@ -326,7 +400,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust17' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust18' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -376,7 +450,7 @@ function mergeStatic(scene, dust) {
       const geos = list.map(({ mesh, bake, ground }) => {
         const g = ground ? floatGeometry(mesh.geometry, null, 0.96, 0, 2)
           // (a mineral is bare rock: said in the metalness channel, which rock has no other use for)
-          : floatGeometry(mesh.geometry, bake ? mesh.material.color : null, mesh.material.roughness, ROCK.test(mesh.material.name || '') ? -1 : mesh.material.metalness, CLEAN_PARTS.test(owner.name || '') ? 0 : dust);
+          : floatGeometry(mesh.geometry, bake ? mesh.material.color : null, mesh.material.roughness, ROCK.test(mesh.material.name || '') ? -1 : mesh.material.metalness, CABIN_PARTS.test(owner.name || '') ? -1 : CLEAN_PARTS.test(owner.name || '') ? 0 : dust);
         g.applyMatrix4(rel.multiplyMatrices(inv, mesh.matrixWorld));
         return g;
       });
@@ -489,6 +563,11 @@ function mergeSkinned(scene, dust) {
  * cab behind it is dark. A coated one gives back a quarter.) The greenhouse is seen from above as much
  * as from beside: looked down on, its panes were not there ("no glass seen from above").
  */
+/**
+ * 1 while the picture is taken from the rover's own seat (game/rover.js): its panes are then looked out through. A
+ * pane that reads as glass from outside, half dark and mirroring a quarter of the sky, is a welder's mask from inside.
+ */
+export const paneView = { value: 0 };
 const PANES = { rover: { a: 0.5, film: 0.5, top: 0.93, env: 6.5 }, greenhouse: { a: 0.27, film: 0.48, top: 0.84, env: 1.6 }, default: { a: 0.2, film: 0.35, top: 0.82, env: 1.6 } };
 
 function prepare(gltf, name) {
@@ -502,6 +581,8 @@ function prepare(gltf, name) {
     if (!o.isMesh) return;
     o.castShadow = true;
     o.receiveShadow = true;
+    // (the rover's cab fittings are inside its hull, which casts for them)
+    for (let a = o.parent; a && a !== gltf.scene; a = a.parent) if (a.userData && a.userData.part && CABIN_PARTS.test(a.name || '')) { o.castShadow = false; break; }
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
       const name = m.name || '';
@@ -509,7 +590,7 @@ function prepare(gltf, name) {
       // only the first cast no shadow, so a glass dome shaded its own floor like a tin one, and of its monitors only
       // the first had a picture laid on it.)
       if (name.startsWith('glass_clear') || EMISSIVE.test(name) || name.startsWith('solar_cell')) o.castShadow = false;
-      if (name.startsWith('screen')) screenUVs(o);
+      if (name.startsWith('screen')) screenUVs(o, name === 'screen_drive');
       if (seen.has(m)) continue;
       seen.add(m);
       if (name.startsWith('glass_clear')) {
@@ -522,7 +603,9 @@ function prepare(gltf, name) {
         // A pane is seen by what it does to the light: looked through squarely it is almost not there, and looked along
         // it mirrors the sky. And glass on Mars carries a film of dust. (At one faint tint from every angle a dome of
         // it read as an open frame with nothing in it.)
+        const cab = pane === PANES.rover;
         m.onBeforeCompile = (sh) => {
+          if (cab) { sh.uniforms.uPaneView = paneView; sh.fragmentShader = 'uniform float uPaneView;\n' + sh.fragmentShader; }
           sh.fragmentShader = sh.fragmentShader
             .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.07, vec3(0.5));')      // (and never bright enough to bloom: the dome's own lamp still starred a pane at night)
             .replace('#include <opaque_fragment>', `{ vec3 paneN = normalize(vNormal);
@@ -533,10 +616,17 @@ function prepare(gltf, name) {
                   filmLit += directionalLights[0].color * (abs(dot(paneN, directionalLights[0].direction)) * 0.32);
                 #endif
                 outgoingLight += vec3(0.34, 0.24, 0.16) * filmLit * (${pane.film.toFixed(2)} + ${(1 - pane.film).toFixed(2)} * glance);
-                diffuseColor.a = mix(diffuseColor.a + 0.10, ${pane.top.toFixed(2)}, glance * 0.85); }
+                diffuseColor.a = mix(diffuseColor.a + 0.10, ${pane.top.toFixed(2)}, glance * 0.85);
+                ${cab ? `// From the driver's seat a pane is what he sees Mars through: nearly nothing looked through squarely, and its
+                // dust a thin veil that the sun lights, thicker where the pane is looked along.
+                if (uPaneView > 0.0) {
+                  float veil = 0.035 + 0.3 * glance;
+                  outgoingLight = mix(outgoingLight, vec3(0.34, 0.24, 0.16) * filmLit * 1.6, uPaneView);
+                  diffuseColor.a = mix(diffuseColor.a, veil, uPaneView);
+                }` : ''} }
               #include <opaque_fragment>`);
         };
-        m.customProgramCacheKey = () => `glass5:${pane.film}:${pane.top}`;
+        m.customProgramCacheKey = () => `glass6:${pane.film}:${pane.top}:${cab}`;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;
@@ -544,7 +634,7 @@ function prepare(gltf, name) {
         o.castShadow = false;
         if (name.startsWith('screen')) {
           // a monitor shows something: the models carry no pictures, so the panels are drawn here and each screen laid on one
-          m.emissiveMap = screenTexture(); m.emissive.setRGB(1, 1, 1); m.color.setRGB(0.02, 0.03, 0.04); m.roughness = 0.25;
+          m.emissiveMap = name === 'screen_drive' ? dashTexture() : screenTexture(); m.emissive.setRGB(1, 1, 1); m.color.setRGB(0.02, 0.03, 0.04); m.roughness = 0.25;
         }
       } else if (name === 'void') {
         m.color.set(0x000000); m.roughness = 1;

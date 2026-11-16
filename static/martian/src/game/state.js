@@ -17,6 +17,7 @@ export const S = {
   kind: 'story',
   started: false, uiOpen: false, over: false, won: false, sleeping: false,
   firstPerson: false,
+  cockpit: false,                 // in the rover: the picture from the driver's seat, not from behind (game/rover.js)
   mode: 'walk',                    // walk | rover | cutscene
   diff: 'survival', rescueSol: 25, drainMult: 1.0,
   sol: 1, tod: 0.02,

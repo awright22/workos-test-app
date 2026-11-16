@@ -246,6 +246,22 @@ export function buildAstronaut() {
   play('Idle', 0);
 }
 
+/**
+ * The Drive clip is three seconds of small steering: the wheel goes 11.9 degrees to the right and 17.7 to the left
+ * and back (tools/assets/astronaut.py, clip_drive). Left to run, his hands sawed at the wheel while the rover went
+ * straight, and held it still through a turn. So it does not run: it is held at the moment its wheel is as far over
+ * as the rover's is, and his hands, and his head a little, go with the steering.
+ */
+const DRIVE_W = Math.PI * 2 / 3, driveSteer = (t) => (13 * Math.sin(DRIVE_W * t) + 5 * Math.sin(2 * DRIVE_W * t + 1)) * Math.PI / 180;
+function holdDrive(turn) {
+  const a = anim.actions.Drive;
+  if (!a) return;
+  // (between its two extremes the clip's wheel goes one way only: halve the stretch until the moment is found)
+  let lo = 0.394, hi = 2.332;
+  for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (driveSteer(mid) > turn) lo = mid; else hi = mid; }
+  a.time = (lo + hi) / 2;
+  a.timeScale = 0;
+}
 function play(name, fade = 0.22, restart = false) {
   const next = anim.actions[name];
   if (!next) return;
@@ -363,17 +379,21 @@ export function updateAstronaut(dt) {
   const air = driving ? S.roverO2 > 6 : S.inside && S.o2 > 6 && !S.breach.active;
   anim.airT = air ? anim.airT + dt : 0;
   const bare = anim.head.length > 0 && anim.airT > 1.1 && !S.dead;
-  if (bare !== anim.bare) {
-    anim.bare = bare;
-    for (const o of anim.helmet) o.visible = !bare;
-    for (const o of anim.head) o.visible = bare;
+  // (and from the driver's own seat the picture is taken from inside his head: neither is drawn then, and his arms
+  //  and knees are what he sees of himself)
+  const own = driving && !!S.cockpit && anim.eye && ctx.engine && _v1.setFromMatrixPosition(anim.eye.matrixWorld).distanceTo(ctx.engine.camera.position) < 0.75;
+  const headKey = own ? 2 : bare ? 1 : 0;
+  if (headKey !== anim.headKey) {
+    anim.headKey = headKey; anim.bare = bare;
+    for (const o of anim.helmet) o.visible = headKey === 0;
+    for (const o of anim.head) o.visible = headKey === 1;
   }
   player.bare = bare;
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
   if (driving || !player.onGround || S.over) anim.kneel = 0;
   if (S.over && S.dead) play('Collapse', 0.25);
-  else if (driving) play('Drive', 0.3);
+  else if (driving) { play('Drive', 0.3); holdDrive(World.rover.wheelTurn || 0); }
   else if (!player.onGround) {
     if (player.airT < 0.12 && player.vy > 0 && anim.name !== 'Air') play('JumpStart', 0.08);
     else play('Air', 0.18);
@@ -494,7 +514,7 @@ export function updateAstronaut(dt) {
   // helmet lamps come on in the dark
   const dark = 1 - clamp(ctx.engine.sky.day * 3, 0, 1);
   const lampOn = driving || S.inside ? 0 : Math.max(dark, S.storm.i > 0.6 ? 0.5 : 0);
-  if (anim.lampsFor !== driving && World.rover && World.rover.headlight) mountLamps(driving);
+  if ((anim.lampsFor !== driving || (driving && anim.lampsSeat !== !!S.cockpit)) && World.rover && World.rover.headlight) mountLamps(driving);
   const set = (light, to) => { light.intensity = ctx.engine.snapLight > 0 ? to : lerp(light.intensity, to, damp(0.25, dt)); };
   if (!driving) {
     set(anim.lamp, lampOn * LAMPS.pool.power);
@@ -525,6 +545,9 @@ const LAMPS = {
   // (the rover's wide lamps likewise stand above and behind it, where a work light on a mast would be: the rover was a
   //  black shape with two red lamps on it, in front of the ground it lit)
   flood: { angle: 0.74, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 4.4, -5.2], aim: [0, -5.0, 16] },
+  // (seen from the driver's seat they are where they are, on the roof's edge over the windscreen: from behind, with
+  //  nothing to cast a shadow, they lit the inside of the cab through its roof as bright as day)
+  floodSeat: { angle: 0.8, penumbra: 1.0, distance: 80, decay: -0.35, at: [0, 2.95, 2.45], aim: [0, -4.4, 12] },
   // (its far end is ground seen edge-on: stronger than this it was a bright bar drawn along the horizon)
   high: { angle: 0.2, penumbra: 0.95, distance: 135, decay: -0.6, aim: [0, -1.4, 70], power: 1.0 },
 };
@@ -538,9 +561,10 @@ function mountLamp(light, parent, role, at) {
 function mountLamps(driving) {
   const rv = World.rover, hl = rv.headlight, inner = rv.model.inner;
   if (!rv.lampAt) rv.lampAt = [hl.position.x, hl.position.y, hl.position.z];
-  if (driving) { mountLamp(hl, inner, LAMPS.flood, LAMPS.flood.at); mountLamp(anim.lamp, inner, LAMPS.high, rv.lampAt); }
+  const flood = S.cockpit ? LAMPS.floodSeat : LAMPS.flood;
+  if (driving) { mountLamp(hl, inner, flood, flood.at); mountLamp(anim.lamp, inner, LAMPS.high, rv.lampAt); }
   else { mountLamp(anim.lamp, anim.eye, LAMPS.pool, LAMPS.pool.at); mountLamp(hl, anim.eye, LAMPS.throw, LAMPS.throw.at); }
-  anim.lampsFor = driving;
+  anim.lampsFor = driving; anim.lampsSeat = !!S.cockpit;
 }
 const wrap = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
 

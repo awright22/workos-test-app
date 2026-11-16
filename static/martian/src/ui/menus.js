@@ -297,7 +297,7 @@ export function showSettings(back, overTitle) {
   // On a phone the four groups are four tabs, each of which fits the screen. (As one scrolling sheet, Sound
   // and the colour-blind switch were below the fold with nothing to say they were there.)
   const tabbed = layout.compact;
-  const view = !overTitle && layout.calm && menuHooks.view && menuHooks.view.can() ? menuHooks.view : null;
+  const view = !overTitle && menuHooks.view && menuHooks.view.can() && (layout.calm || menuHooks.view.seat()) ? menuHooks.view : null;
   const p = openOverlay('sheet',
     `<div class="sheet settings${tabbed ? ' tabbed' : ''}"><header class="sheet-hd"><h1>Settings</h1>${tabbed ? seg('settab', 'Settings group', SET_TABS, setTab) : ''}</header>` +
     '<div class="sheet-bd mg-scroll"><div class="set-grid">' +
@@ -317,8 +317,11 @@ export function showSettings(back, overTitle) {
     `<div class="set-row"><label for="set-sensitivity">Look sensitivity</label><div class="ctl">${range('sensitivity', 'Look sensitivity', 0.3, 2.5, 0.05, settings.sensitivity, pct, 1)}</div></div>` +
     `<div class="set-row"><span class="lbl">Invert vertical look</span><div class="ctl">${sw('invertY', 'Invert vertical look', settings.invertY)}</div></div>` +
     // (the quiet HUD has no VIEW button: in a game, on foot, the view is changed here)
-    (view ? `<div class="set-row"><span class="lbl">Helmet view</span><div class="ctl">${sw('helmetView', 'Helmet view', view.get())}</div>` +
-      '<p class="hint">Look out through the visor. Off, the camera stands behind you.</p></div>' : '') + '</section>' +
+    (view ? (view.seat()
+      ? `<div class="set-row"><span class="lbl">Cab view</span><div class="ctl">${sw('helmetView', 'Cab view', view.get())}</div>` +
+        '<p class="hint">Drive from the driver\'s seat. Off, the camera rides behind the rover.</p></div>'
+      : `<div class="set-row"><span class="lbl">Helmet view</span><div class="ctl">${sw('helmetView', 'Helmet view', view.get())}</div>` +
+        '<p class="hint">Look out through the visor. Off, the camera stands behind you.</p></div>') : '') + '</section>' +
     // audio
     `<section class="set-sec" data-sec="sound"><h3>${icon('volume')}Sound</h3>` +
     `<div class="set-row"><label for="set-volume">Master volume</label><div class="ctl">${range('volume', 'Master volume', 0, 1, 0.05, settings.volume, pct)}</div></div>` +
@@ -441,7 +444,7 @@ const KEYBOARD = [
 const touchRows = () => [
   ['Move, drive', 'Left thumb, lower left'], ['Look', 'Drag anywhere else'], ['Interact', 'Hold the action button'], ['Run', `${icon('run')}Run (toggle)`],
   ['Jump', `${icon('jump')}Jump`], ['Exit the rover', `${icon('exit')}Exit`], ['Crack an <span class="chem">O<sub>2</sub></span> candle', 'Candle (when you carry one)'],
-  ['Switch view', layout.calm ? 'Settings, Controls' : `${icon('eye')}View`],
+  ['Switch view', layout.calm ? `Driving: ${icon('eye')}View. On foot: Settings` : `${icon('eye')}View`],
   // (the four buttons at the top right carry their own signs: one line for the three screens and one for the menu,
   //  and the whole list fits a phone held sideways without scrolling. A line apiece ran to seven rows.)
   ['The three screens', 'Top right'], ['Pause, settings, photo mode', layout.calm ? `${icon('pause')}Top right` : `${icon('pause')}Menu`],

@@ -36,6 +36,12 @@ const lookY = () => (input.invertY ? -1 : 1);
 // dragMode is a recoverable fallback, not a one-way latch: any successful lock clears it
 let pointerLocked = false, dragMode = false, dragging = false, lastMX = 0, lastMY = 0, lockChangedAt = 0;
 
+/** VIEW, or V: on foot, the helmet's view or the camera behind him; in the rover, the driver's seat or the camera behind it. */
+function switchView(say) {
+  if (S.mode === 'rover') S.cockpit = !S.cockpit;
+  else if (S.mode === 'walk') { S.firstPerson = !S.firstPerson; if (say) log(S.firstPerson ? 'Helmet cam. Just you and the visor.' : 'Suit cam deployed. Looking good, Watney. Ish.', 'sys'); }
+}
+
 export function tryLock() {
   if (dragMode && input.isTouch) return;
   if (S.uiOpen || screenOpen()) return;
@@ -81,8 +87,7 @@ export function initInput() {
     }
     if (k === 'f' && S.mode === 'rover' && !S.uiOpen && !screenOpen()) leaveRover();
     if (k === 'v' && !S.uiOpen && !screenOpen()) {
-      S.firstPerson = !S.firstPerson;
-      log(S.firstPerson ? 'Helmet cam. Just you and the visor.' : 'Suit cam deployed. Looking good, Watney. Ish.', 'sys');
+      switchView(true);
     }
     if (!S.uiOpen && !S.flags.coldOpen) {
       if (k === 'm' && screenUnlocked('map')) toggleScreen('map');
@@ -212,7 +217,7 @@ function initTouch(canvas) {
     UI.tSprint.setAttribute('aria-pressed', touchIn.sprint);
   });
   press(UI.tExit, () => { if (S.mode === 'rover') leaveRover(); });
-  press(UI.tCam, () => { if (playing()) S.firstPerson = !S.firstPerson; });
+  press(UI.tCam, () => { if (playing()) switchView(false); });
   press(UI.tCandle, () => { if (playing()) useCandle(); });
   press(UI.tPause, () => { if (screenOpen()) closeScreens(); showPause(); });
   // the bars, tapped, say what they are (on the quiet HUD the first tap shows them all, and a tap while they show is this one)

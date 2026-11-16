@@ -11,6 +11,7 @@ import { X_AXIS, _pv, _q1, _q2, _v1, _v2, _v3 } from '../core/scratch.js';
 import { surfaceAt, groundSlope } from '../planet/surface.js';
 import { R } from '../planet/constants.js';
 import { WHEEL_RADIUS, World } from '../world/build.js';
+import { paneView, dustUniforms } from '../world/models.js';
 import { BAL, S, machineEff, roverPowerCap, roverTopSpeed } from './state.js';
 import { wearRover } from './machines.js';
 import { input } from './input.js';
@@ -24,9 +25,13 @@ export const roverF = {
   q: new THREE.Quaternion(), speed: 0, steer: 0,
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
-  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, camSee: 0, camRise: 0, leaving: false, accel: 0, lat: 0, camBlend: 1, camFromQ: null,
+  slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, camSee: 0, camRise: 0, leaving: false, accel: 0, lat: 0, camBlend: 1, camFromQ: null, camFromP: null,
+  camSeat: false, seatYaw: 0, seatPitch: -0.14,      // the driver's own view: see seatCamera
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
+/** The yoke turns about its column (tools/assets/vehicles.py: along (0, 0.85, 0.527) there, toward the driver), by no
+ *  more than the Drive clip's hands go each way (tools/assets/astronaut.py, clip_drive: 11.9 degrees to the right). */
+const YOKE_AXIS = new THREE.Vector3(0, 0.527, -0.85).normalize(), WHEEL_TURN = 11.5 * Math.PI / 180;
 const _down = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _w = new THREE.Vector3();
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
@@ -183,6 +188,7 @@ export function updateBoarding(dt) {
 export function enterRover() {
   S.mode = 'rover';
   roverF.camInit = false; roverF.camYaw = 0; roverF.camPitch = 0; roverF.camRise = 0; roverF.camSee = 0;
+  roverF.seatYaw = 0; roverF.seatPitch = SEAT_REST;
   input.yaw = 0; input.pitch = 0;
   Snd.play('roverEnter');
   emit('rover-enter', {});
@@ -236,7 +242,23 @@ export function roverLights(dt) {
   }
   for (const m of rv.lamps) m.emissiveIntensity = m.userData.baseEmissive * (dim && (driven || m.userData.marker) ? 1.6 * (m.userData.marker ? 1 : 0.04 + 0.96 * ahead) : 0.12);
   rv.markers = lerp(rv.markers, dim ? 1 : 0, damp(0.15, dt));
+  // The cab's own lamp: on after dark with a driver in it, low and warm, enough to see the wheel and his hands by and
+  // not enough to put the windscreen out. (A light in the shader of what is inside the cab: world/models.js, uCabin.)
+  // From the seat its panes are looked out through (world/models.js, paneView), and the storm's veil stays off what
+  // of the picture is the cab (render/engine.js, cabMask). Here, where every frame comes, and not with the driving:
+  // a driver who dies in the seat, or is taken from it by a checkpoint, leaves neither behind him.
+  const seated = driven && !!S.cockpit && !!rv.seat;
+  paneView.value = lerp(paneView.value, seated ? 1 : 0, Math.min(1, dt * 6));
+  if (seated && !rv.cabThings) rv.cabThings = [rv.model.part('cabin'), rv.seat].filter(Boolean);
+  if (ctx.engine) ctx.engine.cabThings = seated && roverF.camBlend >= 1 ? rv.cabThings : null;
+  // (and the cab's fittings are not drawn from further off than they can be made out through its glass)
+  if (!rv.cabin) rv.cabin = rv.model.part('cabin');
+  if (rv.cabin && cam) rv.cabin.visible = seated || cam.position.distanceToSquared(rv.group.position) < 70 * 70;
+  const cabin = dustUniforms.uCabin.value, lamp = driven && dim ? 1 : 0;
+  RVL.cab = lerp(RVL.cab, lamp, damp(0.25, dt));
+  cabin.set(0.075 * RVL.cab, 0.062 * RVL.cab, 0.048 * RVL.cab, 0.5);
 }
+const RVL = { cab: 0 };
 
 export function updateRover(dt) {
   const RV = roverF, k = input.keys, t = input.touch;
@@ -353,8 +375,69 @@ export function updateRover(dt) {
   if (rv.steer.FL) { rv.steer.FL.rotation.y = RV.steer; rv.steer.FR.rotation.y = RV.steer; }
   if (rv.steer.RL) { rv.steer.RL.rotation.y = -RV.steer * 0.45; rv.steer.RR.rotation.y = -RV.steer * 0.45; }
   if (rv.dish) rv.dish.rotation.y += dt * 0.15;
+  // The wheel in his hands: as far over as the steering is asked to go, of what the speed allows. His hands are on
+  // it by the Drive clip, which game/player.js holds at the moment of its small steering motion that has the wheel
+  // this far over: so they go with it. (rv.wheelTurn: radians, to the right positive, the clip's own way round.)
+  rv.wheelTurn = -clamp(RV.steer / maxSteer, -1, 1) * WHEEL_TURN;
+  if (rv.yoke) rv.yoke.quaternion.setFromAxisAngle(YOKE_AXIS, -rv.wheelTurn);
 
-  // --- chase camera -----------------------------------------------------------------------
+  // --- camera: from behind the rover, or from the driver's seat ----------------------------
+  // (changed on the way, the picture goes from the one to the other: it does not cut)
+  if (!!S.cockpit !== RV.camSeat) { RV.camSeat = !!S.cockpit; if (RV.camInit) RV.camInit = false; RV.seatYaw = 0; RV.seatPitch = SEAT_REST; }
+  if (S.cockpit && World.rover.seat) seatCamera(dt); else chaseCamera(dt);
+  S.inside = false;
+}
+
+/**
+ * The driver's own view: the camera is his eyes, in the seat, and the cab rides with it. (The owner: "Would be dope to
+ * have 1P view in the rover (need to be able to see the cockpit etc)".) It is fixed to the sprung body, not to his
+ * head: the dashboard stands still in the picture and Mars moves in the glass. A look-drag turns his head, as far as
+ * a man in a seat can turn it; under way, and left alone, he looks where he is going again. Parked, the look stays
+ * where it was put: he is looking at something.
+ */
+const SEAT_EYE = [0.015, 0.716, 0.077], SEAT_REST = -0.14, SEAT_T = 0.55;
+const _seatP = new THREE.Vector3(), _seatQ = new THREE.Quaternion(), _halfTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+function seatCamera(dt) {
+  const RV = roverF, rv = World.rover, c = ctx.engine.camera;
+  if (input.yaw || input.pitch) {
+    RV.seatYaw = clamp(RV.seatYaw + input.yaw, -2.25, 2.25);
+    RV.seatPitch = clamp(RV.seatPitch + input.pitch * (input.invertY ? -1 : 1), -0.85, 0.7);
+    RV.camIdle = 0;
+  }
+  input.yaw = 0; input.pitch = 0;
+  RV.camIdle += dt;
+  if (RV.camIdle > 2.2 && Math.abs(RV.speed) > 1.5) { RV.seatYaw = lerp(RV.seatYaw, 0, damp(0.4, dt)); RV.seatPitch = lerp(RV.seatPitch, SEAT_REST, damp(0.4, dt)); }
+  rv.group.updateWorldMatrix(true, false);
+  rv.seat.updateWorldMatrix(true, false);
+  _seatP.set(SEAT_EYE[0], SEAT_EYE[1], SEAT_EYE[2]).applyMatrix4(rv.seat.matrixWorld);
+  // (the model's nose is +Z, a camera looks along -Z. And his head goes a little with the wheel, into the turn.)
+  rv.model.inner.getWorldQuaternion(_seatQ).multiply(_halfTurn)
+    .multiply(_q2.setFromAxisAngle(_v3.set(0, 1, 0), RV.seatYaw + RV.steer * 0.1 * clamp(Math.abs(RV.speed) / 8, 0, 1)))
+    .multiply(_q2.setFromAxisAngle(_v3.set(1, 0, 0), RV.seatPitch));
+  if (!RV.camInit) {
+    RV.camFromP = (RV.camFromP || new THREE.Vector3()).copy(c.position);
+    RV.camFromQ = (RV.camFromQ || new THREE.Quaternion()).copy(c.quaternion);
+    RV.camBlend = c.position.distanceTo(_seatP) < 40 ? 0 : 1;
+    RV.camInit = true;
+  }
+  if (RV.camBlend < 1) {
+    RV.camBlend = Math.min(1, RV.camBlend + dt / SEAT_T);
+    const e = RV.camBlend * RV.camBlend * (3 - 2 * RV.camBlend);
+    c.position.copy(RV.camFromP).lerp(_seatP, e);
+    c.quaternion.copy(RV.camFromQ).slerp(_seatQ, e);
+  } else { c.position.copy(_seatP); c.quaternion.copy(_seatQ); }
+  RV.camPos.copy(c.position);                      // (so that the view from behind, asked for again, starts from here)
+  if (S.shake > 0) {
+    S.shake = Math.max(0, S.shake - dt * 1.6);
+    if (!input.reducedMotion) c.position.addScaledVector(_v1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.05);
+  }
+  // (a wider lens than from behind: a cab is a small room, and the dashboard and both corner panes belong in the picture)
+  c.fov = lerp(c.fov, Math.min(74, ctx.engine.baseFov + 12 + Math.abs(RV.speed) * 0.1), damp(0.3, dt));
+  c.updateProjectionMatrix();
+}
+
+function chaseCamera(dt) {
+  const RV = roverF;
   // the mouse or a look-drag orbits it; it eases back behind the rover when left alone
   if (input.yaw || input.pitch) { RV.camYaw += input.yaw; RV.camPitch = clamp(RV.camPitch + input.pitch * (input.invertY ? -1 : 1), -0.5, 0.9); RV.camIdle = 0; }
   input.yaw = 0; input.pitch = 0;
@@ -435,5 +518,4 @@ export function updateRover(dt) {
   }
   c.fov = lerp(c.fov, ctx.engine.baseFov + 4 + Math.abs(RV.speed) * 0.22, damp(0.3, dt));
   c.updateProjectionMatrix();
-  S.inside = false;
 }

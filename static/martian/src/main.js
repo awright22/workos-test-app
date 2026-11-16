@@ -179,7 +179,7 @@ function draw(dt, focus) {
   {
     const hero = e.final.uniforms.uHero.value, a = astro;
     hero.w = 0;
-    if (a && a.visible && S.started && !S.firstPerson && S.mode !== 'cutscene') {
+    if (a && a.visible && S.started && !S.firstPerson && !(S.cockpit && S.mode === 'rover') && S.mode !== 'cutscene') {
       a.updateWorldMatrix(true, false);
       _hero.set(0, 1.0, 0).applyMatrix4(a.matrixWorld);
       const dist = _hero.distanceTo(_heroCam.setFromMatrixPosition(e.camera.matrixWorld));

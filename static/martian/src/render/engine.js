@@ -33,6 +33,8 @@ const FINAL_FRAGMENT = /* glsl */`
   uniform vec2 uVeilDir;
   uniform vec4 uHero;
   uniform float uAspect;
+  uniform sampler2D tCab;
+  uniform float uCab;
   varying vec2 vUv;
   float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   float vn(vec2 p) {
@@ -82,10 +84,14 @@ const FINAL_FRAGMENT = /* glsl */`
       // (Drawn across him at full strength they were stripes on his legs.)
       vec2 hd = (vUv - uHero.xy) * vec2(uAspect, 0.52) / max(uHero.z, 0.001);
       float clearHere = uHero.w * (1.0 - smoothstep(0.55, 1.25, length(hd)));
-      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread) * (1.0 - 0.72 * clearHere));
+      // And from the rover's seat the storm is outside the glass: nothing of it over the cab's own walls, its
+      // dashboard or his hands. (tCab: where those are in the picture. See Engine.cabMask.)
+      float cabHere = uCab > 0.0 ? uCab * texture2D(tCab, vUv).r : 0.0;
+      float open = (1.0 - 0.72 * clearHere) * (1.0 - cabHere);
+      col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread) * open);
       // ... and grains caught by the light as they pass the visor: a flicker of specks, thickest where the dust is
       float speck = hash12(floor(gl_FragCoord.xy * 0.5) + floor(uTime * 30.0) * 7.3);
-      col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick));
+      col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick)) * (1.0 - cabHere);
     }
     col *= uExposure;
     // scene-referred grade
@@ -137,6 +143,7 @@ class FinalPass extends Pass {
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
       uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
       uSharp: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
+      tCab: { value: null }, uCab: { value: 0 },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -155,6 +162,7 @@ class FinalPass extends Pass {
 }
 
 const _v = new THREE.Vector3(), _u = new THREE.Vector3();
+const _cabSize = new THREE.Vector2(), _cabClear = new THREE.Color(), CAB_LAYER = 6;
 
 export class Engine {
   constructor(container, qualityName) {
@@ -424,11 +432,47 @@ export class Engine {
     if (old) old.dispose();
   }
 
+  /**
+   * From the rover's seat in a storm: where the cab is in the picture, so that the storm's veil, which is laid over
+   * the finished picture, is laid over the glass and not over the dashboard. The cab's own parts and the driver are
+   * drawn once more, flat white, at half size (`things`: set by game/rover.js while the picture is taken from the
+   * seat, null otherwise). Only then, and only while there is a veil: no other frame pays for it.
+   */
+  cabMask() {
+    const fu = this.final.uniforms, r = this.renderer, things = this.cabThings;
+    if (!things || fu.uVeil.value < 0.01) { fu.uCab.value = 0; return; }
+    const size = r.getDrawingBufferSize(_cabSize), w = Math.max(1, size.x >> 1), h = Math.max(1, size.y >> 1);
+    if (!this.cabTarget) {
+      this.cabTarget = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true, type: THREE.UnsignedByteType });
+      this.cabTarget.texture.colorSpace = THREE.NoColorSpace;
+      this.cabMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, toneMapped: false });
+    } else if (this.cabTarget.width !== w || this.cabTarget.height !== h) this.cabTarget.setSize(w, h);
+    if (this.cabMarked !== things) { this.cabMarked = things; for (const t of things) t.traverse((o) => { o.layers.enable(CAB_LAYER); }); }
+    const cam = this.camera, scene = this.scene, keep = cam.layers.mask;
+    const target = r.getRenderTarget(), over = scene.overrideMaterial, bg = scene.background, auto = r.autoClear, alpha = r.getClearAlpha(), shadows = r.shadowMap.autoUpdate;
+    r.getClearColor(_cabClear);
+    cam.layers.set(CAB_LAYER);
+    scene.overrideMaterial = this.cabMat; scene.background = null;
+    r.shadowMap.autoUpdate = false;
+    r.setRenderTarget(this.cabTarget);
+    r.setClearColor(0x000000, 1);
+    r.autoClear = true;
+    r.render(scene, cam);
+    r.setRenderTarget(target);
+    r.setClearColor(_cabClear, alpha);
+    r.autoClear = auto;
+    r.shadowMap.autoUpdate = shadows;
+    scene.overrideMaterial = over; scene.background = bg;
+    cam.layers.mask = keep;
+    fu.tCab.value = this.cabTarget.texture; fu.uCab.value = 1;
+  }
+
   render() {
     const info = this.renderer.info;
     info.autoReset = false;
     info.reset();
     this._shadowMark = null;
+    this.cabMask();
     this.composer.render();
     const s = this._shadowMark || { calls: 0, triangles: 0 };
     this.frameStats = { calls: info.render.calls, triangles: info.render.triangles, shadowCalls: s.calls, shadowTriangles: s.triangles };

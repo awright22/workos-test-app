@@ -1,7 +1,7 @@
 // How much of a phone's screen the HUD stands on when nothing is wrong.
 //
 // The quiet HUD (ui/hud.js, css/hud.css) is held to a bar: standing in the open, walking, standing at the rover with
-// its button up, and driving, it covers no more than 15% of the screen, none of the middle of it (the middle two
+// its button up, and driving (from behind the rover and from its seat), it covers no more than 15% of the screen, none of the middle of it (the middle two
 // fifths across by the middle half down), and no more than 35% of its top third. Measured in the page (audit-lib.mjs,
 // coverInPage) at three phones held sideways: the two the interface audit walks, and the owner's (932 x 430 with the
 // island's margins). The smallest of them has 16%: it has a third less screen than the owner's for controls that
@@ -98,6 +98,10 @@ export async function measure(size, o = {}) {
   await rest();
   await ev((G) => { G.tick(0.05, 20); });
   await take('rover-driving', true);
+  // the same from the driver's seat (VIEW): the speed is on the rover's own display, and the plate stands down
+  await ev((G) => { G.S.cockpit = true; G.tick(0.05, 30); });
+  await take('rover-cab', true);
+  await ev((G) => { G.S.cockpit = false; G.tick(0.05, 30); });
   await touch('touchEnd', []);
   // asked for, in the seat: the dial tapped
   await page.evaluate(() => window.__UI.openGauges(1e6));
@@ -180,7 +184,7 @@ export async function run(o = {}) {
       const over = r.held && (r.all > (size.all || BAR.all) + 1e-6 || r.middle > BAR.middle + 1e-6 || r.top > BAR.top + 1e-6);
       if (over) bad++;
       console.log(`  ${over ? 'OVER' : r.held ? 'ok  ' : '    '} ${r.state.padEnd(20)} screen ${pct(r.all).padStart(6)}  middle ${pct(r.middle).padStart(6)}  top third ${pct(r.top).padStart(6)}` +
-        `   ${r.parts.slice(0, 5).map(([k, v]) => `${k} ${pct(v)}`).join(', ')}`);
+        `   ${r.parts.slice(0, process.argv.includes('--all') ? 14 : 5).map(([k, v]) => `${k} ${pct(v)}`).join(', ')}`);
     }
     // with several things wrong, one leads: one banner, of the thing that kills soonest; the rest are marks clear of
     // the task card; and the card gives one task
