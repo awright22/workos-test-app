@@ -757,13 +757,15 @@ export function startLaunch() {
         // (and from far enough off to hold both: aimed between them from seven metres, the man in the nose was cut by
         //  the edge of the picture and two thirds of it was empty. The camera now stands back by the width of the gap
         //  and closes with it.)
-        const gap = _c.copy(to).sub(beckAt).length(), share = 1 - smoothstep(9, 15, gap), lead = lerp(1.0, gap * 0.5, share);
-        stand(_d.copy(beckAt).addScaledVector(way, lead), _a, O.crossPitch, lerp(7.6 - ct * 0.4, Math.max(6.2, (gap + 4.6) / 1.4), share), O.crossRoll);
+        //  (Between him and the man he is going to, who sits a pace and a half beyond the place Beck will stop at: aimed
+        //  between Beck and that place, the man in the nose was still at the picture's edge.)
+        const gap = _c.copy(markAt).sub(beckAt).length(), share = 1 - smoothstep(10, 16, gap);
+        stand(_d.copy(beckAt).lerp(markAt, 0.5 * share).addScaledVector(way, 1.0 - share), _a, O.crossPitch, lerp(7.6 - ct * 0.4, Math.max(6.2, (gap + 5.4) / 1.4), share), O.crossRoll);
       } else if (ot >= HOME_AT) {
         // behind the two of them and above, on the way home: the tether drawing them in, the ship and her open lock ahead
         // (a wide lens aimed between them and the ship, so that she is whole in the picture and they are near the lens:
         //  aimed at the pair, a piece of her ring hung in the corner of the last picture of the game)
-        setShot('home', 62);
+        setShot('home', 68);
         const ct = ot - HOME_AT;
         _a.copy(O.f).multiplyScalar(Math.cos(O.homeAz)).addScaledVector(O.x, -Math.sin(O.homeAz));
         // (the camera stands off the pair, beyond them from the ship, and looks a fifth of the way from them to her)
@@ -773,7 +775,7 @@ export function startLaunch() {
         //  two grey figures and a grey ship on black.)
         const off = 7.4 + Math.min(ct, 8) * 0.12;
         cam.position.copy(_d).addScaledVector(_a, Math.cos(O.homePitch) * off).addScaledVector(up, Math.sin(O.homePitch) * off);
-        _d.lerp(_c.copy(O.centre).addScaledVector(O.f, 4), 0.15);
+        _d.lerp(_c.copy(O.centre).addScaledVector(O.f, 4), 0.13);
         _b.copy(up).applyAxisAngle(_c.copy(cam.position).sub(_d).normalize(), O.homeRoll);
         camLookAt(_d, _b);
       } else {
@@ -903,5 +905,5 @@ function enterOrbit(up, F) {
     //  corner of the picture, and the man in the nose was cut by its edge)
     crossAz: 108 * DEG, crossPitch: 44 * DEG, crossRoll: -0.2,
     reachAz: 60 * DEG, reachPitch: 50 * DEG, reachRoll: -0.2,
-    homeAz: 52 * DEG, homePitch: 38 * DEG, homeRoll: 0.1 };
+    homeAz: 52 * DEG, homePitch: 41 * DEG, homeRoll: 0.1 };
 }
