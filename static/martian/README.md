@@ -169,7 +169,13 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   the screen, the middle clear, 35% of the top third. `--shoot` photographs each state.
   `tools/tests/ui-audit.mjs` runs it as its last part. With several things wrong at once the
   quiet HUD lets one lead (what kills in minutes first): its banner, the gauge it bears on and
-  the one task; the rest wait beside it as marks.
+  the one task; the rest wait beside it as marks. A banner leads with what to do (RUN TO THE
+  HAB) and says what is wrong under it; beside it the task card is one line, the place and how
+  far, and RUN stays on the screen while the tank is what is wrong.
+- `node tools/tests/card-open.mjs` plays six stretches on a phone (standing, walking, driving,
+  nightfall, the air running low) and measures how long the task card stands open: nine seconds
+  for a new task on foot, four and a half at the wheel, never beside a banner that has said what
+  to do. It is part of the suite.
 - `node tools/tests/motion.mjs` walks and drives eleven real routes with the stick held and
   flags what a still cannot show: no progress, a jump of the man or the camera, the man or the
   rover in the ground or over it, the camera in a rock, the rover hidden from the camera by the

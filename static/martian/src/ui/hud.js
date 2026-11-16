@@ -1189,15 +1189,17 @@ export function updateHud() {
   if (S.breach.active) al.push(['crit', 'warning', 'Seal the breach', 'the Hab is losing its air', 'the Hab is losing air', 'o2', 1]);
   if (!filling && !safeAir && S.mode !== 'rover') {
     if (sf < 0.12) al.push(['crit', 'suit', `Run to the ${airAt}`, `${O2} critical`, `${O2} critical`, null, 0]);
-    else if (sf < 0.25) al.push(['warn', 'suit', `Go to the ${airAt}`, `${O2} low: under a quarter left`, `${O2} under a quarter`, null, 0]);
+    // (a second line no longer than the first: "suit O2 low: under a quarter left" made the banner wide enough to push
+    //  the marks beside it under the task card, and the dial beside them already says a quarter)
+    else if (sf < 0.25) al.push(['warn', 'suit', `Go to the ${airAt}`, `${O2} is low`, `${O2} is low`, null, 0]);
   }
-  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Park in the sun', 'rover battery low: it charges by day', 'rover battery low', null, 7]);
+  if (S.mode === 'rover' && S.roverPower / roverPowerCap() < 0.1) al.push(['warn', 'battery', 'Park in the sun', 'rover battery low', 'rover battery low', null, 7]);
   if (S.storm.i > 0.15) {
     // (what the storm is doing depends on where it is: over the Hab it starves the panels, out here it only blinds)
     const atHab = stormIntensityAt(World.hab.position) > 0.15;
     al.push(['warn', 'storm', 'Dust storm', atHab ? 'solar power is down' : 'keep the Hab in sight', atHab ? 'solar power is down' : 'keep your bearings', atHab ? 'power' : null, 8]);
   }
-  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Get indoors', 'extreme cold: the suit heater burns <span class="chem">O<sub>2</sub></span>', 'the cold burns <span class="chem">O<sub>2</sub></span>', null, 9]);
+  if (t < -85 && !S.inside && S.mode !== 'rover') al.push(['cold', 'cold', 'Get indoors', 'the cold burns suit <span class="chem">O<sub>2</sub></span>', 'the cold burns <span class="chem">O<sub>2</sub></span>', null, 9]);
   const critical = al.some((a) => a[0] === 'crit');
   if (critical !== UI.critical) { UI.critical = critical; root.classList.toggle('is-critical', critical); }
 
