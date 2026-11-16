@@ -985,6 +985,24 @@ function fmtLeft(sec) {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 /**
+ * The rover's own display, which is the speedometer when the picture is taken from its seat (world/models.js,
+ * drawDash): a few times a second, and at once when the task card's figure for how far has changed. Called after the
+ * card is brought up to date (main.js), so that the two never say different things in one frame: drawn before it, the
+ * display read 5.9 km beside a card that had just turned to 6.0.
+ */
+export function updateRoverDash() {
+  if (S.mode !== 'rover' || !S.cockpit || !World.rover) return;
+  if (!(playTime() - (hud.dashT || 0) > 0.16 || hud.dashLead !== leadShown)) return;
+  hud.dashT = playTime(); hud.dashLead = leadShown;
+  const rp = World.rover.group.position, lead = leadTask(), w = lead ? objectiveWhere(lead.o) : null;
+  drawDash({
+    kmh: Math.abs(roverF.speed) * 3.6, power: S.roverPower / roverPowerCap(), o2: S.roverO2 / BAL.roverO2Cap, heading: headingOf(rp, roverF.q) * R2D,
+    gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D',
+    // (the task in hand, as the card has it: its own figure for how far, and which way off the nose)
+    to: w ? { dist: leadShown && leadShown !== 'here' ? leadShown : fmtDist(w.show), bearing: bearingTo(rp, w.pos, roverF.q) * R2D, here: leadShown === 'here' || w.show < 12 } : null,
+  });
+}
+/**
  * How long the suit's tank lasts, in seconds: what is in it, divided by what a walk uses in the conditions he is
  * in (the figure the simulation itself drains by). It is a function of the gauge and nothing else, so it cannot go
  * stale and the same gauge never reads two different times: it falls a second a second at a walk, slower standing
@@ -1119,19 +1137,6 @@ export function updateHud() {
   if (S.mode === 'rover') {
     setText('rspd', UI.roverSpeed, String(Math.round(Math.abs(roverF.speed) * 3.6)));
     const pf = S.roverPower / roverPowerCap(), of = S.roverO2 / BAL.roverO2Cap;
-    // (and on the rover's own display, which is the speedometer when the picture is taken from its seat: a few times a second)
-    // (and at once when the card's figure for how far has changed: for a sixth of a second the two could differ)
-    if (S.cockpit && (playTime() - (hud.dashT || 0) > 0.16 || hud.dashLead !== leadShown)) {
-      hud.dashT = playTime(); hud.dashLead = leadShown;
-      const rp = World.rover.group.position, lead = leadTask(), w = lead ? objectiveWhere(lead.o) : null;
-      drawDash({
-        kmh: Math.abs(roverF.speed) * 3.6, power: pf, o2: of, heading: headingOf(rp, roverF.q) * R2D,
-        gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D',
-        // (the task in hand, as the HUD's own line has it: how far, and which way off the nose)
-        // (the figure is the card's own, as it last drew it: worked out afresh here it could say 5.9 km beside the card's 6.0)
-        to: w ? { dist: leadShown && leadShown !== 'here' ? leadShown : fmtDist(w.show), bearing: bearingTo(rp, w.pos, roverF.q) * R2D, here: leadShown === 'here' || w.show < 12 } : null,
-      });
-    }
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
     a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`; a.wrap.style.setProperty('--f', clamp(pf, 0, 1).toFixed(3));
     b.fill.style.transform = `scaleX(${clamp(of, 0, 1).toFixed(3)})`; b.wrap.style.setProperty('--f', clamp(of, 0, 1).toFixed(3));

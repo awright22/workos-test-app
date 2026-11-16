@@ -122,16 +122,15 @@ export function drawDash(d) {
   bar(170, 'AIR', d.o2, o2);
   g.fillStyle = rule; g.fillRect(556, 76, 2, 128);
   // the task in hand: how far, and where it lies off the nose (an arrow large enough to steer by)
-  g.textAlign = 'left'; g.fillStyle = dim; g.font = `600 28px ${cond}`; g.fillText(to ? 'TO GO' : 'NO TARGET', 576, 106);
+  const fig = to ? /^([\d.,]+)\s*(.*)$/.exec(to.dist) || [0, to.dist, ''] : null;
+  // (the unit rides with the label: after the figure it ran under the arrow's ring)
+  g.textAlign = 'left'; g.fillStyle = dim; g.font = `600 28px ${cond}`; g.fillText(!to ? 'NO TARGET' : to.here || !fig[2] ? 'TO GO' : fig[2].toUpperCase() + ' TO GO', 576, 106);
   if (to) {
-    const m = /^([\d.,]+)\s*(.*)$/.exec(to.dist) || [0, to.dist, ''];
-    g.fillStyle = warm; g.font = `600 62px ${cond}`;
-    if (to.here) g.fillText('HERE', 576, 170);
-    else {
-      g.fillText(m[1], 576, 170);
-      const wv = g.measureText(m[1]).width;
-      g.font = `600 30px ${cond}`; g.fillText(m[2].toUpperCase(), 576 + wv + 6, 170);
-    }
+    g.fillStyle = warm;
+    const word = to.here ? 'HERE' : fig[1];
+    g.font = `600 62px ${cond}`;
+    if (g.measureText(word).width > 92) g.font = `600 ${Math.floor(62 * 92 / g.measureText(word).width)}px ${cond}`;
+    g.fillText(word, 576, 170);
     const cx = 712, cy = 150, r = 38, a = brg * Math.PI / 180;
     g.strokeStyle = rule; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
     g.fillStyle = dim; g.fillRect(cx - 1.5, cy - r - 9, 3, 12);

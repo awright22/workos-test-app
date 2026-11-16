@@ -45,7 +45,7 @@ import { updateBuildGhost } from './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
 import { updateDiscoveries, checkAchievements } from './game/story.js';
 import { startLaunch } from './game/launch.js';
-import { updateHud, updateCompass, updateObjectivesHud, updateWaypoint } from './ui/hud.js';
+import { updateHud, updateCompass, updateObjectivesHud, updateRoverDash, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
 import { showStart, newGame, continueGame, ensureKind } from './game/flow.js';
@@ -300,6 +300,7 @@ function tick(dt) {
   part('hud', updateHud);
   part('compass', updateCompass);
   part('tasks', updateObjectivesHud);
+  part('dash', updateRoverDash);
   part('marker', () => updateWaypoint(ctx.engine.camera));
   if (UI.mapScreen.style.display === 'block') {
     mapOpenTimer += dt;
