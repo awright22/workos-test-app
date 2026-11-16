@@ -168,7 +168,7 @@
 /* (but driving it has VIEW, where RUN stands on foot: the driver's seat, or the camera behind the rover. The owner
    asked for the view from the cab, and a switch two menus deep is not a way into it.) */
 #mg-root.mg-calm.is-rover #mg-tCam { display: flex; right: calc(var(--sar) + 6.1875rem); bottom: calc(var(--sab) + 6.125rem); border-color: rgba(245, 240, 232, .22); background: rgba(14, 12, 11, .5); }
-#mg-root.is-cab #mg-tCam, #mg-tCam.on { border-color: var(--accent); color: var(--accent); }
+#mg-root.is-cab #mg-tCam, #mg-tCam.on { border-color: var(--accent); color: var(--accent); background: rgba(46, 30, 10, .86); }
 /* (on the smallest phone the two of them are a thumb and no more: with VIEW added at its full size, driving covered
    16.3% of that screen against a bar of 16: tests/hud-cover.mjs) */
 @media (max-width: 760px) {

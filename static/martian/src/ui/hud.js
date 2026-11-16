@@ -1120,7 +1120,13 @@ export function updateHud() {
     // (and on the rover's own display, which is the speedometer when the picture is taken from its seat: a few times a second)
     if (S.cockpit && playTime() - (hud.dashT || 0) > 0.16) {
       hud.dashT = playTime();
-      drawDash({ kmh: Math.abs(roverF.speed) * 3.6, power: pf, o2: of, heading: headingOf(World.rover.group.position, roverF.q) * R2D, gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D' });
+      const rp = World.rover.group.position, lead = leadTask(), w = lead ? objectiveWhere(lead.o) : null;
+      drawDash({
+        kmh: Math.abs(roverF.speed) * 3.6, power: pf, o2: of, heading: headingOf(rp, roverF.q) * R2D,
+        gear: roverF.speed < -0.3 ? 'R' : Math.abs(roverF.speed) < 0.3 && Math.abs(roverF.throttle) < 0.05 ? 'P' : 'D',
+        // (the task in hand, as the HUD's own line has it: how far, and which way off the nose)
+        to: w ? { dist: fmtDist(w.show), bearing: bearingTo(rp, w.pos, roverF.q) * R2D, here: w.show < 12 } : null,
+      });
     }
     const a = UI.roverBars.pwr, b = UI.roverBars.o2;
     a.fill.style.transform = `scaleX(${clamp(pf, 0, 1).toFixed(3)})`; a.wrap.style.setProperty('--f', clamp(pf, 0, 1).toFixed(3));

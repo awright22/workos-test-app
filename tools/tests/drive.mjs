@@ -185,6 +185,14 @@ const cab = await g.eval(async (G) => {
   key('v'); G.tick(1 / 30, 45); G.roverF.speed = 0; key('f'); G.tick(1 / 30, 60);
   out.afoot = { mode: G.S.mode, off: +cam.position.distanceTo(G.player.pos).toFixed(1), things: !!G.ctx.engine.cabThings };
   G.S.cockpit = false;
+  // the cab's screens: the driving display has a picture of its own, whole; each of the others one panel of the four
+  out.screens = [];
+  rv.model.inner.traverse((o) => {
+    if (!o.isMesh || !/^screen/.test(o.material.name || '')) return;
+    const uv = o.geometry.attributes.uv; let u0 = 9, u1 = -9, v0 = 9, v1 = -9;
+    for (let i = 0; i < uv.count; i++) { u0 = Math.min(u0, uv.getX(i)); u1 = Math.max(u1, uv.getX(i)); v0 = Math.min(v0, uv.getY(i)); v1 = Math.max(v1, uv.getY(i)); }
+    out.screens.push({ mat: o.material.name, part: o.name.split(':')[0], u: +(u1 - u0).toFixed(2), v: +(v1 - v0).toFixed(2) });
+  });
   return out;
 });
 check('V in the rover puts the picture at the driver\'s eyes, with neither his helmet nor his head drawn',
@@ -193,6 +201,13 @@ check('the wheel goes over with the steering and his hand goes with it (within 3
 check('parked, a look to the side stays where it was put; in a storm the veil is kept off the cab', cab.look > 0.6 && cab.storm.veil > 0.3 && cab.storm.mask === 1, { look: cab.look, storm: cab.storm });
 check('V again puts it back behind the rover, his head drawn again; out of the rover it is behind him on foot',
   !cab.back.cockpit && cab.back.off > 5 && cab.back.heads > 0 && cab.back.mask === 0 && cab.afoot.mode === 'walk' && cab.afoot.off < 9 && !cab.afoot.things, { back: cab.back, afoot: cab.afoot });
+
+{
+  const drive = cab.screens.filter((x) => x.mat === 'screen_drive'), rest = cab.screens.filter((x) => x.mat === 'screen');
+  // (two side by side in one mesh span the sheet across and half of it up: never the whole of it both ways)
+  check('the driving display shows its own picture whole, and no other screen shows the whole sheet of four panels',
+    drive.length === 1 && drive[0].u > 0.99 && drive[0].v > 0.99 && rest.length >= 1 && rest.every((x) => x.v < 0.5 || x.u < 0.5), cab.screens);
+}
 
 console.log(`\n${fails.length ? 'FAILED: ' + fails.length : 'passed'}; console errors: ${g.errors.length}`, g.errors.slice(0, 3));
 await g.close();

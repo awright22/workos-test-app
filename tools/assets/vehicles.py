@@ -746,14 +746,20 @@ def _cab_lining(cabin, levels, panes):
         f.material_index = 0 if f.calc_center_median().z > 1.56 else 1
     for name, tags in panes.items():
         faces = _pane_faces(bm, tag, set(tags), normals)
-        bmesh.ops.inset_region(bm, faces=faces, thickness=0.058 if name == 'rear' else 0.066 if name == 'brow' else 0.046, depth=0.0, use_even_offset=True,
-                               use_boundary=True)
-        rim = bmesh.ops.inset_region(bm, faces=faces, thickness=0.006, depth=0.03, use_even_offset=True, use_boundary=True)['faces']
+        full = 0.058 if name == 'rear' else 0.066 if name == 'brow' else 0.046
+        # (each pane sits in a frame of its own: a band of lighter trim, proud of the liner by a finger, then the seal.
+        #  With the liner run flat to a hairline of rubber the pillars were planks with holes cut in them.)
+        bmesh.ops.inset_region(bm, faces=faces, thickness=full - 0.026, depth=0.0, use_even_offset=True, use_boundary=True)
+        band = bmesh.ops.inset_region(bm, faces=faces, thickness=0.004, depth=-0.012, use_even_offset=True, use_boundary=True)['faces']
+        ring = bmesh.ops.inset_region(bm, faces=faces, thickness=0.022, depth=0.0, use_even_offset=True, use_boundary=True)['faces']
+        rim = bmesh.ops.inset_region(bm, faces=faces, thickness=0.006, depth=0.042, use_even_offset=True, use_boundary=True)['faces']
+        for f in band + ring:
+            f.material_index = 3
         for f in rim:
             f.material_index = 2
         bmesh.ops.delete(bm, geom=faces, context='FACES')
     bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
-    obj('cab_lining', bm, ['cab_liner', 'cab_trim', 'rubber'], cabin, smooth=20)
+    obj('cab_lining', bm, ['cab_liner', 'cab_trim', 'rubber', 'cab_frame'], cabin, smooth=20)
 
 
 def _switch_row(bm_body, bm_tip, M, count, pitch=0.034, up=True):
@@ -770,29 +776,32 @@ def _rover_cab_interior(root, levels, panes):
     """The cab as its driver sees it (the owner: "need to be able to see the cockpit"). Everything here hangs from the
     part `cabin`, which the game keeps clean of dust and lights as a room (world/models.js).
 
-    He sits at x = +0.40, his eyes at (0.415, -1.50, 2.156), and looks along -Y. From there, resting, the picture's
-    lower edge is some 35 degrees under the horizon: what is to be seen without looking down stands on the dashboard,
-    not in it. So the driver's display is in a hood on top of the dash, the wheel is raised to his hands, and the
-    centre screen stands up from the dash beside it."""
+    He sits in the middle of it, his eyes at (0, -1.50, 2.156), and looks along -Y: the windscreen is straight ahead of
+    him and its two pillars are thirty-four degrees off to either side. (He sat at x = 0.40 beside a second seat, and the
+    pillar between the windscreen and the corner pane stood a hand off the line he drove along: "a fat dark post in the
+    middle of the windscreen", the first thing its reviewer saw.) From his seat, resting, the picture's lower edge is
+    some forty degrees under the horizon: what is to be seen without looking down stands on the dashboard, not in it.
+    So the driver's display is in a hood on top of the dash, wide, behind the wheel, with a lesser screen each side."""
     F = CAB_FLOOR
     mat('cab_trim', color=(0.085, 0.088, 0.095), metallic=0.0, roughness=0.72)       # moulded dark plastic
     mat('cab_liner', color=(0.215, 0.235, 0.265), metallic=0.0, roughness=0.94)      # padded cloth: a cool dark grey (a mid grey, under this sky, was brown card)
+    mat('cab_frame', color=(0.40, 0.41, 0.42), metallic=0.1, roughness=0.6)          # the band of trim round each pane
     mat('cab_pad', color=(0.15, 0.142, 0.135), metallic=0.0, roughness=0.96)         # the dash's top, the floor's mat
     mat('cab_seat', color=(0.22, 0.215, 0.21), metallic=0.0, roughness=0.92)
     mat('cab_panel', color=(0.30, 0.31, 0.32), metallic=0.25, roughness=0.5)         # switch panels: bare grey plate
+    mat('cab_label', color=(0.78, 0.76, 0.70), metallic=0.0, roughness=0.6)          # placards
     mat('screen_drive', color=(0.02, 0.04, 0.07), metallic=0.0, roughness=0.25, emissive=(0.12, 0.30, 0.55), strength=1.5)
     cabin = part('cabin', root)
     _cab_lining(cabin, levels, panes)
 
-    # ---- floor: a ribbed mat, and the sills where the hull steps out over the wheels
+    # ---- floor: a ribbed mat under his feet
     bm = bm_new()
     box(bm, (1.22, 1.90, 0.04), (0, -1.55, F - 0.02))
-    for sx in (-0.40, 0.40):
-        for i in range(7):
-            box(bm, (0.36, 0.022, 0.008), (sx, -2.34 + i * 0.07, F + 0.004))
+    for i in range(8):
+        box(bm, (0.50, 0.022, 0.008), (0.0, -2.36 + i * 0.07, F + 0.004))
     obj('cab_floor', bm, 'cab_pad', cabin, bevel=0.004)
 
-    # ---- dashboard: a hull of its own, wall to wall under the windscreen, leaning over the crew's knees
+    # ---- dashboard: a hull of its own, wall to wall under the windscreen, leaning over his knees
     dash = [
         (1.30, [(0, -2.76), (0.56, -2.76), (1.00, -2.28), (1.00, -2.17), (0.93, -2.14), (0, -2.14)]),
         (1.50, [(0, -2.68), (0.58, -2.68), (1.02, -2.19), (1.02, -2.06), (0.94, -2.025), (0, -2.025)]),
@@ -804,34 +813,55 @@ def _rover_cab_interior(root, levels, panes):
     chamfer_edges(bm, 24.0, 0.016)
     for f in bm.faces:
         f.material_index = 1 if f.normal.z > 0.8 else 0
-    # under it, between the sills: the knee bolster, the footwell's end, the centre tunnel
-    taper_box(bm, (1.20, 0.30), (1.20, 0.50), F, 1.30, (0, -2.45), (0, 0.06))
-    box(bm, (0.30, 0.86, 0.36), (0, -1.66, F + 0.18))
+    taper_box(bm, (1.20, 0.30), (1.20, 0.50), F, 1.30, (0, -2.45), (0, 0.06))               # under it: the knee bolster, the footwell's end
     obj('dash', bm, ['cab_trim', 'cab_pad'], cabin, smooth=30)
 
-    # ---- the driver's display, in a hood on the dash, behind the wheel
-    X = 0.40
+    # ---- the driver's display: wide, in a hood on the dash behind the wheel
+    HW = 0.66                                                                             # the hood, across
     hood = [(-2.46, 1.61), (-2.085, 1.61), (-2.18, 1.895), (-2.27, 1.915), (-2.46, 1.75)]
     bm = bm_new()
-    prism(bm, hood, 0.47, T(X, 0, 0) @ YZX)
-    prism(bm, [(-2.28, 1.90), (-2.11, 1.925), (-2.11, 1.94), (-2.28, 1.922)], 0.50, T(X, 0, 0) @ YZX)        # its brow: shade for the screen
-    for sx in (-1, 1):                                                                                     # and cheeks
-        prism(bm, [(-2.20, 1.62), (-2.085, 1.62), (-2.11, 1.925), (-2.20, 1.91)], 0.014, T(X + sx * 0.243, 0, 0) @ YZX)
+    prism(bm, hood, HW, YZX)
+    prism(bm, [(-2.28, 1.90), (-2.11, 1.925), (-2.11, 1.94), (-2.28, 1.922)], HW + 0.03, YZX)           # its brow: shade for the screen
+    for sx in (-1, 1):                                                                                 # and cheeks
+        prism(bm, [(-2.20, 1.62), (-2.085, 1.62), (-2.11, 1.925), (-2.20, 1.91)], 0.014, T(sx * (HW / 2 + 0.008), 0, 0) @ YZX)
     obj('drive_hood', bm, 'cab_trim', cabin, bevel=0.006)
-    face_n = Vector((0, 0.285, 0.095)).normalized()                                                        # the hood's face: at him, and up
-    Mf = frame((X, -2.1325, 1.7525), face_n, (1, 0, 0))
+    face_n = Vector((0, 0.285, 0.095)).normalized()                                                    # the hood's face: at him, and up
+    Mf = frame((0, -2.1395, 1.7735), face_n, (1, 0, 0))                                                    # (high on the face: the wheel's horns stand in front of its foot)
     bm = bm_new()
-    box(bm, (0.36, 0.18, 0.006), (0, 0, 0.004), Mf)
+    box(bm, (0.60, 0.1875, 0.006), (0, 0, 0.004), Mf)
     obj('drive_screen', bm, 'screen_drive', cabin)
-    bm = bm_new()                                                                                          # tell-tales under it
-    for i in range(5):
-        box(bm, (0.022, 0.009, 0.004), (-0.15 + i * 0.03, 0.105, 0.004), Mf)
+    bm = bm_new()                                                                                      # tell-tales under it
+    for i in range(7):
+        box(bm, (0.022, 0.009, 0.004), (-0.09 + i * 0.03, 0.118, 0.004), Mf)
     obj('drive_tells', bm, 'light_green', cabin)
+
+    # ---- a lesser screen each side of the hood, standing on the dash and turned to him; switches under each
+    housings, glass = bm_new(), bm_new()
+    body, tips, lit, plates = bm_new(), bm_new(), bm_new(), bm_new()
+    Md_face = Vector((0, 0.34, 0.105)).normalized()
+    for sx in (-1, 1):
+        Mc = T(sx * 0.565, -2.07, 1.60) @ R('Z', sx * 24) @ R('X', -16)
+        box(housings, (0.33, 0.045, 0.235), (0, -0.027, 0.14), Mc)
+        box(housings, (0.10, 0.06, 0.05), (0, -0.04, 0.02), Mc)
+        box(glass, (0.295, 0.006, 0.195), (0, -0.003, 0.145), Mc)
+        Mpl = frame((sx * 0.56, -2.016, 1.45), Md_face, (1, 0, 0))
+        box(plates, (0.30, 0.105, 0.004), (0, 0, 0.002), Mpl)
+        _switch_row(body, tips, Mpl @ T(0, 0.022, 0.004), 7, 0.036, up=sx > 0)
+        for i in range(7):
+            box(lit, (0.012, 0.006, 0.003), ((i - 3) * 0.036, -0.012, 0.0055), Mpl)
+        for kx in (-1, 1):
+            lathe(body, [(0.0, 0.0), (0.019, 0.0), (0.016, 0.02), (0.0, 0.022)], 10, Mpl @ T(kx * 0.11, -0.036, 0.004))
+    # (and a plate of switches on the dash's face below the wheel)
+    Mpl = frame((0.0, -2.014, 1.40), Md_face, (1, 0, 0))
+    box(plates, (0.26, 0.07, 0.004), (0, 0, 0.002), Mpl)
+    _switch_row(body, tips, Mpl @ T(0, 0.006, 0.004), 6, 0.036)
+    obj('side_housings', housings, 'cab_trim', cabin, bevel=0.008)
+    obj('screens', glass, 'screen', cabin)
 
     # ---- the wheel: a yoke on a column. His hands are on it already: the astronaut's Drive clip (astronaut.py,
     #      YOKE_C, YOKE_N, YOKE_R) holds a horn 0.15 m each side of this hub and turns them about this axis, so the
     #      yoke is a part of its own, pivoted at the hub, and the game turns it with his hands (game/rover.js).
-    hub = Vector((X, -1.985, 1.633))
+    hub = Vector((0.0, -1.985, 1.633))
     axis = Vector((0, 0.85, 0.527)).normalized()                                                           # the column: toward his chest
     My = frame(hub, axis, (1, 0, 0))
     bm = bm_new()
@@ -855,152 +885,146 @@ def _rover_cab_interior(root, levels, panes):
         box(bm, (0.02, 0.014, 0.006), (sx * 0.10, 0.0, 0.011), Ml)
     obj('yoke_buttons', bm, 'painted_orange', yoke)
 
-    # ---- centre stack: the big screen standing on the dash, switches under it, turned a little to the driver
-    Mc = T(0.0, -2.05, 1.60) @ R('Z', -9) @ R('X', -14)
+    # ---- a desk each side of his seat, from the seat out over the sill to the wall: the drive lever and the brake
+    #      by his right hand, the cameras' stick and a row of switches by his left, lockers behind
     bm = bm_new()
-    box(bm, (0.37, 0.05, 0.27), (0, -0.03, 0.155), Mc)                                                     # housing
-    box(bm, (0.12, 0.07, 0.05), (0, -0.045, 0.02), Mc)                                                     # its foot
-    obj('centre_housing', bm, 'cab_trim', cabin, bevel=0.008)
-    bm = bm_new()
-    box(bm, (0.33, 0.006, 0.215), (0, -0.003, 0.165), Mc)
-    # passenger's display, let into the dash's face; a strip on the tunnel
-    Mp = frame((-0.42, -2.012, 1.50), Vector((0, 0.34, 0.105)).normalized(), (1, 0, 0))
-    box(bm, (0.32, 0.13, 0.006), (0, 0, 0.003), Mp)
-    box(bm, (0.15, 0.24, 0.006), (0, -1.50, F + 0.363))
-    obj('screens', bm, 'screen', cabin)
-    # switch panels: on the dash's face each side of the stack's foot, and on the tunnel
-    body, tips, lit = bm_new(), bm_new(), bm_new()
-    plates = bm_new()
-    Md_face = Vector((0, 0.34, 0.105)).normalized()
-    for cx, n in ((0.0, 7), (0.40, 5)):
-        Mpl = frame((cx, -2.014, 1.45), Md_face, (1, 0, 0))
-        box(plates, (0.036 * n + 0.03, 0.105, 0.004), (0, 0, 0.002), Mpl)
-        _switch_row(body, tips, Mpl @ T(0, 0.022, 0.004), n)
-        for i in range(n):
-            box(lit, (0.012, 0.006, 0.003), ((i - (n - 1) / 2) * 0.034, -0.012, 0.0055), Mpl)
-        for kx in (-1, 1):
-            if cx == 0.0:
-                lathe(body, [(0.0, 0.0), (0.021, 0.0), (0.018, 0.022), (0.0, 0.024)], 10, Mpl @ T(kx * 0.075, -0.034, 0.004))
-    Mt = T(0, -1.78, F + 0.36)
-    box(plates, (0.22, 0.20, 0.004), (0, 0, 0.002), Mt)
-    _switch_row(body, tips, Mt @ T(0, 0.055, 0.004), 5)
-    box(body, (0.05, 0.035, 0.03), (-0.07, -0.04, 0.015), Mt)                                              # guarded switch
+    for sx in (-1, 1):
+        box(bm, (0.22, 1.06, 0.44), (sx * 0.47, -1.47, F + 0.22))                          # the part that stands on the floor
+        box(bm, (0.46, 1.06, 0.07), (sx * 0.79, -1.47, 1.325))                             # its top, out over the sill
+        box(bm, (0.40, 0.30, 0.20), (sx * 0.80, -0.92, 1.46))                              # locker at its back
+    obj('side_desks', bm, 'cab_trim', cabin, bevel=0.012)
+    for sx in (-1, 1):
+        Ms = T(sx * 0.66, -1.62, 1.36)
+        box(plates, (0.50, 0.50, 0.004), (0, 0, 0.002), Ms)
+        _switch_row(body, tips, Ms @ T(sx * 0.12, 0.14, 0.004), 5, 0.04)
+        _switch_row(body, tips, Ms @ T(sx * 0.12, 0.07, 0.004), 5, 0.04, up=False)
+        for i in range(5):
+            box(lit, (0.012, 0.006, 0.003), (sx * 0.12 + (i - 2) * 0.04, 0.175, 0.0055), Ms)
+        lathe(body, [(0.0, 0.0), (0.03, 0.0), (0.026, 0.02), (0.0, 0.022)], 10, Ms @ T(sx * 0.14, -0.10, 0.004))
     obj('switch_plates', plates, 'cab_panel', cabin, bevel=0.002)
     obj('switch_bodies', body, 'plastic_black', cabin)
     obj('switch_tips', tips, 'aluminium', cabin)
     obj('switch_lights', lit, 'light_green', cabin)
     bm = bm_new()
-    box(bm, (0.052, 0.037, 0.012), (-0.07, -0.04, 0.036), Mt)                                              # its red cover
-    box(bm, (0.30, 0.012, 0.012), (-0.42, -1.99, 1.615))                                                   # passenger's grab bar's stripe
-    obj('cab_red', bm, 'painted_red', cabin, bevel=0.003)
-    # drive lever on the tunnel, by his right hand; the brake's handle behind it
-    bm = bm_new()
-    tube(bm, [(0.08, -1.74, F + 0.36), (0.08, -1.80, F + 0.50)], 0.011, 8)
-    tube(bm, [(-0.02, -1.36, F + 0.36), (-0.02, -1.40, F + 0.40), (-0.02, -1.56, F + 0.44)], 0.012, 8, round_r=0.02)
-    tube(bm, [(-0.62, -1.985, 1.56), (-0.62, -1.93, 1.60), (-0.22, -1.93, 1.60), (-0.22, -1.985, 1.56)], 0.013, 8, round_r=0.03)    # passenger's grab bar
+    tube(bm, [(-0.50, -1.74, 1.36), (-0.50, -1.80, 1.50)], 0.011, 8)                                       # drive lever
+    tube(bm, [(-0.52, -1.36, 1.36), (-0.52, -1.40, 1.40), (-0.52, -1.56, 1.44)], 0.012, 8, round_r=0.02)   # brake
+    tube(bm, [(0.50, -1.76, 1.36), (0.50, -1.775, 1.47)], 0.009, 6)                                        # the cameras' stick
+    tube(bm, [(-0.90, -2.02, 1.60), (-0.90, -1.955, 1.66), (-0.66, -1.955, 1.66), (-0.66, -2.02, 1.60)], 0.012, 8, round_r=0.03)   # a grab bar on the dash
     obj('cab_levers', bm, 'aluminium', cabin, smooth=60)
     bm = bm_new()
-    add_cyl(bm, 0.023, 0.062, (0.08, -1.812, F + 0.528), 10, 'X')
-    box(bm, (0.035, 0.09, 0.03), (-0.02, -1.60, F + 0.45))
+    add_cyl(bm, 0.023, 0.062, (-0.50, -1.812, 1.528), 10, 'X')
+    box(bm, (0.035, 0.09, 0.03), (-0.52, -1.60, 1.45))
+    add_sphere(bm, 0.02, (0.50, -1.777, 1.485), 8, 6)
+    for sx in (-1, 1):                                                                    # locker latches
+        box(bm, (0.012, 0.05, 0.03), (sx * 0.597, -0.92, 1.47))
     obj('cab_grips', bm, 'painted_orange', cabin, bevel=0.005)
-
-    # ---- pedals, footrest
     bm = bm_new()
-    for px, w in ((0.50, 0.075), (0.36, 0.11)):
+    box(bm, (0.052, 0.037, 0.03), (-0.78, -1.40, 1.375))                                  # a guarded switch on the right desk
+    obj('cab_guard', bm, 'plastic_black', cabin)
+    bm = bm_new()
+    box(bm, (0.054, 0.039, 0.012), (-0.78, -1.40, 1.396))                                 # its red cover
+    obj('cab_red', bm, 'painted_red', cabin, bevel=0.003)
+
+    # ---- pedals
+    bm = bm_new()
+    for px, w in ((0.10, 0.075), (-0.07, 0.11)):
         Mq = T(px, -2.26, F + 0.12) @ R('X', 28)
         box(bm, (w, 0.008, 0.15), (0, 0, 0.0), Mq)
         box(bm, (0.014, 0.014, 0.16), (0, -0.05, 0.02), Mq @ R('X', 35))
     obj('pedals', bm, 'steel', cabin, bevel=0.002)
 
-    # ---- seats: cushion, bolsters, back, headrest; the harness lies over the passenger's
+    # ---- his seat: cushion, bolsters, back, headrest, the harness's straps hanging at its shoulders
     seats, frames_bm, belts = bm_new(), bm_new(), bm_new()
-    for sx in (-1, 1):
-        x = sx * 0.40
-        box(frames_bm, (0.26, 0.30, 0.30), (x, -1.50, F + 0.15))                          # pedestal
-        box(frames_bm, (0.50, 0.06, 0.05), (x, -1.50, F + 0.30))                          # slide rail
-        box(seats, (0.46, 0.50, 0.11), (x, -1.50, F + 0.385))                             # cushion
-        for bx in (-1, 1):
-            box(seats, (0.06, 0.46, 0.05), (x + bx * 0.215, -1.50, F + 0.45))             # its side bolsters
-        Mb = T(x, -1.235, F + 0.42) @ R('X', -10)
-        box(seats, (0.44, 0.10, 0.62), (0, 0, 0.31), Mb)                                  # back
-        box(seats, (0.50, 0.07, 0.20), (0, -0.03, 0.14), Mb)                              # lumbar bolster
-        for bx in (-1, 1):
-            box(seats, (0.06, 0.09, 0.40), (bx * 0.215, -0.035, 0.40), Mb)                # shoulder bolsters
-        box(seats, (0.26, 0.09, 0.17), (0, 0.0, 0.74), Mb)                                # headrest
-        for sy in (-1, 1):
-            tube(frames_bm, [(sy * 0.07, 0, 0.60), (sy * 0.07, 0, 0.67)], 0.012, 6, M=Mb)
-        if sx < 0:
-            for bx in (-1, 1):
-                box(belts, (0.045, 0.012, 0.52), (bx * 0.11, -0.085, 0.36), Mb)
-            box(belts, (0.30, 0.012, 0.045), (0, -0.09, 0.16), Mb)
-    obj('seats', seats, 'cab_seat', cabin, bevel=0.03, seg=2)
+    x = 0.0
+    box(frames_bm, (0.26, 0.30, 0.30), (x, -1.50, F + 0.15))                          # pedestal
+    box(frames_bm, (0.50, 0.06, 0.05), (x, -1.50, F + 0.30))                          # slide rail
+    box(seats, (0.46, 0.50, 0.11), (x, -1.50, F + 0.385))                             # cushion
+    for bx in (-1, 1):
+        box(seats, (0.06, 0.46, 0.05), (x + bx * 0.215, -1.50, F + 0.45))             # its side bolsters
+    Mb = T(x, -1.235, F + 0.42) @ R('X', -10)
+    box(seats, (0.44, 0.10, 0.62), (0, 0, 0.31), Mb)                                  # back
+    box(seats, (0.50, 0.07, 0.20), (0, -0.03, 0.14), Mb)                              # lumbar bolster
+    for bx in (-1, 1):
+        box(seats, (0.06, 0.09, 0.40), (bx * 0.215, -0.035, 0.40), Mb)                # shoulder bolsters
+    box(seats, (0.26, 0.09, 0.17), (0, 0.0, 0.74), Mb)                                # headrest
+    for sy in (-1, 1):
+        tube(frames_bm, [(sy * 0.07, 0, 0.60), (sy * 0.07, 0, 0.67)], 0.012, 6, M=Mb)
+        box(belts, (0.045, 0.012, 0.30), (sy * 0.235, 0.06, 0.46), Mb)                # the harness, on the back's own sides
+    obj('seats', seats, 'cab_seat', cabin, bevel=0.03, seg=1)
     obj('seat_frames', frames_bm, 'painted_dark', cabin, bevel=0.01)
     obj('seat_belts', belts, 'suit_orange', cabin)
 
-    # ---- overhead: a console on the roof above the windscreen, a rib across the roof, grab handles, a cable run
+    # ---- overhead: a console on the roof over the windscreen with a lamp each side of it, two visors folded up at
+    #      the header, ribs and cable runs along the roof, a grab bar across it, handles over the side windows
     ZR = CAB_ROOF - 0.055
     bm = bm_new()
-    Mo = T(0.0, -1.66, ZR) @ R('X', 180)                                                  # its face looks down
-    box(bm, (0.62, 0.34, 0.06), (0, 0, 0.03), Mo)
+    Mo = T(0.0, -1.62, ZR) @ R('X', 180)                                                  # its face looks down
+    box(bm, (0.62, 0.36, 0.06), (0, 0, 0.03), Mo)
     for y in (-1.15, -0.80):                                                              # roof ribs
         box(bm, (1.36, 0.05, 0.035), (0, y, ZR - 0.016))
     obj('overhead', bm, 'cab_trim', cabin, bevel=0.012)
     body, tips, lit, plates = bm_new(), bm_new(), bm_new(), bm_new()
     Mo2 = Mo @ T(0, 0, 0.06)
-    box(plates, (0.54, 0.26, 0.004), (0, 0, 0.002), Mo2)
-    _switch_row(body, tips, Mo2 @ T(0, 0.07, 0.004), 9, 0.05)
-    _switch_row(body, tips, Mo2 @ T(-0.06, -0.01, 0.004), 6, 0.05, up=False)
+    box(plates, (0.54, 0.28, 0.004), (0, 0, 0.002), Mo2)
+    _switch_row(body, tips, Mo2 @ T(0, 0.08, 0.004), 9, 0.05)
+    _switch_row(body, tips, Mo2 @ T(0, 0.0, 0.004), 9, 0.05, up=False)
     for i in range(9):
-        box(lit, (0.014, 0.007, 0.003), ((i - 4) * 0.05, 0.10, 0.0055), Mo2)
+        box(lit, (0.014, 0.007, 0.003), ((i - 4) * 0.05, 0.115, 0.0055), Mo2)
     obj('overhead_plate', plates, 'cab_panel', cabin, bevel=0.002)
     obj('overhead_bodies', body, 'plastic_black', cabin)
     obj('overhead_tips', tips, 'aluminium', cabin)
     obj('overhead_lights', lit, 'light_amber', cabin)
     bm = bm_new()
-    for lx in (-0.17, 0.17):                                                              # the cab's two lamps
-        lathe(bm, [(0.0, 0.0), (0.045, 0.0), (0.04, 0.012), (0.0, 0.016)], 12, Mo2 @ T(lx, -0.085, 0.0))
+    for lx in (-0.44, 0.44):                                                              # the cab's two lamps, in the roof beside the console
+        lathe(bm, [(0.0, 0.0), (0.06, 0.0), (0.052, 0.014), (0.0, 0.02)], 14, T(lx, -1.60, ZR) @ R('X', 180))
     obj('cab_lamps', bm, 'plastic_white', cabin, smooth=60)
     bm = bm_new()
+    for lx in (-0.44, 0.44):
+        lathe(bm, [(0.072, 0.0), (0.072, 0.012), (0.06, 0.012), (0.06, 0.0)], 14, T(lx, -1.60, ZR) @ R('X', 180), close=True)
+    # the header: the bar the visors hinge on, and two visors folded up against the roof behind it
+    box(bm, (1.00, 0.04, 0.03), (0, -2.02, 2.50))
     for sx in (-1, 1):
-        # a handle over each side window (none on the windscreen's pillars: there it was a bar across the driver's view)
+        box(bm, (0.40, 0.17, 0.012), (0, 0.085, 0.0), T(sx * 0.26, -2.02, 2.515) @ R('X', 28))
+    obj('cab_header', bm, 'cab_trim', cabin, bevel=0.006)
+    bm = bm_new()
+    for sx in (-1, 1):
         handle(bm, (sx * 0.83, -1.55, 2.52), (sx * 0.83, -1.25, 2.52), 0.05, 0.012, 6, normal=(-sx * 0.5, 0, -0.86))
     obj('cab_handles', bm, 'painted_orange', cabin, smooth=60)
     bm = bm_new()
+    tube(bm, [(-0.70, -1.38, ZR - 0.01), (-0.70, -1.38, ZR - 0.07), (0.70, -1.38, ZR - 0.07), (0.70, -1.38, ZR - 0.01)], 0.013, 8, round_r=0.04)   # grab bar across the roof
+    obj('cab_bar', bm, 'aluminium', cabin, smooth=60)
+    bm = bm_new()
     for sx in (-1, 1):                                                                    # cable runs along the roof's edge
         tube(bm, [(sx * 0.66, -1.86, ZR - 0.02), (sx * 0.70, -1.50, ZR - 0.02), (sx * 0.70, -0.66, ZR - 0.02)], 0.014, 6, round_r=0.05)
-    tube(bm, [(0.30, -1.50, ZR - 0.012), (0.30, -0.66, ZR - 0.012)], 0.01, 6)
+    tube(bm, [(0.30, -1.44, ZR - 0.012), (0.30, -0.66, ZR - 0.012)], 0.01, 6)
     obj('cab_cables', bm, 'rubber', cabin, smooth=60)
 
-    # ---- the sills over the wheels: a side console by the driver, stowage by the passenger
+    # ---- placards on the header over the windscreen, and a handset hung at the roof console's right with its cord
+    #      (on the windscreen's pillars, which are a hand wide, they hung out over the corner panes)
+    labels, dark, stripe = bm_new(), bm_new(), bm_new()
+    for lx, w in ((-0.36, 0.12), (-0.20, 0.07), (0.30, 0.16)):
+        Mp = frame((lx, -2.0, 2.50), (0, 1, 0), (1, 0, 0))                                # on the header bar's face, toward him
+        box(labels, (w, 0.022, 0.003), (0, 0, 0.0015), Mp)
+    box(stripe, (0.05, 0.022, 0.003), (0, 0, 0.0015), frame((0.14, -2.0, 2.50), (0, 1, 0), (1, 0, 0)))
+    Mh = T(-0.37, -1.52, ZR - 0.062)
+    box(dark, (0.05, 0.15, 0.035), (0, 0, -0.018), Mh)                                    # the handset, flat under the console's edge
+    box(dark, (0.06, 0.05, 0.012), (0, 0, 0.0), Mh)                                       # its clip
+    tube(dark, [Mh @ Vector((0, 0.075, -0.02)), Mh @ Vector((0.01, 0.12, -0.07)), Mh @ Vector((0.0, 0.17, -0.05)), Mh @ Vector((-0.02, 0.22, -0.005))], 0.006, 5, round_r=0.03)
+    obj('cab_labels', labels, 'cab_label', cabin)
+    obj('cab_stripes', stripe, 'painted_orange', cabin)
+    obj('cab_handset', dark, 'plastic_black', cabin, smooth=60)
+
+    # ---- a fire extinguisher in the right footwell, by the wall
     bm = bm_new()
-    box(bm, (0.24, 0.62, 0.10), (0.86, -1.56, 1.36))                                      # driver's side console
-    box(bm, (0.24, 0.50, 0.16), (-0.86, -1.30, 1.39))                                     # stowage locker
-    obj('sill_units', bm, 'cab_trim', cabin, bevel=0.012)
-    body, tips, plates = bm_new(), bm_new(), bm_new()
-    Ms = T(0.86, -1.60, 1.41)
-    box(plates, (0.19, 0.46, 0.004), (0, 0, 0.002), Ms)
-    _switch_row(body, tips, Ms @ T(0, 0.14, 0.004) @ R('Z', 90), 4, 0.04)
-    lathe(body, [(0.0, 0.0), (0.03, 0.0), (0.026, 0.02), (0.0, 0.022)], 10, Ms @ T(0.0, -0.02, 0.004))
-    tube(tips, [(0.86, -1.76, 1.414), (0.86, -1.775, 1.50)], 0.009, 6)                    # a short stick: the cameras, the dish
-    obj('sill_plate', plates, 'cab_panel', cabin, bevel=0.002)
-    obj('sill_bodies', body, 'plastic_black', cabin)
-    obj('sill_tips', tips, 'aluminium', cabin)
-    bm = bm_new()
-    add_sphere(bm, 0.02, (0.86, -1.777, 1.51), 8, 6)
-    for i in range(2):                                                                    # locker latches
-        box(bm, (0.012, 0.05, 0.03), (-0.737, -1.42 + i * 0.24, 1.41))
-    obj('sill_orange', bm, 'painted_orange', cabin)
-    # a fire extinguisher on the passenger's wall, low; a torch clipped by the driver's knee
-    bm = bm_new()
-    add_cyl(bm, 0.055, 0.30, (-0.56, -2.02, F + 0.20), 12, 'Z')
-    add_cyl(bm, 0.022, 0.05, (-0.56, -2.02, F + 0.375), 8, 'Z')
+    add_cyl(bm, 0.05, 0.28, (-0.50, -2.10, F + 0.19), 12, 'Z')
+    add_cyl(bm, 0.02, 0.05, (-0.50, -2.10, F + 0.355), 8, 'Z')
     obj('extinguisher', bm, 'painted_red', cabin, smooth=60)
     bm = bm_new()
-    box(bm, (0.03, 0.05, 0.05), (-0.56, -2.02, F + 0.42))
-    tube(bm, [(-0.56, -2.02, F + 0.41), (-0.56, -1.96, F + 0.36), (-0.56, -1.955, F + 0.22)], 0.008, 6, round_r=0.02)
+    box(bm, (0.03, 0.05, 0.05), (-0.50, -2.10, F + 0.40))
+    tube(bm, [(-0.50, -2.10, F + 0.39), (-0.50, -2.04, F + 0.34), (-0.50, -2.035, F + 0.20)], 0.008, 6, round_r=0.02)
     obj('extinguisher_head', bm, 'plastic_black', cabin)
 
-    # ---- the bulkhead behind the seats: the door through to the bunk, its wheel, racks either side
+    # ---- the bulkhead behind the seat: the door through to the bunk, its wheel, racks either side
     YB = -0.58 - 0.062
     Mh = frame((0, YB, 1.72), (0, -1, 0), (1, 0, 0))                                      # local Z = forward, into the cab
     bm = bm_new()
@@ -1016,16 +1040,16 @@ def _rover_cab_interior(root, levels, panes):
     tube(bm, [Mh @ Vector((0, 0, 0.02)), Mh @ Vector((0, 0, 0.075))], 0.018, 8)
     obj('bulkhead_wheel', bm, 'aluminium', cabin, smooth=60)
     bm = bm_new()
-    box(bm, (0.50, 0.05, 0.03), (0, YB - 0.027, 2.20))                                     # a hazard stripe's bar over the wheel
+    box(bm, (0.50, 0.05, 0.03), (0, YB - 0.027, 2.44))                                     # a hazard bar over the door
     obj('bulkhead_stripe', bm, 'painted_yellow', cabin, bevel=0.004)
     bm = bm_new()
     for sx in (-1, 1):
-        for k, (z, h) in enumerate(((1.20, 0.34), (1.60, 0.30), (1.95, 0.26))):
+        for k, (z, h) in enumerate(((1.56, 0.30), (1.95, 0.26))):
             box(bm, (0.30, 0.16, h), (sx * 0.56, YB - 0.085, z + h / 2 - 0.1))
     obj('bulkhead_racks', bm, 'cab_panel', cabin, bevel=0.01)
     bm = bm_new()
     for sx in (-1, 1):
-        for z in (1.27, 1.65, 1.98):
+        for z in (1.61, 1.98):
             box(bm, (0.14, 0.014, 0.022), (sx * 0.56, YB - 0.17, z))
     obj('rack_pulls', bm, 'painted_orange', cabin)
 
@@ -1443,11 +1467,13 @@ def _rover_details(root):
         for y in (-0.30, 0.10, 0.62, 1.10):
             box(alu, (0.028, 0.03, 0.10), (0, 0, 0.012), frame((sx * 0.972, y, 1.876), (sx * 0.864, 0, 0.504), (0, 1, 0)) @ R('Z', 90))
 
-    # windscreen wipers
+    # windscreen wipers: two, in tandem, parked flat along the sill, each long enough to sweep the glass at the height
+    # of his eyes (they stood upright in the middle of the glass, two more bars across the driver's view; the game's
+    # glass carries its dust everywhere they do not reach: world/models.js, WIPERS)
     Mg = frame((0, -2.64, 1.58), (0, -0.8786, 0.4775), (1, 0, 0))
-    for px in (0.43, -0.10):
-        tube(dark, [(px, 0.035, 0.012), (px - 0.02, 0.10, 0.004), (px - 0.11, 0.45, -0.004)], 0.008, 5, M=Mg)
-        beam(dark, (px - 0.085, 0.20, -0.013), (px - 0.125, 0.62, -0.013), 0.018, 0.014, M=Mg)
+    for px, py in ((0.50, 0.105), (0.16, 0.06)):
+        tube(dark, [(px, 0.035, 0.012), (px - 0.03, py - 0.01, 0.014), (px - 0.46, py, 0.014)], 0.008, 5, M=Mg)
+        beam(dark, (px - 0.22, py, 0.004), (px - 0.70, py, 0.004), 0.018, 0.014, M=Mg)
         lathe(dark, [(0.022, 0.0), (0.022, 0.02), (0.0, 0.024)], 8, Mg @ T(px, 0.035, 0))
 
     # mirror-camera pods on the A pillars, grab handles and access panels on the cab sides
@@ -1538,7 +1564,7 @@ def build_rover():
     _rover_tanks(root)
     _rover_antennas(root)
     _rover_details(root)
-    anchor('seat', root, (0.40, -1.42, CAB_FLOOR + 0.54))
+    anchor('seat', root, (0.0, -1.42, CAB_FLOOR + 0.54))
     anchor('door', root, door)
     anchor('cargo', root, (0, 0.85, 2.165))
     anchor('col_body', root, (0, 0, 0), radius=2.6)

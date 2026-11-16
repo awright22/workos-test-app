@@ -37,18 +37,20 @@ const seat = async (G, hour, yaw = 0.6) => {
 const look = (G, yaw, pitch) => { G.roverF.seatYaw = yaw; G.roverF.seatPitch = pitch; G.roverF.camIdle = 0; G.tick(1 / 30, 3); };
 const SHOTS = [
   ['day-parked', 'parked on a plain at three in the afternoon, looking ahead', async (G) => { await G.seat(15); }],
-  ['day-left', 'the same, the head turned to the left', async (G) => { G.lookSeat(1.15, -0.14); }],
-  ['day-right', 'the same, the head turned to the right, across the other seat', async (G) => { G.lookSeat(-1.15, -0.14); }],
-  ['day-dash', 'the same, looking down at the dashboard and the wheel', async (G) => { G.lookSeat(0, -0.6); }],
-  ['day-up', 'the same, looking up through the brow pane', async (G) => { G.lookSeat(0.3, 0.55); }],
-  ['day-drive', 'at speed by day', async (G) => { G.lookSeat(0, -0.14); G.input.keys.w = true; G.tick(1 / 30, 120); await G.settle(); G.tick(1 / 30, 4); }],
+  ['day-left', 'the same, the head turned to the left', async (G) => { G.lookSeat(1.15, -0.2); }],
+  ['day-right', 'the same, the head turned to the right', async (G) => { G.lookSeat(-1.15, -0.2); }],
+  ['day-back-left', 'the same, turned as far as it goes to the left: the desk, the locker, the bulkhead behind', async (G) => { G.lookSeat(2.25, -0.3); }],
+  ['day-back-right', 'the same, as far as it goes to the right', async (G) => { G.lookSeat(-2.25, -0.3); }],
+  ['day-dash', 'the same, looking down at the dashboard and the wheel', async (G) => { G.lookSeat(0, -0.62); }],
+  ['day-up', 'the same, looking up: the header, the roof console, the brow pane', async (G) => { G.lookSeat(0, 0.6); }],
+  ['day-drive', 'at speed by day', async (G) => { G.lookSeat(0, -0.2); G.input.keys.w = true; G.tick(1 / 30, 120); await G.settle(); G.tick(1 / 30, 4); }],
   ['day-turn', 'at speed, turning', async (G) => { G.input.keys.a = true; G.tick(1 / 30, 30); await G.settle(); G.tick(1 / 30, 3); G.input.keys.a = false; }],
   ['behind-day', 'the view from behind it, the same moment', async (G) => { G.S.cockpit = false; G.tick(1 / 30, 60); await G.settle(); G.tick(1 / 30, 4); G.input.keys.w = false; }],
   ['low-sun', 'driving toward a low sun', async (G) => { await G.seat(17.6, -1.45); }],
   ['storm', 'parked in a dust storm at noon', async (G) => { await G.seat(12); G.setStorm(1); G.S.storm.i = 1; G.tick(1 / 30, 60); await G.settle(); }],
   ['night-parked', 'parked at one in the morning', async (G) => { G.setStorm(0); G.S.storm.i = 0; await G.seat(1); }],
   ['night-dash', 'the same, looking down at the dashboard', async (G) => { G.lookSeat(0, -0.6); }],
-  ['night-drive', 'at speed at one in the morning', async (G) => { G.lookSeat(0, -0.14); G.input.keys.w = true; G.tick(1 / 30, 120); await G.settle(); G.tick(1 / 30, 4); }],
+  ['night-drive', 'at speed at one in the morning', async (G) => { G.lookSeat(0, -0.2); G.input.keys.w = true; G.tick(1 / 30, 120); await G.settle(); G.tick(1 / 30, 4); }],
   ['chase', 'the view from behind it again, the same moment', async (G) => { G.S.cockpit = false; G.tick(1 / 30, 60); await G.settle(); G.tick(1 / 30, 4); }],
 ];
 await page.evaluate(`window.__MG.seat = (hour, yaw) => (${seat.toString()})(window.__MG, hour, yaw); window.__MG.lookSeat = (yaw, pitch) => (${look.toString()})(window.__MG, yaw, pitch);`);

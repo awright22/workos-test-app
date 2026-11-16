@@ -65,56 +65,75 @@ let _dash = null;
 function dashTexture() {
   if (_dash) return _dash.tex;
   const c = document.createElement('canvas');
-  c.width = 512; c.height = 256;
+  c.width = 768; c.height = 240;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   _dash = { c, g: c.getContext('2d'), tex, key: '' };
-  drawDash({ kmh: 0, power: 1, o2: 1, heading: 0, gear: 'P' });
+  drawDash({ kmh: 0, power: 1, o2: 1, heading: 0, gear: 'P', to: null });
   return tex;
 }
 const COMPASS_PTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-/** @param {{ kmh: number, power: number, o2: number, heading: number, gear: string }} d  power and o2 as shares, heading in degrees */
+/**
+ * @param {{ kmh: number, power: number, o2: number, heading: number, gear: string, to: null | { dist: string, bearing: number, here: boolean } }} d
+ *   power and o2 as shares; heading in degrees; `to`: the task in hand, how far it is and where it lies off the nose (degrees, right positive)
+ */
 export function drawDash(d) {
   if (!_dash) return;
   const kmh = Math.round(d.kmh), pw = Math.round(d.power * 100), o2 = Math.round(d.o2 * 100), hd = ((Math.round(d.heading) % 360) + 360) % 360;
-  const key = `${kmh}|${pw}|${o2}|${Math.round(hd / 2)}|${d.gear}`;
+  const to = d.to, brg = to ? Math.round(to.bearing / 3) * 3 : 0;
+  const key = `${kmh}|${pw}|${o2}|${Math.round(hd / 2)}|${d.gear}|${to ? to.dist + brg + to.here : ''}`;
   if (key === _dash.key) return;
   _dash.key = key;
-  const g = _dash.g, W = 512, H = 256, ink = '#c9f4ff', dim = '#5fb4cc', rule = '#1d5068', warm = '#ffb45a', bad = '#ff6a4a';
+  const g = _dash.g, W = 768, H = 240, ink = '#c9f4ff', dim = '#5fb4cc', rule = '#1d5068', warm = '#ffb45a', bad = '#ff6a4a';
   const cond = '"Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif';
   g.fillStyle = '#0b2a3c'; g.fillRect(0, 0, W, H);
   // the heading, along the top: a tape that slides, the figure in the middle of it
-  g.save(); g.beginPath(); g.rect(16, 10, W - 32, 44); g.clip();
+  g.save(); g.beginPath(); g.rect(16, 6, W - 32, 52); g.clip();
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (let deg = Math.floor((hd - 70) / 15) * 15; deg <= hd + 70; deg += 15) {
-    const x = W / 2 + (deg - hd) * 3.4, m = ((deg % 360) + 360) % 360;
-    g.fillStyle = rule; g.fillRect(x - 1, 40, 2, m % 45 === 0 ? 14 : 8);
-    if (m % 45 === 0 && Math.abs(deg - hd) > 14) { g.fillStyle = m === 0 ? warm : dim; g.font = `600 26px ${cond}`; g.fillText(COMPASS_PTS[m / 45], x, 25); }
+  for (let deg = Math.floor((hd - 100) / 15) * 15; deg <= hd + 100; deg += 15) {
+    const x = W / 2 + (deg - hd) * 3.6, m = ((deg % 360) + 360) % 360;
+    g.fillStyle = rule; g.fillRect(x - 1, 44, 2, m % 45 === 0 ? 14 : 8);
+    if (m % 45 === 0 && Math.abs(deg - hd) > 17) { g.fillStyle = m === 0 ? warm : dim; g.font = `600 30px ${cond}`; g.fillText(COMPASS_PTS[m / 45], x, 26); }
   }
   g.restore();
-  g.fillStyle = '#0b2a3c'; g.fillRect(W / 2 - 44, 8, 88, 40);
-  g.strokeStyle = dim; g.lineWidth = 2; g.strokeRect(W / 2 - 42, 10, 84, 36);
-  g.fillStyle = ink; g.font = `600 30px ${cond}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(String(hd).padStart(3, '0') + '\u00b0', W / 2, 29);
-  g.fillStyle = rule; g.fillRect(16, 58, W - 32, 2);
+  g.fillStyle = '#0b2a3c'; g.fillRect(W / 2 - 58, 4, 116, 52);
+  g.strokeStyle = dim; g.lineWidth = 2; g.strokeRect(W / 2 - 56, 6, 112, 46);
+  g.fillStyle = ink; g.font = `600 42px ${cond}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(hd).padStart(3, '0') + '°', W / 2, 31);
+  g.fillStyle = rule; g.fillRect(16, 62, W - 32, 2);
   // the speed, large: what the display is for
+  // (Everything that matters stands in the upper four fifths: the wheel's horns and his gloves are in front of the foot.)
   g.fillStyle = ink; g.textAlign = 'right'; g.textBaseline = 'alphabetic';
-  g.font = `600 150px ${cond}`; g.fillText(String(kmh), 232, 204);
-  g.fillStyle = dim; g.font = `600 30px ${cond}`; g.textAlign = 'left'; g.fillText('KM/H', 244, 204);
+  g.font = `600 150px ${cond}`; g.fillText(String(kmh), 228, 192);
+  g.fillStyle = dim; g.font = `600 26px ${cond}`; g.textAlign = 'left'; g.fillText('KM/H', 242, 192);
   // which way it is set to go
-  g.font = `600 44px ${cond}`; g.fillStyle = d.gear === 'R' ? warm : ink; g.fillText(d.gear, 246, 130);
-  g.strokeStyle = rule; g.lineWidth = 2; g.strokeRect(238, 90, 44, 50);
+  g.font = `600 50px ${cond}`; g.fillStyle = d.gear === 'R' ? warm : ink; g.textAlign = 'center'; g.fillText(d.gear, 268, 132);
+  g.strokeStyle = rule; g.lineWidth = 2; g.strokeRect(242, 86, 52, 58);
+  g.fillStyle = rule; g.fillRect(318, 76, 2, 128);
   // the battery and the cab's air
   const bar = (y, label, v, pct) => {
     const low = pct <= 25, col = pct <= 10 ? bad : low ? warm : ink;
-    g.fillStyle = dim; g.font = `600 26px ${cond}`; g.textAlign = 'left'; g.fillText(label, 336, y);
-    g.fillStyle = col; g.textAlign = 'right'; g.font = `600 34px ${cond}`; g.fillText(String(pct), 496, y);
-    g.fillStyle = rule; g.fillRect(336, y + 10, 160, 14);
-    g.fillStyle = col; g.fillRect(336, y + 10, 160 * Math.max(0, Math.min(1, v)), 14);
+    g.fillStyle = dim; g.font = `600 28px ${cond}`; g.textAlign = 'left'; g.fillText(label, 338, y);
+    g.fillStyle = col; g.textAlign = 'right'; g.font = `600 46px ${cond}`; g.fillText(String(pct), 536, y + 4);
+    g.fillStyle = rule; g.fillRect(338, y + 12, 198, 12);
+    g.fillStyle = col; g.fillRect(338, y + 12, 198 * Math.max(0, Math.min(1, v)), 12);
   };
-  bar(108, 'POWER', d.power, pw);
-  bar(184, 'AIR', d.o2, o2);
-  g.fillStyle = rule; g.fillRect(316, 76, 2, 150);
+  bar(110, 'POWER', d.power, pw);
+  bar(170, 'AIR', d.o2, o2);
+  g.fillStyle = rule; g.fillRect(556, 76, 2, 128);
+  // the task in hand: how far, and where it lies off the nose
+  g.textAlign = 'left'; g.fillStyle = dim; g.font = `600 28px ${cond}`; g.fillText(to ? 'TO GO' : 'NO FIX', 576, 106);
+  if (to) {
+    g.fillStyle = warm; g.font = `600 58px ${cond}`; g.fillText(to.here ? 'HERE' : to.dist.toUpperCase(), 576, 164);
+    const cx = 716, cy = 184, r = 26, a = brg * Math.PI / 180;
+    g.strokeStyle = rule; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
+    g.fillStyle = rule; g.fillRect(cx - 1.5, cy - r - 8, 3, 10);
+    if (!to.here) {
+      g.save(); g.translate(cx, cy); g.rotate(a);
+      g.fillStyle = warm; g.beginPath(); g.moveTo(0, -r + 3); g.lineTo(12, 13); g.lineTo(0, 6); g.lineTo(-12, 13); g.closePath(); g.fill();
+      g.restore();
+    }
+  }
   _dash.tex.needsUpdate = true;
 }
 
@@ -123,7 +142,7 @@ const _sp = new THREE.Vector3(), _sn = new THREE.Vector3(), _sm = new THREE.Matr
  * Texture coordinates for a mesh of flat screens (the models carry none). Each separate screen in the mesh is
  * laid on one of the four panels, the right way up and the right way round for whoever stands facing it.
  */
-function screenUVs(o, whole = false) {
+function screenUVs(o, own = false) {
   const geo = o.geometry, pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, n = pos.count;
   if (!nor) return;
   o.updateWorldMatrix(true, false);
@@ -176,7 +195,7 @@ function screenUVs(o, whole = false) {
       for (const i of list) {
         const a = P[i * 3] * ux + P[i * 3 + 2] * uz, b = P[i * 3] * vx + P[i * 3 + 1] * vy + P[i * 3 + 2] * vz;
         // (a screen with a picture of its own, the rover's driving display, has the whole of it)
-        if (whole) { uv[i * 2] = (a - u0) / du; uv[i * 2 + 1] = (b - v0) / dv; continue; }
+        if (own) { uv[i * 2] = (a - u0) / du; uv[i * 2 + 1] = (b - v0) / dv; continue; }
         uv[i * 2] = ((tile & 1) + 0.03 + 0.94 * (a - u0) / du) / 2;
         uv[i * 2 + 1] = (1 - (tile >> 1) + 0.03 + 0.94 * (b - v0) / dv) / 2;
       }
@@ -385,7 +404,14 @@ function setUpPlain(plain, ground) {
       // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-        if (vPbr.z < -0.5) reflectedLight.indirectDiffuse += uCabin.rgb * diffuseColor.rgb;
+        if (vPbr.z < -0.5) {
+          // (the cab's lamp is in its roof over the windscreen, and its light falls off: laid on evenly, every wall was
+          //  one flat tone with no source to it)
+          vec3 toLamp = vec3(0.0, 2.62, 1.6) - vObjPos;
+          float lampD2 = dot(toLamp, toLamp);
+          float lamp = (0.3 + 0.7 * max(dot(normalize(vObjN), toLamp * inversesqrt(max(lampD2, 0.0001))), 0.0)) * 2.6 / (1.0 + 1.1 * lampD2);
+          reflectedLight.indirectDiffuse += uCabin.rgb * diffuseColor.rgb * lamp;
+        }
         #if NUM_DIR_LIGHTS > 0
         {
           vec3 rimV = normalize(vViewPosition);
@@ -400,7 +426,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust18' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust19' + (ground ? 'G' : '');
   return plain;
 }
 
@@ -606,20 +632,48 @@ function prepare(gltf, name) {
         const cab = pane === PANES.rover;
         m.onBeforeCompile = (sh) => {
           if (cab) {
-            sh.uniforms.uPaneView = paneView;
-            // From the seat the windscreen is most of the picture, and looked through squarely there is nothing on it
-            // to draw: those pixels leave at once, before any of the lighting is worked out. (A pane is a whole
-            // surface's worth of shading laid over the picture; on a phone that is paid for at every pixel.)
-            sh.fragmentShader = 'uniform float uPaneView;\n' + sh.fragmentShader.replace('void main() {', `float paneVeil() {
-                float glance = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 3.0);
-                float veil = 0.3 * glance - 0.02;
-                #if NUM_DIR_LIGHTS > 0
-                  veil += 0.2 * pow(max(dot(-normalize(vViewPosition), directionalLights[0].direction), 0.0), 5.0);
-                #endif
-                return veil;
+            // From the driver's seat a pane is what he sees Mars through, and it is most of the picture. It is drawn by
+            // a few lines of its own and none of the lighting (a whole surface's worth of shading laid over the picture
+            // is paid for at every pixel of a phone's screen): what a driver sees of glass is the dust on it. A film of
+            // it lies on every pane, lit as the ground is lit; the windscreen's two wipers have swept it clean where
+            // they reach, and left a line of it at the end of their stroke; looked along, a pane thickens; and toward
+            // the sun the dust glows. Where there is nothing on the glass the pixel leaves at once.
+            // (The wipers: tools/assets/vehicles.py, two pivots on the sill, blades from 0.22 to 0.70 m, parked to the
+            //  left. The windscreen's own frame: its origin at the middle of its foot, u across, v up the glass.)
+            Object.assign(sh.uniforms, { uPaneView: paneView, uGroundLit: mirrorUniforms.uGroundLit, uSkyHor: mirrorUniforms.uSkyHor });
+            sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPaneP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaneP = position;');
+            sh.fragmentShader = 'uniform float uPaneView; uniform vec3 uGroundLit; uniform vec3 uSkyHor; varying vec3 vPaneP;\n' + sh.fragmentShader.replace('void main() {', `
+              float paneWiped(vec2 q, float px) {
+                vec2 d = q - vec2(px, 0.035);
+                float r = length(d);
+                float reach = smoothstep(0.205, 0.235, r) * (1.0 - smoothstep(0.69, 0.715, r));
+                // (from lying to the left, up and over to ten degrees past upright)
+                float swept = smoothstep(-0.21, -0.15, dot(d / max(r, 0.001), vec2(-1.0, 0.0))) * step(-0.02, d.y);
+                return reach * swept;
               }
               void main() {
-                if (uPaneView > 0.5 && paneVeil() <= 0.0) discard;`);
+                if (uPaneView > 0.5) {
+                  vec3 rel = vPaneP - vec3(0.0, 1.58, 2.64);
+                  vec2 q = vec2(rel.x, dot(rel, vec3(0.0, 0.8786, -0.4775)));
+                  float film = 0.075;
+                  vec3 toEye = normalize(vViewPosition);
+                  if (abs(dot(rel, vec3(0.0, 0.4775, 0.8786))) < 0.04 && abs(q.x) < 0.62) {
+                    float clean = max(paneWiped(q, 0.50), paneWiped(q, 0.16));
+                    // (what the blades pushed ahead of them lies along the end of the stroke)
+                    float ridge = max(smoothstep(0.685, 0.705, length(q - vec2(0.50, 0.035))) * (1.0 - smoothstep(0.715, 0.74, length(q - vec2(0.50, 0.035)))),
+                                      smoothstep(0.685, 0.705, length(q - vec2(0.16, 0.035))) * (1.0 - smoothstep(0.715, 0.74, length(q - vec2(0.16, 0.035))))) * step(0.0, q.y);
+                    film = 0.17 * (1.0 - clean) * (0.86 + 0.14 * sin(q.x * 31.0 + q.y * 7.0) * sin(q.y * 23.0)) + 0.07 * ridge * (1.0 - clean);
+                  }
+                  float glance = pow(1.0 - abs(dot(normalize(vNormal), toEye)), 3.0);
+                  float glare = 0.0;
+                  #if NUM_DIR_LIGHTS > 0
+                    glare = pow(max(dot(-toEye, directionalLights[0].direction), 0.0), 5.0);
+                  #endif
+                  float veil = film + 0.3 * glance + 0.2 * glare * (0.35 + 4.0 * film);
+                  if (veil < 0.006) discard;
+                  gl_FragColor = vec4(mix(uGroundLit * 1.25, uSkyHor * 1.3, clamp(glare * 0.8 + glance * 0.5, 0.0, 1.0)), min(veil, 0.62));
+                  return;
+                }`);
           }
           sh.fragmentShader = sh.fragmentShader
             .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.07, vec3(0.5));')      // (and never bright enough to bloom: the dome's own lamp still starred a pane at night)
@@ -632,17 +686,10 @@ function prepare(gltf, name) {
                 #endif
                 outgoingLight += vec3(0.34, 0.24, 0.16) * filmLit * (${pane.film.toFixed(2)} + ${(1 - pane.film).toFixed(2)} * glance);
                 diffuseColor.a = mix(diffuseColor.a + 0.10, ${pane.top.toFixed(2)}, glance * 0.85);
-                ${cab ? `// From the driver's seat a pane is what he sees Mars through: nearly nothing looked through squarely, and its
-                // dust a thin veil that the sun lights, thicker where the pane is looked along.
-                if (uPaneView > 0.0) {
-                  // (thicker looked along, and toward the sun the dust on it glows: the glare of a windscreen driven into a low sun)
-                  float veil = max(paneVeil(), 0.0);
-                  outgoingLight = mix(outgoingLight, vec3(0.34, 0.24, 0.16) * filmLit * 1.6, uPaneView);
-                  diffuseColor.a = mix(diffuseColor.a, veil, uPaneView);
-                }` : ''} }
+                }
               #include <opaque_fragment>`);
         };
-        m.customProgramCacheKey = () => `glass8:${pane.film}:${pane.top}:${cab}`;
+        m.customProgramCacheKey = () => `glass9:${pane.film}:${pane.top}:${cab}`;
         o.castShadow = false;
       } else if (EMISSIVE.test(name)) {
         m.toneMapped = true;

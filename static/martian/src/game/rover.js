@@ -26,7 +26,7 @@ export const roverF = {
   camPos: new THREE.Vector3(), camInit: false, camYaw: 0, camPitch: 0, camIdle: 9,
   pitch: 0, roll: 0, pitchV: 0, rollV: 0, heave: 0, heaveV: 0,
   slope: 0, slip: 0, throttle: 0, touching: false, camLift: 0, camSee: 0, camRise: 0, leaving: false, accel: 0, lat: 0, camBlend: 1, camFromQ: null, camFromP: null,
-  camSeat: false, camSnap: false, seatYaw: 0, seatPitch: -0.14,      // the driver's own view: see seatCamera
+  camSeat: false, camSnap: false, seatYaw: 0, seatPitch: -0.2,      // the driver's own view: see seatCamera
   jolts: 0, hits: 0,                                 // rocks gone over and boulders run into, counted (tests read them)
 };
 /** The yoke turns about its column (tools/assets/vehicles.py: along (0, 0.85, 0.527) there, toward the driver), by no
@@ -288,6 +288,9 @@ export function roverLights(dt) {
   const cabin = dustUniforms.uCabin.value, lamp = driven && dim ? 1 : 0;
   RVL.cab = lerp(RVL.cab, lamp, damp(0.25, dt));
   cabin.set(0.078 * RVL.cab, 0.058 * RVL.cab, 0.04 * RVL.cab, 0.62);
+  // (and its screens are turned down after dark: at their day's strength they were the brightest thing in the night)
+  if (!rv.screens) { rv.screens = []; rv.cabin && rv.cabin.traverse((o) => { if (o.isMesh && o.material && /^screen/.test(o.material.name || '') && !rv.screens.includes(o.material)) rv.screens.push(o.material); }); }
+  for (const m of rv.screens) m.emissiveIntensity = (m.userData.baseEmissive || 1) * lerp(1, 0.5, clamp(World.dark || 0, 0, 1));
 }
 const RVL = { cab: 0 };
 
@@ -427,7 +430,7 @@ export function updateRover(dt) {
  * a man in a seat can turn it; under way, and left alone, he looks where he is going again. Parked, the look stays
  * where it was put: he is looking at something.
  */
-const SEAT_EYE = [0.015, 0.716, 0.077], SEAT_REST = -0.14, SEAT_T = 0.55;
+const SEAT_EYE = [0.015, 0.716, 0.077], SEAT_REST = -0.2, SEAT_T = 0.55;
 const _seatP = new THREE.Vector3(), _seatQ = new THREE.Quaternion(), _halfTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 function seatCamera(dt) {
   const RV = roverF, rv = World.rover, c = ctx.engine.camera;
@@ -463,8 +466,10 @@ function seatCamera(dt) {
     S.shake = Math.max(0, S.shake - dt * 1.6);
     if (!input.reducedMotion) c.position.addScaledVector(_v1.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), S.shake * 0.05);
   }
-  // (a wider lens than from behind: a cab is a small room, and the dashboard and both corner panes belong in the picture)
-  c.fov = lerp(c.fov, Math.min(74, ctx.engine.baseFov + 12 + Math.abs(RV.speed) * 0.1), damp(0.3, dt));
+  // (a wider lens than from behind: a cab is a small room, and the dashboard and both corner panes belong in the picture.
+  //  And it rests looking eleven degrees down: at eight, with a narrower lens, a phone's picture cut the display in half
+  //  and showed nothing of the wheel.)
+  c.fov = lerp(c.fov, Math.min(76, ctx.engine.baseFov + 15 + Math.abs(RV.speed) * 0.1), damp(0.3, dt));
   c.updateProjectionMatrix();
 }
 

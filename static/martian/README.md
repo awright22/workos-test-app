@@ -71,7 +71,7 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
   ground. He wears his helmet outside and takes it off wherever there is air.
 - **The driver's seat**: the rover can be driven from inside its cab. The picture is taken from
   his eyes: the wheel is in his hands and turns with the steering, the display behind it shows
-  the real speed, heading, power and air, and Mars goes by in the glass. Drag to look round the
+  the real speed, heading, power and air and how far the task in hand is, and Mars goes by in the glass. Drag to look round the
   cab; under way the look comes back to the road. Which view the rover is driven from is remembered.
 - **Making things**: scrap and circuits from salvage become oxygen candles, a folding solar
   array, a greenhouse dome you can farm in anywhere, navigation beacons, oxygen caches and ten
