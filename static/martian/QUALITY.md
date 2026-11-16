@@ -1900,6 +1900,124 @@ secondary text raised from 10 to 11 pt, and banners that say what to do with RUN
 to MET." (3) "HUD and card discipline: the task card always collapses, one HUD variant, the top-centre stack and cab
 view cleared, and the Base tab cards rebuilt around a short 'needs' line."
 
+### The picture review (one fresh reviewer; iPhone size; 121 pictures, all opened)
+
+Given: the 72 stills of `tests/shots.mjs --phone` (844 x 390 at twice the pixels, the interface hidden), the launch's
+17 stills in order (`tests/film.mjs --phone`), 9 of getting about after dark and the horizon (`tests/night-shots.mjs`),
+13 from the rover's seat (`tests/cockpit-shots.mjs`) and 10 of Base mode's buildings and deposits (from
+`tests/base-walk.mjs`, with the interface on); the bar; how the art is made. Not given: any earlier review, finding
+or verdict. Rendered in software on the preset a phone starts on.
+
+Its yardsticks: Journey ("sand, sky gradients and a lone figure lit as part of the scene"), Sky: Children of the
+Light ("what premium mobile lighting, atmosphere and weather look like on a phone"), Astroneer ("a small-studio
+space survival game with a cohesive material language").
+
+**Overall: NOT MET.** "The best twenty pictures would pass as a high-end indie release. The set as a whole would
+not: three areas fail outright, and one of them is the ending."
+
+| Area | Verdict | What decided it |
+| --- | --- | --- |
+| Day | NEARLY | Reads as Mars at a glance with real depth (`walk-plain`, `beacon`, `hab-morning`, `canyon-floor`). Held back by "a sky that is one flat mustard wash" and flat noon ground (`hab-noon`, `lander-viking-1`, `pile`) |
+| Dawn and dusk | NEARLY | `twilight` and `dawn-light` good. `dawn` and `dusk` grey-mauve with a pin-point sun and a front-lit astronaut; `cab/low-sun` shows neither a low sun nor any colour |
+| Night | NEARLY | Stars, silhouettes and lamp pools work (`greenhouse-night`, `rover-night`, `night-slope`, `cab/night-drive`). `hab-night` and the works at night are floodlit; pale rocks blow out in the lamp |
+| Dust storm | **NOT MET** | "A banded overlay, not weather" (`storm-sun`, `cab/storm`, two Base pictures). `storm` (the Hab's silhouette with its green beacon) the nearest |
+| Poles and ice | **NOT MET** | `ice-face`, `ice`, `ice-plain`, `north-pole`, `south-pole`, and a striping artefact in `pole-90` |
+| Orbit | NEARLY | The title **MET** ("real globe, thin rim"). The launch's orbit not: a blurred surface and a thick yellow glow band |
+| The launch | **NOT MET** | Lift-off has spectacle and the Hermes reads as a ship. The climb, the scale in orbit, the rescue's staging and the last shot fail. "The climax is the weakest sequence in the set" |
+| Landmarks | NEARLY | Valles Marineris **MET** at distance, failing up close (`canyon-wall`, `canyon-gully`). Olympus Mons NOT MET (`olympus-flows`, `olympus-caldera`) |
+| Terrain and rocks | NEARLY | Ripples, haze and cracked ground good. A uniform stipple of pits, evenly sprinkled pebbles of one size, blurry boulders |
+| Models | NEARLY | "Purpose-built and recognisable throughout". "Every surface is the same matte paint: foil, glass and metal do not separate" |
+| The astronaut | NEARLY | A believable suit from three sides. Not lit as part of the scene at a low sun, a blob of a shadow at a high one, a stiff pose, a low-poly head with the helmet off |
+| Interiors | NEARLY | The Hab "at the standard"; the cab's dashboard "at the standard"; the cab's sides, back and ceiling "greybox" |
+| Base mode | NEARLY | Kiln, vault, furnace and pad match the story's props. The deposits are weak |
+| Overall | **NOT MET** | |
+
+Already at the standard, by its account: the rover's outside, the Hab outside and in, the greenhouse at night, the
+cab's dashboard, the title's globe, Valles Marineris at distance, the ripples under a low sun, the lamp-lit night on
+the open plain, and that all eleven landers can be told at sight. Its five best: `greenhouse-night` ("the one
+picture a player would screenshot"), `canyon-floor`, `beacon`, `hab-morning`, `mav`. Its five worst: the launch at
+18.4 and 20.2 seconds ("a toy ship over a blurry ball, at the climax"), `cab/day-back-left` ("placeholder"),
+`olympus-flows` ("clay mounds, not a volcano"), `ice-face`, `cab/storm` ("brown bands on a window; a filter").
+
+The findings, in the reviewer's order (most damaging first). FIX, EFFORT and IMPACT are the reviewer's. "Mine" is my
+own note from knowing the code and what has been tried; it is not the reviewer's and not a decision.
+
+| # | Finding | Fix | Effort | Impact | Mine |
+| --- | --- | --- | --- | --- | --- |
+| A1 | **The launch's climb and orbit: the scale collapses.** Looking down at 09.4 the ground is a tan smear with the close-range pits showing as giant holes; at 18.4 and 20.2 the plume seems to strike the surface with a dust ring, "a toy over a small blurry ball" | CODE: a sharper surface for the launch's region, the dust ring cut and the plume shortened with height, a longer lens, a thinner glow at the limb | medium | high | The middle of the climb has been open since the eleventh picture review; the film has had three passes at the lower bar |
+| A2 | **The rescue's staging:** the rescuer "a stiff arms-out doll", the player cropped off the right edge, two thirds of the frame empty black; octagonal ports and smeared dirt on the MAV's nose, the two figures passing through each other; the last shot underlit grey on black with no planet and no rim light | CODE (part): framing, the planet in shot, rim light, rounder ports, collision. SOURCED ART: hand-keyed or motion-captured EVA animation | medium | high | |
+| A3 | **The storm is a screen overlay:** hard-edged horizontal bands at the same contrast over the near astronaut and the far rover; the sun a pin-point with a halo; the white airlock crisp; nothing streaming past the cab's glass | CODE: dust by distance, streaks in the world and a sheet of blowing sand on the ground, the sun dimmed to a disc, grit on the windscreen | medium | high | Larger than medium here, I think: the veil is laid over the finished picture and knows no depth. Dust by distance needs the scene's depth in the last pass, which this engine does not keep; on a phone that has a cost that would have to be measured. Sand sheets in the world are within reach |
+| A4 | **One material for everything:** gold foil is flat yellow facets, the greenhouse's glass invisible, solar panels flat navy, the dish's inside rust-brown, landers with no dust or wear | CODE (part): roughness and metalness by material, a small procedural reflection map, fresnel on glass, dust on what faces up, wear at edges from the baked occlusion. SOURCED ART: scanned detail normals (foil crinkle, weave, brushed metal) and decals | large | high | The models carry no texture coordinates; detail laid on by position (as the dust is) is within the pipeline, and scanned detail normals could be laid on the same way without re-making a model |
+| A5 | **A flat daytime sky:** "one mustard tone from horizon to zenith": no brightening toward the sun, no lighter band at the horizon, no high wisps of dust. `mav` has a gradient with wisps "and shows what the rest lack" | CODE | small | high | |
+| A6 | **Ground and rock monotony:** a uniform stipple of dark pits everywhere; pebbles of one size and one tone, evenly sprinkled; one ripple pattern across a whole plain; plains that end in a ruler-straight horizon with no middle distance | CODE (part): rock sizes on a natural distribution and in clusters, patches of bedrock, gravel and drift, variation of tone. SOURCED ART: scanned ground textures for the view at his feet | medium | high | The ruled horizon was recorded as plateaued after two attempts at the lower bar |
+| A7 | **Ice does not look like ice:** the blocks "low-poly blue crystals with white edge lines, a stylised look from a different game"; ground ice hard-edged blue blobs or white "cow spots"; the north pole white plates like cracked plaster; no sheen, no depth. A corduroy striping in `pole-90` (a bug) | CODE (part): sheen, a blue tint with depth, wind-carved ridges, the striping fixed. SOURCED ART: sculpted ice meshes, scanned ice and snow normals | medium | medium | The ice has had three passes and stayed the weakest environment at the lower bar. The code-only part may be smaller than it looks |
+| A8 | **The astronaut is not lit by the scene:** with the sun behind him his back is evenly lit, "pasted on"; no shadow at all in `night/dusk-plain`; flat grey at night; at a high sun a lumpy scalloped blob for a shadow; the idle pose "a symmetric near-A-pose" from behind | CODE (part): less fill and a rim light at a low sun, a sharper shadow round the player. SOURCED ART: a hand-keyed idle and walk | medium | high | His shadow's shape was looked into before (a tighter cascade and a smaller blur changed next to nothing). The missing shadow in `dusk-plain` is new and is a bug to find |
+| A9 | **Dawn and dusk lack colour:** the sun a pin-point, the glow a pale grey-white dome and not blue, the ground taking no warm light; `dawn-light` has the best long shadows in the set under a blank beige sky with no sun; in `cab/low-sun` the sun sits high in the windscreen | CODE | small | high | `cab/low-sun` is photographed at 17:36 local: the picture's hour is the tool's, not the game's |
+| A10 | **The rover's cab away from its dashboard:** "untextured flat brown boxes with one orange stripe", facets on the seat and on his shoulders, a plain brown fender outside, ceiling lamps that light nothing, pillars flat brown slabs | CODE: scripted upholstery, panels, switches, labelled stowage; lamps that cast | medium | medium | |
+| A11 | **Canyon walls up close:** one cracked-mud pattern at one scale over the whole face, overriding the strata: "elephant hide or dried clay" | CODE (part): jointing along the strata at several scales, ledges, scree at the foot. SOURCED ART: scanned cliff textures or sculpted cliff meshes | medium | medium | |
+| A12 | **Olympus Mons:** the flows "lumpy clay mounds" under the same cracked-mud bump, boulders perched on ridge tops; the caldera murky, a blotchy floor, a smeared dark wall, "a medium crater" | CODE: lobed flows with raised edges, basalt colour, terraced caldera walls, clearer air at altitude | medium | medium | |
+| A13 | **Night floodlighting and blow-out:** the Hab's dome and airlock front near white; the smelter's cone uniformly bright orange; pale rocks in the lamp's pool clipped to white; a distant lander glowing outside any beam; the helmet's pool a circle that lights behind him; the rover's rear lit as if from the camera. "Mostly tuning bugs" | CODE | small | medium | The rover's rear is lit on purpose (its wide lamps stand behind and above it for the camera behind); whether that reads is the finding |
+| A14 | **Lift-off effects:** a translucent teardrop shell with a visible outline round the tower under the flame (a bug); the smoke trail a hard-edged cream ribbon "that reads as a 2D strip"; the flame throws no light on the dunes | CODE | medium | medium | |
+| A15 | **Boulders and outcrops:** large boulders carry a blurry low-resolution surface, a fine hatch on one's top; background outcrops blocky faceted slabs | CODE (part): detail projected at close range, more broken silhouettes. SOURCED ART: scanned rock meshes, "the real step up" | medium | medium | |
+| A16 | **Two art styles:** flat-shaded diamond leaves and a low-poly head against a semi-realistic outside; the Hab's portholes show a flat painted Mars | CODE (part): denser, shaded foliage and a real view through the portholes. SOURCED ART: a sculpted head, authored plants | medium | medium | |
+| A17 | **Small artefacts (bugs):** a ladder-like outline on the ground by the rover's rear and its wheel dust a dark smudge (`rover-drive`); a scribbled dark patch (`rtg`); a hard polygonal edge on the headlamp's patch (`rover-night`); moire stripes (`cab/day-dash`); a blotchy lit strip across the ground (`base/33`); shadowless pale pebbles and a scorch merging with his shadow (`lander-schiaparelli-edm`); a petal hovering over its shadow (`lander-beagle-2`); a hard vertical edge on the far wall (`canyon-rim`, "possible") | CODE | small each | medium together | |
+| A18 | **Base mode's deposits and scale:** the basalt boulder the same brown as every rock; the hematite pavement barely visible; from above the base sparse and toy-scale on an empty plain | CODE | small | medium (for the mode) | |
+| A19 | **The dug heap:** "a smooth clay blob with no granular texture" | CODE | small | low | The heap's dug face was recorded as plateaued after two attempts |
+
+What would move it furthest, in its words: "first, restage the launch film (surface detail and scale on the climb,
+the smoke, the rescue framing and the last shot), because the ending is currently the weakest part of the game.
+Second, a sky and light pass (a real daytime gradient, colour at dawn and dusk, the astronaut lit by the scene, the
+night floodlighting fixed); it is mostly small tuning and it touches every frame. Third, a material and surface pass
+so that foil, glass, metal, fabric, rock and ground stop sharing one matte finish and one detail pattern; this is
+where code gets part of the way and scanned textures, sculpted rock and hand-keyed animation would supply the rest.
+The storm and the ice come next."
+
+### Both reviews together: what code alone can fix, by impact
+
+The reviewers' marks, put in one order: impact first, and within an impact the smaller effort first. "Part" means
+the reviewer said code gets part of the way and sourced art the rest.
+
+| Impact | Effort | | What |
+| --- | --- | --- | --- |
+| high | small | A5 | A daytime sky with a gradient, a brighter side toward the sun, a paler horizon |
+| high | small | A9 | Colour at dawn and dusk: the blue glow, warm light on the ground, a sun that is a disc |
+| high | small | I2 | One name for each thing |
+| high | small | I4 | The task card always puts itself away (to be checked in play first) |
+| high | medium | A1 | The launch's climb and orbit: surface, plume, lens, limb |
+| high | medium | A3 | The storm as weather (larger than medium by my reckoning) |
+| high | medium | I3 | Emergencies that say what to do, with RUN on the screen |
+| high | medium | I5 | The Base tab and the works' sheets |
+| high | medium | I6 | Secondary type raised from 10 to 11 pt |
+| high | medium, part | A2 | The rescue's staging: framing, the planet, light, ports, collision |
+| high | medium, part | A6 | Ground and rocks: sizes, clusters, patches, tone |
+| high | medium, part | A8 | The astronaut lit by the scene, and his shadow |
+| high | large, part | A4 | Materials that read as foil, glass, metal, paint; dust and wear |
+| high | large, part | I1 | Pictures on the sheets drawn from the game's own models; a glyph for each mineral |
+| medium | small | A13 | Night floodlighting and blown-out rocks |
+| medium | small | A17 | The eight small artefacts |
+| medium | small | A18 | Base mode's deposits |
+| medium | small | I8, I9, I10, I11, I13, I14, I16, I18, I19 | The pile-up of new things, the unexplained first hold, the target arrow, the top-centre stack, one HUD, settings, the map, the grey ring, small targets |
+| medium | medium | A10 | The cab's sides, back and ceiling |
+| medium | medium | A12 | Olympus Mons |
+| medium | medium | A14 | Lift-off: the shell round the tower, the smoke, light from the flame |
+| medium | medium | I7, I12, I17 | Lists that slice, the cab view and its dashboard, Base mode's "where" and feedback |
+| medium | medium, part | A7, A11, A15, A16, I15 | Ice, canyon walls up close, boulders, plants and the bare head, the ending and dawn sheets |
+| low | small | A19, I20 to I25, I27 | The heap; small wording and consistency |
+| low | medium | I26 | Photo mode |
+
+**What needs sourced art,** by the reviewers' account (no finding was marked as needing it alone; these are the parts
+code does not reach): hand-keyed or motion-captured animation for the rescue and for his idle and walk (A2, A8);
+scanned detail normals and decals for foil, fabric and metal (A4); scanned ground textures for the view at his feet
+(A6); sculpted or scanned rock, cliff and ice meshes and their surface scans (A7, A11, A15); a sculpted head and
+authored plants (A16); and for the interface a drawn icon family of about sixty, key art for the title, the ending,
+death and dawn, a licensed display face, and motion made in an animation tool (I1, I15).
+
+**What I would add, as mine and not the reviewers'.** Their effort marks are estimates made from pictures. Three of
+the code-fixable items have been tried before at the lower bar without getting past NEARLY, and may be worth less
+than their mark: the ice (three passes), his shadow's shape, and the ruled horizon. One is larger than its mark (the
+storm: see A3). The interface's list is the cheaper of the two: twenty-five of its twenty-seven findings are code
+alone, and eighteen of them small.
+
 ## Open items
 
 | # | Item | State |
