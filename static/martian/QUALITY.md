@@ -2176,12 +2176,12 @@ download and it is that game's hills the crew walk over. It is the book's evacua
 
 | Seconds | What is on the screen | What is said |
 | --- | --- | --- |
-| 0 to 5 | The Hab at dusk in the storm, thirty-five metres off: porch lamps, portholes, the beacon on its mast, the rover where it was left. Six suited figures come away from it past the lens, helmet lamps lit | LEWIS: "Wind's past the abort line. Everyone to the ascent vehicle." |
-| 5 to 10.5 | From behind the last of the six, the line going on into the brown. The Hab's dish comes out of the storm from upwind and takes him at 10.2 s | MARTINEZ: "The MAV's tipping, Commander. She won't stand much more of this." |
-| 10.5 to 15.2 | From where he will come to rest: he is flung, once over in the air, down on his knees, onto his face, and slides to the lens; his lamp flickers out. Far off the others' lamps stop, turn, look where he was, and go | JOHANSSEN: "Commander, I've lost Watney. His suit reads nothing." LEWIS: "Mark! Sound off!" MARTINEZ: "She's going over. We launch now or not at all." |
-| 15.9 to 21.3 | After a dip to black, the same place: the ascent vehicle on the skyline. It lights (the fire lights the dust, the ground and him) and climbs out of the top of the picture | LEWIS: "Launch." |
+| 0 to 5 | The Hab at dusk in the storm, thirty-five metres off: porch lamps, portholes, the beacon on its mast, the rover where it was left. Six suited figures come away from it past the lens, helmet lamps lit, and the lens goes a little way with them | LEWIS: "Wind's past the abort line. Everyone to the ascent vehicle." |
+| 5 to 9.9 | From behind the last of the six, closing on him: the line going on into the brown, and ahead of them on the skyline the ascent vehicle, leaning, its beacon flashing. The Hab's dish comes out of the storm from upwind and takes him at 9.3 s; the shot holds half a second as he goes out of the side of the picture | MARTINEZ: "Ascent vehicle's tipping, Commander. She won't stand much more of this." |
+| 9.9 to 14.8 | From where he will come to rest: he is flung, once over in the air, down on his knees, onto his face, and slides to the lens; his lamp flickers low. Far off the others' lamps stop, turn, look where he was, and go, toward the leaning rocket | JOHANSSEN (as he lands): "Commander! Watney's suit just went dead." LEWIS: "Mark! Sound off!" MARTINEZ: "She's going over. We launch now or not at all." |
+| 15.5 to 21.3 | After a dip to black, the same place, turned to the rocket: it lights (the fire lights the dust, the ground and him) and climbs out of the top of the picture | LEWIS: "Launch." |
 | 22.2 to 24.3 | Black, and a card: THE NEXT MORNING | |
-| then, the game | The picture comes up in under a second on him lying where the film left him. He lies a moment, pushes up onto his knees and stands (three seconds; sooner if the stick is pushed). The HUD is there, and the game's first line: "Suit holed: 46 on the gauge and falling" | |
+| then, the game | The picture comes up in under a second on him lying where the film left him, along the slope of the ground. He lies a moment, pushes up onto his knees and stands (three seconds; sooner if the stick is pushed). The HUD is there, and the game's first line: "Suit holed: 46 on the gauge and falling" | |
 
 **Decisions.**
 - *Silhouettes and lamps.* A storm is the weakest thing this game draws (round 11 and the premium audit both say
@@ -2200,7 +2200,11 @@ download and it is that game's hills the crew walk over. It is the book's evacua
 - *It waits for the ground.* The ground is built a tile at a time, and a game that has just begun has not got the
   tiles the first shot stands on. The film stays on its black until they are there (two seconds at most).
 - *No voices.* What the crew say is set at the foot of the picture, with who says it, a radio click before each
-  line, and a copy in the journal's log. The first line names the rocket in full before anyone calls it the MAV.
+  line, and a copy in the journal's log. Nobody says "MAV" (the game teaches that word later), and each line is
+  said over the picture it is about. A line of two sentences is two rows.
+- *With a mouse.* The game locks the mouse when play begins, and a locked mouse has no pointer to press Skip with.
+  A new game with the film takes the lock when the film is over. A browser that refuses it then, for want of a
+  click, gives it at the first click on the picture; until then the mouse looks by dragging.
 - *It changes nothing.* The hour and the weather are set for the film and put back; nothing is saved from inside
   it; its props are removed. Skip (a button, or Escape, Enter, Space) leaves it at any moment, to the same morning.
   A continued game does not play it, and `?nofilm` starts a new game without it (every test but its own does).
@@ -2218,6 +2222,46 @@ apart round the blow):
 | 2 | The veil's clearing was centred on his feet, not on him; the launch lit nothing where he lay; the game came up on him already on his feet, half a second after a film that left him on his face | The clearing follows the middle of him standing, flying and lying; the engine's light hangs over the pad and reaches him; the game's figure begins on the ground and gets up |
 | 3 | The lamps still covered the visors; the fallen man lay under the subtitle; the launch's glow was a flat disc with the rocket in front of it; the card had a box round it (it had taken the name of an existing style); the dish, in one frame, stood upright on its foot in the sand; worked through on paper, his somersault about his feet put his head a metre under the ground | Two small lamps at the sides of each helmet, where the suit has them; the body in the left third, clear of the words and of the notch; a glow that falls away from its middle; the card alone on the black; the dish end over end with its mast never upright, veering clear of the lens after the blow; he turns about the middle of his body, comes down on his knees and pitches onto his face |
 | 4 | His red pack marker hung in the air a metre and a half over him as he lay (it was fixed over his feet, not to his back); his second bounce was a metre high | The marker hangs on his chest; a lower second bounce |
+
+**The review** (one fresh reviewer, given 28 stills at 844 x 390 and the six-point bar below, not my reading of
+them; all 28 opened, 20 enlarged). The bar, each point MET, NEARLY or NOT MET against "a solid independent
+release": (1) the story is told to someone who has not read the book; (2) each shot reads at once on a phone;
+(3) nothing is broken; (4) it belongs to the game, and the join into play holds; (5) its words work (16 px, who
+speaks, not over the subject, Skip a thumb high and clear of the notch and the home bar); (6) length and pace.
+
+| Point | Grade | The reviewer's reason |
+| --- | --- | --- |
+| 1. The story is told | MET | every beat is there; "the search is carried by the two lines alone; the crew are 8-pixel lamp dots" |
+| 2. Each shot reads at once | NEARLY | after the cut "the man and dish are a speck about 40 px tall in haze"; the rocket "a faint sliver until the glow arrives" |
+| 3. Nothing is broken | NOT MET | findings 1, 2, 5 and 9 below |
+| 4. It belongs to the game | NEARLY | "The join holds: card, then the same white-and-orange man lying, kneeling ... standing." The best frames "are indie quality; shots 2 and 3 are flatter, and edges are jagged throughout" |
+| 5. Its words work | NEARLY | sizes and Skip are right; lines that do not match the picture; Skip's clearance could not be seen |
+| 6. Length and pace | NEARLY | "The strike is the fastest beat, and 05.6 to 09.4 is nearly one unchanging picture" |
+
+Asked whether a player who had never read the book would know why he is alone and what to do next: "Yes: he would
+know a storm forced the crew out, flying wreckage hit him, they believed him dead and launched without him, and
+that his suit is leaking and he must reach the airlock 74 m away."
+
+Its findings, worst first, and what each turned out to be:
+
+| # | The reviewer saw | What it was | What was done |
+| --- | --- | --- | --- |
+| 1 | bug: the fallen man "see-through below the backpack: fine horizontal stripes cross his helmet and legs, and his outline is speckled" | The storm's veil. Its clearing is shaped for a man on his feet and leaves a quarter of the veil even at its middle; its specks ignored the clearing altogether | The film says how wide and how complete the clearing is (1.7 times, complete) for a man lying close to the lens. The veil's specks keep off the hero, in the film and in play |
+| 2 | bug: he "hovers as a stiff plank: boots in the air, a small round shadow under one hand only", his arm cut by the foot of the picture | Measured in the running game (each joint's height over the ground): 5 to 32 cm, which is a suited man face down (ankles 22 cm, on his toes, as the clip has them). He was on the ground, with nothing under him to say so: there is no sun at that hour to cast a shadow | A patch of shade under every figure, and a long one under him as he comes down; the last shot's seat half a metre further back, so the arm is inside the picture; a quarter of his lamp is left on him, so that he is a lit suit and not a grey shape on brown sand. **The measurement found a real fault in the game, not the film:** its own figure lay level on sloping ground, one hand 11 cm in the sand and the other 37 cm over it. It now lies along the slope as it comes to, and turns upright as it stands |
+| 3 | polish: he "is a near-black silhouette, while the man in front is bright white"; dark at 10.7 and white at 11.0 | The lamps stood ahead of the men and the lens behind them | Each lamp a little behind its man, so that the backs the lens sees are lit; his light stays on the middle of him through the fall |
+| 4 | possible bug: Skip 8 px from the right edge, "inside the 47 px side strip" | The stills were taken without the phone's notch and home bar. The test has always measured Skip with them: 55 px in from the right, 35 px up from the foot | Nothing in the game. The stills script now draws the film with the phone's insets |
+| 5 | bug: at 14.6 "a large dark shape with a clean curved edge has entered the lower right" | The gap between two of the storm's nearest streamers, which are sharp-edged by design (they are what says "wind" in play). Over a still, dark picture the gap is a shape | The veil takes a new control, how many near streamers, and the film asks for three tenths of them |
+| 6 | polish: "The MAV's tipping" with no rocket in view; "She's going over" followed by "a rocket standing upright"; "MAV" never explained | all true | The rocket leans nine degrees downwind, is there from the first frame and flashes a beacon: ahead of them in shot 2, on the skyline behind the search in shot 3. Nobody says "MAV". Martinez's last line runs over the dip onto the leaning rocket |
+| 7 | polish: "The impact gets 0.3 s before the cut", and Johanssen speaks "while he is still a speck in the air" | true | The blow is held 0.6 s; her line starts as he lands |
+| 8 | polish: "stair-stepped edges beside crisp text" | The stills are one device pixel to the point. The owner's iPhone reported drawing at 0.64 of its three, about two to the point | Not changed |
+| 9 | minor bug: "a small flat pale disc hangs" in shot 1, "attached to nothing visible" | The lamp of a man hidden behind another. Lamps grew with distance, so a far one was a pale disc | Lamps grow half as fast with distance: far off they are points |
+| 10 | minor: a line over his boots; the dish face-on "a flat dark circle"; the lamp's pool behind his feet; the first of the crew "sliced by the right edge" | | Two-sentence lines are two rows, and narrower; the pool follows his middle; the lens goes with the crew and they start nearer the door. The dish face-on is as it was |
+
+On pace: the second shot is nine tenths of a second shorter and the lens closes on him through it.
+
+What the reviewer could not judge from stills: how anything moves, how long a line stays up, and every sound.
+Nobody has heard this film. Its sounds are the storm, a radio click before each line, the blow, the hiss of his suit
+from the blow on, and the engine; they are wired and their triggers tested, and that is all that can be said here.
 
 ## Open items
 
