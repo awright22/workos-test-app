@@ -80,7 +80,7 @@ let s = await ev(async (G) => {
 check('a boulder offers a rock sample and bags one', s.boulder && /rock sample/i.test(s.label || '') && s.afterRock === 1, s);
 check('the same place cannot be sampled twice', typeof s.again === 'string', s.again);
 // (once he has a sample case going, new ground offers a scoop of it: digging the open ground is offered only with a reason)
-check('new ground offers a soil sample, and digging it bags one', /soil sample/i.test(s.digLabel || '') && s.afterSoil === 2 && s.regolith >= 1, s);
+check('new ground offers a regolith sample, and digging it bags one', /regolith sample/i.test(s.digLabel || '') && s.afterSoil === 2 && s.regolith >= 1, s);
 
 s = await ev((G) => {
   const before = G.science.scienceSummary();
