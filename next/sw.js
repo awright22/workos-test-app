@@ -3,7 +3,7 @@
  * cache name; a new build installs in the background and takes over on the next launch.
  * (The page checks this too: index.html carries its build, and if the offline copy here is another
  * build's it drops it and loads again from the network. See the script in index.html.) */
-const CACHE = 'stranded2-44cd94cd7529';
+const CACHE = 'stranded2-bc87b2c6b4a9';
 // What the game cannot start without: all of it, or the install fails and is tried again.
 const SHELL = ["./","assets/fonts/barlow-condensed-latin-500-normal.woff2","assets/fonts/barlow-condensed-latin-600-normal.woff2","assets/fonts/barlow-latin-400-normal.woff2","assets/fonts/barlow-latin-500-normal.woff2","assets/fonts/barlow-latin-600-normal.woff2","assets/fonts/jetbrains-mono-latin-500-normal.woff2","game.css","game.js","icon-192.png","icon-512.png","manifest.webmanifest","terrain-worker.js"];
 // The rest (the planet's data, the models): fetched one by one, and one that does not arrive is fetched when the
