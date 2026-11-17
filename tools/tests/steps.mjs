@@ -9,6 +9,7 @@
 // footfall when a boot comes down (game/player.js), and the audio plays one step for each (audio/movement.js).
 // Both went wrong once without a test to say so: the sound kept a time of its own, three steps to his feet's two;
 // and the Walk clip was played as if its pace were 2.2, so that at a stroll, and all through the film, he skated.
+// A third thing is held here too: how high a boot comes through as he walks (the owner: "high stepping").
 import { openGame } from './lib.mjs';
 
 const g = await openGame({ width: 844, height: 390, touch: false, quality: 'low' });
@@ -41,7 +42,8 @@ const out = await g.eval(async (G) => {
     }
     const gaps = at.slice(1).map((t, i) => t - at[i]);
     res[label] = { clip: Object.keys(names).sort((a, b) => names[b] - names[a])[0], pace: +(sp / (secs * 60)).toFixed(2), steps: at.length, perSec: +(at.length / secs).toFixed(2),
-      gaps: gaps.length ? [+Math.min(...gaps).toFixed(2), +Math.max(...gaps).toFixed(2)] : [], overGround: low.length ? +Math.max(...low).toFixed(3) : -1, slide: slide(rec) };
+      gaps: gaps.length ? [+Math.min(...gaps).toFixed(2), +Math.max(...gaps).toFixed(2)] : [], overGround: low.length ? +Math.max(...low).toFixed(3) : -1, slide: slide(rec),
+      lift: +(Math.max(...rec.L.map((x) => x.h)) - Math.min(...rec.L.map((x) => x.h))).toFixed(3) };
   };
   go('stroll', () => { G.input.touch.joyY = -0.42; }, 6);
   go('walk', () => { G.input.keys.w = true; }, 6);
@@ -73,8 +75,9 @@ for (const k of ['stroll', 'walk', 'run']) {
   check(`at a ${k} (${r.pace} m/s, the ${r.clip} clip) a planted boot stays where it was put`, r.slide.planted >= 12 && r.slide.median < 1.2, r.slide);
   check(`... and a step is counted each time a boot comes down, at an even beat`, r.steps >= 5 && r.overGround >= 0 && r.overGround < 0.06 && r.gaps[1] / r.gaps[0] < 1.45, { steps: r.steps, perSec: r.perSec, gaps: r.gaps, overGround: r.overGround });
 }
-check('a stroll is walked and a walk is loped: two clips, each at its own pace', out.stroll.clip === 'Walk' && out.walk.clip === 'Run' && out.run.clip === 'Run' && out.stroll.pace < 4.4 && out.walk.pace > 4.5 && out.run.pace > 8, { stroll: [out.stroll.clip, out.stroll.pace], walk: [out.walk.clip, out.walk.pace], run: [out.run.clip, out.run.pace] });
-check('a run takes about twice the steps a walk does, and neither the three a second the old clock made at a walk', out.walk.perSec > 1.1 && out.walk.perSec < 1.8 && out.run.perSec > 2.2 && out.run.perSec < 3.2, { walk: out.walk.perSec, run: out.run.perSec });
+check('he walks with the Walk clip and runs with the Run clip, each at its own pace', out.stroll.clip === 'Walk' && out.walk.clip === 'Walk' && out.run.clip === 'Run' && out.stroll.pace < 4.4 && out.walk.pace > 4.5 && out.walk.pace < 5.6 && out.run.pace > 8, { stroll: [out.stroll.clip, out.stroll.pace], walk: [out.walk.clip, out.walk.pace], run: [out.run.clip, out.run.pace] });
+check('about two steps a second at a walk and nearer three at a run', out.walk.perSec > 1.7 && out.walk.perSec < 2.5 && out.run.perSec > 2.3 && out.run.perSec < 3.2, { walk: out.walk.perSec, run: out.run.perSec });
+check('walking, his boot comes through low: no more than a hand over where it stands (it was a third of a metre, and at a slowed run half a metre)', out.walk.lift > 0.05 && out.walk.lift < 0.2 && out.stroll.lift < 0.2, { walk: out.walk.lift, stroll: out.stroll.lift, run: out.run.lift });
 check('standing still, no step is counted', out.still.steps === 0 && out.still.clip === 'Idle', out.still);
 check('in the opening film the crew\'s planted boots stay where they were put (the first shot)', out.figures === 6 && out.filmFirst.pace > 2 && out.filmFirst.slide.planted >= 8 && out.filmFirst.slide.median < 1.2, out.filmFirst);
 check('... and his, on the walk to the ascent vehicle (the second shot)', out.filmLast.pace > 2 && out.filmLast.slide.planted >= 8 && out.filmLast.slide.median < 1.2, out.filmLast);

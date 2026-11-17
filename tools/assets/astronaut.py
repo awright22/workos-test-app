@@ -2298,8 +2298,11 @@ IDLE_SQUARE = _idle_square()     # metres to move the hips to stand square on bo
 WALK = dict(
     T=0.9, speed=5.1, duty=0.18, y_td=-0.27, hip_mid=0.886, bob=0.044, back=0.03, sway=0.012, lean=9.0,
     pelvis_yaw=9.0, chest_yaw=7.0, yaw_lag=0.02, list=2.0, pitch_osc=1.2, track=0.105, toe_out=4.0,
-    strike=-11.0, roll_on=0.22, heel_rise=0.50, toe_off=58.0, drop=0.30, retract=0.7, swing_out=0.01,
-    swing=lambda a0, a1: [(0.17, a0.y + 0.05, a0.z + 0.15, 52.0), (0.52, 0.14, 0.36, 24.0), (0.84, a1.y - 0.035, a1.z + 0.12, -16.0)],
+    strike=-11.0, roll_on=0.22, heel_rise=0.50, toe_off=56.0, drop=0.22, retract=0.7, swing_out=0.01,
+    # (The boot swings through low: its ankle a hand's breadth higher than it stands at, mid-swing. It used to come
+    #  through at 0.36 m with the heel kicked up to fifty degrees, and at the game's walking pace, which is this clip's,
+    #  the owner saw it: "Dude is also high stepping a bit when walking".)
+    swing=lambda a0, a1: [(0.17, a0.y - 0.03, a0.z + 0.10, 44.0), (0.52, 0.14, 0.225, 15.0), (0.84, a1.y - 0.02, a1.z + 0.08, -13.0)],
     arm_mid=4.0, arm_swing=27.0, elbow=30.0, elbow_swing=14.0, arm_out=12.5, arm_open=2.0, arm_twist=20.0, arm_lag=0.03, shrug=2.5,
     wrist=10.0, asym=0.07,
 )

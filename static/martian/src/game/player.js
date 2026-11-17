@@ -166,7 +166,8 @@ const AIR_SIGN = 1;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, blob: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
 const RUN_SPEED = 9.2;                         // the game's running pace, which the Run clip's stride is made for (he walks at 5.1)
-const WALK_PACE = 5.1, LOPE_FROM = 4.6;       // the pace the Walk clip's planted foot goes back at (measured: 5.11 m/s), and the pace from which he lopes
+const WALK_PACE = 5.1;                        // the pace the Walk clip's planted boot goes back at (measured: 5.11 m/s): the game's walking pace
+const RUN_FROM = 6.4, RUN_UNTIL = 5.9;        // he breaks into the Run clip going faster than this, and drops out of it going slower than that
 const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
 
 const _padA = new THREE.Vector3(), _padB = new THREE.Vector3();
@@ -463,14 +464,17 @@ export function updateAstronaut(dt) {
     anim.kneel = 0;                                      // off at once: he is already moving
     const hurt = S.health < 35 || S.suit < 6;
     if (hurt && player.speed < 4) { play('Stagger', 0.3); ts = clamp(player.speed / 2.4, 0.6, 1.3); }
-    // At the game's walking pace and over he lopes: the Run clip, played slowly, is the long floating step of a man
-    // in a third of a gravity. Below it he walks. Each clip is played at the pace that keeps its planted boot still on
-    // the ground: the Run clip's goes back under him at 9.2 m/s and the Walk clip's at 5.1 (both measured in the
-    // running game: tools/tests/steps.mjs holds them to it). The Walk clip was played for a long time as if its pace
-    // were 2.2: at a stroll his boots went back more than twice as fast as the ground did, and he skated. And below
-    // 4.6 the Run clip was held at half speed, which is 4.6: from there down he walks.
-    else if (player.speed > LOPE_FROM) { play('Run', 0.25); ts = clamp(player.speed / RUN_SPEED, 0.5, 1.25); }
-    else { play('Walk', 0.22); ts = clamp(player.speed / WALK_PACE, 0.3, 1.0); }
+    // He walks with the Walk clip and runs with the Run clip, each played at the pace that keeps its planted boot
+    // still on the ground: the Walk clip's goes back under him at 5.1 m/s, which is the game's walking pace, and the
+    // Run clip's at 9.2, its running pace (both measured in the running game: tools/tests/steps.mjs holds them to
+    // it). Two things were wrong here for a long time, and the owner saw both. The Walk clip was played as if its
+    // pace were 2.2, so at a stroll his boots went back more than twice as fast as the ground, and he skated. And
+    // at the walking pace he was given the Run clip at half speed, "the long floating step of a man in a third of a
+    // gravity": its boots come through half a metre up, and slowed down that is a man stepping over things. ("Dude
+    // is also high stepping a bit when walking.") The Walk clip's own swing has since been lowered too
+    // (tools/assets/astronaut.py).
+    else if (player.speed > (anim.name === 'Run' ? RUN_UNTIL : RUN_FROM)) { play('Run', 0.25); ts = clamp(player.speed / RUN_SPEED, 0.6, 1.25); }
+    else { play('Walk', 0.22); ts = clamp(player.speed / WALK_PACE, 0.3, 1.3); }
   } else if (anim.kneel === 1 || anim.kneel === 2) {
     const from = anim.kneel === 1 ? clamp(KNEEL_T - anim.actions.KneelDown.time, 0, KNEEL_T) : 0;
     play('KneelUp', 0.1, true); anim.actions.KneelUp.time = from; anim.kneel = 3; ts = KNEEL_PACE;
