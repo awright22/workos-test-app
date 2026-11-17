@@ -93,17 +93,21 @@ export function newGame(diffKey, kind = 'story', o = null) {
   frameYaw(player.q, bearingTo(player.pos, World.hab.position, player.q));
   player.alt = 0; syncPlayerPos();
   S.started = true;
-  tryLock();
+  // (with a mouse: the film's Skip is a button, and a locked mouse has no pointer to press it with. The lock is taken
+  //  when the film is over; a browser that refuses it then, for want of a click, gives it at the first click on the picture.)
+  const film = !!(o && o.film);
+  if (!film) tryLock();
   Snd.wind(0.2);
   checkpoint();
   // (The game begins with a film of how he came to be here, when it is begun from the title: game/opening.js. Its
   //  first words are said when the film is over, and at once when there is none.)
   const begin = () => {
+    if (film) tryLock();
     log('Suit holed: 46 on the gauge and falling. The Hab is that way. RUN.', 'suit');
     const ll = `lat ${World.spawn.lat.toFixed(1)}°, lon ${World.spawn.lon.toFixed(1)}°E — ${regionName(World.spawn.v)}`;
     setTimeout(() => log(`Crash site logged: ${ll}. Somewhere on Mars. Emphasis on "somewhere."`), 5500);
   };
-  if (o && o.film) startOpening(begin); else begin();
+  if (film) startOpening(begin); else begin();
 }
 /** The opening film is shown unless the address says not to ("nofilm": the tests, which start a hundred games). */
 const wantFilm = () => { try { return !new URLSearchParams(location.search).has('nofilm'); } catch { return true; } };

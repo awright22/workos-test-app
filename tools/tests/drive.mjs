@@ -174,7 +174,8 @@ const cab = await g.eval(async (G) => {
   G.input.yaw = 0.9; G.tick(1 / 30, 120);
   out.look = +G.roverF.seatYaw.toFixed(2);
   G.setStorm(1); G.S.storm.i = 1; G.tick(1 / 30, 20);
-  G.paused = false; await frames(900); G.paused = true;
+  // (until a frame has been drawn with the storm in it: on a loaded machine that is not always within a second)
+  G.paused = false; for (let i = 0; i < 100 && !(G.ctx.engine.final.uniforms.uVeil.value > 0.3 && G.ctx.engine.final.uniforms.uCab.value === 1); i++) await frames(300); G.paused = true;
   out.storm = { veil: +G.ctx.engine.final.uniforms.uVeil.value.toFixed(2), mask: G.ctx.engine.final.uniforms.uCab.value };
   G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 10);
   // back out behind it

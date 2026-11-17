@@ -38,11 +38,12 @@ const CARRY = 28;             // metres the thing that hits him carries him, dow
 const MAV_FAR = 115;          // metres from where he is hit to the ascent vehicle, further along their line
 // seconds from the first frame
 const T_WALK = 5.0;           // cut: from the Hab to the walk
-const T_HIT = 10.2;           // it reaches him
-const T_AWAY = 10.5;          // cut: to where he will come to rest
+const T_HIT = 9.3;            // it reaches him
+const T_AWAY = 9.9;           // cut: to where he will come to rest (the blow is held for half a second first: he goes out of the side of the picture)
 const FLY = 1.7;              // seconds he is in the air and rolling
-const T_DIP = 15.2;           // a dip to black: they have gone to the rocket, and minutes pass
-const T_BACK = 15.9;          // ... and back, on him
+const T_GO = 4.7;             // seconds after the blow that the others give him up and go
+const T_DIP = 14.8;           // a dip to black: they have gone to the rocket, and minutes pass
+const T_BACK = 15.5;          // ... and back, on him
 const T_FIRE = 17.0;          // ignition
 const T_LIFT = 17.7;          // lift-off
 const T_OUT = 21.3;           // the fade to black begins
@@ -51,15 +52,17 @@ const T_END = 24.3;           // morning
 const WAKE_FADE = 0.9;        // seconds the first picture of the game takes to come up out of the black
 const WAKE_RISE = 3.2;        // ... and that he takes to get from the ground to his feet (game/player.js, wakeOnGround)
 const CARD = 'The next morning';
-// What is said. A player who has not read the book must follow it: the rocket is named in full before it is "the MAV",
-// and what Johanssen sees is said plainly (it is why they leave him: his suit tells them he is dead).
+// What is said. A player who has not read the book must follow it: nobody says "MAV" (the game teaches that word
+// later), what Johanssen sees is said plainly (it is why they leave him: his suit tells them he is dead), and each
+// line is said over the picture it is about: the rocket is leaning on the skyline when Martinez says it is going
+// over. A line of two sentences is set as two rows.
 const LINES = [
-  [0.7, 4.0, 'LEWIS', 'Wind’s past the abort line. Everyone to the ascent vehicle.'],
-  [5.5, 3.8, 'MARTINEZ', 'The MAV’s tipping, Commander. She won’t stand much more of this.'],
-  [10.6, 2.0, 'JOHANSSEN', 'Commander, I’ve lost Watney. His suit reads nothing.'],
-  [12.6, 1.4, 'LEWIS', 'Mark! Sound off!'],
-  [14.0, 2.2, 'MARTINEZ', 'She’s going over. We launch now or not at all.'],
-  [16.2, 1.6, 'LEWIS', 'Launch.'],
+  [0.7, 4.0, 'LEWIS', 'Wind’s past the abort line.\nEveryone to the ascent vehicle.'],
+  [5.2, 3.8, 'MARTINEZ', 'Ascent vehicle’s tipping, Commander.\nShe won’t stand much more of this.'],
+  [11.0, 1.9, 'JOHANSSEN', 'Commander!\nWatney’s suit just went dead.'],
+  [12.9, 1.4, 'LEWIS', 'Mark! Sound off!'],
+  [14.3, 2.3, 'MARTINEZ', 'She’s going over.\nWe launch now or not at all.'],
+  [16.7, 1.5, 'LEWIS', 'Launch.'],
 ];
 
 const V = () => new THREE.Vector3();
@@ -117,7 +120,7 @@ let ui = null;
 export function openingOn() { return !!film; }
 
 /** One of the six: a suited figure with a lamp on its helmet and a marker on its pack, and the clips it needs. */
-function figure(glowMap) {
+function figure(glowMap, shade) {
   const a = model('astronaut');
   a.root.traverse((o) => {
     if (!o.isMesh) return;
@@ -150,7 +153,12 @@ function figure(glowMap) {
   a.inner.traverse((o) => { if (!chest && o.isBone && o.name === 'chest') chest = o; });
   const at = _b.set(0, 1.40, -0.34);
   if (chest) { holder.updateWorldMatrix(true, true); chest.worldToLocal(holder.localToWorld(at)); }
-  return { root: holder, mixer, acts, now: '', lamps, mark: spot(new THREE.Color(1.9, 0.26, 0.08), chest || holder, at.x, at.y, at.z) };
+  // (and a patch of his own shade on the ground under him. There is no sun to cast one, but a figure with nothing
+  //  under it stands on the picture and not on the sand; lying, it hovers.)
+  const under = new THREE.Mesh(shade.geo, shade.mat.clone());
+  under.position.y = 0.03; under.renderOrder = 2;
+  holder.add(under);
+  return { root: holder, mixer, acts, now: '', lamps, under, mark: spot(new THREE.Color(1.9, 0.26, 0.08), chest || holder, at.x, at.y, at.z) };
 }
 function act(f, name, fade = 0.3) {
   if (f.now === name || !f.acts[name]) return;
@@ -180,7 +188,7 @@ function say(i) {
   ui.sub.classList.add('on');
   Snd.play('radioKey');
   // (and it is in the journal's log afterwards, as everything said over the radio is)
-  log(`${LINES[i][2]}: ${LINES[i][3]}`, 'radio', { quiet: true });
+  log(`${LINES[i][2]}: ${LINES[i][3].replace(/\n/g, ' ')}`, 'radio', { quiet: true });
 }
 
 /**
@@ -222,10 +230,17 @@ export function startOpening(done) {
   }
 
   // ---- the cast: five who leave and one who does not (he is the last in the line)
-  const glowMap = softDisc(64);
+  const glowMap = softDisc(64), hazeMap = hazeTexture();
+  const shadeGeo = new THREE.PlaneGeometry(1.5, 1.3); shadeGeo.rotateX(-Math.PI / 2);
+  const bedGeo = new THREE.PlaneGeometry(1.7, 3.3); bedGeo.rotateX(-Math.PI / 2);
+  const shadeMat = new THREE.MeshBasicMaterial({ color: 0x000000, map: hazeMap, transparent: true, opacity: 0.5, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const cast = [];
-  for (let i = 0; i < 6; i++) { const f = figure(glowMap); f.mixer.setTime(i * 0.37); act(f, 'Walk', 0); cast.push(f); }
+  for (let i = 0; i < 6; i++) { const f = figure(glowMap, { geo: shadeGeo, mat: shadeMat }); f.mixer.setTime(i * 0.37); act(f, 'Walk', 0); cast.push(f); }
   const mark = cast[5];
+  // (the long patch he lies on: under the length of him, a pace ahead of where his feet are)
+  const bed = new THREE.Mesh(bedGeo, shadeMat.clone());
+  bed.position.set(0, 0.03, 0.95); bed.renderOrder = 2; bed.material.opacity = 0;
+  mark.root.add(bed);
   // (their helmet lamps are lit: every suit in the game shares the one material)
   const lampMats = [];
   cast[0].root.traverse((o) => { const mm = o.isMesh && !Array.isArray(o.material) ? o.material : null; if (mm && mm.name === 'helmet_light' && !lampMats.includes(mm)) lampMats.push(mm); });
@@ -248,12 +263,19 @@ export function startOpening(done) {
   mavRoot.add(mav.root);
   mavRoot.position.copy(mavAt);
   frameQuat(_a.copy(mavAt).normalize(), 0.7, mavRoot.quaternion);
+  // (it leans downwind, nine degrees: it is why they go. Upright, "she's going over" was said of a rocket standing straight.)
+  mavRoot.quaternion.premultiply(_q.setFromAxisAngle(_b.crossVectors(_a.copy(mavAt).normalize(), wind).normalize(), 0.16));
   mavRoot.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   ctx.world.add(mavRoot);
+  // Its beacon: a flash at its head that shows through the dust from where the Hab is, so that what they walk toward
+  // in the second shot, and what stands on the skyline in the third, is seen to be the same thing.
+  const beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color: new THREE.Color(1.5, 1.7, 2.1), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  beacon.renderOrder = 22;
+  ctx.world.add(beacon);
+  const beaconOn = mav.part('strobe');
   const ascent = mav.part('ascent'), ascentY = ascent ? ascent.position.y : 0;
   const flame = buildFlame();
   (mav.part('flame') || ascent || mavRoot).add(flame);
-  const hazeMap = hazeTexture();
   const fireGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: hazeMap, color: new THREE.Color(2.4, 1.02, 0.36), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   fireGlow.renderOrder = 23;
   ctx.world.add(fireGlow);
@@ -285,7 +307,7 @@ export function startOpening(done) {
     return { at: out, target };
   };
   const crewAim = ground(_a.copy(hit).addScaledVector(along, 7));
-  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 3.1, 0.7);
+  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 3.6, 0.9);
 
   // (the ground under the middle of him as he will lie, a pace ahead of where his feet are)
   const restMid = ground(V().set(0, 0, 0.9).applyQuaternion(restQ).add(wake)), mid = V(), off = V();
@@ -304,6 +326,8 @@ export function startOpening(done) {
   ui.line = -1;
   flame.visible = true; flame.scale.setScalar(0.001);
   e.final.uniforms.uFade.value = 1;
+  // (fewer of the storm's nearest streamers: over a still, dark picture the gap between two is a dark shape with a clean edge)
+  e.final.uniforms.uStreamers.value = 0.3;
   const still = reducedMotion();
   const shake = (k) => { if (!still && k > 0) cam.position.addScaledVector(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), k); };
   const setFov = (f) => { if (cam.fov !== f) { cam.fov = f; cam.updateProjectionMatrix(); } };
@@ -332,8 +356,8 @@ export function startOpening(done) {
       const to = _a.copy(cam.position).sub(f.root.position), d = to.length(), k = Math.exp(-(d / 78) * (d / 78));
       const front = _b.set(0, 0, 1).applyQuaternion(f.root.quaternion), toward = to.dot(front) / Math.max(d, 0.01);
       const lampK = f.lampK === undefined ? 1 : f.lampK, markK = f.markK === undefined ? 1 : f.markK;
-      for (const l of f.lamps) { l.scale.setScalar((0.13 + d * 0.017) * (0.6 + 0.4 * lampK) * l.userData.per); l.material.opacity = 0.95 * k * smoothstep(-0.15, 0.45, toward) * lampK; }
-      f.mark.scale.setScalar((0.16 + d * 0.011) * f.mark.userData.per); f.mark.material.opacity = 0.9 * k * smoothstep(-0.15, 0.45, -toward) * markK;
+      for (const l of f.lamps) { l.scale.setScalar((0.13 + d * 0.008) * (0.6 + 0.4 * lampK) * l.userData.per); l.material.opacity = 0.95 * k * smoothstep(-0.15, 0.45, toward) * lampK; }
+      f.mark.scale.setScalar((0.15 + d * 0.007) * f.mark.userData.per); f.mark.material.opacity = 0.9 * k * smoothstep(-0.15, 0.45, -toward) * markK;
     }
   };
 
@@ -351,12 +375,15 @@ export function startOpening(done) {
       //    its mast, the rover left where it stands; and the six of them coming away from it, past the lens, heads
       //    down. (From forty-five metres, with them between the lens and it, the Hab was a smudge behind six lamps.)
       setFov(40);
-      const s5 = 3 + PACE * t;
+      const s5 = 0.8 + PACE * t;
       for (let i = 0; i < 6; i++) stand(cast[i], s5 + (5 - i) * GAP, (i % 2 ? 0.5 : -0.3), 0, 1);
       onLine(s5 + 5 * GAP + 2.2, 0, 1.3, lightLead.position);
       onLine(s5 + 2.2, 0, 1.3, lightMark.position);
       onLine(27.5 + t * 0.2, 5.6, 1.1, cam.position);
+      // (the lens begins on the Hab and goes a little way with them, so the first of them is not cut by the edge of
+      //  the picture before the shot is over)
       ground(siteLocalToWorld(World.hab, 3.5, 0, 5, _a), 2.9, _c);
+      _c.lerp(onLine(s5 + 3.5 * GAP, 0, 1.4, _e), 0.34 * smoothstep(0.8, 5, t));
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(cam.position);
       World.opening.hero = null;
@@ -366,13 +393,17 @@ export function startOpening(done) {
       setFov(50);
       const s5 = lineLen - PACE * (T_HIT - Math.min(t, T_HIT));
       for (let i = 0; i < 5; i++) stand(cast[i], s5 + (5 - i) * GAP + PACE * Math.max(0, t - T_HIT), (i % 2 ? 0.5 : -0.3), 0, 1);
-      onLine(s5 + 5 * GAP + 2.2, 0, 1.3, lightLead.position);
-      if (t < T_HIT) { stand(mark, s5, -0.3, 0, 1); onLine(s5 + 2.2, 0, 1.3, lightMark.position); }
-      onLine(s5 - 3.6, 1.5, 2.0, cam.position);
+      // (the two lamps: one over the two ahead of him and one over him, each a little behind its man, so that what
+      //  the lens sees of them, their backs, is lit. Lit from in front, he was a black shape beside a white one.)
+      onLine(s5 + 1.5 * GAP - 0.8, 0.5, 2.3, lightLead.position);
+      if (t < T_HIT) { stand(mark, s5, -0.3, 0, 1); onLine(s5 - 1.0, 0.7, 2.2, lightMark.position); }
+      // (the lens closes on him as they go: four seconds of one unchanging picture is a long time in a film of twenty-four)
+      onLine(s5 - 4.6 + 1.3 * smoothstep(T_WALK, T_HIT, t), 1.5, 2.0, cam.position);
       onLine(s5 + 7, -0.4, 1.25, _c);
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(cam.position);
       World.opening.hero = heroAt.copy(mark.root.position).addScaledVector(_b.copy(mark.root.position).normalize(), 1.0);
+      World.opening.wide = 1; World.opening.clear = 1;
       if (t > T_HIT) shake(0.5 * (1 - (t - T_HIT) / (T_AWAY - T_HIT)));
     } else {
       // 3. From where he will lie, low, looking upwind: he and the dish come out of the murk; he rolls to rest by the
@@ -382,12 +413,12 @@ export function startOpening(done) {
       for (let i = 0; i < 5; i++) {
         const f = cast[i], base = lineLen + (5 - i) * GAP + PACE * Math.min(after, 0.9) + (0.5 * PACE) * clamp(after - 0.9, 0, 1) * 0.5;
         const back = (i >= 3 ? 1 : 0.25) * smoothstep(2.2, 3.6, after) * (5 - i) * GAP * 0.8;
-        const gone = Math.max(0, after - 4.2) * 3.4;
-        const turn = Math.PI * smoothstep(1.2, 2.0, after) * (1 - smoothstep(4.0, 4.6, after)) + 0.8 * Math.sin(after * 1.7 + i * 1.9) * smoothstep(1.6, 2.4, after) * (1 - smoothstep(3.9, 4.4, after));
-        stand(f, base - back + gone, (i % 2 ? 0.5 : -0.3), turn, after > 4.2 ? 1 : 0.3);
-        const moving = after < 1.4 || (after > 2.2 && after < 3.6) || after > 4.2;
+        const gone = Math.max(0, after - T_GO) * 3.4;
+        const turn = Math.PI * smoothstep(1.2, 2.0, after) * (1 - smoothstep(T_GO - 0.2, T_GO + 0.4, after)) + 0.8 * Math.sin(after * 1.7 + i * 1.9) * smoothstep(1.6, 2.4, after) * (1 - smoothstep(T_GO - 0.3, T_GO + 0.2, after));
+        stand(f, base - back + gone, (i % 2 ? 0.5 : -0.3), turn, after > T_GO ? 1 : 0.3);
+        const moving = after < 1.4 || (after > 2.2 && after < 3.6) || after > T_GO;
         act(f, moving ? 'Walk' : 'Idle', 0.35);
-        if (f.acts.Walk) f.acts.Walk.setEffectiveTimeScale(after > 4.2 ? 1.5 : 1);
+        if (f.acts.Walk) f.acts.Walk.setEffectiveTimeScale(after > T_GO ? 1.5 : 1);
         f.root.visible = t < T_DIP + 0.4;
       }
       onLine(lineLen + 3 * GAP, 0, 1.3, lightLead.position);
@@ -407,6 +438,8 @@ export function startOpening(done) {
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(wake);
       World.opening.hero = heroAt;       // (set below, where he is put)
+      // (lying, he is wider than the clearing made for a man on his feet, and close to: see main.js)
+      World.opening.wide = 1.7; World.opening.clear = 1.3;
     }
 
     // ---- the dish, and what it does to him
@@ -454,8 +487,13 @@ export function startOpening(done) {
         // his lamp: it flickers as he goes, and is out before the others have turned
         mark.lampK = (1 - smoothstep(1.1, 2.6, k)) * (0.55 + 0.45 * Math.sin(k * 41) * Math.sin(k * 17));
         mark.markK = 1 - smoothstep(1.4, 3.0, k);
-        st.mark = Math.max(0, 1 - smoothstep(0.9, 2.4, k)) * (0.6 + 0.4 * Math.sin(k * 41));
-        ground(_a.copy(mark.root.position).addScaledVector(up, 0), 0.9, lightMark.position);
+        // (it does not go quite out: a quarter of it is left on him until the engine lights him. With none, a grey
+        //  suit on brown sand at dusk was a shape you could see the ground through.)
+        st.mark = Math.max(0.26 * (1 - smoothstep(T_FIRE, T_FIRE + 0.6, t)), (1 - smoothstep(0.9, 2.4, k)) * (0.6 + 0.4 * Math.sin(k * 41)));
+        lightMark.position.copy(mid).addScaledVector(up, 0.8);
+        // (his shade: none in the air, the long patch as he comes down onto his face)
+        mark.under.material.opacity = 0.5 * Math.max(1 - smoothstep(0, 0.12, u), smoothstep(0.46, 0.56, u) * (1 - smoothstep(0.72, 0.9, u)));    // (and under his knees, where he comes down on them)
+        bed.material.opacity = 0.55 * smoothstep(0.75, 1, u);
         for (const mm of lampMats) mm.emissiveIntensity = 5;      // (the others' stay lit: his is the sprite's to put out)
       }
     }
@@ -480,7 +518,11 @@ export function startOpening(done) {
       lightFire.position.copy(_a).addScaledVector(up, 32);
       st.fire = burn * (1 - smoothstep(70, 190, alt)) * (0.9 + 0.1 * Math.sin(t * 31)) * (t > T_BACK ? 1 : 0);
       for (const mm of strobe) mm.emissiveIntensity = Math.sin(t * 7) > 0.6 ? 1.6 : 0.04;
-      mavRoot.visible = t > T_BACK - 0.2;
+      // (the beacon: two quick flashes and a second of dark, seen from as far as the Hab; it goes up with the rocket)
+      if (beaconOn) { beaconOn.getWorldPosition(_a); ctx.world.worldToLocal(_a); } else ground(mavAt, 24 + alt, _a);
+      beacon.position.copy(_a);
+      { const d = _a.distanceTo(cam.position), ph = (t * 0.8) % 1, on = ph < 0.07 || (ph > 0.16 && ph < 0.23) ? 1 : 0.05;
+        beacon.scale.setScalar(0.5 + d * 0.016); beacon.material.opacity = on * Math.exp(-(d / 210) * (d / 210)) * (1 - smoothstep(40, 160, alt)); }
       World.launch.burning = burn > 0.02 && lt < 3.0;
       World.launch.alt = Math.min(1100, alt * 9);
       if (burn > 0.02 && !lit) lit = true;
@@ -504,14 +546,16 @@ export function startOpening(done) {
     root.classList.remove('is-opening');
     // the props go, and with them the three lamps
     for (const o of [lightLead, lightMark, lightFire]) { removeLampsOf(o); ctx.world.remove(o); }
-    for (const f of cast) { f.mixer.stopAllAction(); ctx.world.remove(f.root); for (const l of f.lamps) l.material.dispose(); f.mark.material.dispose(); }
+    for (const f of cast) { f.mixer.stopAllAction(); ctx.world.remove(f.root); for (const l of f.lamps) l.material.dispose(); f.mark.material.dispose(); f.under.material.dispose(); }
     for (let i = 0; i < lampMats.length; i++) lampMats[i].emissiveIntensity = keep.lampGlow[i];
     flame.removeFromParent();
     flame.traverse((o) => { if (o.material) o.material.dispose(); if (o.geometry) o.geometry.dispose(); });
-    for (const o of [mavRoot, dish, fireGlow]) ctx.world.remove(o);
+    for (const o of [mavRoot, dish, fireGlow, beacon]) ctx.world.remove(o);
     for (const mm of strobe) mm.dispose();
-    fireGlow.material.dispose(); glowMap.dispose(); hazeMap.dispose();
+    fireGlow.material.dispose(); beacon.material.dispose(); glowMap.dispose(); hazeMap.dispose();
+    shadeGeo.dispose(); bedGeo.dispose(); shadeMat.dispose(); bed.material.dispose();
     Snd.rumble(0);
+    e.final.uniforms.uStreamers.value = 1;
     // the morning after, as the game has always begun
     S.tod = keep.tod; S.storm.i = keep.storm; S.storm.hold = keep.hold;
     updateSunDir();

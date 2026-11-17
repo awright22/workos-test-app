@@ -26,7 +26,7 @@ const FINAL_FRAGMENT = /* glsl */`
   #include <common>
   #include <tonemapping_pars_fragment>
   uniform sampler2D tDiffuse;
-  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil, uKnee;
+  uniform float uExposure, uTime, uVignette, uGrain, uSaturation, uDanger, uCold, uFade, uContrast, uMono, uVeil, uKnee, uStreamers;
   uniform float uSharp;
   uniform vec2 uTexel;
   uniform vec3 uTint, uVeilCol;
@@ -76,7 +76,9 @@ const FINAL_FRAGMENT = /* glsl */`
       mid += (thread - 0.5) * 0.30;
       near += (thread - 0.5) * 0.50;
       // (the streamers nearest the eye are the ones that say "wind": sharp-edged, and whipping past twice as fast)
-      near = smoothstep(0.38, 0.78, near) * (0.5 + 0.5 * smoothstep(0.85, 0.1, vUv.y));
+      // (uStreamers: 1 in play. The opening film asks for fewer: over a still, dark picture the gap between two of
+      //  them is a large dark shape with a clean edge. See game/opening.js.)
+      near = smoothstep(0.38, 0.78, near) * (0.5 + 0.5 * smoothstep(0.85, 0.1, vUv.y)) * uStreamers;
       float sheet = far * 0.40 + mid * 0.34 + near * 0.42;
       float thick = smoothstep(0.42, 0.8, mid * 0.55 + near * 0.6);
       // The veil is drawn over the whole picture, but the man is five metres from the eye and the Hab fifty: there is
@@ -87,11 +89,12 @@ const FINAL_FRAGMENT = /* glsl */`
       // And from the rover's seat the storm is outside the glass: nothing of it over the cab's own walls, its
       // dashboard or his hands. (tCab: where those are in the picture. See Engine.cabMask.)
       float cabHere = uCab > 0.0 ? uCab * texture2D(tCab, vUv).r : 0.0;
-      float open = (1.0 - 0.72 * clearHere) * (1.0 - cabHere);
+      float open = max(0.0, 1.0 - 0.72 * clearHere) * (1.0 - cabHere);
       col = mix(col, uVeilCol * (0.84 + 0.42 * thick), uVeil * (0.16 + 0.5 * smoothstep(0.28, 0.72, sheet) * gust) * (0.80 + 0.40 * thread) * open);
       // ... and grains caught by the light as they pass the visor: a flicker of specks, thickest where the dust is
       float speck = hash12(floor(gl_FragCoord.xy * 0.5) + floor(uTime * 30.0) * 7.3);
-      col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick)) * (1.0 - cabHere);
+      // (... but not on the man himself, any more than the sheets are: they were a speckled edge on him)
+      col += uVeilCol * (smoothstep(0.965, 1.0, speck) * 0.16 * uVeil * (0.4 + 0.6 * thick)) * (1.0 - cabHere) * (1.0 - min(1.0, clearHere));
     }
     col *= uExposure;
     // After dark the only light is lamps, and a lamp lights white cloth a pace from it many times as brightly as the
@@ -151,7 +154,7 @@ class FinalPass extends Pass {
       tDiffuse: { value: null }, uExposure: { value: 1 }, uKnee: { value: 0 }, uTime: { value: 0 }, uVignette: { value: 0.32 },
       uGrain: { value: 0.018 }, uSaturation: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
       uDanger: { value: 0 }, uCold: { value: 0 }, uFade: { value: 0 }, uContrast: { value: 1 }, uMono: { value: 0 },
-      uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
+      uStreamers: { value: 1 }, uVeil: { value: 0 }, uVeilCol: { value: new THREE.Color() }, uVeilDir: { value: new THREE.Vector2(1, 0.12) }, uHero: { value: new THREE.Vector4(0.5, 0.4, 0.1, 0) }, uAspect: { value: 1.8 },
       uSharp: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
       tCab: { value: null }, uCab: { value: 0 },
     };

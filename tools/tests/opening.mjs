@@ -10,7 +10,8 @@
 // thumb high and clear of the notch and the home bar; the suit is whole until he is hit; nothing is saved from
 // inside it; when it ends the hour, the weather, the suit, the place he stands and the scene's contents are as a
 // game without it has them, and the game's first line is said then and not before; Skip and Escape end it at once
-// with the same result; and continuing that game later does not play it again. And the join: the film goes out on a
+// with the same result; and continuing that game later does not play it again. The longest line is measured at
+// four window sizes (a small phone, this one, a large one, a desktop). And the join: the film goes out on a
 // card on the black, and the game comes up on him lying where the film left him, from where he gets to his feet.
 import { openGame, sleep } from './lib.mjs';
 
@@ -70,6 +71,22 @@ check('what is said is shown: who, and the line, at sizes that can be read', ear
 check('Skip is a thumb high, says so, and is clear of the notch and the home bar', early.skip && /skip/i.test(early.skipText) && early.skipBox.h >= 44 && early.skipBox.w >= 44 && early.skipBox.r <= early.w - 47 && early.skipBox.b <= early.h - 21, early.skipBox);
 check('the line stands clear of Skip and inside the picture', early.subBox.r < early.skipBox.l && early.subBox.l >= 47 && early.subBox.b <= early.h - 21, { sub: early.subBox, skip: early.skipBox });
 check('nothing is saved from inside the film', !early.saved);
+
+// ---- the longest line (the second), on a small phone, a large one, a desktop window, and back
+await ev((G) => { let n = 0; while (G.World.opening && G.World.opening.t < 6.5 && n++ < 400) G.tick(1 / 30, 1); });
+for (const [w, h] of [[667, 375], [932, 430], [1280, 720], [844, 390]]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.waitForFunction((ww) => window.innerWidth === ww, w, { timeout: 30000 });
+  await sleep(250);
+  const m = await page.evaluate(() => {
+    const r = (n) => { const b = n.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom), h: Math.round(b.height), w: Math.round(b.width) }; };
+    const film = document.getElementById('mg-film'), sub = film.querySelector('.sub'), said = sub.querySelector('span'), skip = film.querySelector('.skip'), cs = getComputedStyle(said);
+    return { said: said.textContent, px: parseFloat(cs.fontSize), rows: Math.round(said.getBoundingClientRect().height / parseFloat(cs.lineHeight)), sub: r(sub), skip: r(skip), on: +getComputedStyle(sub).opacity > 0.9, W: window.innerWidth, H: window.innerHeight };
+  });
+  check(`at ${w} x ${h} the longest line is whole, in two rows at most, clear of Skip, the notch and the home bar`,
+    m.on && m.said.length > 50 && m.px >= 15.95 && m.rows >= 1 && m.rows <= 2 && m.sub.l >= 47 && m.sub.r < m.skip.l && m.sub.b <= m.H - 21 && m.sub.t > m.H * 0.55
+    && m.skip.h >= 44 && m.skip.r <= m.W - 47 && m.skip.b <= m.H - 21, { px: m.px, rows: m.rows, sub: m.sub, skip: m.skip });
+}
 
 // ---- to the moment he is hit, and past it
 const struck = await ev((G) => {

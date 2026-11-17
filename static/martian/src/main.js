@@ -187,7 +187,9 @@ function draw(dt, focus) {
       _hero.copy(World.opening.hero);                   // (the middle of him, standing or lying)
       const dist = _hero.distanceTo(_heroCam.setFromMatrixPosition(e.camera.matrixWorld));
       _hero.project(e.camera);
-      if (_hero.z < 1 && dist > 0.5) hero.set(_hero.x * 0.5 + 0.5, _hero.y * 0.5 + 0.5, 1.3 / (dist * Math.tan(e.camera.fov * Math.PI / 360)) * 0.5, 1);
+      // (a man lying down is wider than the clearing made for one standing, and close to the lens what is left of the
+      //  veil at its middle is still stripes on him: the film says how wide it is and how complete)
+      if (_hero.z < 1 && dist > 0.5) hero.set(_hero.x * 0.5 + 0.5, _hero.y * 0.5 + 0.5, 1.3 / (dist * Math.tan(e.camera.fov * Math.PI / 360)) * 0.5 * (World.opening.wide || 1), World.opening.clear || 1);
     }
     if (a && a.visible && S.started && !S.firstPerson && !(S.cockpit && S.mode === 'rover') && S.mode !== 'cutscene') {
       a.updateWorldMatrix(true, false);

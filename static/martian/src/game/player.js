@@ -294,7 +294,19 @@ export function wakeOnGround(sec = 3.2) {
   a.setEffectiveTimeScale(0);
   anim.mixer.update(0);
   anim.rise = sec; anim.riseOf = sec;
+  // The ground he lies on is seldom level, and he lies along it: straight up is turned to the ground's own normal
+  // there, and turned back as he stands. (Level on a slope, one hand was in the sand to the wrist and the other a
+  // forearm's length over it.)
+  {
+    const up = player.up, f = _lf.set(0, 0, -1).applyQuaternion(_lq.copy(player.q).multiply(_q2.setFromAxisAngle(Y_AXIS, player.face)));
+    f.addScaledVector(up, -f.dot(up)).normalize();
+    const r = _lr.crossVectors(up, f).normalize(), h0 = surfaceAt(player.pos);
+    const df = (surfaceAt(_lp.copy(player.pos).addScaledVector(f, 1.6)) - h0) / 1.6, dr = (surfaceAt(_lp.copy(player.pos).addScaledVector(r, 0.7)) - h0) / 0.7;
+    _lp.copy(up).addScaledVector(f, -df).addScaledVector(r, -dr).normalize();
+    anim.lie = (anim.lie || new THREE.Quaternion()).setFromUnitVectors(up, _lp);
+  }
 }
+const _lf = new THREE.Vector3(), _lr = new THREE.Vector3(), _lp = new THREE.Vector3(), _lq = new THREE.Quaternion();
 const RISE_LIES = 0.15;          // the part of the time he is given that he lies still for
 const RISE_WALKS = 0.3;          // ... and the last part of it, off his knees, in which he can be walked
 /** While he gets up: how far up he is, 0 on the ground to 1 on his feet (1 at any other time). */
@@ -479,6 +491,8 @@ export function updateAstronaut(dt) {
     // (going up and in, over the last third of a second of getting into the rover)
     { const b = S.boarding, k = b ? clamp((b.t - (b.dur - 0.32)) / 0.32, 0, 1) : 0; astro.scale.setScalar(1 - 0.4 * k * k); if (k > 0) astro.position.addScaledVector(player.up, 0.7 * k); }
     astro.quaternion.copy(player.q).multiply(_q2.setFromAxisAngle(Y_AXIS, player.face));
+    // (coming to, he lies along the ground and not level: see wakeOnGround)
+    if (anim.rise > 0 && anim.lie) astro.quaternion.premultiply(_q2.identity().slerp(anim.lie, 1 - ease((risen() - 0.3) / 0.5)));
     // Standing, his weight goes from one leg to the other every few seconds: the whole of him tips a few degrees
     // about his boots, and his spine takes it back out (idleLife), so his hips go six centimetres over and his
     // shoulders stay where they were. (From the chest down nothing moved in seven seconds of standing.)
