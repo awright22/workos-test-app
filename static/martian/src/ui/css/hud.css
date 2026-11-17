@@ -934,10 +934,12 @@
 #mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .tx { display: none; }
 #mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .at { grid-column: 2; margin-left: 0; }
 #mg-root.mg-calm #mg-objectives.shut.by-banner .obj.urgent.first .pl { display: inline; font-size: var(--t14); }
-/* (the marks beside a banner say what they are: the other things that are low) */
-#mg-alerts .marks small { font: 600 var(--tcap)/1 var(--f-cond); letter-spacing: .08em; color: var(--ink-2); margin: 0 .0625rem 0 .125rem; }
-/* (with its word the plate is a thumb wider, and beside the banner its last mark stood under the task card's column:
-   the pair of them is set that much to the left. On the smallest phone, where the marks wait under the banner and
-   there is no width to spare, the word is left out.) */
-@media (min-width: 761px) { #mg-root.mg-calm #mg-alerts:has(.alert):has(.marks) { transform: translateX(calc(-50% - 1.375rem)); } }
-@media (max-width: 760px) { #mg-alerts .marks small { display: none; } }
+/* (the marks beside a banner say what they are: the other things that are low. The word stands over them, inside the
+   same plate: set beside them it made the plate a thumb wider, and the banner and its marks then reached either
+   under the task card's column on their right or, moved over, under a notice card on their left. On the smallest
+   phone, where the marks wait under the banner, the word is left out.) */
+#mg-alerts .marks:has(small) { position: relative; padding-top: .9375rem; }
+#mg-alerts .marks small { position: absolute; left: 0; right: 0; top: .25rem; text-align: center; font: 600 var(--tcap)/1 var(--f-cond); letter-spacing: .06em; color: var(--ink-2); }
+#mg-alerts .marks:has(small) .mark { width: 1.4375rem; height: 1.4375rem; }
+#mg-alerts .marks:has(small) .mark .ic { width: .875rem; height: .875rem; }
+@media (max-width: 760px) { #mg-alerts .marks small { display: none; } #mg-alerts .marks:has(small) { padding-top: 0; } #mg-alerts .marks:has(small) .mark { width: 1.625rem; height: 1.625rem; } #mg-alerts .marks:has(small) .mark .ic { width: .9375rem; height: .9375rem; } }
