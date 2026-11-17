@@ -45,6 +45,7 @@ import { updateBuildGhost } from './game/interactables.js';
 import { advanceTime, applyRates, updateSunDir, newSol, sleepToDawn } from './game/sim.js';
 import { updateDiscoveries, checkAchievements } from './game/story.js';
 import { startLaunch } from './game/launch.js';
+import { OPENING_LENGTH, openingOn, skipOpening, startOpening, updateOpeningFade } from './game/opening.js';
 import { updateHud, updateCompass, updateObjectivesHud, updateRoverDash, updateWaypoint } from './ui/hud.js';
 import { screenOpen, renderMap } from './ui/screens.js';
 import { serializeState, applyState, checkpoint, restoreCheckpoint, saveGame } from './game/save.js';
@@ -181,6 +182,15 @@ function draw(dt, focus) {
   {
     const hero = e.final.uniforms.uHero.value, a = astro;
     hero.w = 0;
+    // (in the opening film: over whoever the shot is about. See game/opening.js)
+    if (S.mode === 'cutscene' && World.opening && World.opening.hero) {
+      const h = World.opening.hero;
+      h.updateWorldMatrix(true, false);
+      _hero.set(0, 1.0, 0).applyMatrix4(h.matrixWorld);
+      const dist = _hero.distanceTo(_heroCam.setFromMatrixPosition(e.camera.matrixWorld));
+      _hero.project(e.camera);
+      if (_hero.z < 1 && dist > 0.5) hero.set(_hero.x * 0.5 + 0.5, _hero.y * 0.5 + 0.5, 1.3 / (dist * Math.tan(e.camera.fov * Math.PI / 360)) * 0.5, 1);
+    }
     if (a && a.visible && S.started && !S.firstPerson && !(S.cockpit && S.mode === 'rover') && S.mode !== 'cutscene') {
       a.updateWorldMatrix(true, false);
       _hero.set(0, 1.0, 0).applyMatrix4(a.matrixWorld);
@@ -228,6 +238,18 @@ function part(name, fn) {
   if (e.all) e.all.push(ms);                             // (every one of them, for a part a test has asked that of)
 }
 
+/** The lamps of the place and the marks on its ground, lit as the hour and the weather have them. */
+function siteLights(dt) {
+  blinkT += dt;
+  // how dark it is where the camera is: lamps come on with it (a storm counts as dusk)
+  World.dark = Math.max(1 - clamp(ctx.engine.sky.day * 2.5, 0, 1), S.started && S.storm.i > 0.55 ? 0.5 : 0);
+  if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
+  if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
+  if (World.habLampMats) setGlow(World.habLampMats, S.power > 0.5 ? 0.04 + 0.96 * World.dark : 0.02);
+  { const sk = ctx.engine.sky; setStainLight(Math.min(1, 0.05 + sk.sunIntensity / 2.6 + sk.ambientSky.r * 0.9)); }
+  setGlowLight();
+}
+
 /** Advance the game by dt seconds (no drawing). Returns what the shadows should follow. */
 function tick(dt) {
   part('audio', () => updateAudio(dt));
@@ -243,8 +265,11 @@ function tick(dt) {
     if (World.launchAnim) World.launchAnim(dt);
     updateEffects(dt);
     updateSunDir();
+    // (the opening is played at the Hab: its lamps, its beacon and its portholes are part of the picture)
+    if (World.opening) { siteLights(dt); if (World.habViewMats) setGlow(World.habViewMats, 0.5); }
     return (World.launch && World.launch.focus) || World.mav.position;
   }
+  updateOpeningFade(dt);
   if (!S.sleeping) {
     part('clock', () => { advanceTime(dt); applyRates(dt, false); });
     part('move', () => { if (S.boarding) updateBoarding(dt); if (S.mode === 'walk') updateWalk(dt); else if (S.mode === 'rover') updateRover(dt); });
@@ -255,14 +280,7 @@ function tick(dt) {
     part('devils', () => updateDevils(dt));
     part('sights', () => updateSights(dt));
   }
-  blinkT += dt;
-  // how dark it is where the camera is: lamps come on with it (a storm counts as dusk)
-  World.dark = Math.max(1 - clamp(ctx.engine.sky.day * 2.5, 0, 1), S.started && S.storm.i > 0.55 ? 0.5 : 0);
-  if (World.beaconMats) setGlow(World.beaconMats, Math.sin(blinkT * 5) > 0 ? 1 : 0.05);
-  if (World.mavStrobeMats) setGlow(World.mavStrobeMats, Math.sin(blinkT * 7) > 0.6 ? 1.6 : 0.04);
-  if (World.habLampMats) setGlow(World.habLampMats, S.power > 0.5 ? 0.04 + 0.96 * World.dark : 0.02);
-  { const sk = ctx.engine.sky; setStainLight(Math.min(1, 0.05 + sk.sunIntensity / 2.6 + sk.ambientSky.r * 0.9)); }
-  setGlowLight();
+  siteLights(dt);
   roverLights(dt);
   if (World.mavNose && !S.won) World.mavNose.visible = !S.flags.mavStripped;     // (a loaded run had its nose cone back on)
   if (World.habViewMats) setGlow(World.habViewMats, Math.max(0.02, ctx.engine.sky.day * (1 - 0.75 * (S.started ? S.storm.i : 0))));
@@ -417,6 +435,8 @@ function installDebug() {
       await this.settle();
       return { lat: World.spawn.lat, lon: World.spawn.lon };
     },
+    /** Play the opening film over the game as it stands (a new game, before anything is touched); and leave it. */
+    startOpening(done) { startOpening(done); }, skipOpening, openingOn, OPENING_LENGTH,
     /** Skip the cold open (suit sealed, systems checked, numbers run). */
     skipIntro() {
       Object.assign(S.flags, { coldOpen: false, suitSealed: true, didMath: true, uiColony: true, uiJournal: true, uiMap: true, uiBars: true });      // (uiBars: every bar met, see ui/hud.js)

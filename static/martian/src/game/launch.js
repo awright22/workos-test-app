@@ -47,7 +47,7 @@ const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 // ---- the smoke ---------------------------------------------------------------------------------------------------
 const SMOKE_N = 2600;
 
-function softDisc(size = 64) {
+export function softDisc(size = 64) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const g = c.getContext('2d'), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.14, 'rgba(255,255,255,0.5)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.11)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -277,7 +277,7 @@ function buildColumn(scene, smokeU) {
 }
 
 // ---- the flame ---------------------------------------------------------------------------------------------------
-const flameTime = { value: 0 };
+export const flameTime = { value: 0 };
 function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 0, fall = 1.4, beads = 0) {
   const g = new THREE.CylinderGeometry(rTop, rBottom, length, 20, 10, true);
   g.translate(0, -length / 2, 0);                      // the nozzle at the origin, the tail below
@@ -329,7 +329,7 @@ function plume(rTop, rBottom, length, color, hot, gain, edge, bulge = 0, soft = 
   return m;
 }
 
-function buildFlame() {
+export function buildFlame() {
   const g = new THREE.Group();
   const wide = plume(0.95, 3.6, 17, [1.0, 0.36, 0.10], [1.0, 0.55, 0.22], 1.5, 2.6, 0, 1);
   const flame = plume(0.62, 0.10, 11, [1.0, 0.34, 0.07], [1.0, 0.70, 0.36], 2.0, 1.6, 0.85, 0, 2.1);

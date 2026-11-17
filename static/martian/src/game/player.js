@@ -52,6 +52,8 @@ export function initPlayerAt(unitVec, yaw) {
   syncPlayerPos();
   cam.init = false;
 }
+/** The camera behind him starts afresh from where he now stands (after a film has had the camera). */
+export function resetWalkCamera() { cam.init = false; }
 export function syncPlayerPos() {
   player.up.set(0, 1, 0).applyQuaternion(player.q);
   const ground = surfaceAt(player.up);
@@ -277,6 +279,19 @@ function play(name, fade = 0.22, restart = false) {
   player.anim = name;                 // for tests and the debug hook
 }
 
+/**
+ * He begins on the ground, as he fell, and gets to his feet over `sec` seconds (sooner if he is made to walk): the
+ * opening film ends on him lying there (game/opening.js), and the first picture of the game is of him coming to.
+ */
+export function wakeOnGround(sec = 1.6) {
+  const a = anim.actions.Collapse;
+  if (!a) return;
+  play('Collapse', 0, true);
+  a.time = a.getClip().duration;
+  anim.mixer.update(0);
+  anim.rise = sec;
+}
+
 /** The pose an interaction uses: standing at a console, or kneeling at something on the ground. */
 const _iq = new THREE.Quaternion(), _ipq = new THREE.Quaternion(), _idq = new THREE.Quaternion(), _iv = new THREE.Vector3(), _iw = new THREE.Vector3(), _it = new THREE.Vector3();
 /** Turn a bone to point (along its own length, its +Y) at a place in the world group's frame, `w` of the way from where its clip left it. */
@@ -392,6 +407,11 @@ export function updateAstronaut(dt) {
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
   if (driving || !player.onGround || S.over) anim.kneel = 0;
+  // (coming to: from the ground to his feet, over what is left of the time he was given, or at once if he is walking)
+  if (anim.rise > 0) {
+    if (anim.name === 'Collapse' && !(S.over && S.dead)) play('Idle', player.speed > 0.4 ? 0.4 : Math.max(0.4, anim.rise));
+    anim.rise -= dt;
+  }
   if (S.over && S.dead) play('Collapse', 0.25);
   // (seen from his own seat he is in it at once: for the third of a second it took him to settle from the climb, his
   //  own helmet stood in front of the camera)

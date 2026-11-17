@@ -458,7 +458,8 @@ export function toast(kicker, title, note, o) {
 // that is not his own entry, the suit's, NASA's or a survey's is a NOTE, in the plain colour: a sample bagged, a
 // machine's condition, a passing dust devil. All of it used to be "HAB" in red, an alarm over a line about the
 // weather, and nothing said who HAB was.)
-export const VOICES = { nasa: 'NASA', sys: 'NOTE', alarm: 'HAB', note: 'NOTE', suit: 'SUIT', disc: 'SURVEY', log: 'LOG' };
+// (RADIO: what the crew said over the suit radios in the opening film. It is kept for the journal's log.)
+export const VOICES = { nasa: 'NASA', sys: 'NOTE', alarm: 'HAB', note: 'NOTE', suit: 'SUIT', disc: 'SURVEY', log: 'LOG', radio: 'RADIO' };
 /** A line of his own log as it is shown: the label beside it already says LOG ("LOG  Log, Sol 1." said it twice). */
 export const logText = (l) => (l.voice === 'log' ? l.text.replace(/^Log, /, '') : l.text);
 /** What has been said, newest last: { text, voice, sol }. The journal shows it, and the last of it is kept with the saved game. */

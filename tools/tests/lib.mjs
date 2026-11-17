@@ -20,6 +20,7 @@ const GL_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-s
  * @param {number} [o.dsf] device scale factor
  * @param {string} [o.query] extra URL parameters, e.g. 'safe=0,47,21,47' to simulate a phone's safe-area insets
  * @param {string[]} [o.args] more switches for the browser (tests/motion.mjs asks for exact memory figures)
+ * @param {boolean} [o.film] leave the opening film in (a new game begun from the title then plays it)
  */
 export async function openGame(o = {}) {
   await mkdir(outDir, { recursive: true });
@@ -38,7 +39,10 @@ export async function openGame(o = {}) {
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   const t0 = Date.now();
   // (quality 'auto': no preset in the address, so the game chooses as it would for a player; and then nothing is fixed)
-  await page.goto(o.quality === 'auto' ? `http://127.0.0.1:${port}/${o.query ? '?' + o.query : ''}` : `http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${o.query ? '&' + o.query : ''}`, { waitUntil: 'load' });
+  // (no opening film: a test that begins a game from the title would sit through twenty-five seconds of it, at the
+  // second a frame this machine draws. `o.film` leaves it in, for the test of the film itself.)
+  const query = [o.film ? '' : 'nofilm', o.query || ''].filter(Boolean).join('&');
+  await page.goto(o.quality === 'auto' ? `http://127.0.0.1:${port}/${query ? '?' + query : ''}` : `http://127.0.0.1:${port}/?fixed=1&q=${o.quality || 'low'}${query ? '&' + query : ''}`, { waitUntil: 'load' });
   // (ready, or the game's own "could not start" screen: that fails at once and says why, where a wait for "ready"
   // alone ran out its four minutes and said nothing)
   await page.waitForFunction(() => (window.__MG && window.__MG.ready) || window.__MG_FAILED, null, { timeout: 240000 });

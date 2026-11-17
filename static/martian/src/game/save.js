@@ -118,7 +118,8 @@ export const SAVE_KEY = 'stranded2-save';
 /** Each kind of game has a save of its own: a story run and a base can both be kept. */
 export const saveKey = (kind) => (kind === 'base' ? SAVE_KEY + '-base' : SAVE_KEY);
 export function saveGame() {
-  if (S.over || !S.started) return;
+  // (not during the opening film, which borrows the clock and the weather: the game it would save is not this one)
+  if (S.over || !S.started || World.opening) return;
   try { localStorage.setItem(saveKey(S.kind), JSON.stringify(serializeState())); } catch (e) {}
 }
 /** Save format history:

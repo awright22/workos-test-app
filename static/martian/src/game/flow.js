@@ -16,6 +16,7 @@ import { regionName } from '../planet/features.js';
 import { llToVec } from '../planet/geo.js';
 import { initRoverAt } from './rover.js';
 import { initWear } from './wear.js';
+import { startOpening } from './opening.js';
 import { setSetting } from '../ui/settings.js';
 import { _v1 } from '../core/scratch.js';
 import { applyAudioSettings, menuHooks, showPauseMenu, showTitle } from '../ui/menus.js';
@@ -74,7 +75,7 @@ menuHooks.view = {
 // 33. BOOT & START
 // ============================================================
 export let bootPhase = 'init';
-export function newGame(diffKey, kind = 'story') {
+export function newGame(diffKey, kind = 'story', o = null) {
   S.kind = kind === 'base' ? 'base' : 'story';
   S.diff = diffKey;
   S.rescueSol = rescueSolFor(diffKey, S.kind);
@@ -94,11 +95,18 @@ export function newGame(diffKey, kind = 'story') {
   S.started = true;
   tryLock();
   Snd.wind(0.2);
-  log('Suit holed: 46 on the gauge and falling. The Hab is that way. RUN.', 'suit');
-  const ll = `lat ${World.spawn.lat.toFixed(1)}°, lon ${World.spawn.lon.toFixed(1)}°E — ${regionName(World.spawn.v)}`;
-  setTimeout(() => log(`Crash site logged: ${ll}. Somewhere on Mars. Emphasis on "somewhere."`), 5500);
   checkpoint();
+  // (The game begins with a film of how he came to be here, when it is begun from the title: game/opening.js. Its
+  //  first words are said when the film is over, and at once when there is none.)
+  const begin = () => {
+    log('Suit holed: 46 on the gauge and falling. The Hab is that way. RUN.', 'suit');
+    const ll = `lat ${World.spawn.lat.toFixed(1)}°, lon ${World.spawn.lon.toFixed(1)}°E — ${regionName(World.spawn.v)}`;
+    setTimeout(() => log(`Crash site logged: ${ll}. Somewhere on Mars. Emphasis on "somewhere."`), 5500);
+  };
+  if (o && o.film) startOpening(begin); else begin();
 }
+/** The opening film is shown unless the address says not to ("nofilm": the tests, which start a hundred games). */
+const wantFilm = () => { try { return !new URLSearchParams(location.search).has('nofilm'); } catch { return true; } };
 export function continueGame(saved) {
   S.kind = saved.kind === 'base' ? 'base' : 'story';
   S.diff = saved.diff || 'survival';
@@ -146,6 +154,6 @@ export function showStart() {
     base: true,
     unreadable: unreadableSaveExists(),
     onContinue: (kind) => { audio(); return ensureKind(kind).then(() => continueGame(kind === 'base' ? savedBase : saved)); },
-    onNewGame: (diffKey, kind) => { audio(); return ensureKind(kind).then(() => newGame(diffKey, kind)); },
+    onNewGame: (diffKey, kind) => { audio(); return ensureKind(kind).then(() => newGame(diffKey, kind, { film: wantFilm() })); },
   });
 }
