@@ -653,14 +653,16 @@ export function startLaunch() {
       }
       {
         const D = O.debris, dp = D.geometry.attributes.position, dc = D.geometry.attributes.color, age = ot - 0.8;
-        D.visible = age > 0 && age < 9;
+        // (Scraps of gold foil, and gone in five seconds: white and nine seconds long, over a planet that is now in
+        //  daylight behind them, they were a dozen stars showing through Mars.)
+        D.visible = age > 0 && age < 5.5;
         if (D.visible) {
           for (let i = 0; i < dp.count; i++) {
             const v = O.debrisVel[i];
             dp.setXYZ(i, O.dock.x - O.centre.x + v.x * age, O.dock.y - O.centre.y + v.y * age, O.dock.z - O.centre.z + v.z * age);
-            const glint = Math.pow(Math.max(0, Math.sin(age * v.rate + v.phase)), 10) * 2.6 + 0.12;
-            const fade = 1 - smoothstep(5, 9, age);
-            dc.setXYZ(i, glint * fade, glint * fade * 0.96, glint * fade * 0.88);
+            const glint = Math.pow(Math.max(0, Math.sin(age * v.rate + v.phase)), 10) * 2.6 + 0.05;
+            const fade = 1 - smoothstep(2.4, 5.5, age);
+            dc.setXYZ(i, glint * fade, glint * fade * 0.70, glint * fade * 0.28);
           }
           dp.needsUpdate = dc.needsUpdate = true;
         }
