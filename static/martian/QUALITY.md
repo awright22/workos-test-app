@@ -2263,6 +2263,54 @@ What the reviewer could not judge from stills: how anything moves, how long a li
 Nobody has heard this film. Its sounds are the storm, a radio click before each line, the blow, the hiss of his suit
 from the blow on, and the engine; they are wired and their triggers tested, and that is all that can be said here.
 
+**The re-check** (a second fresh reviewer; 27 new stills, with the phone's notch and home bar and its touch
+controls; all opened, 20 enlarged; given the bar and the first review's ten findings, not what was done about them).
+
+| Point | First review | Re-check | The re-check's reason |
+| --- | --- | --- | --- |
+| 1. The story is told | MET | MET | leaving the base, the strike, "the search and the decision", "the launch over his body", the card and the breach are all there |
+| 2. Each shot reads at once | NEARLY | NEARLY | at the hit "the struck man is cut by the right edge and partly under Skip"; "the searchers are 12 to 15 px specks" |
+| 3. Nothing is broken | NOT MET | NOT MET, "narrowly" | a streamer's wedge in one corner of one frame; the fallen man still seems to float; a pale disc on the Hab; one frame of the tumble in which he stands upright |
+| 4. It belongs to the game | NEARLY | NEARLY | "The storm and the launch glow are competent. The join works" |
+| 5. Its words work | NEARLY | NEARLY | sizes right, Skip measured 72 x 44 px, 55 px in and 35 px up, in every frame; a line over a walker's legs, Skip over the struck man's arm |
+| 6. Length and pace | NEARLY | NEARLY | "There is no dead stretch. The hit is fast" |
+
+Of the first review's ten: Skip's clearance and the first crewman cut by the edge GONE; the dark-then-bright man
+"mostly GONE"; the see-through stripes gone but "his outline is still speckled with bright orange dots once the
+launch glow lights him"; the plank PARTLY (the arm inside the picture, the toes on the ground, but "lit ground under
+his chest and legs, so he seems to float a hand's depth up"); the rocket PARTLY ("the lean is only a few degrees on a
+faint 60 px shape"); the hit PARTLY (the line now waits for him to land; the hit "is still brief"); edges PARTLY;
+the corner wedge and the pale disc STILL THERE.
+
+What was done after the re-check, **seen by me in fourteen new stills and by no reviewer** (the tumble was also
+measured again in the running game, every tenth of a second: no part of him is under the ground at any moment, and
+he comes down from 0.4 m to lying over the last half second):
+
+| The re-check saw | What it was | What was done |
+| --- | --- | --- |
+| a wedge with a clean edge in the lower right corner of one frame | the last of the veil's near streamers (at three tenths) | the film has none |
+| he floats: "lit ground under his chest and legs" | the shade under him fell away from its middle, so it was dark only under the body, where a lens at ground level cannot see; beside him, where it can, the ground was lit | a shade that is even across its middle and soft at its edge |
+| at one frame of the tumble he "stands upright with his back to the camera", "a man standing beside the dish" | the beat where he comes down on his knees, upright, before he pitches forward: a third of a second | he is still coming round as his knees touch, and goes on down: no moment of it is upright |
+| the hit "sits in the right notch strip and under Skip"; a line "printed over the legs of the man about to be struck" | the lens looked straight along their line | it looks to the downwind side of them: they stand in the left of the picture, clear of the words, and the dish is seen coming for half a second longer. **Not cured:** thrown downwind he still passes the lens on its right, and for a fifth of a second Skip is over his pack |
+| "She's going over" over a rocket that looks upright | nine degrees, on a small shape | thirteen degrees (the book's own figure is 12.3) |
+| "We" touches his toes | | the last seat a little further to the side |
+| two white dots at the left edge for one frame of play | the Hab's two porch lamps, 74 m off at the edge of the picture: lit for the film's dusk, and going out over the first second of the morning as the light comes up | left: they are lamps on the Hab, where the Hab is. (The sky is now set to the morning at once when the film ends; the lamps follow the light a moment behind it, as they do at every dawn) |
+
+Left as they are, and why:
+- *The pale disc on the Hab wall* is one of the Hab's own lamps in the dust, as the game draws it.
+- *The orange speckle on his outline in the launch's light, and stair-stepped edges:* the stills are drawn at one
+  device pixel to the point, half of what the owner's iPhone reported drawing. Not judged at the phone's own
+  sharpness by anyone.
+- *Red dots without bodies* (pack markers of men the dust has taken) and *the pool of his lamp on the ground as he
+  flies*: these are the film's design, lights in murk. Recorded as a difference of taste, not fixed.
+- *The searchers are 12 to 15 px specks.* True. The search is carried by the two lines and the lamps; nearer, the
+  crew would see him.
+- *Martinez's line stays up across the dip to black:* meant, as a voice carried over a cut.
+- *In play, the two hint pills ("left thumb moves", "drag to look") sit over his boots as he gets up:* the game's
+  own first-seconds interface, not the film's.
+- *He lies as a straight plank.* It is the game's one falling clip. A second pose (a bent knee, an arm out) would
+  need the clip re-authored in Blender.
+
 ## Open items
 
 | # | Item | State |

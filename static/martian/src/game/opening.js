@@ -112,6 +112,23 @@ function hazeTexture() {
   return t;
 }
 
+/**
+ * The shade under a figure: even across its middle and soft at its edge. (With the glow's own falling-away it was
+ * dark only under the body, where a low lens cannot see: beside him, where it can, the ground was lit, and he lay
+ * a hand's depth over it.)
+ */
+function shadeTexture() {
+  const N = 64, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const d = Math.min(1, Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2) / (N / 2)), k = (j * N + i) * 4;
+    img.data[k] = img.data[k + 1] = img.data[k + 2] = 255; img.data[k + 3] = Math.round(255 * (1 - smoothstep(0.42, 1, d)));
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
 let film = null;
 let fadeIn = 0;
 let ui = null;
@@ -233,7 +250,8 @@ export function startOpening(done) {
   const glowMap = softDisc(64), hazeMap = hazeTexture();
   const shadeGeo = new THREE.PlaneGeometry(1.5, 1.3); shadeGeo.rotateX(-Math.PI / 2);
   const bedGeo = new THREE.PlaneGeometry(1.7, 3.3); bedGeo.rotateX(-Math.PI / 2);
-  const shadeMat = new THREE.MeshBasicMaterial({ color: 0x000000, map: hazeMap, transparent: true, opacity: 0.5, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const shadeMap = shadeTexture();
+  const shadeMat = new THREE.MeshBasicMaterial({ color: 0x000000, map: shadeMap, transparent: true, opacity: 0.5, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const cast = [];
   for (let i = 0; i < 6; i++) { const f = figure(glowMap, { geo: shadeGeo, mat: shadeMat }); f.mixer.setTime(i * 0.37); act(f, 'Walk', 0); cast.push(f); }
   const mark = cast[5];
@@ -263,8 +281,8 @@ export function startOpening(done) {
   mavRoot.add(mav.root);
   mavRoot.position.copy(mavAt);
   frameQuat(_a.copy(mavAt).normalize(), 0.7, mavRoot.quaternion);
-  // (it leans downwind, nine degrees: it is why they go. Upright, "she's going over" was said of a rocket standing straight.)
-  mavRoot.quaternion.premultiply(_q.setFromAxisAngle(_b.crossVectors(_a.copy(mavAt).normalize(), wind).normalize(), 0.16));
+  // (it leans downwind, thirteen degrees: it is why they go. Upright, "she's going over" was said of a rocket standing straight.)
+  mavRoot.quaternion.premultiply(_q.setFromAxisAngle(_b.crossVectors(_a.copy(mavAt).normalize(), wind).normalize(), 0.23));
   mavRoot.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   ctx.world.add(mavRoot);
   // Its beacon: a flash at its head that shows through the dust from where the Hab is, so that what they walk toward
@@ -307,7 +325,7 @@ export function startOpening(done) {
     return { at: out, target };
   };
   const crewAim = ground(_a.copy(hit).addScaledVector(along, 7));
-  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 3.6, 0.9);
+  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 3.6, 1.1);
 
   // (the ground under the middle of him as he will lie, a pace ahead of where his feet are)
   const restMid = ground(V().set(0, 0, 0.9).applyQuaternion(restQ).add(wake)), mid = V(), off = V();
@@ -326,8 +344,9 @@ export function startOpening(done) {
   ui.line = -1;
   flame.visible = true; flame.scale.setScalar(0.001);
   e.final.uniforms.uFade.value = 1;
-  // (fewer of the storm's nearest streamers: over a still, dark picture the gap between two is a dark shape with a clean edge)
-  e.final.uniforms.uStreamers.value = 0.3;
+  // (none of the storm's nearest streamers: over a still, dark picture the gap between two is a dark shape with a clean
+  //  edge. At three tenths of them there was still one, in a corner.)
+  e.final.uniforms.uStreamers.value = 0;
   const still = reducedMotion();
   const shake = (k) => { if (!still && k > 0) cam.position.addScaledVector(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), k); };
   const setFov = (f) => { if (cam.fov !== f) { cam.fov = f; cam.updateProjectionMatrix(); } };
@@ -399,7 +418,9 @@ export function startOpening(done) {
       if (t < T_HIT) { stand(mark, s5, -0.3, 0, 1); onLine(s5 - 1.0, 0.7, 2.2, lightMark.position); }
       // (the lens closes on him as they go: four seconds of one unchanging picture is a long time in a film of twenty-four)
       onLine(s5 - 4.6 + 1.3 * smoothstep(T_WALK, T_HIT, t), 1.5, 2.0, cam.position);
-      onLine(s5 + 7, -0.4, 1.25, _c);
+      // (the lens looks to the downwind side of them: they are in the left of the picture, clear of what is said at
+      //  its foot, and he is thrown across the middle of it and not out of its edge)
+      onLine(s5 + 7, 2.3, 1.25, _c);
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(cam.position);
       World.opening.hero = heroAt.copy(mark.root.position).addScaledVector(_b.copy(mark.root.position).normalize(), 1.0);
@@ -445,10 +466,10 @@ export function startOpening(done) {
     // ---- the dish, and what it does to him
     {
       const k = t - T_HIT, fromHit = k * 17;
-      dish.visible = k > -1.7 && k < FLY + 2.2;
+      dish.visible = k > -2.3 && k < FLY + 2.2;
       if (dish.visible) {
         // (it comes along the wind two metres up, turning over; after him it goes on, lower and off to one side, and is gone)
-        const along1 = k < 0 ? fromHit * 1.5 : fromHit, h = 1.9 + 0.4 * Math.sin(k * 5) - (k > 0 ? Math.min(0.8, k * 0.5) : 0);
+        const along1 = k < 0 ? fromHit * 1.25 : fromHit, h = 1.9 + 0.4 * Math.sin(k * 5) - (k > 0 ? Math.min(0.8, k * 0.5) : 0);
         ground(_a.copy(hit).addScaledVector(wind, along1).addScaledVector(veer, Math.max(0, k) * 5), h, dish.position);
         _b.copy(dish.position).normalize();
         facing(_b, wind, dish.quaternion);
@@ -472,13 +493,14 @@ export function startOpening(done) {
         const tc = k * CLIP_PACE, kn = smoothstep(0, 0.8, tc), dn = smoothstep(1.02, 1.74, tc);
         off.set(0, 1.0 - 0.35 * kn - 0.45 * dn, 0.4 * kn + 0.5 * dn);
         // (one long bound that he turns over in, his knees down at the end of it, and a short one that he pitches forward in)
-        const lift = 1.3 * Math.abs(Math.sin(Math.PI * 1.5 * Math.min(1, u / 0.83))) * Math.pow(1 - u, 1.5);
+        const lift = 1.3 * Math.abs(Math.sin(Math.PI * 1.5 * Math.min(1, u / 0.83))) * Math.pow(1 - u, 1.5) + 0.16 * Math.sin(Math.PI * clamp((u - 0.42) / 0.36, 0, 1));
         ground(_a.copy(hit).lerp(restMid, go), off.y + lift, mid);
         _b.copy(mid).normalize();
         facing(_b, along, _q);
         _q.slerp(restQ, smoothstep(0.1, 1, u));
-        // (over the way the blow sends him, his head downwind first, and done turning before his knees are down)
-        _q2.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), Math.PI * 2 * smoothstep(0, 0.6, u));
+        // (over the way the blow sends him, his head downwind first, and still coming round as his knees touch and he
+        //  goes on down: done turning sooner, he was for a third of a second a man standing upright beside the dish)
+        _q2.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), Math.PI * 2 * smoothstep(0, 0.78, u));
         mark.root.quaternion.copy(_q2).multiply(_q);
         mark.root.position.copy(mid).sub(off.applyQuaternion(mark.root.quaternion));
         // (and the last of the slide brings him exactly to where the game's own figure lies)
@@ -493,7 +515,7 @@ export function startOpening(done) {
         lightMark.position.copy(mid).addScaledVector(up, 0.8);
         // (his shade: none in the air, the long patch as he comes down onto his face)
         mark.under.material.opacity = 0.5 * Math.max(1 - smoothstep(0, 0.12, u), smoothstep(0.46, 0.56, u) * (1 - smoothstep(0.72, 0.9, u)));    // (and under his knees, where he comes down on them)
-        bed.material.opacity = 0.55 * smoothstep(0.75, 1, u);
+        bed.material.opacity = 0.62 * smoothstep(0.75, 1, u);
         for (const mm of lampMats) mm.emissiveIntensity = 5;      // (the others' stay lit: his is the sprite's to put out)
       }
     }
@@ -553,7 +575,7 @@ export function startOpening(done) {
     for (const o of [mavRoot, dish, fireGlow, beacon]) ctx.world.remove(o);
     for (const mm of strobe) mm.dispose();
     fireGlow.material.dispose(); beacon.material.dispose(); glowMap.dispose(); hazeMap.dispose();
-    shadeGeo.dispose(); bedGeo.dispose(); shadeMat.dispose(); bed.material.dispose();
+    shadeGeo.dispose(); bedGeo.dispose(); shadeMat.dispose(); shadeMap.dispose(); bed.material.dispose();
     Snd.rumble(0);
     e.final.uniforms.uStreamers.value = 1;
     // the morning after, as the game has always begun
@@ -565,6 +587,8 @@ export function startOpening(done) {
     if (astro) astro.visible = true;
     resetWalkCamera();
     wakeOnGround(WAKE_RISE);
+    // (the sky, the light and the lamps go to the morning at once: the evening's stars were in the first frames of it)
+    e.sky.update(e.sunDir, cam.position, S.storm.i, e.time);
     e.snapLight = 3;
     e.final.uniforms.uFade.value = 1;
     fadeIn = WAKE_FADE;
