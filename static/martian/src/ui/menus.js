@@ -233,7 +233,7 @@ export function showPauseMenu(o) {
     (o.base ? `<h3>The long stay</h3><p>${o.uplink ? 'Stay fed, and build' : 'Stay fed, find a radio and tell Earth, and build'}: no ship can reach Mars for four years. Make this somewhere a man can live.</p>`
       : `<h3>The way home</h3><p>${o.uplink ? 'Stay fed, and reach the MAV in Schiaparelli' : 'Stay fed, find a radio and tell Earth, then reach the MAV in Schiaparelli'}: the only rocket on Mars. It can launch on Sol ${o.rescueSol}.</p>`) +
     '<p>The rover refills your suit; the Hab refills the rover; the sun refills the Hab.</p>' +
-    '<button type="button" class="mg-btn side-btn" data-act="bars">Guide: what the gauges mean</button></aside>',
+    '<button type="button" class="mg-btn side-btn" data-act="bars">What the gauges mean</button></aside>',
     { label: 'Paused', onEscape: resume });
   on(p, '[data-act]', (b) => {
     const a = b.dataset.act;
