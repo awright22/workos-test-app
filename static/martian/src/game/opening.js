@@ -51,12 +51,14 @@ const T_END = 24.3;           // morning
 const WAKE_FADE = 0.9;        // seconds the first picture of the game takes to come up out of the black
 const WAKE_RISE = 3.2;        // ... and that he takes to get from the ground to his feet (game/player.js, wakeOnGround)
 const CARD = 'The next morning';
+// What is said. A player who has not read the book must follow it: the rocket is named in full before it is "the MAV",
+// and what Johanssen sees is said plainly (it is why they leave him: his suit tells them he is dead).
 const LINES = [
-  [0.7, 4.0, 'LEWIS', 'That’s the abort line. Everyone to the MAV.'],
-  [5.5, 3.8, 'MARTINEZ', 'MAV’s leaning, Commander. Wind’s still climbing.'],
-  [10.6, 1.9, 'JOHANSSEN', 'Watney’s telemetry just dropped.'],
-  [12.6, 1.7, 'LEWIS', 'Mark! Sound off!'],
-  [14.0, 2.2, 'MARTINEZ', 'She won’t hold. We go now or we don’t go.'],
+  [0.7, 4.0, 'LEWIS', 'Wind’s past the abort line. Everyone to the ascent vehicle.'],
+  [5.5, 3.8, 'MARTINEZ', 'The MAV’s tipping, Commander. She won’t stand much more of this.'],
+  [10.6, 2.0, 'JOHANSSEN', 'Commander, I’ve lost Watney. His suit reads nothing.'],
+  [12.6, 1.4, 'LEWIS', 'Mark! Sound off!'],
+  [14.0, 2.2, 'MARTINEZ', 'She’s going over. We launch now or not at all.'],
   [16.2, 1.6, 'LEWIS', 'Launch.'],
 ];
 
@@ -305,7 +307,10 @@ export function startOpening(done) {
   const still = reducedMotion();
   const shake = (k) => { if (!still && k > 0) cam.position.addScaledVector(_a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), k); };
   const setFov = (f) => { if (cam.fov !== f) { cam.fov = f; cam.updateProjectionMatrix(); } };
-  let t = 0, struck = false, lit = false;
+  let t = 0, struck = false, lit = false, calls = 0, waited = 0;
+  // (the ground is built a tile at a time, in the background, and a game that has just begun has not got the tiles the
+  //  first shot stands on: the film stays on its black until they are there, two seconds at the most)
+  const groundBusy = () => { const g = ctx.terrain; return !!g && ((g.queue && g.queue.length > 0) || (g.pending && g.pending.size > 0)); };
 
   /** Stand one of them on the line: `s` metres along it, `side` to one side, facing `turn` radians round from the way they walk. */
   const stand = (f, s, side, turn, lean) => {
@@ -333,6 +338,7 @@ export function startOpening(done) {
   };
 
   const step = (dt) => {
+    if (t === 0 && dt > 0 && waited < 2 && (calls++ < 3 || groundBusy())) { waited += dt; dt = 0; }
     t += dt;
     World.opening.t = t;
     flameTime.value = t;

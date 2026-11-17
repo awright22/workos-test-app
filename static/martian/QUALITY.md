@@ -105,6 +105,8 @@ node tests/run.mjs          # smoke, story arc, saves, science, machines, farm, 
 node tests/ui.mjs --size=phone-844x390   # one part of the interface suite alone (keys, play, portrait, or a size)
 node tests/ui-audit.mjs     # measures every phone state in the page: text under 11 px, targets under 44 px, clipping
 node tests/first-ten.mjs    # the first ten minutes on a phone, as numbered screenshots (--desktop)
+node tests/opening.mjs      # the opening film from the title on a phone: its words, Skip, the card, what it leaves (in the suite)
+node tests/film.mjs --opening --hud   # moments of the opening film as stills -> tools/tests/.cache/film/opening-*.png
 node tests/audio.mjs        # 129 offline audio renders measured for loudness and clicks (5 min)
 node tests/perf.mjs         # draw calls and triangles per frame against the budgets below
 node tests/shots.mjs        # screenshot matrix -> tools/tests/.cache/shots/   (--only a,b for some)
@@ -2162,6 +2164,60 @@ sheet's button ("What the gauges mean"), the word ALSO over its marks, and three
 The preview: `gh-pages/next` `818bdf0` from `058a4dd`, cache `stranded2-3fae541316c5`. The game at the root of
 `gh-pages` is untouched (no file outside `next/` differs from the last publish). The save format is unchanged, and
 nothing third-party was added.
+
+## The opening film (the owner, 17 November)
+
+The owner asked "Is there like an opening video sequence?" There was none: a new game began on the first second of
+play, with a man on the sand and a line of text saying his suit was holed. Then: "Build it!"
+
+**What it is.** `src/game/opening.js`: twenty-four seconds in front of a new game. It is not a video file. The game
+draws it, on the player's own site, with its own Hab, rover, dish, ascent vehicle and suited figures, so it costs no
+download and it is that game's hills the crew walk over. It is the book's evacuation in three shots:
+
+| Seconds | What is on the screen | What is said |
+| --- | --- | --- |
+| 0 to 5 | The Hab at dusk in the storm, thirty-five metres off: porch lamps, portholes, the beacon on its mast, the rover where it was left. Six suited figures come away from it past the lens, helmet lamps lit | LEWIS: "Wind's past the abort line. Everyone to the ascent vehicle." |
+| 5 to 10.5 | From behind the last of the six, the line going on into the brown. The Hab's dish comes out of the storm from upwind and takes him at 10.2 s | MARTINEZ: "The MAV's tipping, Commander. She won't stand much more of this." |
+| 10.5 to 15.2 | From where he will come to rest: he is flung, once over in the air, down on his knees, onto his face, and slides to the lens; his lamp flickers out. Far off the others' lamps stop, turn, look where he was, and go | JOHANSSEN: "Commander, I've lost Watney. His suit reads nothing." LEWIS: "Mark! Sound off!" MARTINEZ: "She's going over. We launch now or not at all." |
+| 15.9 to 21.3 | After a dip to black, the same place: the ascent vehicle on the skyline. It lights (the fire lights the dust, the ground and him) and climbs out of the top of the picture | LEWIS: "Launch." |
+| 22.2 to 24.3 | Black, and a card: THE NEXT MORNING | |
+| then, the game | The picture comes up in under a second on him lying where the film left him. He lies a moment, pushes up onto his knees and stands (three seconds; sooner if the stick is pushed). The HUD is there, and the game's first line: "Suit holed: 46 on the gauge and falling" | |
+
+**Decisions.**
+- *Silhouettes and lamps.* A storm is the weakest thing this game draws (round 11 and the premium audit both say
+  so): it is laid over the finished picture and knows no depth. So the film is set a few minutes after sunset
+  (hour 18.7 of a sol's 24.66), when a storm is a brown murk and what shows in it is lights: helmet lamps from in front, red pack
+  markers from behind, the Hab's lamps, the engine. The storm's own clearing round the player is kept on whoever a
+  shot is about.
+- *No lights are added.* Adding a light to the scene rebuilds every shader, which on a phone stops the picture for
+  a second. The film's three lights (one with the head of the line, one with him, the engine's) are borrowed from
+  the game's fixed pool of lamps (`world/lamps.js`) and handed back.
+- *Sight lines are worked out, not assumed.* A game starts at a random place, so the ground between the lens and
+  the rocket is different every time. The rocket stands on the first of nine bearings from which its upper half can
+  be seen from where he will lie, and the last shot's camera rises from his shoulder until it sees over the ground
+  between (`clearLine`, `seat`). On the first try, at a site with a rise, the launch was a hillside with a glow
+  behind it.
+- *It waits for the ground.* The ground is built a tile at a time, and a game that has just begun has not got the
+  tiles the first shot stands on. The film stays on its black until they are there (two seconds at most).
+- *No voices.* What the crew say is set at the foot of the picture, with who says it, a radio click before each
+  line, and a copy in the journal's log. The first line names the rocket in full before anyone calls it the MAV.
+- *It changes nothing.* The hour and the weather are set for the film and put back; nothing is saved from inside
+  it; its props are removed. Skip (a button, or Escape, Enter, Space) leaves it at any moment, to the same morning.
+  A continued game does not play it, and `?nofilm` starts a new game without it (every test but its own does).
+  With "reduce motion" on, the camera does not shake.
+- *He gets up.* The game's figure had no way up from the ground: `wakeOnGround` (`game/player.js`) runs his fall
+  backwards under the game's control, and holds him from walking until he is off his knees.
+
+**What I saw, and changed, pass by pass** (stills at 844 x 390 on the preset a phone starts on, `tools/tests/film.mjs
+--opening --hud`; a still is one frame of a moving picture, so what moves was judged from frames a fifth of a second
+apart round the blow):
+
+| Pass | What the stills showed | What was done |
+| --- | --- | --- |
+| 1 | Too bright to be a storm at dusk; the Hab a smudge behind six lamps; the lamps balls of light as big as a head, seen from behind as well; stripes of the storm's veil over the close-up; the fallen man floating over sloping ground; at a site with a rise, the crew and the rocket hidden by the hill, and the launch's glow drawn through it | Four minutes later in the evening; the first shot at thirty-five metres with the line starting at the door; smaller lamps that show from in front only; the veil's clearing kept on him through the cut; the body laid along the slope; the rocket's bearing and the camera's seat chosen by line of sight; the glow tested against the ground |
+| 2 | The veil's clearing was centred on his feet, not on him; the launch lit nothing where he lay; the game came up on him already on his feet, half a second after a film that left him on his face | The clearing follows the middle of him standing, flying and lying; the engine's light hangs over the pad and reaches him; the game's figure begins on the ground and gets up |
+| 3 | The lamps still covered the visors; the fallen man lay under the subtitle; the launch's glow was a flat disc with the rocket in front of it; the card had a box round it (it had taken the name of an existing style); the dish, in one frame, stood upright on its foot in the sand; worked through on paper, his somersault about his feet put his head a metre under the ground | Two small lamps at the sides of each helmet, where the suit has them; the body in the left third, clear of the words and of the notch; a glow that falls away from its middle; the card alone on the black; the dish end over end with its mast never upright, veering clear of the lens after the blow; he turns about the middle of his body, comes down on his knees and pitches onto his face |
+| 4 | His red pack marker hung in the air a metre and a half over him as he lay (it was fixed over his feet, not to his back); his second bounce was a metre high | The marker hangs on his chest; a lower second bounce |
 
 ## Open items
 
