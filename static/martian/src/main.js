@@ -174,6 +174,8 @@ function draw(dt, focus) {
   dustUniforms.uDustHere.value.copy(e.camera.position).normalize();
   dustUniforms.uFill.value = e.modelAmbient === undefined ? 1 : e.modelAmbient;
   dustUniforms.uRim.value = e.modelRim || 0;
+  // (out of doors at night what men built takes a lamp's light up to a limit: see the models' shader)
+  dustUniforms.uNightCap.value = 8 + (0.24 - 8) * (1 - e.sky.day) * (1 - (e.indoor || 0));
   dustUniforms.uDustAge.value = S.started ? dustAge() : 0;
   // where he stands on the screen, and how large: the storm's veil thins over him (see the final pass)
   {

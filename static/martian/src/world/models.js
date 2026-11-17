@@ -244,7 +244,7 @@ const CLEAN_PARTS = /^(interior|soil|plants|plants_dead)/;
  */
 const CABIN_PARTS = /^cabin/;
 /** What the dust shader needs from the world: set once the planet's colour map is loaded, and each frame. */
-export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 },
+export const dustUniforms = { uDustGrain: { value: null }, uDustAlbedo: { value: null }, uDustHere: { value: new THREE.Vector3(0, 1, 0) }, uFill: { value: 1 }, uRim: { value: 0 }, uNightCap: { value: 8 },
   // (how much more dust lies on things than when the game began, 0..1: game/wear.js, dustAge)
   uDustAge: { value: 0 }, uCabin: { value: new THREE.Vector4(0, 0, 0, 0.62) } };
 /** What a mirror shows out of doors: the sky at the horizon and overhead, and the lit ground. Set each frame. */
@@ -314,6 +314,7 @@ function setUpPlain(plain, ground) {
         uniform vec3 uDustHere;
         uniform float uFill;
         uniform float uRim;
+        uniform float uNightCap;
         uniform float uDustAge;
         uniform vec4 uCabin;
         #ifndef USE_NORMALMAP_OBJECTSPACE
@@ -410,6 +411,16 @@ function setUpPlain(plain, ground) {
       // Seen against the sun, dusty cloth and metal catch its light along their edge: the rim that separates a figure
       // from the ground behind it. (Out of doors only: uRim is 0 under a roof, where the "sun" is the ceiling's lamps.)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        // After dark a lamp is the only light, and a helmet's beam that is made to reach forty metres of ground seen
+        // edge-on falls square on a white wall fifteen metres off: the Hab's dome stood evenly bright from top to
+        // bottom whenever he faced it, thirty times as bright as the sand at its foot. What men built therefore takes
+        // a lamp's light up to a limit and no further: it is lit, it keeps its shading, and it is never the brightest
+        // thing in a night picture but the lamps themselves. (uNightCap: far above any light by day and indoors.)
+        if (uNightCap < 4.0) {
+          vec3 lampLit = reflectedLight.directDiffuse;
+          float lampMax = max(lampLit.r, max(lampLit.g, lampLit.b));
+          if (lampMax > 0.0001) reflectedLight.directDiffuse = lampLit * (uNightCap * (1.0 - exp(-lampMax / uNightCap)) / lampMax);
+        }
         if (vPbr.z < -0.5) {
           // (the sun reaches the cab's fittings through its glass: a quarter of it, on what faces up and forward)
           reflectedLight.directDiffuse *= 0.26; reflectedLight.directSpecular *= 0.26;
@@ -434,7 +445,7 @@ function setUpPlain(plain, ground) {
         #endif`)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = clamp(vPbr.y, 0.0, 1.0) * (1.0 - dustAmount);');
   };
-  plain.customProgramCacheKey = () => 'plain-pbr-dust20' + (ground ? 'G' : '');
+  plain.customProgramCacheKey = () => 'plain-pbr-dust21' + (ground ? 'G' : '');
   return plain;
 }
 
