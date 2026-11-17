@@ -803,6 +803,9 @@ for (const size of SIZES) {
       const card = await g.eval((G) => {
         const o = document.getElementById('mg-objectives'), why = () => [...o.querySelectorAll('.obj .why')].some((n) => getComputedStyle(n).display !== 'none' && n.getBoundingClientRect().height > 3);
         G.tpLocal(0, 40, 0); G.tick(0.05, 30);
+        // (opening the gauges, just above, puts the card away, as asking for one thing now does: it is opened here the
+        //  way a player opens it, by a press, and then left to close)
+        if (!why()) { o.click(); G.tick(0.05, 2); }
         const out = { open: why(), h0: Math.round(o.getBoundingClientRect().height) };
         G.tick(0.05, 220);
         out.shut = !why(); out.mark = o.classList.contains('shut'); out.h1 = Math.round(o.getBoundingClientRect().height);
