@@ -180,7 +180,9 @@ const cab = await g.eval(async (G) => {
   G.setStorm(0); G.S.storm.i = 0; G.tick(1 / 30, 10);
   // back out behind it
   key('v'); G.tick(1 / 30, 90);
-  G.paused = false; await frames(300); G.paused = true;
+  // (until a frame has been drawn from behind the rover, which is when the cab's mask is let go: a third of a second
+  //  is not always a frame here)
+  G.paused = false; await frames(300); for (let i = 0; i < 100 && G.ctx.engine.final.uniforms.uCab.value !== 0; i++) await frames(300); G.paused = true;
   out.back = { cockpit: !!G.S.cockpit, off: +cam.position.distanceTo(rv.group.position).toFixed(1), heads: drawn(/^(helmet|head|visor)/), mask: G.ctx.engine.final.uniforms.uCab.value };
   // and out of the rover from the seat's view: the picture goes back to him on foot
   key('v'); G.tick(1 / 30, 45); G.roverF.speed = 0; key('f'); G.tick(1 / 30, 60);
