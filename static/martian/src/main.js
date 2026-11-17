@@ -184,9 +184,7 @@ function draw(dt, focus) {
     hero.w = 0;
     // (in the opening film: over whoever the shot is about. See game/opening.js)
     if (S.mode === 'cutscene' && World.opening && World.opening.hero) {
-      const h = World.opening.hero;
-      h.updateWorldMatrix(true, false);
-      _hero.set(0, 1.0, 0).applyMatrix4(h.matrixWorld);
+      _hero.copy(World.opening.hero);                   // (the middle of him, standing or lying)
       const dist = _hero.distanceTo(_heroCam.setFromMatrixPosition(e.camera.matrixWorld));
       _hero.project(e.camera);
       if (_hero.z < 1 && dist > 0.5) hero.set(_hero.x * 0.5 + 0.5, _hero.y * 0.5 + 0.5, 1.3 / (dist * Math.tan(e.camera.fov * Math.PI / 360)) * 0.5, 1);

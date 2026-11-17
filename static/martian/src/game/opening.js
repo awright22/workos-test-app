@@ -29,7 +29,7 @@ import { updateSunDir } from './sim.js';
 import { buildFlame, flameTime, softDisc } from './launch.js';
 import { reducedMotion } from '../ui/settings.js';
 
-const HOUR = 18.6;            // local time of the film: the sun just down, a brown dusk
+const HOUR = 18.68;           // local time of the film: the sun just down, a brown dusk (a few minutes later it is night, and no dust shows)
 const STORM = 0.92;           // how thick the dust is
 const PACE = 2.0;             // metres a second, walking into it
 const GAP = 3.3;              // metres between one of them and the next
@@ -72,6 +72,33 @@ function facing(up, front, out) {
   return out.setFromRotationMatrix(_m.makeBasis(_e, up, _d));
 }
 
+/** Is the ground clear of the straight line between two places? (looked at every two metres, with `margin` to spare) */
+function clearLine(a, b, margin = 0.5) {
+  const n = Math.max(2, Math.ceil(a.distanceTo(b) / 2));
+  for (let i = 1; i < n; i++) { _e.copy(a).lerp(b, i / n); if (surfaceAt(_e) + margin > _e.length()) return false; }
+  return true;
+}
+/** How a body lies at `p` with its head toward `front`: along the ground there, whatever its slope. */
+function lying(p, front, out) {
+  const up = _a.copy(p).normalize(), f = _b.copy(front).addScaledVector(up, -front.dot(up)).normalize(), r = _c.crossVectors(up, f).normalize();
+  const o = ground(p, 0, V()), a = ground(_d.copy(p).addScaledVector(f, 1.6), 0, V()).sub(o), b = ground(_d.copy(p).addScaledVector(r, 0.7), 0, V()).sub(o);
+  const n = V().crossVectors(a, b).normalize();
+  if (n.dot(up) < 0) n.negate();
+  return facing(n, a.normalize(), out);
+}
+/** A glow with no edge and no core: for a fire seen through a hundred metres of dust. */
+function hazeTexture() {
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const d = Math.min(1, Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2) / (N / 2)), v = Math.pow(1 - d, 2.2) * (0.55 + 0.45 * Math.exp(-d * d * 9));
+    const k = (j * N + i) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = 255; img.data[k + 3] = Math.round(255 * v);
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
 let film = null;
 let fadeIn = 0;
 let ui = null;
@@ -99,7 +126,7 @@ function figure(glowMap) {
     holder.add(s);
     return s;
   };
-  const f = { root: holder, mixer, acts, now: '', lamp: spot(new THREE.Color(1.9, 1.7, 1.3), 1.0, 0, 1.74, 0.30), mark: spot(new THREE.Color(1.5, 0.22, 0.08), 0.5, 0, 1.38, -0.33) };
+  const f = { root: holder, mixer, acts, now: '', lamp: spot(new THREE.Color(2.2, 1.95, 1.5), 0.4, 0, 1.74, 0.30), mark: spot(new THREE.Color(1.9, 0.26, 0.08), 0.2, 0, 1.40, -0.34) };
   ctx.world.add(holder);
   return f;
 }
@@ -148,7 +175,16 @@ export function startOpening(done) {
   const door = ground(siteLocalToWorld(World.hab, 4, 0, 13, _a));
   const along = V().copy(hit).sub(door); along.addScaledVector(up, -along.dot(up)).normalize();       // the way they walk
   const lineLen = _a.copy(hit).sub(door).length();
-  const mavAt = ground(_a.copy(hit).addScaledVector(along, MAV_FAR));
+  // The rocket stands on along their line, or off to one side of it if a hill stands between that place and where he
+  // will lie: the first of these that its upper half can be seen from. (On rising ground the last shot was of a
+  // hillside with a glow behind it.)
+  const eye = ground(wake, 2.2);
+  let mavAt = null;
+  for (const deg of [0, 18, -18, 36, -36, 54, -54, 75, -75]) {
+    const at = ground(_a.copy(hit).addScaledVector(_b.copy(along).applyAxisAngle(up, deg * Math.PI / 180), MAV_FAR));
+    if (!mavAt) mavAt = at;
+    if (clearLine(eye, ground(at, 13, _c), 1.0)) { mavAt = at; break; }
+  }
   /** A place on their line, `s` metres from the door, `side` metres downwind of it, `h` over the ground. */
   const onLine = (s, side, h, out) => ground(out.copy(door).addScaledVector(along, s).addScaledVector(wind, side), h, out);
 
@@ -179,7 +215,9 @@ export function startOpening(done) {
   addLamp(lightLead, { color: 0xffedd2, power: 4.2, range: 11, decay: 1.5, level: () => st.lead });
   addLamp(lightMark, { color: 0xffedd2, power: 4.2, range: 11, decay: 1.5, level: () => st.mark });
   // ... and the engine's, when it lights: one lamp a hundred metres off that reaches all the way to him
-  addLamp(lightFire, { color: 0xff8a3c, power: 150, range: 420, decay: 1.0, level: () => st.fire });
+  // (It hangs over the pad, where the plume and the dust it lights are, and not at the nozzle: from ten metres up at
+  //  a hundred and twenty the ground is lit edge-on and takes nothing, and the launch changed nothing where he lay.)
+  addLamp(lightFire, { color: 0xff8a3c, power: 430, range: 480, decay: 1.0, level: () => st.fire });
 
   // ---- the ascent vehicle that leaves
   const mav = model('mav');
@@ -192,7 +230,8 @@ export function startOpening(done) {
   const ascent = mav.part('ascent'), ascentY = ascent ? ascent.position.y : 0;
   const flame = buildFlame();
   (mav.part('flame') || ascent || mavRoot).add(flame);
-  const fireGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color: new THREE.Color(2.6, 1.15, 0.42), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false }));
+  const hazeMap = hazeTexture();
+  const fireGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: hazeMap, color: new THREE.Color(2.4, 1.02, 0.36), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   fireGlow.renderOrder = 23;
   ctx.world.add(fireGlow);
   const strobe = ownMaterials(mav.part('strobe'));
@@ -206,13 +245,30 @@ export function startOpening(done) {
   dish.visible = false;
   ctx.world.add(dish);
 
-  // ---- where he comes to rest: as the game's own figure will lie when it begins (game/player.js, wakeOnGround)
-  const restQ = new THREE.Quaternion().copy(player.q).multiply(_q.setFromAxisAngle(_a.set(0, 1, 0), (player.face || 0) + Math.PI));
+  // ---- where he comes to rest: where the game's own figure will lie when it begins (game/player.js, wakeOnGround),
+  //      his head the way that one's is, and along the ground whatever its slope (level on a slope, he floated)
+  const restQ = lying(wake, _e.set(0, 0, 1).applyQuaternion(_q.copy(player.q).multiply(_q2.setFromAxisAngle(_a.set(0, 1, 0), (player.face || 0) + Math.PI))).clone(), new THREE.Quaternion());
+  // The last shot's camera: beyond him from what it looks toward, low, and no lower than it must be to see over
+  // the ground between (on a flat plain it is at his shoulder; under a rise it climbs until it sees over the crest).
+  const seat = (aim, aimH, back0, side) => {
+    const away = V().copy(wake).sub(aim); away.addScaledVector(up, -away.dot(up)).normalize();
+    const out = V(), target = ground(aim, aimH);
+    for (let h = 0.55; h <= 9; h += 0.45) {
+      out.copy(wake).addScaledVector(away, back0 + h * 1.25).addScaledVector(_a.crossVectors(up, away), side);
+      const r = Math.max(surfaceAt(out) + 0.45, wake.length() + h);
+      out.normalize().multiplyScalar(r);
+      if (clearLine(out, target, 0.35)) break;
+    }
+    return { at: out, target };
+  };
+  const crewAim = ground(_a.copy(hit).addScaledVector(along, 7));
+  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 2.9, -1.2);
 
   if (astro) astro.visible = false;
   S.mode = 'cutscene';
   World.launch = { burning: false, alt: 0, focus: wake.clone(), ground: true };
   World.opening = { hit: false, hero: null, t: 0 };
+  const heroAt = V();          // the middle of whoever the shot is about: the storm's veil thins there (main.js)
   buildUi();
   root.classList.add('is-opening');
   ui.line = -1;
@@ -232,13 +288,19 @@ export function startOpening(done) {
     // (into the wind, and into the walk: upright in that weather they were out for a stroll)
     if (lean) f.root.quaternion.premultiply(_q.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), -0.10 * lean)).premultiply(_q2.setFromAxisAngle(_a.crossVectors(_b, _c).normalize(), 0.09 * lean));
   };
-  /** How much of a lamp shows from the camera: all of it close to, a glow at fifty metres, nothing past a hundred and thirty. */
+  /**
+   * How much of a lamp shows from the camera: all of it close to, a glow at fifty metres, nothing past a hundred and
+   * thirty. The lamp on a helmet is seen from in front of it and the marker on a pack from behind: each a point with
+   * a little light round it. (As balls of light as big as the head, seen from every side, they were six people
+   * carrying lanterns on their shoulders.)
+   */
   const lampsSeen = () => {
     for (const f of cast) {
-      const d = _a.copy(f.root.position).sub(cam.position).length(), k = Math.exp(-(d / 78) * (d / 78));
-      const size = 0.55 + d * 0.035;
-      f.lamp.scale.setScalar(size * (f.lampK === undefined ? 1 : f.lampK)); f.lamp.material.opacity = 0.9 * k;
-      f.mark.scale.setScalar(0.3 + d * 0.022); f.mark.material.opacity = 0.85 * k * (f.markK === undefined ? 1 : f.markK);
+      const to = _a.copy(cam.position).sub(f.root.position), d = to.length(), k = Math.exp(-(d / 78) * (d / 78));
+      const front = _b.set(0, 0, 1).applyQuaternion(f.root.quaternion), toward = to.dot(front) / Math.max(d, 0.01);
+      const lampK = f.lampK === undefined ? 1 : f.lampK, markK = f.markK === undefined ? 1 : f.markK;
+      f.lamp.scale.setScalar((0.34 + d * 0.016) * (0.6 + 0.4 * lampK)); f.lamp.material.opacity = 0.95 * k * smoothstep(-0.15, 0.45, toward) * lampK;
+      f.mark.scale.setScalar(0.16 + d * 0.011); f.mark.material.opacity = 0.9 * k * smoothstep(-0.15, 0.45, -toward) * markK;
     }
   };
 
@@ -251,15 +313,16 @@ export function startOpening(done) {
     { let line = -1; for (let i = 0; i < LINES.length; i++) if (t >= LINES[i][0] && t < LINES[i][0] + LINES[i][1]) line = i; say(line); }
 
     if (t < T_WALK) {
-      // 1. The Hab at dusk in the storm, forty metres off: its porch lamps, its portholes and the beacon on its mast,
-      //    and the six of them coming out of the murk and past the lens, heads down.
-      setFov(38);
-      const s5 = 12 + PACE * t;
+      // 1. The Hab at dusk in the storm, thirty-five metres off: its porch lamps, its portholes and the beacon on
+      //    its mast, the rover left where it stands; and the six of them coming away from it, past the lens, heads
+      //    down. (From forty-five metres, with them between the lens and it, the Hab was a smudge behind six lamps.)
+      setFov(40);
+      const s5 = 3 + PACE * t;
       for (let i = 0; i < 6; i++) stand(cast[i], s5 + (5 - i) * GAP, (i % 2 ? 0.5 : -0.3), 0, 1);
       onLine(s5 + 5 * GAP + 2.2, 0, 1.3, lightLead.position);
       onLine(s5 + 2.2, 0, 1.3, lightMark.position);
-      onLine(41 + t * 0.25, 4.6, 1.15, cam.position);
-      onLine(6, -1.5, 2.6, _c);
+      onLine(27.5 + t * 0.2, 5.6, 1.1, cam.position);
+      ground(siteLocalToWorld(World.hab, 3.5, 0, 5, _a), 2.9, _c);
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(cam.position);
       World.opening.hero = null;
@@ -275,7 +338,7 @@ export function startOpening(done) {
       onLine(s5 + 7, -0.4, 1.25, _c);
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(cam.position);
-      World.opening.hero = t < T_HIT ? mark.root : null;
+      World.opening.hero = heroAt.copy(mark.root.position).addScaledVector(_b.copy(mark.root.position).normalize(), 1.0);
       if (t > T_HIT) shake(0.5 * (1 - (t - T_HIT) / (T_AWAY - T_HIT)));
     } else {
       // 3. From where he will lie, low, looking upwind: he and the dish come out of the murk; he rolls to rest by the
@@ -295,21 +358,21 @@ export function startOpening(done) {
       }
       onLine(lineLen + 3 * GAP, 0, 1.3, lightLead.position);
       st.lead = t < T_DIP ? 1 : 0;
-      setFov(t < T_BACK ? 44 : 40);
+      setFov(t < T_BACK ? 46 : 42);
       if (t < T_BACK) {
-        ground(_a.copy(wake).addScaledVector(wind, 2.4).addScaledVector(along, -1.3), 0.5, cam.position);
-        // (toward where they are, a little above the ground: he comes down the middle of it)
-        ground(_a.copy(hit).addScaledVector(along, 5), 1.5, _c);
+        // (he lies in the lower part of it, and beyond him is where they are: the lens looks between the two)
+        cam.position.copy(seatA.at);
+        _c.copy(seatA.target).lerp(_e.copy(wake).addScaledVector(up, 0.3), 0.42);
       } else {
-        // (nearer him now, and turned to where the rocket stands: it climbs through the top of the picture)
-        const rise = smoothstep(T_LIFT, T_LIFT + 3.4, t);
-        ground(_a.copy(wake).addScaledVector(wind, 2.2).addScaledVector(along, -2.4), 0.42, cam.position);
-        ground(_a.copy(mavAt), 9 + 46 * rise * rise, _c);
-        _c.lerp(_e.copy(wake).addScaledVector(up, 0.6), 0.17 * (1 - rise));
+        // (turned now to where the rocket stands, and it goes up with it: the fire climbs out of the top of the picture)
+        const rise = smoothstep(T_LIFT, T_LIFT + 3.6, t);
+        cam.position.copy(seatB.at).addScaledVector(up, 0.25 * rise);
+        ground(_a.copy(mavAt), 12 + 50 * rise * rise, _c);
+        _c.lerp(_e.copy(wake).addScaledVector(up, 0.3), 0.40 * (1 - rise));
       }
       camLookAt(_c, _b.copy(cam.position).normalize());
       World.launch.focus.copy(wake);
-      World.opening.hero = mark.root;
+      World.opening.hero = heroAt;       // (set below, where he is put)
     }
 
     // ---- the dish, and what it does to him
@@ -334,7 +397,8 @@ export function startOpening(done) {
       if (k >= 0) {
         const u = clamp(k / FLY, 0, 1), go = 1 - (1 - u) * (1 - u);
         _a.copy(hit).lerp(wake, go);
-        ground(_a, 1.25 * Math.sin(Math.PI * Math.min(1, u * 1.25)) * (1 - 0.55 * u), mark.root.position);
+        // (off his feet, a bound and a half, and then along the ground: he is thrown and then he rolls)
+        ground(_a, 1.1 * Math.abs(Math.sin(Math.PI * 1.5 * Math.min(1, u * 1.2))) * (1 - 0.8 * u), mark.root.position);
         _b.copy(mark.root.position).normalize();
         facing(_b, along, _q);
         _q.slerp(restQ, smoothstep(0.1, 1, u));
@@ -342,6 +406,8 @@ export function startOpening(done) {
         _q2.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), -Math.PI * 2 * smoothstep(0, 0.8, u));
         mark.root.quaternion.copy(_q2).multiply(_q);
         if (u >= 1) { mark.root.position.copy(wake); mark.root.quaternion.copy(restQ); }
+        // (his middle: a metre up while he is on his feet or in the air, and where his back is when he lies)
+        if (t >= T_AWAY) heroAt.copy(mark.root.position).addScaledVector(_a.set(0, 0, 1).applyQuaternion(mark.root.quaternion), 0.9 * u).addScaledVector(up, 1.0 - 0.75 * u);
         // his lamp: it flickers as he goes, and is out before the others have turned
         mark.lampK = (1 - smoothstep(1.1, 2.6, k)) * (0.55 + 0.45 * Math.sin(k * 41) * Math.sin(k * 17));
         mark.markK = 1 - smoothstep(1.4, 3.0, k);
@@ -365,10 +431,11 @@ export function startOpening(done) {
       if (P.glow) P.glow.material.opacity = through * 2;
       flame.getWorldPosition(_a);
       fireGlow.position.copy(_a);
-      fireGlow.scale.setScalar(26 + 30 * burn + alt * 0.5);
-      fireGlow.material.opacity = burn * (0.34 + 0.06 * Math.sin(t * 37)) * (1 - smoothstep(60, 170, alt)) * (t > T_BACK ? 1 : 0);
-      lightFire.position.copy(_a);
-      st.fire = burn * (1 - smoothstep(50, 170, alt)) * (0.9 + 0.1 * Math.sin(t * 31)) * (t > T_BACK ? 1 : 0);
+      // (the dust between is lit by it: a haze of light many times the size of the flame, that goes up with it and thins)
+      fireGlow.scale.setScalar(70 + 50 * burn + alt * 0.7);
+      fireGlow.material.opacity = burn * (0.50 + 0.07 * Math.sin(t * 37)) * (1 - smoothstep(60, 190, alt)) * (t > T_BACK ? 1 : 0);
+      lightFire.position.copy(_a).addScaledVector(up, 32);
+      st.fire = burn * (1 - smoothstep(70, 190, alt)) * (0.9 + 0.1 * Math.sin(t * 31)) * (t > T_BACK ? 1 : 0);
       for (const mm of strobe) mm.emissiveIntensity = Math.sin(t * 7) > 0.6 ? 1.6 : 0.04;
       mavRoot.visible = t > T_BACK - 0.2;
       World.launch.burning = burn > 0.02 && lt < 3.0;
@@ -398,7 +465,7 @@ export function startOpening(done) {
     flame.traverse((o) => { if (o.material) o.material.dispose(); if (o.geometry) o.geometry.dispose(); });
     for (const o of [mavRoot, dish, fireGlow]) ctx.world.remove(o);
     for (const mm of strobe) mm.dispose();
-    fireGlow.material.dispose(); glowMap.dispose();
+    fireGlow.material.dispose(); glowMap.dispose(); hazeMap.dispose();
     Snd.rumble(0);
     // the morning after, as the game has always begun
     S.tod = keep.tod; S.storm.i = keep.storm; S.storm.hold = keep.hold;
