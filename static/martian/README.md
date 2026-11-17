@@ -40,6 +40,13 @@ It runs on a desktop and on a phone, installs as an app (PWA) and plays offline 
 
 ## The game
 
+- **The opening**: a new game begins with a film of twenty-four seconds (`src/game/opening.js`):
+  the evacuation in the storm at dusk, the dish that takes him, the crew's lamps searching in the
+  wrong place, and the rocket leaving without him; then a card, THE NEXT MORNING, and the game
+  comes up on him lying where he fell, from where he gets to his feet with a hole in his suit.
+  What the crew say is set at the foot of the picture and kept in the journal's log. Skip (or
+  Escape, Enter, Space) leaves it at any moment; a continued game does not play it; `?nofilm`
+  in the URL starts a new game without it.
 - **Survival**: suit oxygen, Hab oxygen, water, food, power and health; burning hydrazine for
   water; solar panels that gather dust; roaming dust storms; a Hab breach; the cold of the
   night. A sol lasts eight minutes.
@@ -176,6 +183,13 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   nightfall, the air running low) and measures how long the task card stands open: nine seconds
   for a new task on foot, four and a half at the wheel, never beside a banner that has said what
   to do. It is part of the suite.
+- `node tools/tests/opening.mjs` plays the opening film from the title on a phone and checks it:
+  the HUD away, the lines and Skip at sizes a thumb and an eye can use and clear of the notch,
+  nothing saved from inside it, the card on the black, and that what it leaves is the game as it
+  begins without it (the hour, the weather, the suit, the place, nothing left in the scene), with
+  him on the ground and then on his feet. Skip and Escape end it at once. Every other test starts
+  its games without the film. `node tools/tests/film.mjs --opening [--hud] [--at 2.6,10.0,...]`
+  photographs moments of it. It is part of the suite.
 - `node tools/tests/motion.mjs` walks and drives eleven real routes with the stick held and
   flags what a still cannot show: no progress, a jump of the man or the camera, the man or the
   rover in the ground or over it, the camera in a rock, the rover hidden from the camera by the

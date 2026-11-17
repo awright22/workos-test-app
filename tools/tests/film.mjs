@@ -22,6 +22,8 @@ await mkdir(dir, { recursive: true });
 const g = await openGame({ quality: arg('--quality', 'medium'), width: W, height: H, touch: phone, dsf: phone ? 2 : 1, query: phone ? 'safe=0,47,21,47' : '' });
 if (!opening) await g.eval(async (G) => { await G.start(2.0, 303.7); G.skipIntro(); G.paused = true; G.S.storm.cells.forEach((c) => { c.peak = 0; }); G.setStorm(0); });
 if (!process.argv.includes('--hud')) await g.page.addStyleTag({ content: '#mg-root > *:not(canvas) { opacity: 0 !important; }' });
+// (the opening's words fade on the page's own clock, which here advances a frame a second: a still shows where each fade ends)
+if (opening) await g.page.addStyleTag({ content: '#mg-film .sub, #mg-film .later { transition: none !important; }' });
 if (opening) {
   // (a game just begun, nothing touched: the film is played over it, as it is from the title)
   await g.eval(async (G) => { await G.start(2.0, 303.7); G.paused = true; await G.settle(); G.startOpening(); await G.settle(); });

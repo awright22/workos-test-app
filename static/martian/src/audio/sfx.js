@@ -62,6 +62,12 @@ def('uiConfirm', { bus: 'ui', gap: 0.06, prio: 1, hall: 0.08, gain: 2.2, group: 
   E.tone(v, t, { f: n(K, 24), a: 0.003, d: 0.11, g: 0.045 });
   E.tone(v, t + 0.07, { f: n(K, 31), a: 0.003, d: 0.16, g: 0.05 });
 });
+// A radio keying up in his helmet: the click of the carrier and a breath of static. It goes before each thing the
+// crew say in the opening film (game/opening.js), which has no voices: the click says that the line is spoken.
+def('radioKey', { bus: 'ui', gap: 0.25, prio: 1, gain: 1.5 }, (E, v, t) => {
+  tick(E, v, t, 1900, 0.02, 0.012);
+  E.burst(v, t + 0.012, { hp: 1400, bp: 2400, q: 0.9, a: 0.004, h: 0.05, d: 0.09, g: 0.05 });
+});
 def('uiCancel', { bus: 'ui', gap: 0.06, prio: 1, hall: 0.05, gain: 2.8, group: 'uiPress' }, (E, v, t, o, K) => {
   tick(E, v, t, 1300, 0.03, 0.02);
   E.tone(v, t, { f: n(K, 24), f1: n(K, 19), glide: 0.09, a: 0.003, d: 0.14, g: 0.04 });

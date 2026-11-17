@@ -1,11 +1,12 @@
 // The opening: how he came to be alone. A new game begins with it, and it ends where the game has always begun: on
 // his face in the sand, eighty-five metres from the Hab, with a hole in his suit.
 //
-// It is the evacuation, as the book has it, in twenty-five seconds and three shots:
+// It is the evacuation, as the book has it, in twenty-four seconds and three shots:
 //   1  the Hab in the storm at dusk, its lamps and beacon in the murk, and six people filing out past the lens
 //   2  the walk to the ascent vehicle, from behind the last of them; something comes out of the storm and takes him
 //   3  from where he lies: lamps that search in the wrong place and go; then, far off, a rocket leaving without him
-// and then black, and morning, and the first second of play.
+// and then black, a card on it (a night has passed), and morning: the game comes up on him lying where he fell, and
+// he gets to his feet (game/player.js, wakeOnGround).
 //
 // A storm is the weakest thing this game draws (it is laid over the finished picture and knows no depth), so the
 // film is made of what does work in one: silhouettes and lamps in a brown dusk. Nothing in it is seen clearly but
@@ -45,8 +46,11 @@ const T_BACK = 15.9;          // ... and back, on him
 const T_FIRE = 17.0;          // ignition
 const T_LIFT = 17.7;          // lift-off
 const T_OUT = 21.3;           // the fade to black begins
-const T_END = 23.0;           // morning
-const WAKE_FADE = 1.3;        // seconds the first picture of the game takes to come up out of the black
+const T_CARD = 22.2;          // on the black, a card: the night has passed
+const T_END = 24.3;           // morning
+const WAKE_FADE = 0.9;        // seconds the first picture of the game takes to come up out of the black
+const WAKE_RISE = 3.2;        // ... and that he takes to get from the ground to his feet (game/player.js, wakeOnGround)
+const CARD = 'The next morning';
 const LINES = [
   [0.7, 4.0, 'LEWIS', 'That’s the abort line. Everyone to the MAV.'],
   [5.5, 3.8, 'MARTINEZ', 'MAV’s leaning, Commander. Wind’s still climbing.'],
@@ -86,12 +90,16 @@ function lying(p, front, out) {
   if (n.dot(up) < 0) n.negate();
   return facing(n, a.normalize(), out);
 }
-/** A glow with no edge and no core: for a fire seen through a hundred metres of dust. */
+/**
+ * A glow with no edge and no core: for a fire seen through a hundred metres of dust. It falls away from its middle
+ * all the way out, steeply and then for a long way gently. (Flat across its middle and falling only near its rim, it
+ * was a disc of light with the rocket in front of it.)
+ */
 function hazeTexture() {
   const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
-  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  const g = c.getContext('2d'), img = g.createImageData(N, N), rim = 0.72 * Math.exp(-9) + 0.28 * Math.exp(-2.6);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const d = Math.min(1, Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2) / (N / 2)), v = Math.pow(1 - d, 2.2) * (0.55 + 0.45 * Math.exp(-d * d * 9));
+    const d = Math.min(1, Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2) / (N / 2)), v = Math.max(0, 0.72 * Math.exp(-d * d * 9) + 0.28 * Math.exp(-d * d * 2.6) - rim) / (1 - rim) * (1 - d * d * d);
     const k = (j * N + i) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = 255; img.data[k + 3] = Math.round(255 * v);
   }
   g.putImageData(img, 0, 0);
@@ -120,15 +128,27 @@ function figure(glowMap) {
   if (acts.Collapse) { acts.Collapse.setLoop(THREE.LoopOnce, 1); acts.Collapse.clampWhenFinished = true; }
   const holder = new THREE.Group();
   holder.add(a.root);
-  const spot = (color, size, x, y, z) => {
+  ctx.world.add(holder);
+  const spot = (color, on, x, y, z) => {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    s.scale.setScalar(size); s.position.set(x, y, z); s.renderOrder = 22;
-    holder.add(s);
+    s.renderOrder = 22;
+    // (a sprite takes its size from what it hangs on: `per` undoes that, so its size is in metres whatever it hangs on)
+    on.add(s); s.position.set(x, y, z);
+    on.updateWorldMatrix(true, false);
+    s.userData.per = 1 / (on.getWorldScale(_a).x || 1);
     return s;
   };
-  const f = { root: holder, mixer, acts, now: '', lamp: spot(new THREE.Color(2.2, 1.95, 1.5), 0.4, 0, 1.74, 0.30), mark: spot(new THREE.Color(1.9, 0.26, 0.08), 0.2, 0, 1.40, -0.34) };
-  ctx.world.add(holder);
-  return f;
+  // (the two lamps at the sides of the helmet, where the suit has them: a glow hung in front of the visor was a
+  //  lantern carried where the face is)
+  const white = new THREE.Color(1.35, 1.2, 0.95), anchors = [a.part('lamp_L'), a.part('lamp_R')].filter(Boolean);
+  const lamps = anchors.length ? anchors.map((o) => spot(white, o, 0, 0, 0)) : [spot(white, holder, 0.13, 1.8, 0.16), spot(white, holder, -0.13, 1.8, 0.16)];
+  // (the marker is on his pack, and goes where his back goes: hung over his feet, it stood in the air a metre and a
+  //  half over a man lying on his face)
+  let chest = null;
+  a.inner.traverse((o) => { if (!chest && o.isBone && o.name === 'chest') chest = o; });
+  const at = _b.set(0, 1.40, -0.34);
+  if (chest) { holder.updateWorldMatrix(true, true); chest.worldToLocal(holder.localToWorld(at)); }
+  return { root: holder, mixer, acts, now: '', lamps, mark: spot(new THREE.Color(1.9, 0.26, 0.08), chest || holder, at.x, at.y, at.z) };
 }
 function act(f, name, fade = 0.3) {
   if (f.now === name || !f.acts[name]) return;
@@ -141,8 +161,8 @@ function act(f, name, fade = 0.3) {
 
 function buildUi() {
   if (ui) return ui;
-  const box = el('div', 'mg-film', null, root, '<p class="sub" role="status"><b></b><span></span></p><button type="button" class="skip">Skip</button>');
-  ui = { box, sub: box.querySelector('.sub'), who: box.querySelector('.sub b'), said: box.querySelector('.sub span'), skip: box.querySelector('.skip'), line: -1 };
+  const box = el('div', 'mg-film', null, root, `<p class="sub" role="status"><b></b><span></span></p><p class="later">${CARD}</p><button type="button" class="skip">Skip</button>`);
+  ui = { box, sub: box.querySelector('.sub'), who: box.querySelector('.sub b'), said: box.querySelector('.sub span'), card: box.querySelector('.later'), skip: box.querySelector('.skip'), line: -1 };
   ui.skip.addEventListener('click', () => skipOpening());
   window.addEventListener('keydown', (ev) => {
     if (!film) return;
@@ -156,6 +176,7 @@ function say(i) {
   if (i < 0) { ui.sub.classList.remove('on'); return; }
   ui.who.textContent = LINES[i][2]; ui.said.textContent = LINES[i][3];
   ui.sub.classList.add('on');
+  Snd.play('radioKey');
   // (and it is in the journal's log afterwards, as everything said over the radio is)
   log(`${LINES[i][2]}: ${LINES[i][3]}`, 'radio', { quiet: true });
 }
@@ -262,7 +283,14 @@ export function startOpening(done) {
     return { at: out, target };
   };
   const crewAim = ground(_a.copy(hit).addScaledVector(along, 7));
-  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 2.9, -1.2);
+  const seatA = seat(crewAim, 1.5, 3.0, 1.3), seatB = seat(mavAt, 12, 3.1, 0.7);
+
+  // (the ground under the middle of him as he will lie, a pace ahead of where his feet are)
+  const restMid = ground(V().set(0, 0, 0.9).applyQuaternion(restQ).add(wake)), mid = V(), off = V();
+  // (the dish, having hit him, goes off to the side the lens is not on: straight on, it went through the lens)
+  const veer = V().crossVectors(up, wind).normalize();
+  if (_a.copy(seatA.at).sub(wake).dot(veer) > 0) veer.negate();
+  const CLIP_PACE = 2.2 / (FLY + 0.25);      // his fall is the game's Collapse clip (2.2 s: to his knees, then onto his face), a little hurried
 
   if (astro) astro.visible = false;
   S.mode = 'cutscene';
@@ -299,8 +327,8 @@ export function startOpening(done) {
       const to = _a.copy(cam.position).sub(f.root.position), d = to.length(), k = Math.exp(-(d / 78) * (d / 78));
       const front = _b.set(0, 0, 1).applyQuaternion(f.root.quaternion), toward = to.dot(front) / Math.max(d, 0.01);
       const lampK = f.lampK === undefined ? 1 : f.lampK, markK = f.markK === undefined ? 1 : f.markK;
-      f.lamp.scale.setScalar((0.34 + d * 0.016) * (0.6 + 0.4 * lampK)); f.lamp.material.opacity = 0.95 * k * smoothstep(-0.15, 0.45, toward) * lampK;
-      f.mark.scale.setScalar(0.16 + d * 0.011); f.mark.material.opacity = 0.9 * k * smoothstep(-0.15, 0.45, -toward) * markK;
+      for (const l of f.lamps) { l.scale.setScalar((0.13 + d * 0.017) * (0.6 + 0.4 * lampK) * l.userData.per); l.material.opacity = 0.95 * k * smoothstep(-0.15, 0.45, toward) * lampK; }
+      f.mark.scale.setScalar((0.16 + d * 0.011) * f.mark.userData.per); f.mark.material.opacity = 0.9 * k * smoothstep(-0.15, 0.45, -toward) * markK;
     }
   };
 
@@ -380,34 +408,43 @@ export function startOpening(done) {
       const k = t - T_HIT, fromHit = k * 17;
       dish.visible = k > -1.7 && k < FLY + 2.2;
       if (dish.visible) {
-        // (it comes along the wind a metre and a half up, turning over; after him it goes on, lower, and is gone)
-        const along1 = k < 0 ? fromHit * 1.5 : fromHit, h = 1.5 + 0.5 * Math.sin(k * 5) - (k > 0 ? Math.min(0.9, k * 0.5) : 0);
-        ground(_a.copy(hit).addScaledVector(wind, along1), h, dish.position);
+        // (it comes along the wind two metres up, turning over; after him it goes on, lower and off to one side, and is gone)
+        const along1 = k < 0 ? fromHit * 1.5 : fromHit, h = 1.9 + 0.4 * Math.sin(k * 5) - (k > 0 ? Math.min(0.8, k * 0.5) : 0);
+        ground(_a.copy(hit).addScaledVector(wind, along1).addScaledVector(veer, Math.max(0, k) * 5), h, dish.position);
         _b.copy(dish.position).normalize();
         facing(_b, wind, dish.quaternion);
-        dish.quaternion.multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), k * 7.3)).multiply(_q2.setFromAxisAngle(_a.set(0, 0, 1), 0.6 + k * 2.1));
+        // (end over end along the wind, its mast leaning well out of the plane it turns in: so it is never upright,
+        //  and no moment of it is a dish standing on its foot in the sand)
+        dish.quaternion.multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), k * 7.3)).multiply(_q2.setFromAxisAngle(_a.set(0, 0, 1), 0.95 + 0.25 * Math.sin(k * 3.1)));
       }
       if (k >= 0 && !struck) {
         struck = true;
         World.opening.hit = true;                      // (from here his suit is holed: the sound of it begins. See audio/driver.js)
         Snd.play('roverThud'); Snd.play('land', { hard: true, g: 1 });
         act(mark, 'Collapse', 0.12);
-        if (mark.acts.Collapse) mark.acts.Collapse.setEffectiveTimeScale(2.2 / (FLY + 0.25));
+        if (mark.acts.Collapse) mark.acts.Collapse.setEffectiveTimeScale(CLIP_PACE);
       }
       if (k >= 0) {
         const u = clamp(k / FLY, 0, 1), go = 1 - (1 - u) * (1 - u);
-        _a.copy(hit).lerp(wake, go);
-        // (off his feet, a bound and a half, and then along the ground: he is thrown and then he rolls)
-        ground(_a, 1.1 * Math.abs(Math.sin(Math.PI * 1.5 * Math.min(1, u * 1.2))) * (1 - 0.8 * u), mark.root.position);
-        _b.copy(mark.root.position).normalize();
+        // Thrown, once over in the air, down on his knees, and onto his face: it is the middle of him that is flung
+        // and that he turns about. (Turned about his feet, which is where a figure's origin is, he went over with
+        // his head a metre under the sand.) Where his middle is in his own frame follows the clip: over his feet
+        // standing, lower and ahead of them on his knees, a pace ahead and on the ground lying.
+        const tc = k * CLIP_PACE, kn = smoothstep(0, 0.8, tc), dn = smoothstep(1.02, 1.74, tc);
+        off.set(0, 1.0 - 0.35 * kn - 0.45 * dn, 0.4 * kn + 0.5 * dn);
+        // (one long bound that he turns over in, his knees down at the end of it, and a short one that he pitches forward in)
+        const lift = 1.3 * Math.abs(Math.sin(Math.PI * 1.5 * Math.min(1, u / 0.83))) * Math.pow(1 - u, 1.5);
+        ground(_a.copy(hit).lerp(restMid, go), off.y + lift, mid);
+        _b.copy(mid).normalize();
         facing(_b, along, _q);
         _q.slerp(restQ, smoothstep(0.1, 1, u));
-        // (once over, about the axis square to the wind, and done turning before he is down)
-        _q2.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), -Math.PI * 2 * smoothstep(0, 0.8, u));
+        // (over the way the blow sends him, his head downwind first, and done turning before his knees are down)
+        _q2.setFromAxisAngle(_a.crossVectors(_b, wind).normalize(), Math.PI * 2 * smoothstep(0, 0.6, u));
         mark.root.quaternion.copy(_q2).multiply(_q);
-        if (u >= 1) { mark.root.position.copy(wake); mark.root.quaternion.copy(restQ); }
-        // (his middle: a metre up while he is on his feet or in the air, and where his back is when he lies)
-        if (t >= T_AWAY) heroAt.copy(mark.root.position).addScaledVector(_a.set(0, 0, 1).applyQuaternion(mark.root.quaternion), 0.9 * u).addScaledVector(up, 1.0 - 0.75 * u);
+        mark.root.position.copy(mid).sub(off.applyQuaternion(mark.root.quaternion));
+        // (and the last of the slide brings him exactly to where the game's own figure lies)
+        { const settle = smoothstep(0.8, 1, u); mark.root.position.lerp(wake, settle); mark.root.quaternion.slerp(restQ, settle); }
+        if (t >= T_AWAY) heroAt.copy(mid);
         // his lamp: it flickers as he goes, and is out before the others have turned
         mark.lampK = (1 - smoothstep(1.1, 2.6, k)) * (0.55 + 0.45 * Math.sin(k * 41) * Math.sin(k * 17));
         mark.markK = 1 - smoothstep(1.4, 3.0, k);
@@ -432,8 +469,8 @@ export function startOpening(done) {
       flame.getWorldPosition(_a);
       fireGlow.position.copy(_a);
       // (the dust between is lit by it: a haze of light many times the size of the flame, that goes up with it and thins)
-      fireGlow.scale.setScalar(70 + 50 * burn + alt * 0.7);
-      fireGlow.material.opacity = burn * (0.50 + 0.07 * Math.sin(t * 37)) * (1 - smoothstep(60, 190, alt)) * (t > T_BACK ? 1 : 0);
+      fireGlow.scale.setScalar(100 + 70 * burn + alt * 0.9);
+      fireGlow.material.opacity = burn * (0.46 + 0.06 * Math.sin(t * 37)) * (1 - smoothstep(60, 190, alt)) * (t > T_BACK ? 1 : 0);
       lightFire.position.copy(_a).addScaledVector(up, 32);
       st.fire = burn * (1 - smoothstep(70, 190, alt)) * (0.9 + 0.1 * Math.sin(t * 31)) * (t > T_BACK ? 1 : 0);
       for (const mm of strobe) mm.emissiveIntensity = Math.sin(t * 7) > 0.6 ? 1.6 : 0.04;
@@ -447,6 +484,7 @@ export function startOpening(done) {
     }
 
     lampsSeen();
+    ui.card.classList.toggle('on', t >= T_CARD && t < T_END - 0.5);
     // ---- up out of black, down to it between the two parts of the last shot, and out
     e.final.uniforms.uFade.value = Math.max(1 - smoothstep(0.15, 1.1, t), 1 - smoothstep(0, 0.32, Math.abs(t - (T_DIP + T_BACK) / 2) - 0.1), smoothstep(T_OUT, T_OUT + 1.0, t));
     if (t >= T_END) finish();
@@ -456,10 +494,11 @@ export function startOpening(done) {
     if (!film) return;
     film = null;
     say(-1);
+    ui.card.classList.remove('on');
     root.classList.remove('is-opening');
     // the props go, and with them the three lamps
     for (const o of [lightLead, lightMark, lightFire]) { removeLampsOf(o); ctx.world.remove(o); }
-    for (const f of cast) { f.mixer.stopAllAction(); ctx.world.remove(f.root); f.lamp.material.dispose(); f.mark.material.dispose(); }
+    for (const f of cast) { f.mixer.stopAllAction(); ctx.world.remove(f.root); for (const l of f.lamps) l.material.dispose(); f.mark.material.dispose(); }
     for (let i = 0; i < lampMats.length; i++) lampMats[i].emissiveIntensity = keep.lampGlow[i];
     flame.removeFromParent();
     flame.traverse((o) => { if (o.material) o.material.dispose(); if (o.geometry) o.geometry.dispose(); });
@@ -475,7 +514,7 @@ export function startOpening(done) {
     World.launchAnim = null; World.launch = null; World.opening = null;
     if (astro) astro.visible = true;
     resetWalkCamera();
-    wakeOnGround(WAKE_FADE + 0.5);
+    wakeOnGround(WAKE_RISE);
     e.snapLight = 3;
     e.final.uniforms.uFade.value = 1;
     fadeIn = WAKE_FADE;

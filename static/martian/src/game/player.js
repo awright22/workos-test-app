@@ -282,15 +282,23 @@ function play(name, fade = 0.22, restart = false) {
 /**
  * He begins on the ground, as he fell, and gets to his feet over `sec` seconds (sooner if he is made to walk): the
  * opening film ends on him lying there (game/opening.js), and the first picture of the game is of him coming to.
+ * It is his fall run backwards (see updateAstronaut): he lies a moment, pushes up onto his knees, and stands.
+ * (A cross-fade from lying to standing was tried first: the clip chain took him to his feet in a fifth of a second,
+ * and held off, it tilted him up from the ground as stiff as a plank.)
  */
-export function wakeOnGround(sec = 1.6) {
+export function wakeOnGround(sec = 3.2) {
   const a = anim.actions.Collapse;
   if (!a) return;
   play('Collapse', 0, true);
   a.time = a.getClip().duration;
+  a.setEffectiveTimeScale(0);
   anim.mixer.update(0);
-  anim.rise = sec;
+  anim.rise = sec; anim.riseOf = sec;
 }
+const RISE_LIES = 0.15;          // the part of the time he is given that he lies still for
+const RISE_WALKS = 0.3;          // ... and the last part of it, off his knees, in which he can be walked
+/** While he gets up: how far up he is, 0 on the ground to 1 on his feet (1 at any other time). */
+function risen() { return anim.rise > 0 && anim.riseOf > 0 ? clamp(1 - anim.rise / anim.riseOf, 0, 1) : 1; }
 
 /** The pose an interaction uses: standing at a console, or kneeling at something on the ground. */
 const _iq = new THREE.Quaternion(), _ipq = new THREE.Quaternion(), _idq = new THREE.Quaternion(), _iv = new THREE.Vector3(), _iw = new THREE.Vector3(), _it = new THREE.Vector3();
@@ -407,12 +415,19 @@ export function updateAstronaut(dt) {
   const working = input.eHeld && interaction.active && S.holdT > 0.02 && !driving;
   let ts = 1;
   if (driving || !player.onGround || S.over) anim.kneel = 0;
-  // (coming to: from the ground to his feet, over what is left of the time he was given, or at once if he is walking)
+  // Coming to: the fall, backwards. The clip is held and its time is set from here: still on the ground at first, up
+  // onto his knees, and to his feet, sooner if the stick is pushed. Nothing else below takes him while it runs; once
+  // he is off his knees and walking it lets go, and the clips below take him from wherever it had got to.
+  let rising = false;
   if (anim.rise > 0) {
-    if (anim.name === 'Collapse' && !(S.over && S.dead)) play('Idle', player.speed > 0.4 ? 0.4 : Math.max(0.4, anim.rise));
-    anim.rise -= dt;
+    const a = anim.actions.Collapse;
+    anim.rise -= dt * (moveInputMag().mag > 0.12 ? 1.6 : 1);
+    const up = risen();
+    if (!a || anim.name !== 'Collapse' || (S.over && S.dead) || driving || (up > 1 - RISE_WALKS && player.speed > 0.6)) anim.rise = 0;
+    else if (anim.rise > 0) { rising = true; ts = 0; a.time = a.getClip().duration * (1 - ease((up - RISE_LIES) / (1 - RISE_LIES))); }
   }
-  if (S.over && S.dead) play('Collapse', 0.25);
+  if (rising) { /* (see above) */ }
+  else if (S.over && S.dead) play('Collapse', 0.25);
   // (seen from his own seat he is in it at once: for the third of a second it took him to settle from the climb, his
   //  own helmet stood in front of the camera)
   else if (driving) { play('Drive', World.rover.seatView ? 0.01 : 0.3); holdDrive(World.rover.wheelTurn || 0); }
@@ -619,6 +634,8 @@ export function updateWalk(dt) {
   const hurt = S.health < 35 || S.suit < 6;
   let top = wantRun ? BAL.runSpeed : BAL.walkSpeed;
   if (hurt) top *= 0.55;
+  // (on the ground, and on his knees, he goes nowhere: his feet are his own again as he stands)
+  if (anim.rise > 0) top *= clamp((risen() - (1 - RISE_WALKS)) / RISE_WALKS, 0, 1);
   let tx = 0, tz = 0;
   if (mv.mag > 0.12 && !working) { const l = Math.hypot(mv.mx, mv.mz); tx = (mv.mx / l) * top * mv.mag; tz = (mv.mz / l) * top * mv.mag; }
   // getting into the rover: his feet are not the player's for that moment. He steps to its hull (game/rover.js).
