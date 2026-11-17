@@ -190,6 +190,10 @@ The interface lives in `src/ui/` and is built into `game.css` and `game.js` by `
   him on the ground and then on his feet. Skip and Escape end it at once. Every other test starts
   its games without the film. `node tools/tests/film.mjs --opening [--hud] [--at 2.6,10.0,...]`
   photographs moments of it. It is part of the suite.
+- `node tools/tests/steps.mjs` measures his steps in the running game: a planted boot stays where it was put
+  (at a stroll, a walk, a run, and for the opening film's figures), and a step is counted, and sounds, each time
+  a boot comes down; and at a walk a boot comes through low. Each walking clip is played at the pace its own
+  planted boot goes back at (the Walk clip's 5.1 m/s, the Run clip's 9.2). It is part of the suite.
 - `node tools/tests/motion.mjs` walks and drives eleven real routes with the stick held and
   flags what a still cannot show: no progress, a jump of the man or the camera, the man or the
   rover in the ground or over it, the camera in a rock, the rover hidden from the camera by the
