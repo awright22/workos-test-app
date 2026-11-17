@@ -55,8 +55,9 @@ const has = (r, ...names) => names.every((n) => r.h.includes(n));
 let r = await act(async () => { await window.__run(0.4); });
 check('cold open: outside, suit leaking', r.p.scene === 'play' && r.p.place === 'outside' && r.p.leak === true && r.p.o2 < 0.6, { scene: r.p.scene, place: r.p.place, leak: r.p.leak });
 
-r = await act(async (G) => { G.input.keys.w = true; await window.__run(1.6); G.input.keys.w = false; });
-check('walking makes footsteps', r.h.filter((n) => n === 'step').length >= 3 && r.p.move === 1, r.h);
+// (a step sounds when a boot comes down, and at a walk that is three times in two seconds: see steps.mjs)
+r = await act(async (G) => { G.input.keys.w = true; await window.__run(2.8); G.input.keys.w = false; });
+check('walking makes footsteps', r.h.filter((n) => n === 'step').length >= 3 && r.h.filter((n) => n === 'step').length <= 6 && r.p.move === 1, r.h);
 
 r = await act(async (G) => { G.tpLocal(0, 10); await window.__run(2.5, true); });
 check('sealing the suit: its own sound, tool work while holding, leak stops', has(r, 'suitSeal', 'work_tool') && r.p.leak === false, r.h);

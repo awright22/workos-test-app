@@ -3,9 +3,8 @@
 import { clamp, smooth } from './dsp.js';
 import { Layer } from './engine.js';
 
-// The walk animation swings each leg with sin(gait). A foot lands just after its leg is furthest
-// forward (the joints trail their targets by about a tenth of a second), twice per cycle.
-const STRIKE = Math.PI / 2 + 0.6;
+// A step sounds when a boot comes down: the game counts his footfalls from his feet as they are drawn (see
+// updateAstronaut in game/player.js), and this plays one sound for each. It keeps no time of its own.
 /** Seconds between two "work" sounds for each kind of held action. */
 const WORK_EVERY = { dig: 0.5, wipe: 0.42, tool: 0.46, soft: 0.55 };
 
@@ -19,7 +18,7 @@ function buildHold(E, L) {
 export class Movement {
   constructor(E, sys) {
     this.E = E; this.sys = sys;
-    this.lastIdx = null; this.side = 1;
+    this.lastSteps = null; this.side = 1;
     this.wasGround = true; this.peak = 0;
     this.hold = new Layer(E, buildHold);
     this.workNext = -1;
@@ -31,14 +30,13 @@ export class Movement {
     const hard = p.place === 'hab';
 
     // ---- footsteps ----
-    const idx = Math.floor((p.gait - STRIKE) / Math.PI);
-    if (afoot && p.onGround && p.move > 0.12 && this.lastIdx !== null && idx !== this.lastIdx) {
-      this.side = -this.side;
+    if (afoot && p.onGround && this.lastSteps !== null && p.steps !== this.lastSteps) {
+      this.side = p.stepSide || -this.side;
       const weight = (p.run ? 1.25 : 0.85) * (0.7 + 0.3 * p.move) * E.rr(0.88, 1.12);
       sys.play('step', { hard, g: weight, pan: this.side * 0.14 });
       if (E.rand() < (p.run ? 0.85 : 0.5)) sys.play('rustle', { g: p.run ? 1.6 : 1, delay: p.run ? 0.14 : 0.22, pan: -this.side * 0.25 });
     }
-    this.lastIdx = idx;
+    this.lastSteps = p.steps;
 
     // ---- leaving the ground and coming back ----
     if (afoot) {

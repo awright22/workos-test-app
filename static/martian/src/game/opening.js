@@ -32,7 +32,8 @@ import { reducedMotion } from '../ui/settings.js';
 
 const HOUR = 18.68;           // local time of the film: the sun just down, a brown dusk (a few minutes later it is night, and no dust shows)
 const STORM = 0.92;           // how thick the dust is
-const PACE = 2.0;             // metres a second, walking into it
+const PACE = 3.0;             // metres a second, into it: people leaving in a hurry
+const WALK_PACE = 5.1;        // the pace the Walk clip's planted boot goes back at (game/player.js): a figure's clip is played at its own pace over this
 const GAP = 3.3;              // metres between one of them and the next
 const CARRY = 28;             // metres the thing that hits him carries him, downwind, out of their sight
 const MAV_FAR = 115;          // metres from where he is hit to the ascent vehicle, further along their line
@@ -357,6 +358,11 @@ export function startOpening(done) {
 
   /** Stand one of them on the line: `s` metres along it, `side` to one side, facing `turn` radians round from the way they walk. */
   const stand = (f, s, side, turn, lean) => {
+    // (how fast it is going along the line, from where it stood a frame ago: its walk is played at that pace, so that
+    //  a boot that is down stays where it was put. At the clip's own pace whatever they did, they skated: three
+    //  metres of ground a second went by under boots that were going back at five.)
+    if (f.sWas !== undefined && frameDt > 0 && Math.abs(s - f.sWas) < 1.5) f.v = Math.abs(s - f.sWas) / frameDt;
+    f.sWas = s;
     onLine(s, side, 0, f.root.position);
     _b.copy(f.root.position).normalize();
     _c.copy(along).applyAxisAngle(_b, turn);
@@ -380,9 +386,10 @@ export function startOpening(done) {
     }
   };
 
+  let frameDt = 0;
   const step = (dt) => {
     if (t === 0 && dt > 0 && waited < 2 && (calls++ < 3 || groundBusy())) { waited += dt; dt = 0; }
-    t += dt;
+    t += dt; frameDt = dt;
     World.opening.t = t;
     flameTime.value = t;
     for (const f of cast) f.mixer.update(dt);
@@ -434,12 +441,12 @@ export function startOpening(done) {
       for (let i = 0; i < 5; i++) {
         const f = cast[i], base = lineLen + (5 - i) * GAP + PACE * Math.min(after, 0.9) + (0.5 * PACE) * clamp(after - 0.9, 0, 1) * 0.5;
         const back = (i >= 3 ? 1 : 0.25) * smoothstep(2.2, 3.6, after) * (5 - i) * GAP * 0.8;
-        const gone = Math.max(0, after - T_GO) * 3.4;
+        const gone = Math.max(0, after - T_GO) * 5.1;
         const turn = Math.PI * smoothstep(1.2, 2.0, after) * (1 - smoothstep(T_GO - 0.2, T_GO + 0.4, after)) + 0.8 * Math.sin(after * 1.7 + i * 1.9) * smoothstep(1.6, 2.4, after) * (1 - smoothstep(T_GO - 0.3, T_GO + 0.2, after));
         stand(f, base - back + gone, (i % 2 ? 0.5 : -0.3), turn, after > T_GO ? 1 : 0.3);
         const moving = after < 1.4 || (after > 2.2 && after < 3.6) || after > T_GO;
         act(f, moving ? 'Walk' : 'Idle', 0.35);
-        if (f.acts.Walk) f.acts.Walk.setEffectiveTimeScale(after > T_GO ? 1.5 : 1);
+
         f.root.visible = t < T_DIP + 0.4;
       }
       onLine(lineLen + 3 * GAP, 0, 1.3, lightLead.position);
@@ -553,6 +560,8 @@ export function startOpening(done) {
       if (t > T_FIRE && t < T_OUT) shake(0.06 * burn * (1 - smoothstep(0, 4.5, lt)));
     }
 
+    // (each of them walks at the pace it is going at)
+    for (const f of cast) if (f.now === 'Walk' && f.acts.Walk && f.v !== undefined && f !== mark || (f === mark && !struck && f.acts.Walk && f.v !== undefined)) f.acts.Walk.setEffectiveTimeScale(clamp(f.v / WALK_PACE, 0.3, 1.4));
     lampsSeen();
     ui.card.classList.toggle('on', t >= T_CARD && t < T_END - 0.5);
     // ---- up out of black, down to it between the two parts of the last shot, and out

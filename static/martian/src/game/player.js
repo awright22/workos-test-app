@@ -33,6 +33,7 @@ export function camLookAt(target, up) {
 export const player = {
   q: new THREE.Quaternion(),        // control frame: local +Y = up, -Z = camera heading
   pitch: -0.12, alt: 0, vy: 0, onGround: true, bob: 0,
+  steps: 0, stepSide: 1,            // footfalls counted from his feet as they are drawn, and which foot the last was (see updateAstronaut)
   pos: new THREE.Vector3(),         // world position (feet), derived each frame
   up: new THREE.Vector3(0, 1, 0),
   eyeH: 1.68,
@@ -165,7 +166,7 @@ const AIR_SIGN = 1;
 const anim = { mixer: null, actions: {}, current: null, bones: {}, lamp: null, blob: null, lampMats: [], inner: null, seated: false, stepPhase: 0, lastClipTime: 0,
   helmet: [], head: [], bare: false, airT: 0 };
 const RUN_SPEED = 9.2;                         // the game's running pace, which the Run clip's stride is made for (he walks at 5.1)
-const STROLL_SPEED = 2.2, LOPE_FROM = 3.1;     // the pace the Walk clip's own stride makes, and the pace from which he lopes
+const WALK_PACE = 5.1, LOPE_FROM = 4.6;       // the pace the Walk clip's planted foot goes back at (measured: 5.11 m/s), and the pace from which he lopes
 const KNEEL_T = 0.45, KNEEL_PACE = 0.8;        // length of the KneelDown and KneelUp clips, and how fast they are played (a touch slower: it is a man in a suit)
 
 const _padA = new THREE.Vector3(), _padB = new THREE.Vector3();
@@ -193,7 +194,7 @@ export function buildAstronaut() {
       const pad = new THREE.Mesh(padGeo, anim.blob.material.clone());
       pad.position.y = 0.024; pad.renderOrder = 3; pad.visible = false;
       astro.add(pad);
-      return { mesh: pad, foot: m.part('foot_' + side), toe: m.part('toe_' + side), rest: 0 };
+      return { mesh: pad, foot: m.part('foot_' + side), toe: m.part('toe_' + side), rest: 0, side: side === 'L' ? -1 : 1, down: true };
     }).filter((pd) => pd.foot && pd.toe);
     for (const pd of anim.pads) { pd.foot.getWorldPosition(_padA); pd.toe.getWorldPosition(_padB); pd.rest = astro.worldToLocal(_padA.lerp(_padB, 0.5)).y; }
   }
@@ -462,13 +463,14 @@ export function updateAstronaut(dt) {
     anim.kneel = 0;                                      // off at once: he is already moving
     const hurt = S.health < 35 || S.suit < 6;
     if (hurt && player.speed < 4) { play('Stagger', 0.3); ts = clamp(player.speed / 2.4, 0.6, 1.3); }
-    // Above a stroll he lopes. On Mars a man leaves the ground between steps from little more than a metre a second,
-    // and it is the Run clip that has a flight in it and a stride to match: played slowly at the game's walking pace
-    // it is the long floating step of a man in a third of a gravity. (The Walk clip's stride is under a metre. At
-    // five metres a second its feet slid more than a metre a step: the reviewers of the frame strips measured it.)
-    // The Walk clip is for a stroll, at the pace its own stride makes.
+    // At the game's walking pace and over he lopes: the Run clip, played slowly, is the long floating step of a man
+    // in a third of a gravity. Below it he walks. Each clip is played at the pace that keeps its planted boot still on
+    // the ground: the Run clip's goes back under him at 9.2 m/s and the Walk clip's at 5.1 (both measured in the
+    // running game: tools/tests/steps.mjs holds them to it). The Walk clip was played for a long time as if its pace
+    // were 2.2: at a stroll his boots went back more than twice as fast as the ground did, and he skated. And below
+    // 4.6 the Run clip was held at half speed, which is 4.6: from there down he walks.
     else if (player.speed > LOPE_FROM) { play('Run', 0.25); ts = clamp(player.speed / RUN_SPEED, 0.5, 1.25); }
-    else { play('Walk', 0.22); ts = clamp(player.speed / STROLL_SPEED, 0.45, 1.5); }
+    else { play('Walk', 0.22); ts = clamp(player.speed / WALK_PACE, 0.3, 1.0); }
   } else if (anim.kneel === 1 || anim.kneel === 2) {
     const from = anim.kneel === 1 ? clamp(KNEEL_T - anim.actions.KneelDown.time, 0, KNEEL_T) : 0;
     play('KneelUp', 0.1, true); anim.actions.KneelUp.time = from; anim.kneel = 3; ts = KNEEL_PACE;
@@ -544,6 +546,20 @@ export function updateAstronaut(dt) {
     const yawTo = clamp(-wrap(player.face), -1.1, 1.1);          // head turns toward the camera's heading
     if (anim.bones.chest) anim.bones.chest.rotateX(-look * 0.06);
     if (anim.bones.head) { anim.bones.head.rotateX(-look * 0.5); anim.bones.head.rotateY(yawTo * 0.55); }
+  }
+  // Footfalls, read from his feet as they are drawn: the sound of his steps follows them (audio/movement.js). A boot
+  // is down when it is within five centimetres of where it stands at rest, and up when it is nine over it; each time
+  // one comes down while a walking clip is moving his legs, that is a step. (The sound used to keep a time of its
+  // own, at a pace that was not the clips': at a walk it made three steps to his feet's two, and the two drifted in
+  // and out of step with each other.)
+  if (!driving && anim.pads && anim.pads.length) {
+    const striding = player.onGround && (anim.name === 'Walk' || anim.name === 'Run' || anim.name === 'Stagger');
+    for (const pd of anim.pads) {
+      astro.worldToLocal(pd.foot.getWorldPosition(_padA)); astro.worldToLocal(pd.toe.getWorldPosition(_padB));
+      const h = (_padA.y + _padB.y) / 2 - pd.rest;
+      if (pd.down && h > 0.09) pd.down = false;
+      else if (!pd.down && h < 0.05) { pd.down = true; if (striding) { player.steps++; player.stepSide = pd.side; } }
+    }
   }
   // his shadow on a floor (see buildAstronaut): there under a roof, gone in the rover and out of doors
   if (anim.blob) {

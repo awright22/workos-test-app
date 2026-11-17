@@ -72,7 +72,7 @@ export function updateAudio(dt) {
     const free = playing && !ui && !S.sleeping;
     P.move = free && !rover ? moveInputMag().mag : 0;
     P.run = sprinting() && S.suit > 1;
-    P.onGround = player.onGround; P.gait = player.bob; P.alt = player.alt;
+    P.onGround = player.onGround; P.steps = player.steps; P.stepSide = player.stepSide; P.alt = player.alt;
     P.o2 = clamp(S.suit / suitCap(), 0, 1);
     P.health = clamp(S.health / 100, 0, 1);
     // (in the opening film his suit is whole until the thing hits him: game/opening.js)

@@ -38,7 +38,8 @@ export const DEFAULT_PARAMS = {
   day: 1,               // 0 night .. 1 full daylight
   move: 0,              // 0..1 walking input
   run: false, onGround: true,
-  gait: 0,              // walk-cycle phase in radians (player.bob)
+  steps: 0,             // footfalls so far, counted from his feet as they are drawn (player.steps)
+  stepSide: 1,          // ... and which foot the last one was: -1 left, 1 right
   alt: 0,               // metres above the ground (jumps)
   roverSpeed: 0,        // m/s, signed
   throttle: 0,          // -1..1
