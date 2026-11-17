@@ -1801,7 +1801,8 @@ scanned textures), and estimate the effort as small, medium or large. Record it 
 don't act on it yet, and send me the summary: the verdict per area and the code-fixable list ranked by impact. Then
 stop."
 
-**Nothing in this section has been acted on.** It is a record of two reviews of the build on the preview
+**Nothing in the two reviews' records below was acted on when they were written.** A first batch of ten findings has
+been acted on since: see "Acting on it: a first batch" at the end of this section. What follows first is a record of two reviews of the build on the preview
 (`gh-pages/next` `f4231a0` from `ff12ab5`, cache `stranded2-fd502c3ff815`), photographed again for the purpose on
 the preset a phone starts on. The bars reached under the target of 14 November ("a solid indie release") stand as
 they were: these verdicts are against a standard one step above it, and are not a change to those.
@@ -2017,6 +2018,131 @@ the code-fixable items have been tried before at the lower bar without getting p
 than their mark: the ice (three passes), his shadow's shape, and the ruled horizon. One is larger than its mark (the
 storm: see A3). The interface's list is the cheaper of the two: twenty-five of its twenty-seven findings are code
 alone, and eighteen of them small.
+
+### Acting on it: a first batch (the owner, 16 November)
+
+The owner, on the summary: "Act on the premium-bar audit, a bounded batch only: A5, A9, I2, I4 (check it in play
+first, as you noted), I3, I6, A1, A2 (the code part), A13 and A17. One pass and one re-check each, against the
+premium bar. Skip the storm (A3), ice (A7), materials (A4), sourced-art work, and everything else on the list.
+Publish to the preview when it passes, update QUALITY.md, send me a short summary of what moved, then stop."
+
+So: ten findings, one pass on each, one re-check by a fresh reviewer who was given the pictures, the bar and the
+findings as first reported (as points to find STILL THERE, PARTLY THERE or GONE), and not what had been done about
+them. Nothing outside the ten was touched on purpose; what the pass changed beside them is said below.
+
+**I4, checked in play before anything was changed.** `tests/card-open.mjs` (new, and now in the suite) steps the game
+through six stretches of ordinary play on the phone and asks the task card twice a second whether it is open. On the
+build the review saw: open 23% of the first forty seconds (the nine seconds a new task is given), 0% of a
+ninety-second walk, 8% of a two-minute drive (one task change, nine seconds), 0% of the next minute's driving. So
+the finding as worded, "the task card does not get out of the way", was the pictures' doing, as suspected: every
+walk photographs a state a moment after its task changes. What was true in it: at the wheel a new task covered the
+road for nine seconds; with the gauges opened by a tap the card stayed open beside them; and in an emergency the
+card stood open at four lines beside a banner. Those three were changed (below), and the finding's wording was not
+acted on beyond them.
+
+What was done, finding by finding:
+
+| # | What was changed | Where |
+| --- | --- | --- |
+| A5 | The sky's dome is three tones and not two: a pale band on the horizon (the last ten degrees), butterscotch above it, a deep red-brown reached by half way up, so that a level camera, which sees only the lowest quarter of a dome, has a gradient in its picture. The side the sun is on is brighter and paler and the side away from it deeper. The high wisps begin lower and are a little stronger. Measured on the stills: the top of the sky in `hab-noon` went from (182, 149, 105) to (167, 121, 74) with the ground unchanged at (169, 121, 90) | `render/sky.js` |
+| A9 | Under a low sun the sky round it is blue, and the blue takes the brown's place there and is not added to it (added, it summed to the grey-white dome); beyond it, low down, a rose belt; on the far side a cool band under a mauve sky. The sun is drawn at twice its true size by day and three times when low, dim enough low down to be a disc. Low sunlight is warm (1.0, 0.74, 0.50) where it was a cool white, and the haze a shade rosier. The cab's low-sun picture is now taken at 17:56 and not 17:36 (the tool's hour, not the game's) | `render/sky.js`, `tests/cockpit-shots.mjs` |
+| A13 | After dark what a lamp falls on has a shoulder in the last pass: it rises as before up to a third of white and then ever more slowly, so a white wall under a porch lamp and a pale rock in the headlamps keep their shading. The porch lamps reach twelve metres and not twenty, at three quarters the strength (the pair of them lit the dome top to bottom). The helmet's pool lies forward of his heels. The helmet's long beam and the rover's grow less with distance. The rover's wide lamps stand over its tail and not a rover's length behind it, so they light its roof and graze its back. Models take a seventh of the sky's fill at night and not a sixth. And, found on the way (the first night picture of the re-check set had him facing the dome, and his own long beam lit it evenly top to bottom, shoulder or no shoulder): what men built takes a lamp's light up to a limit after dark and no further, in the models' own shader, so that a white wall fifteen metres off in the beam is lit, keeps its shading, and is not thirty times as bright as the sand at its foot | `render/engine.js`, `game/player.js`, `world/build.js`, `world/models.js`, `main.js` |
+| A17 | (a) The "ladder" on the ground was the rover's own shadow with its panel wings left out: the cells cast no shadow, as they do not on models where a sheet lies behind them, so each wing's shadow was its frame alone. The rover's cells now cast. The "dark smudge" beside it is the rover's shadow under its dust. (b) Rock joints are drawn only where the land stands steeper than it did (a small crater's wall in a dune took them). (c) The headlamp's patch: the long beam grows less with distance (see A13). (d) The stripes in the cab were the sun's shadow map on fittings a pace from the eye: the cab's fittings no longer take the shadow map, and take a quarter of the sun instead. (e) The lit strip across the base at night is the helmet's long beam seen from above: reduced with A13, not otherwise changed. (f) The wreck's clods are the ground's own red-brown and not a pale beige; its scorch is a dark grey-brown and no longer as dark as a shadow. (g) Both of Beagle 2's unfolded discs have sagged until an edge rests on the soil. (h) The edge on the canyon's far wall: not looked for (the review itself marked it "possible") | `world/models.js`, `render/terrain-material.js`, `tools/assets/landers.py` (two models rebuilt) |
+| A1 | The haze thins under the cameras that climb, so the ground under the rocket is land and not a tan smear. A finer grain (ninety metres and twenty-seven) comes into the ground from a few hundred metres up to orbit. The camera ahead of the rocket has a long lens from twice as far (27 degrees for 46): the planet's edge is a shallow arc and not a ball. The flame shortens with height and the wide plume is gone before that camera takes over (its last trace was the "dust ring"). The glow on the limb is two thirds as deep and dimmer | `game/launch.js`, `render/terrain-material.js`, `render/engine.js`, `render/sky.js` |
+| A2 (code) | The last scene is lit from forty degrees and not twenty-two, and the Hermes flies toward the sun and not away from it: every camera of the rescue stands ahead of her and looks back, and what they saw was the shaded side of everything against the night side of the planet. The crossing is framed on both men, from further off as the gap is wide and closing with it. Beck flies with one arm out ahead of him and the other at the line on his chest. The two are carried shoulder to shoulder at 0.84 m and not 0.66. The last shot looks down along the tether from above: the two men over the planet's lit face, the ship whole above its edge. The ascent vehicle's windows and covers are round (seven facets to a corner and twenty-eight to a disc, for three and twelve), and it carries less dust (0.31 for 0.38) | `game/launch.js`, `tools/assets/vehicles.py` (one model rebuilt), `world/models.js` |
+| I2 | One name for each thing. The stuff that is dug is regolith in every label and instruction (three recipes, the kiln's task, the sample bags, the journal's material kinds); his own prose keeps "soil" where he is talking. What is raked up at a hematite pavement is hematite ("Iron ore" is gone as a name); "blueberries" is left only as NASA's nickname inside two notes, which say so. What he holds is "carried" ("in the stores" is gone). The readouts are gauges ("what the bars mean" and "tap the dial" are gone) and the one for his body is HEALTH on the HUD, in the guide, in the log and on the bunk ("Vitals" is gone). The screens are Map and Journal under their buttons' own names ("Orbital Survey" and "Mission Journal" are gone). The fabricator says "ready to fabricate"; "ready to build" is for buildings. The Base tab's two lists are "Base works" and "Base buildings" | `game/base.js`, `game/interactables.js`, `game/fieldwork.js`, `game/works.js`, `game/science.js`, `game/mail.js`, `game/sim.js`, `ui/hud.js`, `ui/screens.js`, `ui/menus.js`, `ui/dom.js` |
+| I3 | A banner leads with what to do, in capitals, and says what is wrong under it: RUN TO THE HAB over "suit O2 critical", SEAL THE BREACH over "the Hab is losing its air", GO TO THE HAB, PARK IN THE SUN, GET INDOORS, and for a gauge that leads MAKE WATER, WIPE THE PANELS and the rest. Beside a banner that has said what to do the task card is its one line, and that line is the place and how far (HAB · 18 m). RUN is on the screen for as long as the tank is what is wrong, ringed in red until he is running. The marks of the other warnings carry the word ALSO (not on the smallest phone, where they wait under the banner). The bunk offers nothing while the Hab is holed (its button read NO SLEEP YET). The WARNING card in the review's pictures is put up by the test tools to measure a crowded HUD: no code in the game raises one | `ui/hud.js`, `ui/css/hud.css`, `ui/css/touch.css`, `game/interactables.js` |
+| I4 | At the wheel a new task is given four and a half seconds and not nine. Opening the gauges shuts the card. In an emergency the card is not opened at all (I3). After: open 4% of the two-minute drive, 0% in the emergency stretch | `ui/hud.js`, `tests/card-open.mjs` |
+| I6 | On every phone wider than the smallest the floor for text is 13 px and the step above it 14 (they were 12 and 13), through the four size tokens that all secondary text on a phone is set by; and secondary greys are a shade lighter on every phone (0.85 and 0.68 of full, for 0.78 and 0.58). The smallest phone (667 wide) keeps the 12 px floor: its sheets were fitted to it line by line | `ui/css/hud.css` |
+
+**The interface re-check** (one fresh reviewer; 844 x 390; 129 pictures, all opened, and the card's play measurement).
+Given: the 78 states, the HUD on its own in 14 situations, Base mode's 37 steps, what `tests/card-open.mjs` printed,
+the bar for the four areas the batch bears on, and the four findings as first reported. Not given: what had been
+done. Its yardsticks: Subnautica, Sky: Children of the Light, Mini Motorways.
+
+| Area | Before | After | What decided it |
+| --- | --- | --- | --- |
+| Wording | NOT MET | NEARLY | "The big double names from the earlier review are gone", no keyboard wording on touch. A dozen smaller double names remain, and two things read as bugs (below) |
+| Legibility | NEARLY | NEARLY | Titles, buttons, gauge numbers and banners read well. "Secondary type is still about 11 to 12 points everywhere; what improved is its brightness, not its size" |
+| The HUD in play | NEARLY | **MET** | Settled, a suit ring with the clock, a one-line task with its distance, a compass chip, four buttons and the stick; one tap opens every gauge; the card is shut for nearly all of play |
+| Emergencies | NEARLY | **MET** | "One red banner leads, with the action first and the cause second, and it is the right one in every case shown." Task line, compass chip, door marker and RUN all turn red and agree |
+
+| # | Finding | Re-check | What it saw |
+| --- | --- | --- | --- |
+| I2 | One thing, several names | PARTLY THERE | Of the eight pairs reported: soil and regolith gone; Map and Journal gone; "ready to fabricate" over FABRICATE gone; no "dial", no "VITALS", no "in the stores", no "iron ore"; Colony, Base, "Base works" and "Base buildings" now read as a hierarchy. Thirteen smaller ones it still found, each with its files: the rover's BATTERY and ROVER O2 on the HUD against POWER and AIR on the cab's own display; TASKS, MISSION and "to do" for the task list; SAMPLES and FIELD SAMPLES; "saved run" and "saved game"; "6 carried" in prompts and "have 6" in cost chips; "Its bar: HAB O2" on two teaching cards; MENU for the button that opens PAUSED; "Scrap Metal" and "scrap"; DESK WALL and "the wall behind the comms desk"; RESCUE SOL 25 and RESCUE 25; "Colony, the Base tab" and "the works"; "the Hab's work table" and "at the Hab"; a prompt with HOLD before it on the full HUD and without on the quiet one |
+| I3 | Emergencies name the problem, not the action | PARTLY THERE | The banner: gone (the action leads in every case). RUN while he stands: gone for the tank; not offered out of doors with the Hab holed behind him. NO SLEEP YET: gone, "but at 4 m there is no action button at all" (the wall is patched from beside it, and only the journal says to hold). The marks: "still there, with a label": a pill that reads ALSO and then two rings "the shape of a button with no word on it" |
+| I4 | The task card does not get out of the way | GONE | "In play it is shut": 0% of the walk, 4% of the drive. Shut, it is one line of about 215 x 32 points. Open, it is as it was |
+| I6 | Secondary type too small | PARTLY THERE | "Brighter, hardly bigger." It read the card's body, the LATER line, the prompt's second line and the loading tip at about 11 points, the save warning, settings hints and inventory notes at 11.5, the title's sub-labels at 10 in capitals. The card bodies and the LATER line "now pass on contrast" |
+
+On I6, what the pictures cannot say: the sizes set are 13 px where they were 12 (the audit measures them in the
+page: under 13 fails at this size), in a condensed face that is small on its body, and a reader measuring letters
+in a picture reads 13 px of it as 11 or 12. The sizes this reviewer wants are two or three steps up, not one; that
+is the "layouts must grow" of the first report, and one step did not do it.
+
+New things it reported, none of them caused by this pass but one: the fold of a list still cuts rows and buttons in
+half (I7, not in this batch); Base's "Missing ..." sentences read as machine output and end on a semicolon (I5); with
+the gauges open in the rover the suit's ring carries two labels and no figure (`hud/07`); the dim grey action ring
+(I18); deleting a save is a line in a corner on one screen and a dialog on another; map labels that do not pair with
+their markers (I16); the storm's banner is still the storm's name over a line that is not always an action; VIEW is
+lit in the cab and grey behind it. The one that was this pass's doing: the pause sheet's guide button, whose label
+grew by two letters and a size and filled its button edge to edge. Its label is now "What the gauges mean".
+
+**The picture re-check** (one fresh reviewer; iPhone size; 60 pictures, all opened). Given: 24 stills at twice the
+pixels, the launch's 17 stills in order, 9 of getting about after dark and the horizon, 4 from the rover's seat, the
+three works of Base mode by day and after dark; the bar for the areas the batch bears on, with "artefacts" as an
+area of its own; and the six findings as first reported. Not given: what had been done. Its yardsticks: Sky:
+Children of the Light, Outer Wilds, Astroneer. (One picture of the eight artefacts, the whole base at night, was
+not taken again: the walk that takes it is forty minutes long.)
+
+| Area | Before | After | What decided it |
+| --- | --- | --- | --- |
+| Day | NEARLY | NEARLY | The best frames "reach the bar" (`hab-morning`, `rover-park`, `beacon`, `rtg`, `walk-plain`, `canyon-rim`): a graded sky with wisps, hard shadows, haze with depth. "About a third are still flat and evenly lit": the three landers on their plain, `pile`, the works by day |
+| Dawn and dusk | NEARLY | NEARLY | `dawn`, `dawn-light` and `hab-dusk` "are stop-and-look pictures". Looking into a setting sun is weaker: the ground a murky mauve-brown with no warm light and almost no long shadows |
+| Night | NEARLY | NEARLY | Stars, silhouettes, lamp pools, the porthole, the tail lamps' spill, the greenhouse "are all there". Each of the bar's three "nothings" is still broken somewhere: black cut-outs, a floodlit thing, near-white rocks |
+| Orbit | NEARLY | NEARLY | A real globe with a thin limb line. The part of it nearest the camera is "smeared, magnified texture" in six of the film's stills |
+| The launch | **NOT MET** | NEARLY | "The rescue now reads", the Hermes "looks like a ship". The climb out of the air (`09.4` to `12.5`) "is not believable" and alone is NOT MET; the last shot "is flat" |
+| Artefacts | (not graded) | **NOT MET** | "No single fault is severe", but about a dozen visible ones, four of them at phone size: the lamp's patch in `rover-night`, the pebbles and blot at the wreck, the smeared globe, star-like dots in front of the planet |
+
+| # | Finding | Re-check | What it saw |
+| --- | --- | --- | --- |
+| A5 | A flat daytime sky | GONE | "Every day picture now has a paler band at the horizon", most have wisps, `day-sun` brightens toward the sun. A residue: above the band the sky is one even tone in the three flattest pictures |
+| A9 | Dawn and dusk lack colour | PARTLY THERE | Fixed: the glow "is clearly blue", `dawn-light` has a pink-mauve sky over warmly raked ground, `hab-dusk` runs lavender to warm brown, the cab's sun sits on the horizon. Remaining: the sun "is still a small pin with a modest bloom"; facing it the ground takes no warm light; the glow in `dusk` is a pillar with a soft edge and not an aureole |
+| A13 | Night floodlighting and blow-out | PARTLY THERE | The dome: gone ("dark with a soft wash"; the airlock front bright, but it keeps its detail). The smelter's cone: graded now, still a very bright orange. Pale rocks: mostly cream, a few near-white still. The distant lander: "effectively gone". The helmet's pool: right in three pictures, still lighting behind him in two. The rover's rear: "reduced, not gone" |
+| A17 | Small artefacts | four GONE or part, three STILL THERE | (a) PARTLY: "a small blocky, ladder-like mark is still inside the rover's shadow", and the dust is a tan haze now but a muddy one. (b) GONE in `rtg`; the same kind of scribble is in `mav`, `dawn-light` and faintly `rover-drive`. (c) STILL THERE: the lamp's patch has a hard left edge and "reads as a pasted bright quadrilateral". (d) GONE. (e) not photographed. (f) STILL THERE: pale pebbles with no shadows, and the blot at his feet "is still shadow and scorch run together". (g) GONE. (h) STILL THERE, and still only "possible" |
+| A1 | The launch's climb and orbit | PARTLY THERE | Gone: the dust ring. Improved: the limb is a thin line. Remaining: `09.4` "still a blurred tan smear, with crisp individual rocks drawn on it", read as thirty metres up and kilometres up at once; `12.5` "a model rocket over a small ball"; under the flame in `18.4` a halo and a dark smudge that "still half-read as the plume touching the surface" |
+| A2 | The rescue's staging (the code part) | PARTLY THERE | Fixed: "the rescuer reaches like a man", the player is fully in frame, the empty black is down to about 40%, the ports are round, the planet is in every shot, "the two read as two men". Remaining: the stiff pose "has moved to the player", a spread X in the nose; the nose cone's blurry smudges; the bodies still sink into each other; the last shot has the planet now, "but the ship is flat mid-grey on black with no rim light" and most of the frame is empty |
+
+New things it reported. Three are this pass's own doing. The first, white dots in front of the planet in `launch-24.4`:
+they are the scraps blown out of the airlock, which were glints among stars while the planet behind them was in the
+dark and are "stars showing through the planet" now that it is lit. They are gold and gone in five seconds now
+(changed after the re-check, seen by nobody but me). The second, "the smeared globe in the climax": the planet under
+the rescue was the night side and is now in daylight, and the survey's colours, magnified from five kilometres up,
+are soft. The third, black cut-outs at night (a dish, the greenhouse's door, his own figure in twilight): what men
+built takes less of the night's fill and of a lamp's light than it did, which is what took the floodlighting off the
+dome; the other side of that is that what no lamp reaches is nearer black. The rest is not this pass's: a lamp that
+shines through the kiln (lamps cast no shadows here), the cab's wiper arcs read as a smear, the wreck's shards, the
+astronaut pasted on at dusk (A8, not in this batch), a dust puff that is a clean circle at lift-off, low-poly
+boulders, the works' chunkier style, ground whose hue drifts from picture to picture.
+
+Its three best: `dawn` ("the picture that sells Mars"), `hab-morning`, `greenhouse-night`. Its three worst:
+`launch-09.4`, `lander-schiaparelli-edm`, `launch-33.0`.
+
+**Where the ten stand, by the re-checks' own words.** GONE: A5 (the sky), I4 (the task card). PARTLY THERE: A9, A13,
+A1, A2, I2, I3, I6, and A17 taken as a set (three of its seven gone, one part, three still there). Areas that
+moved: the launch from NOT MET to NEARLY; wording from NOT MET to NEARLY; the HUD in play and emergencies from
+NEARLY to MET. No area went down. Neither review is at the standard as a whole, and this batch was not expected to
+put it there: what is left in these ten is listed above, and the storm, the ice, the materials and everything that
+needs sourced art were not in it.
+
+What I would say of it, as mine. The sky and the emergencies are the two places where one pass did the whole job.
+The launch got its largest gain from light and not from the things the first report asked for: the rescue is now
+played in daylight over a lit planet, and that made it read. The climb's first seconds (`09.4`) did not move: a
+picture of ground from three hundred metres up needs ground made for that height, which is more than a pass. I6 is
+the one I misjudged: one step of type size is not what the finding asks for, and the larger step means re-fitting
+sheets.
+
+**Tested and published.** Being tested as this is written (the whole suite on `6f7d50a`); the result and the
+preview's build are recorded here when they are in.
 
 ## Open items
 
